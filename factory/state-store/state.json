@@ -1,14 +1,14 @@
 {
   "factory_version": "0.1.0",
-  "current_phase": 0,
+  "current_phase": 1,
   "current_requirement": null,
   "active_worktrees": {},
   "worker_leases": {},
   "requirement_status": {},
   "phase_status": {
     "0R": "VERIFIED",
-    "0": "READY",
-    "1": "BLOCKED",
+    "0": "VERIFIED",
+    "1": "READY",
     "2": "BLOCKED",
     "3": "BLOCKED",
     "4": "BLOCKED",
@@ -22,6 +22,16 @@
       "timestamp": "2026-07-16T06:00:00.000000",
       "level": "INFO",
       "message": "State cleaned: test residue removed"
+    },
+    {
+      "timestamp": "2026-07-16T07:19:05.262144",
+      "level": "INFO",
+      "message": "Advanced to phase 1"
+    },
+    {
+      "timestamp": "2026-07-16T07:19:05.458238",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
     }
   ],
   "evidence_refs": {},
@@ -29,7 +39,7 @@
   "merge_queue": [],
   "blockers": [],
   "created_at": "2026-07-16T04:30:00.841000",
-  "updated_at": "2026-07-16T05:43:41.254028",
+  "updated_at": "2026-07-16T07:19:05.458321",
   "restart_count": 1,
   "worker_registry": {
     "codex": {
