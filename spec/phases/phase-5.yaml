@@ -20,7 +20,17 @@ disabled_capabilities:
   - db_migrate
 
 requirements:
+  - AH-EXT-CALENDAR-001
+  - AH-EXT-CERT-FRAMEWORK-001
+  - AH-EXT-COMPENSATION-001
+  - AH-EXT-CREDENTIAL-001
+  - AH-EXT-GITHUB-PR-001
   - AH-EXT-GMAIL-001
+  - AH-EXT-IDEMPOTENCY-001
+  - AH-EXT-READBACK-001
+  - AH-EXT-RECONCILE-001
+  - AH-EXT-SAGA-001
+  - AH-EXT-SLACK-001
 
 fixtures:
   - fixtures/phase-5/valid/

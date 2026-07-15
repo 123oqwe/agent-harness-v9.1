@@ -1,0 +1,12 @@
+{
+  "requirement_id": "AH-CONTRACT-RUNPLAN-001",
+  "commit_sha": null,
+  "commands_run": [],
+  "exit_codes": [],
+  "stdout_hash": null,
+  "stderr_hash": null,
+  "test_results": {},
+  "coverage": {},
+  "collected_at": "2026-07-16T05:24:29.169551",
+  "raw_output_saved": false
+}

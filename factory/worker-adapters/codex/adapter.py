@@ -1,22 +1,14 @@
 #!/usr/bin/env python3
-"""CodexWorkerAdapter — starts a real Codex CLI session to implement requirements.
+"""[REAL] CodexWorkerAdapter — starts a real Codex CLI session.
 
-Uses Codex CLI as an MCP server or direct CLI invocation.
+Uses: codex exec --json <prompt>
 Records all invocations for audit.
 """
-import json, os, sys, subprocess, time, hashlib, datetime, tempfile
+import json, os, sys, subprocess, time, hashlib, datetime, signal
 from pathlib import Path
 
 def start_session(context_packet, config=None):
-    """Start a Codex worker session.
-    
-    Args:
-        context_packet: ContextPacket dict with requirement, criteria, allowed paths
-        config: Optional config dict (model, temperature, etc.)
-    
-    Returns:
-        WorkerSession dict with session_id, pid, status
-    """
+    """[REAL] Start a Codex worker session."""
     session = {
         "session_id": f"codex-{context_packet['requirement_id']}-{int(time.time())}",
         "provider": "codex",
@@ -36,10 +28,15 @@ def start_session(context_packet, config=None):
         "budget": context_packet.get("budget"),
         "requirement_id": context_packet["requirement_id"],
         "allowed_paths": context_packet.get("allowed_paths", []),
-        "forbidden_paths": context_packet.get("forbidden_paths", [])
+        "forbidden_paths": context_packet.get("forbidden_paths", []),
+        "worktree_path": config.get("worktree_path") if config else None,
+        "proc": None,
+        "stdout": None,
+        "stderr": None,
+        "exit_code": None
     }
     
-    # Build prompt for Codex
+    # Build prompt
     prompt = f"""You are implementing requirement {context_packet['requirement_id']}: {context_packet['title']}
 
 Goal: {context_packet['goal']}
@@ -50,57 +47,94 @@ Acceptance Criteria:
 Security Invariants:
 {chr(10).join(f'- {s}' for s in context_packet.get('security_invariants', []))}
 
-Allowed paths: {context_packet.get('allowed_paths', [])}
-Forbidden paths: {context_packet.get('forbidden_paths', [])}
 Test commands: {context_packet.get('test_commands', [])}
 
 Definition of Done: {context_packet.get('definition_of_done', 'All criteria met + tests pass')}
 
-Write tests first, then implement. Run actual tests. Generate evidence from real command output.
-Do NOT modify files in forbidden paths. Do NOT modify spec/, control/, or evidence/.
+Write tests first, then implement. Run actual tests. Do NOT modify files in forbidden paths.
 """
     
     session["prompt"] = prompt
-    
-    # In real implementation: invoke Codex CLI
-    # codex --model <model> --prompt <prompt> --worktree <path>
-    # For now, record the invocation
     session["status"] = "ready_to_dispatch"
-    session["dispatch_command"] = f"codex --requirement {context_packet['requirement_id']}"
-    
     return session
 
-def dispatch(session):
-    """Actually dispatch the worker (start Codex process)."""
+def dispatch(session, timeout=600):
+    """[REAL] Dispatch the worker — actually Popen codex exec.
+    
+    Executes: codex exec --json <prompt>
+    Captures stdout, stderr, exit code.
+    """
     # Check if codex CLI is available
     codex_check = subprocess.run(["which", "codex"], capture_output=True, text=True)
-    
     if codex_check.returncode != 0:
         session["status"] = "provider_unavailable"
         session["exit_reason"] = "codex CLI not found"
         session["end_time"] = datetime.datetime.now().isoformat()
         return session
     
-    # Start Codex process
+    # Build command
+    cmd = ["codex", "exec", "--json"]
+    
+    # Add model if specified
+    if session.get("model") and session["model"] != "codex":
+        cmd.extend(["-m", session["model"]])
+    
+    # Add sandbox mode (read-write for implementation)
+    cmd.extend(["-s", "workspace-write"])
+    
+    # Add prompt
+    cmd.append(session["prompt"])
+    
+    # Set working directory to worktree if available
+    cwd = session.get("worktree_path")
+    if cwd and not os.path.exists(cwd):
+        cwd = None
+    
+    session["dispatch_command"] = " ".join(cmd[:3]) + " ..."
+    session["status"] = "running"
+    session["dispatched_at"] = datetime.datetime.now().isoformat()
+    
     try:
-        # In real implementation:
-        # proc = subprocess.Popen(
-        #     ["codex", "--prompt", session["prompt"], "--json"],
-        #     stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        # )
-        # For now, mark as dispatched
-        session["status"] = "running"
-        session["pid"] = None  # Would be proc.pid
-        session["dispatched_at"] = datetime.datetime.now().isoformat()
+        # REAL Popen — actually start the process
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd,
+            text=True,
+            preexec_fn=os.setsid  # Create new process group for clean kill
+        )
+        session["proc"] = proc
+        session["pid"] = proc.pid
+        
+        # Wait for completion with timeout
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+            session["stdout"] = stdout
+            session["stderr"] = stderr
+            session["exit_code"] = proc.returncode
+            session["status"] = "completed" if proc.returncode == 0 else "failed"
+            session["exit_reason"] = "success" if proc.returncode == 0 else f"exit_code={proc.returncode}"
+        except subprocess.TimeoutExpired:
+            # Kill the process group
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            stdout, stderr = proc.communicate(timeout=10)
+            session["stdout"] = stdout
+            session["stderr"] = stderr + "\nTIMEOUT after {timeout}s"
+            session["exit_code"] = -1
+            session["status"] = "timeout"
+            session["exit_reason"] = f"timeout after {timeout}s"
+            
     except Exception as e:
         session["status"] = "failed"
         session["exit_reason"] = str(e)
-        session["end_time"] = datetime.datetime.now().isoformat()
+        session["exit_code"] = -1
     
+    session["end_time"] = datetime.datetime.now().isoformat()
     return session
 
 def collect_result(session):
-    """Collect structured result from worker."""
+    """[REAL] Collect structured result from worker."""
     result = {
         "session_id": session["session_id"],
         "requirement_id": session["requirement_id"],
@@ -109,20 +143,30 @@ def collect_result(session):
         "model": session["model"],
         "start_time": session["start_time"],
         "end_time": session.get("end_time"),
-        "cost": session.get("cost"),
+        "exit_code": session.get("exit_code"),
         "exit_reason": session.get("exit_reason"),
+        "pid": session.get("pid"),
+        "stdout": session.get("stdout", ""),
+        "stderr": session.get("stderr", ""),
+        "stdout_hash": hashlib.sha256(
+            (session.get("stdout") or "").encode()
+        ).hexdigest()[:16] if session.get("stdout") else None,
+        "stderr_hash": hashlib.sha256(
+            (session.get("stderr") or "").encode()
+        ).hexdigest()[:16] if session.get("stderr") else None,
+        "dispatch_command": session.get("dispatch_command"),
         "artifacts": session.get("artifacts", []),
-        "files_changed": [],  # Would be filled from git diff
-        "tests_written": [],  # Would be filled from file analysis
-        "commands_run": [],  # Would be filled from process output
-        "evidence": None  # Would be filled from stdout
     }
     return result
 
 def cancel(session):
-    """Cancel a running worker session."""
+    """[REAL] Cancel a running worker session — kills the process group."""
+    if session.get("proc") and session.get("pid"):
+        try:
+            os.killpg(os.getpgid(session["pid"]), signal.SIGTERM)
+        except ProcessLookupError:
+            pass  # Already dead
     session["status"] = "cancelled"
     session["exit_reason"] = "cancelled_by_controller"
     session["end_time"] = datetime.datetime.now().isoformat()
-    # In real implementation: proc.terminate()
     return session

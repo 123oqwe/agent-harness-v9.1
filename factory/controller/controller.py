@@ -184,33 +184,58 @@ def build_context_packet(req):
     return packet
 
 def dispatch_worker(req, context_packet, adapter_path):
-    """Dispatch worker to implement requirement.
+    """[REAL] Dispatch worker — actually Popen Codex or Claude.
     
-    In real implementation, this would:
-    - Start Codex CLI or Claude Code SDK
-    - Pass context packet
-    - Monitor progress
-    - Collect results
-    
-    For now, records the dispatch and returns structured result.
+    Uses worker-adapters to start real CLI processes.
+    Captures real stdout, stderr, exit_code.
     """
     state = load_state()
     
-    worker_invocation = {
-        "requirement_id": req["id"],
+    # Determine provider and import adapter
+    provider = "codex" if "codex" in adapter_path else "claude"
+    adapter_dir = Path(__file__).parent.parent / "worker-adapters" / provider
+    sys.path.insert(0, str(adapter_dir))
+    
+    try:
+        from adapter import start_session, dispatch as adapter_dispatch, collect_result
+    except ImportError:
+        log(f"Could not import {provider} adapter", "ERROR")
+        return {"status": "adapter_error", "exit_code": -1, "exit_reason": "import failed"}
+    
+    # Start session
+    config = {"worktree_path": None}  # Would set to worktree path
+    session = start_session(context_packet, config)
+    
+    # Record worker lease
+    state.setdefault("worker_leases", {})[req["id"]] = {
         "adapter": adapter_path,
-        "provider": "codex" if "codex" in adapter_path else "claude",
-        "model": "default",
-        "agent_role": req.get("owner_role", "backend"),
-        "context_hash": context_packet["hash"],
-        "tool_permissions": context_packet["tool_permissions"],
-        "start_time": datetime.datetime.now().isoformat(),
-        "end_time": None,
-        "cost": None,
-        "exit_reason": None,
-        "artifacts": [],
-        "status": "dispatched"
+        "provider": provider,
+        "started_at": session["start_time"],
+        "heartbeat": session["start_time"],
+        "lease_expiry": (datetime.datetime.now() + datetime.timedelta(hours=1)).isoformat(),
+        "status": "active",
+        "session_id": session["session_id"]
     }
+    save_state(state)
+    
+    log(f"Worker dispatched for {req['id']} using {provider} (session={session['session_id']})")
+    
+    # [REAL] Actually dispatch — Popen the CLI process
+    session = adapter_dispatch(session, timeout=600)
+    
+    # [REAL] Collect result with real stdout/stderr
+    result = collect_result(session)
+    
+    # Update worker lease
+    state = load_state()
+    if req["id"] in state.get("worker_leases", {}):
+        state["worker_leases"][req["id"]]["status"] = "completed" if result.get("exit_code") == 0 else "failed"
+        state["worker_leases"][req["id"]]["end_time"] = result.get("end_time")
+    save_state(state)
+    
+    log(f"Worker completed for {req['id']}: exit_code={result.get('exit_code')}, stdout={len(result.get('stdout',''))} chars")
+    
+    return result
     
     # Record worker lease
     state.setdefault("worker_leases", {})[req["id"]] = {
@@ -226,20 +251,26 @@ def dispatch_worker(req, context_packet, adapter_path):
     log(f"Worker dispatched for {req['id']} using {worker_invocation['provider']}")
     return worker_invocation
 
-def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_results, coverage):
-    """Collect evidence from actual command output."""
-    evidence = {
-        "requirement_id": req_id,
-        "commit_sha": None,  # Would be filled after git commit
-        "commands_run": commands_run,
-        "exit_codes": exit_codes,
-        "stdout_hash": hashlib.sha256(stdout.encode()).hexdigest()[:16] if stdout else None,
-        "stderr_hash": hashlib.sha256(stderr.encode()).hexdigest()[:16] if stderr else None,
-        "test_results": test_results,
-        "coverage": coverage,
-        "collected_at": datetime.datetime.now().isoformat(),
-        "raw_output_saved": False  # Would save raw output to evidence/
-    }
+def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_results, coverage, worker_result=None):
+    """[REAL] Collect evidence from actual command output.
+    
+    Refuses to generate evidence from empty data — returns error instead.
+    If worker_result is provided, extracts real stdout/stderr/exit_code from it.
+    """
+    # If worker_result provided, extract real data
+    if worker_result:
+        stdout = worker_result.get("stdout", "") or ""
+        stderr = worker_result.get("stderr", "") or ""
+        exit_codes = [worker_result.get("exit_code", -1)] if worker_result.get("exit_code") is not None else []
+        commands_run = [worker_result.get("dispatch_command", "unknown")] if worker_result.get("dispatch_command") else []
+    
+    # Refuse empty evidence
+    if not stdout and not exit_codes:
+        return {
+            "requirement_id": req_id,
+            "error": "REFUSED: empty evidence (no stdout, no exit codes)",
+            "collected_at": datetime.datetime.now().isoformat()
+        }
     
     # Save raw output to evidence directory
     ev_path = EVIDENCE_DIR / f"{req_id}.json"
@@ -356,6 +387,15 @@ def dispatch_verifier(req_id, evidence, commit_sha=None):
         check6_detail = "No evidence to check"
     verification["checks"].append({"name": "evidence_hashed", "passed": check6_pass, "detail": check6_detail})
     
+    # Check if product code exists for rerun
+    product_dir = BASE_DIR / "product"
+    if not product_dir.exists() or not (product_dir / "package.json").exists():
+        verification["mode"] = "METADATA_ONLY"
+        verification["mode_note"] = "No product code to rerun. Verifier checks evidence metadata only. Will switch to RERUN mode when product/ has code."
+    else:
+        verification["mode"] = "RERUN"
+        verification["mode_note"] = "Product code exists. Verifier should rerun tests."
+    
     # Overall result
     all_pass = all(c["passed"] for c in verification["checks"])
     verification["result"] = "PASS" if all_pass else "FAIL"
@@ -414,12 +454,10 @@ def run_cycle():
             release_lock(req_id)
             return {"action": "no_adapter", "requirement": req_id}
         
-        # 5. Dispatch worker
+        # 5. Dispatch worker — [REAL] actually Popen Codex/Claude
         worker_result = dispatch_worker(req, packet, adapter)
         
-        # 6. Collect evidence (would come from worker)
-        # In real implementation, worker returns evidence
-        # For now, create placeholder evidence
+        # 6. [REAL] Collect evidence from worker's actual stdout/stderr
         evidence = collect_evidence(
             req_id,
             commands_run=[],
@@ -427,7 +465,8 @@ def run_cycle():
             stdout="",
             stderr="",
             test_results={},
-            coverage={}
+            coverage={},
+            worker_result=worker_result
         )
         
         # 7. Dispatch verifier
@@ -482,14 +521,144 @@ def restart_recovery():
     save_state(state)
     log(f"Restart recovery complete (restart #{state['restart_count']})")
 
+def advance_phase():
+    """[REAL] Advance to the next phase after current phase gate passes."""
+    state = load_state()
+    current = state.get("current_phase", 0)
+    next_phase = current + 1
+    
+    # Check if there are requirements for the next phase
+    req_path = SPEC_DIR / "requirements" / "requirements.ndjson"
+    has_next_reqs = False
+    if req_path.exists():
+        with open(req_path) as f:
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    if r.get("delivery_phase") == next_phase:
+                        has_next_reqs = True
+                        break
+    
+    if not has_next_reqs:
+        log(f"No requirements for phase {next_phase}, staying at phase {current}", "WARN")
+        return False
+    
+    state["current_phase"] = next_phase
+    state.setdefault("phase_status", {})[str(next_phase)] = "READY"
+    save_state(state)
+    log(f"Advanced to phase {next_phase}")
+    
+    # Update current-state.json
+    cs_path = BASE_DIR / "control" / "current-state.json"
+    if cs_path.exists():
+        with open(cs_path) as f:
+            cs = json.load(f)
+        cs["phase"] = next_phase
+        for pid in cs.get("phases", {}):
+            if pid == str(next_phase):
+                cs["phases"][pid]["status"] = "READY"
+                cs["phases"][pid]["blockers"] = []
+            elif pid == str(current):
+                cs["phases"][pid]["status"] = "VERIFIED"
+                cs["phases"][pid]["blockers"] = []
+        cs["last_updated"] = datetime.datetime.now().isoformat()
+        with open(cs_path, "w") as f:
+            json.dump(cs, f, indent=2)
+    
+    return True
+
+def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
+    """[REAL] Automatic scheduling loop.
+    
+    Continuously processes requirements until:
+    - No READY requirements found (all done or blocked)
+    - Max iterations reached
+    - Open blocker exists (if stop_on_blocker=True)
+    - Phase gate fails
+    
+    Usage:
+        python3 controller.py loop                          # Run indefinitely
+        python3 controller.py loop --max-iterations 10      # Run 10 cycles
+        python3 controller.py loop --idle-sleep 60           # Sleep 60s when idle
+    """
+    from blocker_service import list_open_blockers
+    
+    iteration = 0
+    idle_count = 0
+    
+    log(f"=== Factory Loop Started (max={max_iterations}, sleep={idle_sleep_seconds}s) ===")
+    
+    while max_iterations is None or iteration < max_iterations:
+        iteration += 1
+        
+        # Check for open blockers
+        open_blockers = list_open_blockers()
+        if open_blockers and stop_on_blocker:
+            log(f"Stopping: {len(open_blockers)} open blockers", "WARN")
+            for b in open_blockers:
+                log(f"  Blocker {b['blocker_id']}: {b['blocker_type']} - {b.get('required_decision','')}", "WARN")
+            return {"action": "stopped_blockers", "blockers": len(open_blockers), "iterations": iteration}
+        
+        # Run one cycle
+        result = run_cycle()
+        
+        if result["action"] == "completed":
+            idle_count = 0
+            log(f"Iteration {iteration}: completed {result.get('requirement','')} -> {result.get('verification','')}")
+            
+        elif result["action"] == "no_requirement":
+            idle_count += 1
+            log(f"Iteration {iteration}: no READY requirements (idle #{idle_count})")
+            
+            # Try to run phase gate
+            try:
+                sys.path.insert(0, str(Path(__file__).parent.parent / "phase-gates"))
+                from gate_runner import run_phase_gate
+                state = load_state()
+                current_phase = state.get("current_phase", 0)
+                gate = run_phase_gate(current_phase)
+                
+                if gate["result"] == "PASS":
+                    log(f"Phase {current_phase} gate PASSED, advancing...")
+                    if not advance_phase():
+                        log("Cannot advance, stopping loop", "WARN")
+                        return {"action": "stopped_no_advance", "iterations": iteration}
+                else:
+                    failed_checks = [c["name"] for c in gate["checks"] if not c["passed"]]
+                    log(f"Phase {current_phase} gate FAILED: {failed_checks}", "WARN")
+                    # Don't stop, just wait and retry
+            except Exception as e:
+                log(f"Phase gate error: {e}", "ERROR")
+            
+            if idle_count >= 3:
+                log(f"Idle {idle_count} times, stopping loop", "WARN")
+                return {"action": "stopped_idle", "iterations": iteration}
+            
+            import time
+            time.sleep(idle_sleep_seconds)
+            
+        elif result["action"] in ("error", "lock_failed", "no_adapter"):
+            idle_count += 1
+            log(f"Iteration {iteration}: {result['action']} for {result.get('requirement','')}", "ERROR")
+            import time
+            time.sleep(idle_sleep_seconds)
+    
+    log(f"=== Factory Loop Ended ({iteration} iterations) ===")
+    return {"action": "completed_loop", "iterations": iteration}
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Agent Harness Factory Controller")
-    parser.add_argument("command", choices=["cycle", "recover", "status", "select"])
+    parser.add_argument("command", choices=["cycle", "loop", "recover", "status", "select", "advance"])
+    parser.add_argument("--max-iterations", type=int, default=None)
+    parser.add_argument("--idle-sleep", type=int, default=30)
     args = parser.parse_args()
     
     if args.command == "cycle":
         result = run_cycle()
+        print(json.dumps(result, indent=2, default=str))
+    elif args.command == "loop":
+        result = run_loop(max_iterations=args.max_iterations, idle_sleep_seconds=args.idle_sleep)
         print(json.dumps(result, indent=2, default=str))
     elif args.command == "recover":
         restart_recovery()
@@ -500,7 +669,8 @@ if __name__ == "__main__":
             "active_worktrees": len(state.get("active_worktrees", {})),
             "requirement_status_count": len(state.get("requirement_status", {})),
             "restart_count": state.get("restart_count", 0),
-            "blockers": len(state.get("blockers", []))
+            "blockers": len(state.get("blockers", [])),
+            "merge_queue": len(state.get("merge_queue", []))
         }, indent=2))
     elif args.command == "select":
         req = select_ready_requirement()
@@ -508,3 +678,8 @@ if __name__ == "__main__":
             print(f"READY: {req['id']} - {req['title']}")
         else:
             print("No READY requirements")
+    elif args.command == "advance":
+        if advance_phase():
+            print("Phase advanced")
+        else:
+            print("Cannot advance")
