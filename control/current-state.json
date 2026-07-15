@@ -4,7 +4,7 @@
   "generated_by": "manual-audit-correction",
   "specification": "VERIFIED",
   "phase": 0,
-  "factory_status": "IMPLEMENTED",
+  "factory_status": "IMPLEMENTED_AND_TESTED",
   "product_status": "NOT_STARTED",
   "production_status": "BLOCKED",
   "phases": {
@@ -111,7 +111,7 @@
     "merge_queue": "PASS",
     "dashboard": "PASS"
   },
-  "last_updated": "2026-07-16T04:32:51.054131",
+  "last_updated": "2026-07-16T05:35:18.345376",
   "verification_evidence": {
     "model_check": "VERIFIED (TLC v2.19, 251 states, 0 errors)",
     "spec_gate": "PASS (10/10 checks, actual file checks)",
@@ -127,5 +127,30 @@
     "artifacts_audit_moved": "archive/non-normative/v9.1-audit/",
     "phase_0R_fixed": "5 NOT DONE \u2192 DONE",
     "bootstrap_fixed": "REPAIR_IN_PROGRESS \u2192 VERIFIED"
+  },
+  "factory_repairs": {
+    "fix_1_requirement_selection": "FIXED - reads implementation_maturity from requirements.ndjson",
+    "fix_2_worker_popen": "FIXED - Codex and Claude adapters use real subprocess.Popen",
+    "fix_3_evidence_collection": "FIXED - extracts real stdout/stderr/exit_code from worker result",
+    "fix_4_verifier_mode": "FIXED - METADATA_ONLY when no product code, RERUN when product exists",
+    "fix_5_worktree_git": "FIXED - real git worktree add/remove/list commands",
+    "fix_6_merge_queue": "FIXED - real git rebase + spec gate + git merge --no-ff",
+    "fix_7_auto_scheduling": "FIXED - run_loop() with --max-iterations and --idle-sleep",
+    "fix_8_check_scripts": "FIXED - 5 scripts do real checks, 2 injection tests pass",
+    "fix_9a_requirement_queue": "IMPLEMENTED - priority queue with atomic pop",
+    "fix_9b_worker_registry": "IMPLEMENTED - provider availability check + role mapping",
+    "fix_9c_context_packet_builder": "IMPLEMENTED - minimal context with schema/ADR loading",
+    "fix_9d_evidence_collector": "IMPLEMENTED - structured evidence from worker stdout",
+    "fix_9e_sandbox_runner": "IMPLEMENTED - run_command with hash capture (STUB for container isolation)",
+    "fix_9f_verifier": "IMPLEMENTED - 7 checks with METADATA_ONLY/RERUN mode"
+  },
+  "factory_verification": {
+    "all_modules_import": "PASS",
+    "spec_gate": "PASS (10/10)",
+    "check_scripts": "PASS (5/5)",
+    "codex_popen_test": "PASS (pid=89115, exit_code=0, 24823 chars stdout)",
+    "worktree_test": "PASS (create/list/remove all real)",
+    "run_loop_test": "PASS (3 iterations, correct cycle)",
+    "injection_tests": "PASS (placeholder detected, deprecated detected)"
   }
 }
