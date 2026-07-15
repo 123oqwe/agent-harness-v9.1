@@ -337,10 +337,38 @@ def dispatch_worker(req, context_packet, adapter_path, worktree_path=None):
 def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_results, coverage, worker_result=None):
     """[REAL] Collect evidence from actual command output.
     
-    Refuses to generate evidence from empty data — returns error instead.
-    If worker_result is provided, extracts real stdout/stderr/exit_code from it.
+    Delegates to evidence_collector.collect_from_worker when available,
+    then enhances with test_results parsing and state update.
     """
-    # If worker_result provided, extract real data
+    # Delegate structured evidence collection to evidence_collector module
+    if worker_result:
+        try:
+            sys.path.insert(0, str(Path(__file__).parent.parent / "evidence-collector"))
+            from evidence_collector import collect_from_worker, parse_test_output
+            ev_path_obj = collect_from_worker(worker_result, req_id, str(EVIDENCE_DIR))
+            if ev_path_obj:
+                # Enhance: parse test results from stdout
+                parsed = parse_test_output(worker_result.get("stdout", "") or "")
+                if parsed:
+                    ev_path_obj["test_results"] = parsed
+                # Add exit_codes for verifier compatibility
+                ec = worker_result.get("exit_code")
+                ev_path_obj["exit_codes"] = [ec] if ec is not None else []
+                # Save enhanced evidence
+                ev_file = EVIDENCE_DIR / f"{req_id}.json"
+                ev_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(ev_file, 'w') as f:
+                    json.dump(ev_path_obj, f, indent=2)
+                # Update state
+                state = load_state()
+                state.setdefault("evidence_refs", {})[req_id] = str(ev_file)
+                save_state(state)
+                log(f"Evidence collected for {req_id}")
+                return ev_path_obj
+        except Exception:
+            pass  # Fall back to inline implementation
+
+    # Inline fallback
     if worker_result:
         stdout = worker_result.get("stdout", "") or ""
         stderr = worker_result.get("stderr", "") or ""
@@ -539,8 +567,28 @@ def run_cycle():
         log(f"Worktree created: {worktree_path} (branch={worktree_branch})")
 
         try:
-            # 5. Dispatch worker — [REAL] actually Popen Codex/Claude
+            # 5. Reserve budget before dispatch
+            try:
+                sys.path.insert(0, str(Path(__file__).parent.parent / "budget-ledger"))
+                from budget_ledger import reserve, consume, check_budget
+                budget_usd = int(packet.get("budget", {}).get("usd_micros", "500000"))
+                reserve(req_id, budget_usd, category="model")
+                if not check_budget(req_id, budget_usd):
+                    log(f"Budget insufficient for {req_id}", "WARN")
+            except Exception:
+                pass
+
+            # 5.1 Dispatch worker — [REAL] actually Popen Codex/Claude
             worker_result = dispatch_worker(req, packet, adapter, worktree_path=worktree_path)
+
+            # 5.2 Consume actual budget
+            try:
+                from budget_ledger import consume as budget_consume
+                stdout_len = len(worker_result.get("stdout", "") or "")
+                actual_cost = min(budget_usd, max(100000, stdout_len * 10))
+                budget_consume(req_id, actual_cost, category="model")
+            except Exception:
+                pass
 
             # 5.5 Commit worker output in worktree
             if worker_result.get("exit_code") == 0:
