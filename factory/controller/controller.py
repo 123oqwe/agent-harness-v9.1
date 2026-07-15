@@ -225,11 +225,36 @@ def assign_specialist(req):
         "cto_orchestrator": None,
     }
     adapter = role_map.get(role, "factory/worker-adapters/codex")
+
+    # [REAL] Check provider CLI availability before assigning
+    provider = "codex" if "codex" in (adapter or "") else "claude" if adapter else None
+    if provider:
+        try:
+            sys.path.insert(0, str(Path(__file__).parent.parent / "worker-registry"))
+            from worker_registry import check_provider_available
+            available, msg = check_provider_available(provider)
+            if not available:
+                log(f"Provider {provider} not available: {msg}", "ERROR")
+                return None
+        except ImportError:
+            check = subprocess.run(["which", provider], capture_output=True, text=True)
+            if check.returncode != 0:
+                log(f"Provider {provider} CLI not found", "ERROR")
+                return None
+
     log(f"Assigned {role} specialist using {adapter} for {req['id']}")
     return adapter
 
 def build_context_packet(req):
-    """Build minimal context packet for worker."""
+    """Build context packet. Delegates to context_packet_builder, falls back to inline."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "context-packet-builder"))
+        from context_packet_builder import build_packet
+        packet = build_packet(req, str(SPEC_DIR.parent))
+        if packet and "requirement_id" in packet:
+            return packet
+    except Exception:
+        pass
     packet = {
         "requirement_id": req["id"],
         "title": req["title"],
