@@ -1,0 +1,135 @@
+{
+  "total_placeholders": 26,
+  "placeholders": [
+    {
+      "file": "ui/screens/settings.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/memory_center.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/task_view.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/evidence_viewer.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/enterprise_admin.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/onboarding.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/chat.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/reconciliation_center.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/mission_control.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/writing_workspace.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/coding_workspace.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/multimodal_studio.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/daily_brief.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/planning_workspace.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/approval_center.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/research_workspace.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/document_workspace.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/notification_center.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "ui/screens/privacy_center.yaml",
+      "pattern": "Generic UI template",
+      "severity": "P1"
+    },
+    {
+      "file": "state-machines/model-check-report.txt",
+      "pattern": "PENDING model check",
+      "severity": "P0"
+    },
+    {
+      "file": "adr/ADR-005-workflow-and-queue.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    },
+    {
+      "file": "adr/ADR-002-frontend-and-desktop.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    },
+    {
+      "file": "adr/ADR-004-database-and-migrations.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    },
+    {
+      "file": "adr/ADR-008-deployment-platform.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    },
+    {
+      "file": "adr/ADR-001-repository-and-monorepo.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    },
+    {
+      "file": "adr/ADR-003-backend-and-api.md",
+      "pattern": "NEEDS_VERIFICATION ADR",
+      "severity": "P1"
+    }
+  ]
+}

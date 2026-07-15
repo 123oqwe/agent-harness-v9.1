@@ -1,0 +1,38 @@
+# Dataset Registry
+datasets:
+  - dataset_id: DS-SYNTHETIC-CODING-001
+    version: 1.0
+    source: synthetic
+    license: internal
+    consent_basis: N/A
+    pii_classes: []
+    anonymization: N/A
+    retention: indefinite
+    deletion: on-demand
+    gold_labels: true
+    reviewer_agreement: 1.0
+    contamination_risks: none
+    allowed_environments: [local, dev, staging]
+    allowed_providers: [all]
+  - dataset_id: DS-SWEBENCH-001
+    version: verified
+    source: public_benchmark
+    license: MIT
+    consent_basis: N/A
+    pii_classes: []
+    retention: indefinite
+    gold_labels: true
+    allowed_environments: [local, dev, staging, canary]
+    allowed_providers: [all]
+  - dataset_id: DS-CONSENTED-STAGING-001
+    version: 1.0
+    source: consented_staging
+    license: internal
+    consent_basis: explicit_opt_in
+    pii_classes: [email_content, calendar_content]
+    anonymization: pseudonymized
+    retention: 90 days
+    deletion: on-demand
+    gold_labels: true
+    allowed_environments: [staging]
+    allowed_providers: [staging_provider_only]

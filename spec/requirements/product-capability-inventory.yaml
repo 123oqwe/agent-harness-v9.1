@@ -1,0 +1,337 @@
+# Product Capability Inventory
+# Total capabilities: 108
+
+
+# A_product_surfaces (23 capabilities)
+- capability_id: CAP-A-001
+  name: onboarding
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-002
+  name: authentication
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-003
+  name: local_vault_setup
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-004
+  name: provider_setup
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-005
+  name: connector_setup
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-006
+  name: chat
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-007
+  name: task_view
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-008
+  name: mission_control
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-009
+  name: daily_brief
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-010
+  name: coding_workspace
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-011
+  name: document_workspace
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-012
+  name: research_workspace
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-013
+  name: writing_workspace
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-014
+  name: planning_workspace
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-015
+  name: multimodal_studio
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-016
+  name: approval_center
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-017
+  name: memory_center
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-018
+  name: evidence_viewer
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-019
+  name: reconciliation_center
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-020
+  name: notifications
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-021
+  name: settings
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-022
+  name: privacy_center
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-A-023
+  name: enterprise_admin
+  requirement_ids: []  # TO BE MAPPED
+
+# B_core_harness (25 capabilities)
+- capability_id: CAP-B-001
+  name: prompt_instruction_system
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-002
+  name: task_profiling
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-003
+  name: routing_dag
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-004
+  name: workflow_planning
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-005
+  name: agent_graph
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-006
+  name: context_graph
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-007
+  name: verification_graph
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-008
+  name: model_gateway
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-009
+  name: runtime_core_loop
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-010
+  name: durable_state
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-011
+  name: streaming_events
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-012
+  name: cancellation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-013
+  name: retry
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-014
+  name: fallback
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-015
+  name: budget_ledger
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-016
+  name: tool_execution_pipeline
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-017
+  name: skills
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-018
+  name: mcp_host
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-019
+  name: sandbox
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-020
+  name: memory_consolidation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-021
+  name: rag_index
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-022
+  name: rag_retrieval
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-023
+  name: observability_tracing
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-024
+  name: evaluation_harness
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-B-025
+  name: evolution_shadow
+  requirement_ids: []  # TO BE MAPPED
+
+# C_safety_governance (15 capabilities)
+- capability_id: CAP-C-001
+  name: identity_plane
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-002
+  name: policy_engine
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-003
+  name: consent_management
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-004
+  name: authorization_service
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-005
+  name: capability_token
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-006
+  name: secrets_broker
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-007
+  name: pep
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-008
+  name: audit_worm
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-009
+  name: idempotency
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-010
+  name: reconciliation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-011
+  name: compensation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-012
+  name: tenant_isolation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-013
+  name: plugin_supply_chain
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-014
+  name: protected_paths
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-C-015
+  name: independent_verifier
+  requirement_ids: []  # TO BE MAPPED
+
+# D_domains (28 capabilities)
+- capability_id: CAP-D-001
+  name: coding_vertical
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-002
+  name: documents_ingestion
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-003
+  name: documents_parsing
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-004
+  name: documents_indexing
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-005
+  name: research_retrieval
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-006
+  name: research_citation
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-007
+  name: writing_draft
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-008
+  name: writing_revise
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-009
+  name: planning_decompose
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-010
+  name: planning_validate
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-011
+  name: pa_email
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-012
+  name: pa_calendar
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-013
+  name: pa_reminders
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-014
+  name: pa_open_loops
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-015
+  name: pa_relationships
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-016
+  name: founder_mission
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-017
+  name: founder_templates
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-018
+  name: multimodal_image_gen
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-019
+  name: multimodal_image_edit
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-020
+  name: multimodal_vision
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-021
+  name: external_gmail
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-022
+  name: external_calendar
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-023
+  name: external_slack
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-024
+  name: external_github
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-025
+  name: enterprise_rbac
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-026
+  name: enterprise_sso
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-027
+  name: enterprise_audit
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-D-028
+  name: enterprise_billing
+  requirement_ids: []  # TO BE MAPPED
+
+# E_operations (17 capabilities)
+- capability_id: CAP-E-001
+  name: deployment_dev
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-002
+  name: deployment_staging
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-003
+  name: deployment_canary
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-004
+  name: deployment_production
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-005
+  name: migration
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-006
+  name: backup
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-007
+  name: restore
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-008
+  name: rollback
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-009
+  name: kill_switch
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-010
+  name: slo_monitoring
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-011
+  name: alerts
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-012
+  name: incident_response
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-013
+  name: support_workflow
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-014
+  name: billing
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-015
+  name: data_deletion
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-016
+  name: status_page
+  requirement_ids: []  # TO BE MAPPED
+- capability_id: CAP-E-017
+  name: post_launch_review
+  requirement_ids: []  # TO BE MAPPED

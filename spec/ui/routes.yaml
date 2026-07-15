@@ -1,0 +1,59 @@
+# UI Routes
+routes:
+  - path: /
+    screen: chat
+    roles: [user, admin]
+  - path: /onboarding
+    screen: onboarding
+    roles: [user]
+  - path: /tasks
+    screen: task_view
+    roles: [user, admin]
+  - path: /missions
+    screen: mission_control
+    roles: [user, admin]
+  - path: /daily-brief
+    screen: daily_brief
+    roles: [user]
+  - path: /coding
+    screen: coding_workspace
+    roles: [user]
+  - path: /documents
+    screen: document_workspace
+    roles: [user]
+  - path: /research
+    screen: research_workspace
+    roles: [user]
+  - path: /writing
+    screen: writing_workspace
+    roles: [user]
+  - path: /planning
+    screen: planning_workspace
+    roles: [user]
+  - path: /multimodal
+    screen: multimodal_studio
+    roles: [user]
+  - path: /approvals
+    screen: approval_center
+    roles: [user, admin]
+  - path: /memory
+    screen: memory_center
+    roles: [user]
+  - path: /evidence
+    screen: evidence_viewer
+    roles: [user, admin]
+  - path: /reconciliation
+    screen: reconciliation_center
+    roles: [user, admin]
+  - path: /notifications
+    screen: notification_center
+    roles: [user]
+  - path: /settings
+    screen: settings
+    roles: [user, admin]
+  - path: /privacy
+    screen: privacy_center
+    roles: [user]
+  - path: /admin
+    screen: enterprise_admin
+    roles: [admin]

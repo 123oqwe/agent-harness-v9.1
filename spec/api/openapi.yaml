@@ -1,0 +1,1291 @@
+openapi: 3.1.0
+info:
+  title: Agent Harness API
+  version: 9.2.0
+  description: Complete API for Agent Harness v9.2
+  contact:
+    name: Agent Harness Team
+servers:
+  - url: https://api.agent-harness.dev/v1
+    description: Production
+  - url: https://staging-api.agent-harness.dev/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+tags:
+  - name: auth
+  - name: users
+  - name: organizations
+  - name: workspaces
+  - name: vault
+  - name: tasks
+  - name: missions
+  - name: routines
+  - name: watches
+  - name: runs
+  - name: steps
+  - name: approvals
+  - name: memories
+  - name: artifacts
+  - name: evidence
+  - name: reconciliation
+  - name: notifications
+  - name: tools
+  - name: skills
+  - name: connectors
+  - name: providers
+  - name: admin
+  - name: audit
+  - name: billing
+  - name: usage
+  - name: support
+  - name: release
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method]
+              properties:
+                method:
+                  type: string
+                  enum: [password, webauthn, oidc, saml]
+                email:
+                  type: string
+                password:
+                  type: string
+                webauthn_assertion:
+                  type: string
+                oidc_code:
+                  type: string
+                saml_response:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      responses:
+        '204':
+          description: Logged out
+
+  /users/me:
+    get:
+      tags: [users]
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: User list
+
+  /organizations:
+    get:
+      tags: [organizations]
+      operationId: listOrganizations
+      responses:
+        '200':
+          description: Organization list
+    post:
+      tags: [organizations]
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreate'
+      responses:
+        '201':
+          description: Organization created
+
+  /organizations/{orgId}:
+    get:
+      tags: [organizations]
+      operationId: getOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '200':
+          description: Organization details
+    delete:
+      tags: [organizations]
+      operationId: deleteOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrgId'
+      responses:
+        '204':
+          description: Organization deleted
+
+  /workspaces:
+    get:
+      tags: [workspaces]
+      operationId: listWorkspaces
+      responses:
+        '200':
+          description: Workspace list
+    post:
+      tags: [workspaces]
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceCreate'
+      responses:
+        '201':
+          description: Workspace created
+
+  /vault/setup:
+    post:
+      tags: [vault]
+      operationId: setupVault
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, encryption_method]
+              properties:
+                path:
+                  type: string
+                encryption_method:
+                  type: string
+                  enum: [device_key, password]
+      responses:
+        '201':
+          description: Vault created
+        '409':
+          description: Vault already exists
+
+  /vault/status:
+    get:
+      tags: [vault]
+      operationId: getVaultStatus
+      responses:
+        '200':
+          description: Vault status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initialized:
+                    type: boolean
+                  encrypted:
+                    type: boolean
+                  size_bytes:
+                    type: integer
+                  last_backup:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /vault/data:
+    get:
+      tags: [vault]
+      operationId: listVaultData
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vault data list
+    delete:
+      tags: [vault]
+      operationId: deleteVaultData
+      parameters:
+        - name: data_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  /tasks:
+    get:
+      tags: [tasks]
+      operationId: listTasks
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+      responses:
+        '200':
+          description: Task list
+    post:
+      tags: [tasks]
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created
+
+  /tasks/{taskId}:
+    get:
+      tags: [tasks]
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task details
+
+  /missions:
+    get:
+      tags: [missions]
+      operationId: listMissions
+      responses:
+        '200':
+          description: Mission list
+    post:
+      tags: [missions]
+      operationId: createMission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MissionCreate'
+      responses:
+        '201':
+          description: Mission created
+
+  /missions/{missionId}:
+    get:
+      tags: [missions]
+      operationId: getMission
+      parameters:
+        - $ref: '#/components/parameters/MissionId'
+      responses:
+        '200':
+          description: Mission details
+    delete:
+      tags: [missions]
+      operationId: cancelMission
+      parameters:
+        - $ref: '#/components/parameters/MissionId'
+      responses:
+        '204':
+          description: Mission cancelled
+
+  /routines:
+    get:
+      tags: [routines]
+      operationId: listRoutines
+      responses:
+        '200':
+          description: Routine list
+    post:
+      tags: [routines]
+      operationId: createRoutine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutineCreate'
+      responses:
+        '201':
+          description: Routine created
+
+  /routines/{routineId}:
+    put:
+      tags: [routines]
+      operationId: updateRoutine
+      parameters:
+        - $ref: '#/components/parameters/RoutineId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutineUpdate'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [routines]
+      operationId: deleteRoutine
+      parameters:
+        - $ref: '#/components/parameters/RoutineId'
+      responses:
+        '204':
+          description: Deleted
+
+  /watches:
+    get:
+      tags: [watches]
+      operationId: listWatches
+      responses:
+        '200':
+          description: Watch list
+    post:
+      tags: [watches]
+      operationId: createWatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchCreate'
+      responses:
+        '201':
+          description: Watch created
+
+  /runs:
+    post:
+      tags: [runs]
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunCreate'
+      responses:
+        '201':
+          description: Run created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run_id:
+                    type: string
+                    format: uuid
+    get:
+      tags: [runs]
+      operationId: listRuns
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run list
+
+  /runs/{runId}:
+    get:
+      tags: [runs]
+      operationId: getRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStatus'
+
+  /runs/{runId}/events:
+    get:
+      tags: [runs]
+      operationId: streamRunEvents
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event stream (SSE)
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamEvent'
+
+  /runs/{runId}/pause:
+    post:
+      tags: [runs]
+      operationId: pauseRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run paused (effect-state-aware)
+
+  /runs/{runId}/resume:
+    post:
+      tags: [runs]
+      operationId: resumeRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run resumed (effect-state-aware)
+
+  /runs/{runId}/cancel:
+    post:
+      tags: [runs]
+      operationId: cancelRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run cancelled
+
+  /runs/{runId}/steer:
+    post:
+      tags: [runs]
+      operationId: steerRun
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, content]
+              properties:
+                type:
+                  type: string
+                  enum: [steer, follow_up, next_turn, cancel, kill]
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Steer accepted
+
+  /runs/{runId}/steps:
+    get:
+      tags: [steps]
+      operationId: listSteps
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Step list
+
+  /approvals:
+    get:
+      tags: [approvals]
+      operationId: listApprovals
+      responses:
+        '200':
+          description: Pending approvals
+    post:
+      tags: [approvals]
+      operationId: submitApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approval_id, decision]
+              properties:
+                approval_id:
+                  type: string
+                decision:
+                  type: string
+                  enum: [approve, reject]
+                authentication_level:
+                  type: string
+                  enum: [session, recent_password, webauthn]
+      responses:
+        '200':
+          description: Decision recorded
+
+  /memories:
+    get:
+      tags: [memories]
+      operationId: listMemories
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [episodic, semantic, procedural, preference, relationship, goal]
+      responses:
+        '200':
+          description: Memory list
+    post:
+      tags: [memories]
+      operationId: proposeMemory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryProposal'
+      responses:
+        '202':
+          description: Memory proposed (requires approval)
+
+  /memories/{memoryId}:
+    get:
+      tags: [memories]
+      operationId: getMemory
+      parameters:
+        - $ref: '#/components/parameters/MemoryId'
+      responses:
+        '200':
+          description: Memory details
+    put:
+      tags: [memories]
+      operationId: updateMemory
+      parameters:
+        - $ref: '#/components/parameters/MemoryId'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [memories]
+      operationId: deleteMemory
+      parameters:
+        - $ref: '#/components/parameters/MemoryId'
+      responses:
+        '204':
+          description: Deleted
+
+  /artifacts:
+    get:
+      tags: [artifacts]
+      operationId: listArtifacts
+      responses:
+        '200':
+          description: Artifact list
+    post:
+      tags: [artifacts]
+      operationId: createArtifact
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Artifact created
+
+  /evidence:
+    get:
+      tags: [evidence]
+      operationId: listEvidence
+      parameters:
+        - name: run_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evidence list
+
+  /evidence/{evidenceId}:
+    get:
+      tags: [evidence]
+      operationId: getEvidence
+      parameters:
+        - $ref: '#/components/parameters/EvidenceId'
+      responses:
+        '200':
+          description: Evidence package
+
+  /reconciliation:
+    get:
+      tags: [reconciliation]
+      operationId: listReconciliation
+      responses:
+        '200':
+          description: Reconciliation list
+    post:
+      tags: [reconciliation]
+      operationId: submitReconciliation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operation_id, action]
+              properties:
+                operation_id:
+                  type: string
+                action:
+                  type: string
+                  enum: [confirm, remediate, compensate]
+      responses:
+        '200':
+          description: Action recorded
+
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      parameters:
+        - name: unread_only
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Notification list
+
+  /notifications/{notificationId}/read:
+    post:
+      tags: [notifications]
+      operationId: markNotificationRead
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Marked read
+
+  /tools:
+    get:
+      tags: [tools]
+      operationId: listTools
+      responses:
+        '200':
+          description: Tool list
+
+  /skills:
+    get:
+      tags: [skills]
+      operationId: listSkills
+      responses:
+        '200':
+          description: Skill list
+
+  /connectors:
+    get:
+      tags: [connectors]
+      operationId: listConnectors
+      responses:
+        '200':
+          description: Connector list
+    post:
+      tags: [connectors]
+      operationId: createConnector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, credential_ref]
+              properties:
+                provider:
+                  type: string
+                credential_ref:
+                  type: string
+                scopes:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Connector created
+
+  /providers:
+    get:
+      tags: [providers]
+      operationId: listProviders
+      responses:
+        '200':
+          description: Provider list
+    post:
+      tags: [providers]
+      operationId: configureProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, api_key_ref]
+              properties:
+                provider:
+                  type: string
+                api_key_ref:
+                  type: string
+                model_allowlist:
+                  type: array
+                  items:
+                    type: string
+                data_policy:
+                  type: object
+      responses:
+        '201':
+          description: Provider configured
+
+  /admin/policies:
+    get:
+      tags: [admin]
+      operationId: listPolicies
+      responses:
+        '200':
+          description: Policy list
+    put:
+      tags: [admin]
+      operationId: updatePolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated
+
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: adminListUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: User list (admin)
+    post:
+      tags: [admin]
+      operationId: adminCreateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: User created
+    delete:
+      tags: [admin]
+      operationId: adminDeleteUser
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: User deleted
+
+  /admin/audit:
+    get:
+      tags: [audit]
+      operationId: searchAudit
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+      responses:
+        '200':
+          description: Audit entries
+
+  /admin/audit/export:
+    post:
+      tags: [audit]
+      operationId: exportAudit
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format:
+                  type: string
+                  enum: [json, csv]
+                start_date:
+                  type: string
+                end_date:
+                  type: string
+      responses:
+        '200':
+          description: Audit export
+
+  /billing/usage:
+    get:
+      tags: [billing]
+      operationId: getUsage
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Usage data
+
+  /billing/invoices:
+    get:
+      tags: [billing]
+      operationId: listInvoices
+      responses:
+        '200':
+          description: Invoice list
+
+  /support/tickets:
+    post:
+      tags: [support]
+      operationId: createTicket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, body]
+              properties:
+                subject:
+                  type: string
+                body:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high, urgent]
+      responses:
+        '201':
+          description: Ticket created
+
+  /release/approval:
+    post:
+      tags: [release]
+      operationId: submitReleaseApproval
+      description: Submit human-signed production release authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseApproval'
+      responses:
+        '200':
+          description: Release approved, cutover initiated
+        '403':
+          description: Invalid signature or expired approval
+
+  /healthz:
+    get:
+      tags: [release]
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  providers:
+                    type: object
+                  vault:
+                    type: string
+                  active_tasks:
+                    type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+    MissionId:
+      name: missionId
+      in: path
+      required: true
+      schema:
+        type: string
+    RoutineId:
+      name: routineId
+      in: path
+      required: true
+      schema:
+        type: string
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MemoryId:
+      name: memoryId
+      in: path
+      required: true
+      schema:
+        type: string
+    EvidenceId:
+      name: evidenceId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Rate limited
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retry:
+          type: string
+          enum: [never, automatic, reconcile_first, human_required]
+        details:
+          type: object
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        created_at:
+          type: string
+          format: date-time
+
+    OrganizationCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        data_residency:
+          type: string
+
+    WorkspaceCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        org_id:
+          type: string
+
+    TaskCreate:
+      type: object
+      required: [input]
+      properties:
+        input:
+          type: string
+        goal:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        budget:
+          type: object
+
+    MissionCreate:
+      type: object
+      required: [raw_idea]
+      properties:
+        raw_idea:
+          type: string
+        template:
+          type: string
+        budget:
+          type: object
+
+    RoutineCreate:
+      type: object
+      required: [name, schedule, action]
+      properties:
+        name:
+          type: string
+        schedule:
+          type: string
+          description: Cron expression
+        action:
+          type: string
+        timezone:
+          type: string
+
+    RoutineUpdate:
+      type: object
+      properties:
+        schedule:
+          type: string
+        action:
+          type: string
+        enabled:
+          type: boolean
+
+    WatchCreate:
+      type: object
+      required: [condition, action]
+      properties:
+        condition:
+          type: string
+        action:
+          type: string
+        check_interval:
+          type: string
+
+    RunCreate:
+      type: object
+      required: [task_id]
+      properties:
+        task_id:
+          type: string
+        experience_profile:
+          type: string
+          enum: [simple, advanced, debug]
+        budget_override:
+          type: object
+
+    RunStatus:
+      type: object
+      properties:
+        run_id:
+          type: string
+        status:
+          type: string
+          enum: [preparing, waiting_for_input, waiting_for_approval, working, paused, verifying, reconciling, completed, completed_with_warnings, needs_attention, failed, cancelled]
+        current_step:
+          type: string
+        budget_consumed:
+          type: object
+        external_effects:
+          type: boolean
+        can_pause:
+          type: boolean
+        can_cancel:
+          type: boolean
+        next_action:
+          type: string
+
+    StreamEvent:
+      type: object
+      required: [event_id, sequence, run_id, type, timestamp, payload, redaction_applied]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+        run_id:
+          type: string
+        agent_id:
+          type: string
+          nullable: true
+        step_id:
+          type: string
+          nullable: true
+        type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        payload:
+          type: object
+        redaction_applied:
+          type: boolean
+
+    MemoryProposal:
+      type: object
+      required: [type, content, provenance]
+      properties:
+        type:
+          type: string
+          enum: [episodic, semantic, procedural, preference, relationship, goal]
+        content:
+          type: object
+        provenance:
+          type: object
+        trust_level:
+          type: string
+          enum: [untrusted, verified, trusted]
+          default: untrusted
+
+    ReleaseApproval:
+      type: object
+      required: [release_id, build_digest, release_manifest_hash, target_environment, approved_by, approved_at, expires_at, webauthn_signature]
+      properties:
+        release_id:
+          type: string
+          format: uuid
+        build_digest:
+          type: string
+        release_manifest_hash:
+          type: string
+        target_environment:
+          type: string
+          enum: [production]
+        approved_by:
+          type: string
+        approved_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        webauthn_signature:
+          type: string

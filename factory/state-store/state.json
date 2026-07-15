@@ -1,0 +1,40 @@
+{
+  "factory_version": "0.1.0",
+  "current_phase": 0,
+  "current_requirement": null,
+  "active_worktrees": {},
+  "worker_leases": {},
+  "requirement_status": {},
+  "phase_status": {
+    "0": "BLOCKED"
+  },
+  "command_history": [
+    {
+      "timestamp": "2026-07-16T04:30:00.841501",
+      "level": "INFO",
+      "message": "Restart recovery complete (restart #1)"
+    }
+  ],
+  "evidence_refs": {},
+  "verifier_results": {},
+  "merge_queue": [],
+  "blockers": [
+    {
+      "blocker_id": "BLK-TEST-001-1784147400",
+      "requirement_id": "TEST-001",
+      "blocker_type": "specification_conflict",
+      "evidence": [
+        "Test evidence"
+      ],
+      "required_decision": "Test decision",
+      "status": "open",
+      "created_at": "2026-07-16T04:30:00.859696",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolution": null
+    }
+  ],
+  "created_at": "2026-07-16T04:30:00.841000",
+  "updated_at": "2026-07-16T04:30:00.859788",
+  "restart_count": 1
+}

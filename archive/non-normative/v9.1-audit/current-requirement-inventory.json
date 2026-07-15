@@ -1,0 +1,25 @@
+{
+  "total_requirements": 40,
+  "by_phase": {
+    "0": 13,
+    "1": 17,
+    "2": 4,
+    "3": 4,
+    "5": 1,
+    "8": 1
+  },
+  "by_domain": {
+    "architecture": 15,
+    "security": 11,
+    "coding": 7,
+    "documents": 1,
+    "research": 1,
+    "writing": 1,
+    "planning": 1,
+    "personal_assistant": 1,
+    "external_actions": 1,
+    "enterprise": 1
+  },
+  "covered_capabilities": "UNKNOWN - no capability_inventory_ids field in current requirements",
+  "gap": "Only 40 requirements for 84 capabilities"
+}

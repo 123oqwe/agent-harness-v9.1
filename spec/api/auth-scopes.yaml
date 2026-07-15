@@ -1,0 +1,75 @@
+scopes:
+  - name: runs:read
+    description: Read run status and events
+  - name: runs:write
+    description: Create, pause, resume, cancel runs
+  - name: runs:steer
+    description: Send steering commands
+  - name: runs:approve
+    description: Approve or reject actions
+  - name: tasks:read
+    description: Read tasks
+  - name: tasks:write
+    description: Create and modify tasks
+  - name: missions:read
+    description: Read missions
+  - name: missions:write
+    description: Create and cancel missions
+  - name: routines:read
+    description: Read routines
+  - name: routines:write
+    description: Create, update, delete routines
+  - name: watches:read
+    description: Read watches
+  - name: watches:write
+    description: Create watches
+  - name: tools:read
+    description: List available tools
+  - name: tools:execute
+    description: Execute tools (via run only)
+  - name: skills:read
+    description: List available skills
+  - name: memory:read
+    description: Read memory entries
+  - name: memory:write
+    description: Propose memory entries
+  - name: memory:delete
+    description: Delete memory entries
+  - name: vault:read
+    description: Read vault data
+  - name: vault:write
+    description: Write vault data
+  - name: vault:delete
+    description: Delete vault data
+  - name: connectors:read
+    description: List connectors
+  - name: connectors:write
+    description: Create connectors
+  - name: providers:read
+    description: List providers
+  - name: providers:write
+    description: Configure providers
+  - name: artifacts:read
+    description: Read artifacts
+  - name: artifacts:write
+    description: Create artifacts
+  - name: evidence:read
+    description: Read evidence packages
+  - name: reconciliation:read
+    description: Read reconciliation status
+  - name: reconciliation:write
+    description: Submit reconciliation actions
+  - name: admin:read
+    description: Read admin settings
+  - name: admin:write
+    description: Modify admin settings
+  - name: admin:users
+    description: Manage users
+  - name: audit:read
+    description: Read audit log
+  - name: audit:export
+    description: Export audit log
+  - name: billing:read
+    description: Read billing and usage
+  - name: release:approve
+    description: Submit release approval (requires WebAuthn)

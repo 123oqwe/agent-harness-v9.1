@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidencePackage",
+  "required": [
+    "requirement_id",
+    "commit_sha",
+    "source_files",
+    "tests_added",
+    "commands_run",
+    "exit_codes",
+    "test_results",
+    "coverage",
+    "security_checks",
+    "verifier_result"
+  ],
+  "properties": {
+    "requirement_id": {
+      "type": "string"
+    },
+    "commit_sha": {
+      "type": "string"
+    },
+    "source_files": {
+      "type": "array"
+    },
+    "tests_added": {
+      "type": "array"
+    },
+    "commands_run": {
+      "type": "array"
+    },
+    "exit_codes": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "test_results": {
+      "type": "object"
+    },
+    "coverage": {
+      "type": "object"
+    },
+    "security_checks": {
+      "type": "object"
+    },
+    "verifier_result": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "verifier_model": {
+      "type": "string"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

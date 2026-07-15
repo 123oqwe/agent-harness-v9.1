@@ -1,0 +1,94 @@
+phase: 7
+name: "Enterprise Hardening & Production Candidate"
+status: BLOCKED
+objective: "Enterprise Hardening & Production Candidate"
+
+dependencies:
+  - phase-0
+  - phase-1
+  - phase-2
+  - phase-3
+  - phase-4
+  - phase-5
+  - phase-6
+
+enabled_domains:
+  - enterprise
+
+disabled_capabilities:
+  []
+
+requirements:
+  - AH-ENT-ORG-001
+  - AH-ENT-MEMBER-001
+  - AH-ENT-RBAC-001
+  - AH-ENT-ABAC-001
+  - AH-ENT-OIDC-001
+  - AH-ENT-SAML-001
+  - AH-ENT-SCIM-001
+  - AH-ENT-ADMIN-SCREENS-001
+  - AH-ENT-ORG-POLICY-001
+  - AH-ENT-MODEL-ALLOW-001
+  - AH-ENT-TOOL-ALLOW-001
+  - AH-ENT-CONNECTOR-POLICY-001
+  - AH-ENT-BUDGET-POLICY-001
+  - AH-ENT-AUDIT-SEARCH-001
+  - AH-ENT-RETENTION-001
+  - AH-ENT-RESIDENCY-001
+  - AH-ENT-TENANT-EXPORT-001
+  - AH-ENT-TENANT-DELETE-001
+  - AH-ENT-PLUGIN-SIGN-001
+  - AH-ENT-WORKLOAD-ID-001
+  - AH-ENT-MICROVM-001
+  - AH-ENT-BILLING-001
+  - AH-ENT-KILLSWITCH-001
+  - AH-ENT-INCIDENT-CONSOLE-001
+  - AH-ENT-SUPPORT-TOOL-001
+  - AH-UI-ADMIN-001
+
+fixtures:
+  - fixtures/phase-7/valid/
+  - fixtures/phase-7/invalid/
+
+unit_tests: "tests/phase-7/unit/"
+integration_tests: "tests/phase-7/integration/"
+e2e_tests: "tests/phase-7/e2e/"
+security_tests: "tests/phase-7/security/"
+
+domain_evals:
+  enterprise: "evals/enterprise/phase-7.yaml"
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-7/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-7/"
+  consented_staging: "data-tests/consented-staging/phase-7/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-7/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - all_phase_requirements_verified: true
+  - regression_tests_pass: true
+  - active_stub_count: 0
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"

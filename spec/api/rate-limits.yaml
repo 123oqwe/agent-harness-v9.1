@@ -1,0 +1,45 @@
+limits:
+  - endpoint: /auth/login
+    method: POST
+    rate: 5/minute
+    burst: 10
+  - endpoint: /auth/refresh
+    method: POST
+    rate: 10/minute
+    burst: 20
+  - endpoint: /runs
+    method: POST
+    rate: 10/minute
+    burst: 20
+  - endpoint: /runs/*/events
+    method: GET
+    rate: 100/minute
+    burst: 200
+  - endpoint: /runs/*/steer
+    method: POST
+    rate: 30/minute
+    burst: 50
+  - endpoint: /approvals
+    method: POST
+    rate: 30/minute
+    burst: 50
+  - endpoint: /tools
+    method: GET
+    rate: 60/minute
+    burst: 100
+  - endpoint: /memories
+    method: GET
+    rate: 60/minute
+    burst: 100
+  - endpoint: /memories
+    method: POST
+    rate: 10/minute
+    burst: 20
+  - endpoint: /admin/*
+    method: "*"
+    rate: 30/minute
+    burst: 50
+  - endpoint: /release/approval
+    method: POST
+    rate: 1/hour
+    burst: 1

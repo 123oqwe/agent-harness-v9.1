@@ -1,0 +1,84 @@
+phase: 4
+name: "Memory, Assurance, Observability & Evolution Shadow"
+status: BLOCKED
+objective: "Memory, Assurance, Observability & Evolution Shadow"
+
+dependencies:
+  - phase-0
+  - phase-1
+  - phase-2
+  - phase-3
+
+enabled_domains:
+  - all
+
+disabled_capabilities:
+  - external_write
+  - evolution_production
+
+requirements:
+  - AH-MEM-CREATE-001
+  - AH-MEM-APPROVAL-001
+  - AH-MEM-TRUST-001
+  - AH-MEM-CONFLICT-001
+  - AH-MEM-TTL-001
+  - AH-MEM-DELETE-001
+  - AH-MEM-LOCAL-001
+  - AH-MEM-UI-001
+  - AH-OBS-EVENTS-001
+  - AH-OBS-TRACE-001
+  - AH-OBS-OTEL-001
+  - AH-EVAL-HARNESS-001
+  - AH-EVOL-FAIL-001
+  - AH-EVOL-NEGATIVE-001
+  - AH-EVOL-CANDIDATE-001
+  - AH-EVOL-OFFLINE-001
+  - AH-EVOL-SHADOW-001
+  - AH-EVOL-ROLLBACK-001
+
+fixtures:
+  - fixtures/phase-4/valid/
+  - fixtures/phase-4/invalid/
+
+unit_tests: "tests/phase-4/unit/"
+integration_tests: "tests/phase-4/integration/"
+e2e_tests: "tests/phase-4/e2e/"
+security_tests: "tests/phase-4/security/"
+
+domain_evals:
+  all: "evals/all/phase-4.yaml"
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-4/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-4/"
+  consented_staging: "data-tests/consented-staging/phase-4/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-4/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - all_phase_requirements_verified: true
+  - regression_tests_pass: true
+  - active_stub_count: 0
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"

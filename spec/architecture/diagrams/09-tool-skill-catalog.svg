@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Concrete Tool & Skill Catalog — 20 Tools + 10 Skills -->
+<svg width="1400" height="780" viewBox="0 0 1400 780" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="780" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#e3b341" font-size="15" font-weight="bold">Concrete Tool & Skill Catalog — 20 Tools + 10 Skills (v8)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">20 tools (each: schema + effect contract + risk tier) + 10 skills (each: trigger + strategy + workflow)</text>
+<text x="20" y="70" fill="#e3b341" font-size="12" font-weight="bold">Phase 1 Tools (20)</text>
+<rect x="20" y="80" width="320" height="144" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="30" y="98" fill="#58a6ff" font-size="11" font-weight="bold">Filesystem (6)</text>
+<text x="30" y="105" fill="#8b949e" font-size="10">read_file</text>
+<text x="220" y="105" fill="#3fb950" font-size="9">T0</text>
+<text x="30" y="124" fill="#8b949e" font-size="10">write_file</text>
+<text x="220" y="124" fill="#fbbf24" font-size="9">T1</text>
+<text x="30" y="143" fill="#8b949e" font-size="10">edit_file</text>
+<text x="220" y="143" fill="#fbbf24" font-size="9">T1</text>
+<text x="30" y="162" fill="#8b949e" font-size="10">delete_file</text>
+<text x="220" y="162" fill="#f85149" font-size="9">T2</text>
+<text x="30" y="181" fill="#8b949e" font-size="10">list_directory</text>
+<text x="220" y="181" fill="#3fb950" font-size="9">T0</text>
+<text x="30" y="200" fill="#8b949e" font-size="10">search_files</text>
+<text x="220" y="200" fill="#3fb950" font-size="9">T0</text>
+<rect x="360" y="80" width="320" height="125" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="370" y="98" fill="#3fb950" font-size="11" font-weight="bold">Code (5)</text>
+<text x="370" y="105" fill="#8b949e" font-size="10">run_tests</text>
+<text x="560" y="105" fill="#3fb950" font-size="9">T0</text>
+<text x="370" y="124" fill="#8b949e" font-size="10">code_lint</text>
+<text x="560" y="124" fill="#3fb950" font-size="9">T0</text>
+<text x="370" y="143" fill="#8b949e" font-size="10">code_format</text>
+<text x="560" y="143" fill="#fbbf24" font-size="9">T1</text>
+<text x="370" y="162" fill="#8b949e" font-size="10">parse_ast</text>
+<text x="560" y="162" fill="#3fb950" font-size="9">T0</text>
+<text x="370" y="181" fill="#8b949e" font-size="10">find_references</text>
+<text x="560" y="181" fill="#3fb950" font-size="9">T0</text>
+<rect x="680" y="80" width="320" height="106" fill="#161b22" stroke="#f778ba" stroke-width="2" rx="6"/>
+<text x="690" y="98" fill="#f778ba" font-size="11" font-weight="bold">Git (4)</text>
+<text x="690" y="105" fill="#8b949e" font-size="10">git_status</text>
+<text x="880" y="105" fill="#3fb950" font-size="9">T0</text>
+<text x="690" y="124" fill="#8b949e" font-size="10">git_diff</text>
+<text x="880" y="124" fill="#3fb950" font-size="9">T0</text>
+<text x="690" y="143" fill="#8b949e" font-size="10">git_commit</text>
+<text x="880" y="143" fill="#f85149" font-size="9">T2</text>
+<text x="690" y="162" fill="#8b949e" font-size="10">git_branch</text>
+<text x="880" y="162" fill="#fbbf24" font-size="9">T1/T2</text>
+<rect x="1000" y="80" width="320" height="125" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="1010" y="98" fill="#bc8cff" font-size="11" font-weight="bold">Other (5)</text>
+<text x="1010" y="105" fill="#8b949e" font-size="10">execute_command</text>
+<text x="1200" y="105" fill="#f85149" font-size="9">T2</text>
+<text x="1010" y="124" fill="#8b949e" font-size="10">web_search</text>
+<text x="1200" y="124" fill="#3fb950" font-size="9">T0</text>
+<text x="1010" y="143" fill="#8b949e" font-size="10">web_fetch</text>
+<text x="1200" y="143" fill="#3fb950" font-size="9">T0</text>
+<text x="1010" y="162" fill="#8b949e" font-size="10">rag_query</text>
+<text x="1200" y="162" fill="#3fb950" font-size="9">T0</text>
+<text x="1010" y="181" fill="#8b949e" font-size="10">ask_user</text>
+<text x="1200" y="181" fill="#3fb950" font-size="9">T0</text>
+<rect x="20" y="210" width="1360" height="40" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="30" y="228" fill="#f85149" font-size="11" font-weight="bold">Phase 2 Tools (6, 硬禁用): send_email(T4) · create_event(T4) · deploy(T5) · db_migrate(T5) · create_pr(T3) · send_slack(T3)</text>
+<text x="20" y="275" fill="#bc8cff" font-size="12" font-weight="bold">Builtin Skills (10)</text>
+<text x="30" y="300" fill="#fbbf24" font-size="10" font-weight="bold">Skill</text>
+<text x="250" y="300" fill="#3fb950" font-size="10" font-weight="bold">Strategy</text>
+<text x="480" y="300" fill="#fbbf24" font-size="10" font-weight="bold">Workflow Pattern</text>
+<text x="750" y="300" fill="#bc8cff" font-size="10" font-weight="bold">Agent Topology</text>
+<text x="1000" y="300" fill="#f778ba" font-size="10" font-weight="bold">Context</text>
+<text x="1180" y="300" fill="#e3b341" font-size="10" font-weight="bold">Tools</text>
+<rect x="20" y="306" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="321" fill="#bc8cff" font-size="10">code_review</text>
+<text x="250" y="321" fill="#3fb950" font-size="10">PlanExecute</text>
+<text x="480" y="321" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="321" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="321" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="321" fill="#e3b341" font-size="9">diff,ast,refs,lint</text>
+<rect x="20" y="330" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="345" fill="#bc8cff" font-size="10">debug_and_fix</text>
+<text x="250" y="345" fill="#3fb950" font-size="10">ReAct</text>
+<text x="480" y="345" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="345" fill="#bc8cff" font-size="10">Single→Multi</text>
+<text x="1000" y="345" fill="#f778ba" font-size="10">Parent-Child</text>
+<text x="1180" y="345" fill="#e3b341" font-size="9">tests,read,search,edit</text>
+<rect x="20" y="354" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="369" fill="#bc8cff" font-size="10">test_generation</text>
+<text x="250" y="369" fill="#3fb950" font-size="10">PlanExecute</text>
+<text x="480" y="369" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="369" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="369" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="369" fill="#e3b341" font-size="9">read,ast,refs,write</text>
+<rect x="20" y="378" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="393" fill="#bc8cff" font-size="10">refactor_extract</text>
+<text x="250" y="393" fill="#3fb950" font-size="10">PlanExecute</text>
+<text x="480" y="393" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="393" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="393" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="393" fill="#e3b341" font-size="9">read,ast,refs,edit</text>
+<rect x="20" y="402" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="417" fill="#bc8cff" font-size="10">doc_generation</text>
+<text x="250" y="417" fill="#3fb950" font-size="10">ReAct</text>
+<text x="480" y="417" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="417" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="417" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="417" fill="#e3b341" font-size="9">read,ast,refs,edit</text>
+<rect x="20" y="426" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="441" fill="#bc8cff" font-size="10">dependency_audit</text>
+<text x="250" y="441" fill="#3fb950" font-size="10">PlanExecute</text>
+<text x="480" y="441" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="441" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="441" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="441" fill="#e3b341" font-size="9">read,search,web</text>
+<rect x="20" y="450" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="465" fill="#bc8cff" font-size="10">migration_planner</text>
+<text x="250" y="465" fill="#3fb950" font-size="10">PlanExecute</text>
+<text x="480" y="465" fill="#fbbf24" font-size="10">PlanExecute + ResearchThenAct</text>
+<text x="750" y="465" fill="#bc8cff" font-size="10">Single→Multi</text>
+<text x="1000" y="465" fill="#f778ba" font-size="10">Shared Selective</text>
+<text x="1180" y="465" fill="#e3b341" font-size="9">read,search,web,ast</text>
+<rect x="20" y="474" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="489" fill="#bc8cff" font-size="10">search_and_summarize</text>
+<text x="250" y="489" fill="#3fb950" font-size="10">ReAct</text>
+<text x="480" y="489" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="489" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="489" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="489" fill="#e3b341" font-size="9">search,read,rag</text>
+<rect x="20" y="498" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="513" fill="#bc8cff" font-size="10">fix_failing_tests</text>
+<text x="250" y="513" fill="#3fb950" font-size="10">ReAct</text>
+<text x="480" y="513" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="513" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="513" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="513" fill="#e3b341" font-size="9">tests,read,search,edit</text>
+<rect x="20" y="522" width="1360" height="22" fill="#161b22" stroke="#30363d" stroke-width="0.5" rx="3"/>
+<text x="30" y="537" fill="#bc8cff" font-size="10">git_workflow</text>
+<text x="250" y="537" fill="#3fb950" font-size="10">Direct</text>
+<text x="480" y="537" fill="#fbbf24" font-size="10">—</text>
+<text x="750" y="537" fill="#bc8cff" font-size="10">Single</text>
+<text x="1000" y="537" fill="#f778ba" font-size="10">—</text>
+<text x="1180" y="537" fill="#e3b341" font-size="9">git_status,diff,commit</text>
+<rect x="20" y="580" width="660" height="80" fill="#161b22" stroke="#e3b341" stroke-width="2" rx="6"/>
+<text x="30" y="598" fill="#e3b341" font-size="11" font-weight="bold">ToolDefinition</text>
+<text x="30" y="614" fill="#8b949e" font-size="10">name·version·category·input_schema·output_schema</text>
+<text x="30" y="628" fill="#8b949e" font-size="9">effect_contract·required_risk_tier·required_credentials</text>
+<text x="30" y="642" fill="#8b949e" font-size="9">execute(input, ctx)</text>
+<text x="30" y="656" fill="#8b949e" font-size="9">区分: Model API(推理) vs Action Tool(改变现实)</text>
+<rect x="700" y="580" width="680" height="80" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="710" y="598" fill="#bc8cff" font-size="11" font-weight="bold">SkillDefinition</text>
+<text x="710" y="614" fill="#8b949e" font-size="10">name·trigger·priority·reasoning_strategy·workflow_pattern·agent_topology</text>
+<text x="710" y="628" fill="#8b949e" font-size="9">required_tools·optional_tools·max_risk_tier·requires_user_confirmation</text>
+<text x="710" y="642" fill="#8b949e" font-size="9">workflow·source(builtin/evolved/user_created)</text>
+<text x="710" y="656" fill="#8b949e" font-size="9">v8: reasoning_strategy + workflow_pattern + agent_topology 各自独立</text>
+<rect x="20" y="675" width="1360" height="55" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="30" y="693" fill="#f85149" font-size="11" font-weight="bold">ToolEffectContract (v6.1, 每个 tool 必须定义)</text>
+<text x="30" y="709" fill="#8b949e" font-size="10">effect_type(pure|read_only|idempotent|non_idempotent|irreversible) · deduplication · delivery_guarantee · retry_policy · transaction_scope</text>
+<text x="30" y="723" fill="#8b949e" font-size="9">prepare_support · readback_confidence · compensation_safety · authoritative_readback · compensation_handler</text>
+<text x="20" y="755" fill="#8b949e" font-size="10">v8 修正: Tool Router 选择原子工具 · Skill Router 选择已封装流程 · Model/API Router 选择模型能力 · 三者独立, 联合优化</text>
+</svg>

@@ -1,0 +1,9 @@
+{
+  "test": "orchestrator_end_to_end",
+  "timestamp": "2026-07-16T03:47:55.383322",
+  "orchestrator_exit_code": 2,
+  "selected_requirement": "AH-CONTRACT-RUNPLAN-001",
+  "context_packet_built": true,
+  "dependency_validation": "PASS: All dependencies verified",
+  "result": "FAIL"
+}

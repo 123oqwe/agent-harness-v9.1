@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentGraph",
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "nodes": {
+      "type": "array"
+    },
+    "edges": {
+      "type": "array"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

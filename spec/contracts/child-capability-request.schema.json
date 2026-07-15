@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChildCapabilityRequest",
+  "description": "Parent sends this to Authorization Service. Authorization Service signs, NOT parent.",
+  "required": [
+    "child_manifest_hash",
+    "parent_delegation_proof",
+    "budget_ceiling",
+    "tool_grants",
+    "resource_grants",
+    "delegation_depth"
+  ],
+  "properties": {
+    "child_manifest_hash": {
+      "type": "string"
+    },
+    "parent_delegation_proof": {
+      "type": "string"
+    },
+    "budget_ceiling": {
+      "type": "object"
+    },
+    "tool_grants": {
+      "type": "array"
+    },
+    "resource_grants": {
+      "type": "array"
+    },
+    "delegation_depth": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

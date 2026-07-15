@@ -1,0 +1,1497 @@
+{
+  "version": "1.0",
+  "total_families": 5,
+  "total_capabilities": 108,
+  "families": {
+    "A_product_surfaces": [
+      {
+        "capability_id": "CAP-A-001",
+        "name": "onboarding",
+        "requirement_ids": [
+          "AH-UI-ONBOARDING-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-002",
+        "name": "authentication",
+        "requirement_ids": [
+          "AH-CAPMAP-002"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-003",
+        "name": "local_vault_setup",
+        "requirement_ids": [
+          "AH-UX-DESKTOP-001",
+          "AH-MEM-LOCAL-001",
+          "AH-PROD-ONCALL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-004",
+        "name": "provider_setup",
+        "requirement_ids": [
+          "AH-PROD-ONCALL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-005",
+        "name": "connector_setup",
+        "requirement_ids": [
+          "AH-PROD-ONCALL-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-006",
+        "name": "chat",
+        "requirement_ids": [
+          "AH-UI-CHAT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-007",
+        "name": "task_view",
+        "requirement_ids": [
+          "AH-PA-VERTICAL-001",
+          "AH-UI-EVIDENCE-001",
+          "AH-UI-TASK-001",
+          "AH-PROD-PRIVACY-001",
+          "AH-UI-MEMORY-001",
+          "AH-PROD-REVIEW-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-008",
+        "name": "mission_control",
+        "requirement_ids": [
+          "AH-MISSION-BUDGET-001",
+          "AH-MISSION-STATE-001",
+          "AH-CROSSDOMAIN-MISSION-001",
+          "AH-STATE-MISSION-001",
+          "AH-FOUNDER-TEMPL-001",
+          "AH-UI-MISSION-001",
+          "AH-MISSION-DECOMP-001",
+          "AH-UI-PRIVACY-001",
+          "AH-MISSION-API-001",
+          "AH-MISSION-CANCEL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-009",
+        "name": "daily_brief",
+        "requirement_ids": [
+          "AH-PA-VERTICAL-001",
+          "AH-WRITING-VERTICAL-001",
+          "AH-UI-DAILYBRIEF-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-010",
+        "name": "coding_workspace",
+        "requirement_ids": [
+          "AH-RUNTIME-LOOP-001",
+          "AH-UI-WRITING-001",
+          "AH-TOOL-READ-001",
+          "AH-UI-RESEARCH-001",
+          "AH-TOOL-EDIT-001",
+          "AH-TOOL-EXEC-001",
+          "AH-TOOL-SEARCH-001",
+          "AH-UI-PLANNING-001",
+          "AH-UI-CODING-001",
+          "AH-CODING-VERTICAL-001",
+          "AH-UI-DOC-001",
+          "AH-TOOL-WRITE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-011",
+        "name": "document_workspace",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-ENC-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-INGEST-DOCX-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-UI-DOC-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-INGEST-PPTX-001",
+          "AH-UI-WRITING-001",
+          "AH-RAG-QUERY-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-RAG-GRAPH-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-UI-CODING-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-DELETE-001",
+          "AH-UI-PLANNING-001",
+          "AH-DOC-INGEST-XLSX-001",
+          "AH-RAG-META-001",
+          "AH-DOC-INGEST-MD-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-012",
+        "name": "research_workspace",
+        "requirement_ids": [
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-UI-PLANNING-001",
+          "AH-RESEARCH-VERTICAL-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-013",
+        "name": "writing_workspace",
+        "requirement_ids": [
+          "AH-UI-WRITING-001",
+          "AH-WRITING-VERTICAL-001",
+          "AH-UI-RESEARCH-001",
+          "AH-UI-PLANNING-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-014",
+        "name": "planning_workspace",
+        "requirement_ids": [
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-UI-PLANNING-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001",
+          "AH-PLANNING-VERTICAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-015",
+        "name": "multimodal_studio",
+        "requirement_ids": [
+          "AH-MM-IMAGE-EDIT-001",
+          "AH-UI-MM-001",
+          "AH-MM-ARTIFACT-001",
+          "AH-MM-VISION-VERIFY-001",
+          "AH-MM-IMAGE-GEN-001",
+          "AH-MM-IMAGE-IN-001",
+          "AH-MM-DOC-VISION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-016",
+        "name": "approval_center",
+        "requirement_ids": [
+          "AH-STATE-APPROVAL-001",
+          "AH-RELEASE-001",
+          "AH-UI-NOTIFY-001",
+          "AH-UI-APPROVAL-001",
+          "AH-MEM-UI-001",
+          "AH-UI-PRIVACY-001",
+          "AH-UI-MEMORY-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-UI-RECONCILE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-017",
+        "name": "memory_center",
+        "requirement_ids": [
+          "AH-MEM-DELETE-001",
+          "AH-EVOL-NEGATIVE-001",
+          "AH-MEM-TRUST-001",
+          "AH-UI-NOTIFY-001",
+          "AH-UI-APPROVAL-001",
+          "AH-MEM-UI-001",
+          "AH-UI-PRIVACY-001",
+          "AH-UI-MEMORY-001",
+          "AH-MEM-CREATE-001",
+          "AH-SANDBOX-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-MEM-LOCAL-001",
+          "AH-MEM-TTL-001",
+          "AH-EVOL-FAIL-001",
+          "AH-UI-RECONCILE-001",
+          "AH-MEM-CONFLICT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-018",
+        "name": "evidence_viewer",
+        "requirement_ids": [
+          "AH-UI-EVIDENCE-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-RESEARCH-VERTICAL-001",
+          "AH-EVIDENCE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-019",
+        "name": "reconciliation_center",
+        "requirement_ids": [
+          "AH-UI-NOTIFY-001",
+          "AH-UI-APPROVAL-001",
+          "AH-UI-PRIVACY-001",
+          "AH-MEM-UI-001",
+          "AH-UI-MEMORY-001",
+          "AH-EXT-RECONCILE-001",
+          "AH-UI-RECONCILE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-020",
+        "name": "notifications",
+        "requirement_ids": [
+          "AH-CAPMAP-020"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-021",
+        "name": "settings",
+        "requirement_ids": [
+          "AH-UI-SETTINGS-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-022",
+        "name": "privacy_center",
+        "requirement_ids": [
+          "AH-UI-NOTIFY-001",
+          "AH-UI-APPROVAL-001",
+          "AH-PROD-PRIVACY-001",
+          "AH-UI-PRIVACY-001",
+          "AH-MEM-UI-001",
+          "AH-UI-MEMORY-001",
+          "AH-UI-RECONCILE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-A-023",
+        "name": "enterprise_admin",
+        "requirement_ids": [
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-ADMIN-001",
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-ENT-ORG-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-BILLING-001",
+          "AH-RELEASE-001",
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-MICROVM-001",
+          "AH-ENT-AUDIT-SEARCH-001",
+          "AH-ENT-RBAC-001",
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-ENT-MEMBER-001",
+          "AH-ENT-PLUGIN-SIGN-001",
+          "AH-ENT-SAML-001",
+          "AH-ENT-KILLSWITCH-001",
+          "AH-ENT-SCIM-001",
+          "AH-ENT-OIDC-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ADMIN-SCREENS-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-ENT-ABAC-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      }
+    ],
+    "B_core_harness": [
+      {
+        "capability_id": "CAP-B-001",
+        "name": "prompt_instruction_system",
+        "requirement_ids": [
+          "AH-HOOK-001",
+          "AH-RAG-INJECTION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-002",
+        "name": "task_profiling",
+        "requirement_ids": [
+          "AH-PA-VERTICAL-001",
+          "AH-UI-TASK-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-003",
+        "name": "routing_dag",
+        "requirement_ids": [
+          "AH-ROUTER-DAG-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-004",
+        "name": "workflow_planning",
+        "requirement_ids": [
+          "AH-SPIKE-006",
+          "AH-UI-PLANNING-001",
+          "AH-MISSION-DECOMP-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-PLANNING-VERTICAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-005",
+        "name": "agent_graph",
+        "requirement_ids": [
+          "AH-SUBAGENT-001",
+          "AH-RAG-GRAPH-001",
+          "AH-MULTIAGENT-MERGE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-006",
+        "name": "context_graph",
+        "requirement_ids": [
+          "AH-CONTEXT-COMPILER-001",
+          "AH-SCHED-FRESHCTX-001",
+          "AH-RAG-GRAPH-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-007",
+        "name": "verification_graph",
+        "requirement_ids": [
+          "AH-MM-VISION-VERIFY-001",
+          "AH-EXT-READBACK-001",
+          "AH-RAG-GRAPH-001",
+          "AH-PROD-BILLING-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-008",
+        "name": "model_gateway",
+        "requirement_ids": [
+          "AH-THREAT-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-STATE-OPERATION-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-STATE-RUN-001",
+          "AH-SPEC-MODELCHECK-001",
+          "AH-ENT-ORG-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-009",
+        "name": "runtime_core_loop",
+        "requirement_ids": [
+          "AH-RUNTIME-LOOP-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-RUNTIME-SESSIONTREE-001",
+          "AH-RUNTIME-STEERING-001",
+          "AH-RUNTIME-SESSION-001",
+          "AH-RUNTIME-BUDGET-002",
+          "AH-OPENLOOP-TRACK-001",
+          "AH-RUNTIME-MODELFALLBACK-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-010",
+        "name": "durable_state",
+        "requirement_ids": [
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-MISSION-STATE-001",
+          "AH-STATE-MISSION-001",
+          "AH-STATE-APPROVAL-001",
+          "AH-STATE-STEP-001",
+          "AH-RUNTIME-SESSION-001",
+          "AH-UI-CHAT-001",
+          "AH-STATE-OPERATION-001",
+          "AH-STATE-EXTERNAL-001",
+          "AH-UX-STATES-001",
+          "AH-STATE-RUN-001",
+          "AH-SPEC-MODELCHECK-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-STATE-ATTEMPT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-011",
+        "name": "streaming_events",
+        "requirement_ids": [
+          "AH-OBS-EVENTS-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-012",
+        "name": "cancellation",
+        "requirement_ids": [
+          "AH-MISSION-CANCEL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-013",
+        "name": "retry",
+        "requirement_ids": [
+          "AH-CAPMAP-013"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-014",
+        "name": "fallback",
+        "requirement_ids": [
+          "AH-DOC-INGEST-IMG-001",
+          "AH-RUNTIME-MODELFALLBACK-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-015",
+        "name": "budget_ledger",
+        "requirement_ids": [
+          "AH-MISSION-BUDGET-001",
+          "AH-CONTEXT-COMPILER-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-RUNTIME-BUDGET-002"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-016",
+        "name": "tool_execution_pipeline",
+        "requirement_ids": [
+          "AH-TOOL-READ-001",
+          "AH-CROSSDOMAIN-MISSION-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-SCHED-REAUTH-001",
+          "AH-TOOL-EDIT-001",
+          "AH-TOOL-EXEC-001",
+          "AH-TOOL-SEARCH-001",
+          "AH-ROUTER-DAG-001",
+          "AH-CONTRACT-TOOLSPEC-001",
+          "AH-SPIKE-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-TOOL-WRITE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-017",
+        "name": "skills",
+        "requirement_ids": [
+          "AH-CAPMAP-017"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-018",
+        "name": "mcp_host",
+        "requirement_ids": [
+          "AH-MCP-STDIO-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-019",
+        "name": "sandbox",
+        "requirement_ids": [
+          "AH-TOOL-EXEC-001",
+          "AH-SANDBOX-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-020",
+        "name": "memory_consolidation",
+        "requirement_ids": [
+          "AH-MEM-DELETE-001",
+          "AH-EVOL-NEGATIVE-001",
+          "AH-MEM-TRUST-001",
+          "AH-MEM-UI-001",
+          "AH-UI-MEMORY-001",
+          "AH-MEM-CREATE-001",
+          "AH-SANDBOX-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-MEM-LOCAL-001",
+          "AH-MEM-TTL-001",
+          "AH-EVOL-FAIL-001",
+          "AH-MEM-CONFLICT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-021",
+        "name": "rag_index",
+        "requirement_ids": [
+          "AH-RAG-QUERY-001",
+          "AH-RAG-CITE-001",
+          "AH-RAG-GRAPH-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-DELETE-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-RAG-META-001",
+          "AH-OBS-TRACE-001",
+          "AH-OBS-EVENTS-001",
+          "AH-RAG-INJECTION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-022",
+        "name": "rag_retrieval",
+        "requirement_ids": [
+          "AH-RAG-QUERY-001",
+          "AH-RAG-CITE-001",
+          "AH-RAG-GRAPH-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-DELETE-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-RAG-META-001",
+          "AH-OBS-TRACE-001",
+          "AH-OBS-EVENTS-001",
+          "AH-RAG-INJECTION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-023",
+        "name": "observability_tracing",
+        "requirement_ids": [
+          "AH-OBS-OTEL-001",
+          "AH-OBS-TRACE-001",
+          "AH-OBS-EVENTS-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-024",
+        "name": "evaluation_harness",
+        "requirement_ids": [
+          "AH-EVAL-HARNESS-001",
+          "AH-EVOL-OFFLINE-001",
+          "AH-ROUTER-EVAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-B-025",
+        "name": "evolution_shadow",
+        "requirement_ids": [
+          "AH-EVOL-CANDIDATE-001",
+          "AH-EVOL-ROLLBACK-001",
+          "AH-EVOL-OFFLINE-001",
+          "AH-EVOL-SHADOW-001"
+        ]
+      }
+    ],
+    "C_safety_governance": [
+      {
+        "capability_id": "CAP-C-001",
+        "name": "identity_plane",
+        "requirement_ids": [
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-MM-IMAGE-EDIT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-002",
+        "name": "policy_engine",
+        "requirement_ids": [
+          "AH-RUNTIME-LOOP-001",
+          "AH-POLICY-ENGINE-001",
+          "AH-WATCH-COND-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-PROACTIVE-SUGG-001",
+          "AH-ENT-CONNECTOR-POLICY-001",
+          "AH-SPIKE-006"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-003",
+        "name": "consent_management",
+        "requirement_ids": [
+          "AH-ENT-MEMBER-001",
+          "AH-PROD-BETA-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-004",
+        "name": "authorization_service",
+        "requirement_ids": [
+          "AH-SUBAGENT-001",
+          "AH-SCHED-REAUTH-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-005",
+        "name": "capability_token",
+        "requirement_ids": [
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-CAPABILITY-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-006",
+        "name": "secrets_broker",
+        "requirement_ids": [
+          "AH-CAPMAP-006"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-007",
+        "name": "pep",
+        "requirement_ids": [
+          "AH-POLICY-ENGINE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-008",
+        "name": "audit_worm",
+        "requirement_ids": [
+          "AH-ENT-AUDIT-SEARCH-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-009",
+        "name": "idempotency",
+        "requirement_ids": [
+          "AH-EXT-IDEMPOTENCY-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-010",
+        "name": "reconciliation",
+        "requirement_ids": [
+          "AH-EXT-RECONCILE-001",
+          "AH-UI-RECONCILE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-011",
+        "name": "compensation",
+        "requirement_ids": [
+          "AH-EXT-COMPENSATION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-012",
+        "name": "tenant_isolation",
+        "requirement_ids": [
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-ENT-ORG-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-013",
+        "name": "plugin_supply_chain",
+        "requirement_ids": [
+          "AH-ENT-PLUGIN-SIGN-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-014",
+        "name": "protected_paths",
+        "requirement_ids": [
+          "AH-SPEC-PROTECTION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-C-015",
+        "name": "independent_verifier",
+        "requirement_ids": [
+          "AH-SPEC-VERIFIER-001"
+        ]
+      }
+    ],
+    "D_domains": [
+      {
+        "capability_id": "CAP-D-001",
+        "name": "coding_vertical",
+        "requirement_ids": [
+          "AH-RUNTIME-LOOP-001",
+          "AH-TOOL-READ-001",
+          "AH-PA-VERTICAL-001",
+          "AH-WRITING-VERTICAL-001",
+          "AH-TOOL-EDIT-001",
+          "AH-TOOL-EXEC-001",
+          "AH-TOOL-SEARCH-001",
+          "AH-RESEARCH-VERTICAL-001",
+          "AH-UI-CODING-001",
+          "AH-CODING-VERTICAL-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-PLANNING-VERTICAL-001",
+          "AH-TOOL-WRITE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-002",
+        "name": "documents_ingestion",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-ENC-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-INGEST-DOCX-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-INGEST-PPTX-001",
+          "AH-RAG-QUERY-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-RAG-GRAPH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-DELETE-001",
+          "AH-DOC-INGEST-XLSX-001",
+          "AH-RAG-META-001",
+          "AH-DOC-INGEST-MD-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-003",
+        "name": "documents_parsing",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-ENC-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-INGEST-DOCX-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-INGEST-PPTX-001",
+          "AH-RAG-QUERY-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-RAG-GRAPH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-DELETE-001",
+          "AH-DOC-INGEST-XLSX-001",
+          "AH-RAG-META-001",
+          "AH-DOC-INGEST-MD-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-004",
+        "name": "documents_indexing",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-ENC-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-INGEST-DOCX-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-RERANK-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-EMBED-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-INGEST-PPTX-001",
+          "AH-RAG-QUERY-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-RAG-GRAPH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-DELETE-001",
+          "AH-DOC-INGEST-XLSX-001",
+          "AH-RAG-META-001",
+          "AH-DOC-INGEST-MD-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-005",
+        "name": "research_retrieval",
+        "requirement_ids": [
+          "AH-RAG-QUERY-001",
+          "AH-RESEARCH-VERTICAL-001",
+          "AH-UI-RESEARCH-001",
+          "AH-RAG-RERANK-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-006",
+        "name": "research_citation",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-RESEARCH-VERTICAL-001",
+          "AH-UI-RESEARCH-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-007",
+        "name": "writing_draft",
+        "requirement_ids": [
+          "AH-UI-WRITING-001",
+          "AH-EXT-SLACK-001",
+          "AH-WRITING-VERTICAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-008",
+        "name": "writing_revise",
+        "requirement_ids": [
+          "AH-UI-WRITING-001",
+          "AH-WRITING-VERTICAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-009",
+        "name": "planning_decompose",
+        "requirement_ids": [
+          "AH-PLANNING-VERTICAL-001",
+          "AH-UI-PLANNING-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-010",
+        "name": "planning_validate",
+        "requirement_ids": [
+          "AH-PLANNING-VERTICAL-001",
+          "AH-UI-PLANNING-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-011",
+        "name": "pa_email",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-UI-DOC-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-PROD-STATUS-001",
+          "AH-EVIDENCE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-MEM-DELETE-001",
+          "AH-PA-VERTICAL-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-UI-CODING-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-RAG-DELETE-001",
+          "AH-CAPABILITY-001",
+          "AH-UI-PLANNING-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-012",
+        "name": "pa_calendar",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-UI-DOC-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-PROD-STATUS-001",
+          "AH-EVIDENCE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-MEM-DELETE-001",
+          "AH-PA-VERTICAL-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-EXT-CALENDAR-001",
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-UI-CODING-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-RAG-DELETE-001",
+          "AH-CAPABILITY-001",
+          "AH-UI-PLANNING-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-013",
+        "name": "pa_reminders",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-UI-DOC-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-PROD-STATUS-001",
+          "AH-EVIDENCE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-MEM-DELETE-001",
+          "AH-PA-VERTICAL-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-UI-CODING-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-RAG-DELETE-001",
+          "AH-CAPABILITY-001",
+          "AH-UI-PLANNING-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-014",
+        "name": "pa_open_loops",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-UI-DOC-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-PROD-STATUS-001",
+          "AH-EVIDENCE-001",
+          "AH-SPEC-API-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-MEM-DELETE-001",
+          "AH-PA-VERTICAL-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-UI-WRITING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-OPENLOOP-TRACK-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-UI-CODING-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-RAG-DELETE-001",
+          "AH-CAPABILITY-001",
+          "AH-UI-PLANNING-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-015",
+        "name": "pa_relationships",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-UI-DOC-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-PROD-STATUS-001",
+          "AH-EVIDENCE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-MEM-DELETE-001",
+          "AH-PA-VERTICAL-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-UI-WRITING-001",
+          "AH-RAG-GRAPH-001",
+          "AH-UI-RESEARCH-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-UI-CODING-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-RAG-DELETE-001",
+          "AH-CAPABILITY-001",
+          "AH-UI-PLANNING-001",
+          "AH-SPEC-CAPINV-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-016",
+        "name": "founder_mission",
+        "requirement_ids": [
+          "AH-MISSION-BUDGET-001",
+          "AH-MISSION-STATE-001",
+          "AH-CROSSDOMAIN-MISSION-001",
+          "AH-STATE-MISSION-001",
+          "AH-FOUNDER-TEMPL-001",
+          "AH-UI-MISSION-001",
+          "AH-MISSION-DECOMP-001",
+          "AH-MISSION-API-001",
+          "AH-MISSION-CANCEL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-017",
+        "name": "founder_templates",
+        "requirement_ids": [
+          "AH-MISSION-BUDGET-001",
+          "AH-CROSSDOMAIN-MISSION-001",
+          "AH-MISSION-STATE-001",
+          "AH-FOUNDER-TEMPL-001",
+          "AH-MISSION-DECOMP-001",
+          "AH-MISSION-API-001",
+          "AH-MISSION-CANCEL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-018",
+        "name": "multimodal_image_gen",
+        "requirement_ids": [
+          "AH-MM-IMAGE-EDIT-001",
+          "AH-RAG-CITE-001",
+          "AH-UI-MM-001",
+          "AH-MM-ARTIFACT-001",
+          "AH-EVOL-CANDIDATE-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-EVIDENCE-001",
+          "AH-MM-VISION-VERIFY-001",
+          "AH-MULTIAGENT-MERGE-001",
+          "AH-MM-IMAGE-GEN-001",
+          "AH-RAG-EMBED-001",
+          "AH-SUBAGENT-001",
+          "AH-MM-IMAGE-IN-001",
+          "AH-MM-DOC-VISION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-019",
+        "name": "multimodal_image_edit",
+        "requirement_ids": [
+          "AH-MM-IMAGE-EDIT-001",
+          "AH-UI-MM-001",
+          "AH-TOOL-EDIT-001",
+          "AH-MM-ARTIFACT-001",
+          "AH-DOC-INGEST-IMG-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-MM-VISION-VERIFY-001",
+          "AH-MM-IMAGE-GEN-001",
+          "AH-UI-MEMORY-001",
+          "AH-MM-IMAGE-IN-001",
+          "AH-MM-DOC-VISION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-020",
+        "name": "multimodal_vision",
+        "requirement_ids": [
+          "AH-MM-IMAGE-EDIT-001",
+          "AH-UI-MM-001",
+          "AH-MM-ARTIFACT-001",
+          "AH-MM-VISION-VERIFY-001",
+          "AH-MM-IMAGE-GEN-001",
+          "AH-ENT-SCIM-001",
+          "AH-MM-IMAGE-IN-001",
+          "AH-MM-DOC-VISION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-021",
+        "name": "external_gmail",
+        "requirement_ids": [
+          "AH-EXT-CALENDAR-001",
+          "AH-PA-VERTICAL-001",
+          "AH-EXT-GITHUB-PR-001",
+          "AH-EXT-IDEMPOTENCY-001",
+          "AH-EXT-COMPENSATION-001",
+          "AH-EXT-GMAIL-001",
+          "AH-EXT-SAGA-001",
+          "AH-EXT-SLACK-001",
+          "AH-STATE-EXTERNAL-001",
+          "AH-EXT-CERT-FRAMEWORK-001",
+          "AH-EXT-RECONCILE-001",
+          "AH-EXT-READBACK-001",
+          "AH-EXT-CREDENTIAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-022",
+        "name": "external_calendar",
+        "requirement_ids": [
+          "AH-EXT-CALENDAR-001",
+          "AH-PA-VERTICAL-001",
+          "AH-EXT-GITHUB-PR-001",
+          "AH-EXT-IDEMPOTENCY-001",
+          "AH-EXT-COMPENSATION-001",
+          "AH-EXT-GMAIL-001",
+          "AH-EXT-SAGA-001",
+          "AH-EXT-SLACK-001",
+          "AH-STATE-EXTERNAL-001",
+          "AH-EXT-CERT-FRAMEWORK-001",
+          "AH-EXT-RECONCILE-001",
+          "AH-EXT-READBACK-001",
+          "AH-EXT-CREDENTIAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-023",
+        "name": "external_slack",
+        "requirement_ids": [
+          "AH-EXT-CALENDAR-001",
+          "AH-PA-VERTICAL-001",
+          "AH-EXT-GITHUB-PR-001",
+          "AH-EXT-IDEMPOTENCY-001",
+          "AH-EXT-COMPENSATION-001",
+          "AH-EXT-GMAIL-001",
+          "AH-EXT-SAGA-001",
+          "AH-EXT-SLACK-001",
+          "AH-STATE-EXTERNAL-001",
+          "AH-EXT-CERT-FRAMEWORK-001",
+          "AH-EXT-RECONCILE-001",
+          "AH-EXT-READBACK-001",
+          "AH-EXT-CREDENTIAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-024",
+        "name": "external_github",
+        "requirement_ids": [
+          "AH-EXT-CALENDAR-001",
+          "AH-PA-VERTICAL-001",
+          "AH-EXT-GITHUB-PR-001",
+          "AH-EXT-IDEMPOTENCY-001",
+          "AH-EXT-COMPENSATION-001",
+          "AH-EXT-GMAIL-001",
+          "AH-EXT-SAGA-001",
+          "AH-EXT-SLACK-001",
+          "AH-STATE-EXTERNAL-001",
+          "AH-EXT-CERT-FRAMEWORK-001",
+          "AH-EXT-RECONCILE-001",
+          "AH-EXT-READBACK-001",
+          "AH-EXT-CREDENTIAL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-025",
+        "name": "enterprise_rbac",
+        "requirement_ids": [
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-ADMIN-001",
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-ENT-ORG-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-BILLING-001",
+          "AH-RELEASE-001",
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-MICROVM-001",
+          "AH-ENT-AUDIT-SEARCH-001",
+          "AH-ENT-RBAC-001",
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-ENT-MEMBER-001",
+          "AH-ENT-PLUGIN-SIGN-001",
+          "AH-ENT-SAML-001",
+          "AH-ENT-KILLSWITCH-001",
+          "AH-ENT-SCIM-001",
+          "AH-ENT-OIDC-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ADMIN-SCREENS-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-ENT-ABAC-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-026",
+        "name": "enterprise_sso",
+        "requirement_ids": [
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-ADMIN-001",
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-ENT-ORG-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-BILLING-001",
+          "AH-RELEASE-001",
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-MICROVM-001",
+          "AH-ENT-AUDIT-SEARCH-001",
+          "AH-ENT-RBAC-001",
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-ENT-MEMBER-001",
+          "AH-ENT-PLUGIN-SIGN-001",
+          "AH-ENT-SAML-001",
+          "AH-ENT-KILLSWITCH-001",
+          "AH-ENT-SCIM-001",
+          "AH-ENT-OIDC-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ADMIN-SCREENS-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-ENT-ABAC-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-027",
+        "name": "enterprise_audit",
+        "requirement_ids": [
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-ADMIN-001",
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-ENT-ORG-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-BILLING-001",
+          "AH-RELEASE-001",
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-MICROVM-001",
+          "AH-ENT-AUDIT-SEARCH-001",
+          "AH-ENT-RBAC-001",
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-ENT-MEMBER-001",
+          "AH-ENT-PLUGIN-SIGN-001",
+          "AH-ENT-SAML-001",
+          "AH-ENT-KILLSWITCH-001",
+          "AH-ENT-SCIM-001",
+          "AH-ENT-OIDC-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ADMIN-SCREENS-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-ENT-ABAC-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-D-028",
+        "name": "enterprise_billing",
+        "requirement_ids": [
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-ADMIN-001",
+          "AH-ENT-WORKLOAD-ID-001",
+          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-ENT-ORG-001",
+          "AH-ENT-TOOL-ALLOW-001",
+          "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-BILLING-001",
+          "AH-RELEASE-001",
+          "AH-ENT-TENANT-EXPORT-001",
+          "AH-ENT-MICROVM-001",
+          "AH-ENT-AUDIT-SEARCH-001",
+          "AH-ENT-RBAC-001",
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-ENT-MEMBER-001",
+          "AH-PROD-BILLING-001",
+          "AH-ENT-PLUGIN-SIGN-001",
+          "AH-ENT-SAML-001",
+          "AH-ENT-KILLSWITCH-001",
+          "AH-ENT-SCIM-001",
+          "AH-ENT-OIDC-001",
+          "AH-ENT-BUDGET-POLICY-001",
+          "AH-ENT-RETENTION-001",
+          "AH-ENT-ADMIN-SCREENS-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ENT-ORG-POLICY-001",
+          "AH-ENT-ABAC-001",
+          "AH-ENT-CONNECTOR-POLICY-001"
+        ]
+      }
+    ],
+    "E_operations": [
+      {
+        "capability_id": "CAP-E-001",
+        "name": "deployment_dev",
+        "requirement_ids": [
+          "AH-SPIKE-001",
+          "AH-PROD-CANARY-001",
+          "AH-SPIKE-007",
+          "AH-SPEC-CI-GATES-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-002",
+        "name": "deployment_staging",
+        "requirement_ids": [
+          "AH-PROD-CANARY-001",
+          "AH-SPIKE-007"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-003",
+        "name": "deployment_canary",
+        "requirement_ids": [
+          "AH-PROD-CANARY-001",
+          "AH-SPIKE-007"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-004",
+        "name": "deployment_production",
+        "requirement_ids": [
+          "AH-PROD-CANARY-001",
+          "AH-PROD-RESTORE-001",
+          "AH-PROD-BACKUP-001",
+          "AH-RELEASE-001",
+          "AH-SPIKE-007",
+          "AH-PROD-MIGRATION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-005",
+        "name": "migration",
+        "requirement_ids": [
+          "AH-RAG-EMBED-MIG-001",
+          "AH-PROD-MIGRATION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-006",
+        "name": "backup",
+        "requirement_ids": [
+          "AH-PROD-BACKUP-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-007",
+        "name": "restore",
+        "requirement_ids": [
+          "AH-PROD-RESTORE-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-008",
+        "name": "rollback",
+        "requirement_ids": [
+          "AH-PROD-ROLLBACK-001",
+          "AH-EVOL-ROLLBACK-001",
+          "AH-EXT-SAGA-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-009",
+        "name": "kill_switch",
+        "requirement_ids": [
+          "AH-PROD-KILLSWITCH-001",
+          "AH-ENT-KILLSWITCH-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-010",
+        "name": "slo_monitoring",
+        "requirement_ids": [
+          "AH-PROD-SLO-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-011",
+        "name": "alerts",
+        "requirement_ids": [
+          "AH-CAPMAP-011"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-012",
+        "name": "incident_response",
+        "requirement_ids": [
+          "AH-ENT-INCIDENT-CONSOLE-001",
+          "AH-PROD-INCIDENT-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-013",
+        "name": "support_workflow",
+        "requirement_ids": [
+          "AH-SPIKE-006",
+          "AH-MISSION-DECOMP-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
+          "AH-ENT-SUPPORT-TOOL-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-014",
+        "name": "billing",
+        "requirement_ids": [
+          "AH-ENT-BILLING-001",
+          "AH-PROD-BILLING-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-015",
+        "name": "data_deletion",
+        "requirement_ids": [
+          "AH-MEM-DELETE-001",
+          "AH-ENT-RESIDENCY-001",
+          "AH-ROUTER-EVAL-001",
+          "AH-RAG-DELETE-001",
+          "AH-ENT-TENANT-DELETE-001",
+          "AH-UI-PRIVACY-001",
+          "AH-MM-IMAGE-GEN-001",
+          "AH-PROD-DELETE-001",
+          "AH-RAG-META-001",
+          "AH-PROD-MIGRATION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-016",
+        "name": "status_page",
+        "requirement_ids": [
+          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-PROD-STATUS-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-MM-DOC-VISION-001"
+        ]
+      },
+      {
+        "capability_id": "CAP-E-017",
+        "name": "post_launch_review",
+        "requirement_ids": [
+          "AH-PROD-REVIEW-001",
+          "AH-SPIKE-005",
+          "AH-PROD-PRIVACY-001"
+        ]
+      }
+    ]
+  }
+}

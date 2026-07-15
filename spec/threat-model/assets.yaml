@@ -1,0 +1,36 @@
+# Assets
+- id: ASSET-001
+  name: Local Vault
+  type: data_store
+  sensitivity: secret
+  location: local_device
+- id: ASSET-002
+  name: CapabilityToken
+  type: credential
+  sensitivity: secret
+  location: memory
+- id: ASSET-003
+  name: User PII
+  type: data
+  sensitivity: confidential
+  location: local_vault
+- id: ASSET-004
+  name: Provider Credentials
+  type: credential
+  sensitivity: secret
+  location: local_vault_or_kms
+- id: ASSET-005
+  name: Audit Log
+  type: data_store
+  sensitivity: confidential
+  location: local_or_enterprise
+- id: ASSET-006
+  name: Session State
+  type: data
+  sensitivity: internal
+  location: local
+- id: ASSET-007
+  name: Memory Store
+  type: data_store
+  sensitivity: confidential
+  location: local_vault

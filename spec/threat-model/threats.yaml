@@ -1,0 +1,81 @@
+# Threats
+- threat_id: THREAT-TOCTOU-001
+  threat: Approval-to-execution TOCTOU
+  asset: ASSET-002
+  trust_boundary: TB-001
+  attack_preconditions: [Attacker can modify manifest after approval]
+  attack_steps: [User approves manifest A, Attacker swaps to B, Tool executes B]
+  control_ids: [CTRL-REVALIDATE-001]
+  implementation_location: src/security/revalidate.ts
+  test_fixture: tests/security/toctou.test.ts
+  expected_result: Manifest hash mismatch detected, execution denied
+  residual_risk: none
+
+- threat_id: THREAT-SSRF-001
+  threat: SSRF via web_fetch
+  asset: ASSET-001
+  trust_boundary: TB-002
+  attack_preconditions: [Agent can call web_fetch]
+  attack_steps: [Agent fetches internal URL, Internal service responds]
+  control_ids: [CTRL-EGRESS-001]
+  implementation_location: src/security/egress-filter.ts
+  test_fixture: tests/security/ssrf.test.ts
+  expected_result: Internal URL blocked by egress policy
+  residual_risk: none
+
+- threat_id: THREAT-INDIRECT-INJECTION
+  threat: Indirect prompt injection via tool output
+  asset: ASSET-006
+  trust_boundary: TB-006
+  attack_preconditions: [Tool output contains malicious instructions]
+  attack_steps: [web_fetch returns page with ignore previous instructions, LLM follows injected instruction]
+  control_ids: [CTRL-TAINT-001]
+  implementation_location: src/security/taint.ts
+  test_fixture: tests/security/injection.test.ts
+  expected_result: Taint label prevents instruction override
+  residual_risk: low
+
+- threat_id: THREAT-MEMORY-POISONING
+  threat: Memory poisoned by malicious input
+  asset: ASSET-007
+  trust_boundary: TB-006
+  control_ids: [CTRL-MEMORY-VERIFY-001]
+  implementation_location: src/memory/verification.ts
+  test_fixture: tests/security/memory-poison.test.ts
+  residual_risk: medium
+
+- threat_id: THREAT-TOOL-POISONING
+  threat: Malicious MCP tool
+  asset: ASSET-006
+  trust_boundary: TB-006
+  control_ids: [CTRL-PLUGIN-SIGN-001]
+  implementation_location: src/tools/mcp-host.ts
+  test_fixture: tests/security/tool-poison.test.ts
+  residual_risk: low
+
+- threat_id: THREAT-CAPABILITY-REPLAY
+  threat: Capability token replay
+  asset: ASSET-002
+  trust_boundary: TB-001
+  control_ids: [CTRL-CAPABILITY-SINGLE-USE-001]
+  implementation_location: src/security/capability.ts
+  test_fixture: tests/security/capability-replay.test.ts
+  residual_risk: none
+
+- threat_id: THREAT-CONTEXT-LEAK
+  threat: Multi-agent context leak
+  asset: ASSET-003
+  trust_boundary: TB-005
+  control_ids: [CTRL-CONTEXT-ISOLATION-001]
+  implementation_location: src/router/context-graph.ts
+  test_fixture: tests/security/context-leak.test.ts
+  residual_risk: low
+
+- threat_id: THREAT-BUDGET-BYPASS
+  threat: Router bypasses budget
+  asset: ASSET-001
+  trust_boundary: TB-001
+  control_ids: [CTRL-BUDGET-PEP-001]
+  implementation_location: src/security/budget-guard.ts
+  test_fixture: tests/security/budget-bypass.test.ts
+  residual_risk: none

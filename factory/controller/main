@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR=""
+BASE_DIR="."
+echo "=== Agent Harness v9.2 Orchestrator ==="
+echo "Base: "
+ACTIVE_PHASE=
+if [ "" = "-1" ]; then
+  echo "No active phase. All blocked."
+  exit 1
+fi
+echo "Active phase: "
+NEXT_REQ=
+if [ "" = "NONE" ]; then
+  echo "No READY requirements. Check phase gate."
+  exit 0
+fi
+echo "Next requirement: "
+python3 "/build-context-packet" "" ""
+echo "=== Orchestrator cycle complete ==="

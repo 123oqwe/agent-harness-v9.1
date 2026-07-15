@@ -1,0 +1,87 @@
+phase: 6
+name: "Mission Layer, Routines & Proactive Assistant"
+status: BLOCKED
+objective: "Mission Layer, Routines & Proactive Assistant"
+
+dependencies:
+  - phase-0
+  - phase-1
+  - phase-2
+  - phase-3
+  - phase-4
+  - phase-5
+
+enabled_domains:
+  - founder_operator
+  - personal_assistant
+
+disabled_capabilities:
+  - dynamic_tool_generation_production
+
+requirements:
+  - AH-MISSION-STATE-001
+  - AH-MISSION-API-001
+  - AH-MISSION-DECOMP-001
+  - AH-ROUTINE-SCHED-001
+  - AH-WATCH-COND-001
+  - AH-SCHED-TZ-001
+  - AH-SCHED-MISSED-001
+  - AH-PROACTIVE-SUGG-001
+  - AH-OPENLOOP-TRACK-001
+  - AH-RELATION-FOLLOW-001
+  - AH-FOUNDER-TEMPL-001
+  - AH-CROSSDOMAIN-MISSION-001
+  - AH-MISSION-CANCEL-001
+  - AH-MISSION-BUDGET-001
+  - AH-SCHED-REAUTH-001
+  - AH-SCHED-FRESHCTX-001
+  - AH-UI-MISSION-001
+  - AH-UI-DAILYBRIEF-001
+
+fixtures:
+  - fixtures/phase-6/valid/
+  - fixtures/phase-6/invalid/
+
+unit_tests: "tests/phase-6/unit/"
+integration_tests: "tests/phase-6/integration/"
+e2e_tests: "tests/phase-6/e2e/"
+security_tests: "tests/phase-6/security/"
+
+domain_evals:
+  founder_operator: "evals/founder_operator/phase-6.yaml"
+  personal_assistant: "evals/personal_assistant/phase-6.yaml"
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-6/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-6/"
+  consented_staging: "data-tests/consented-staging/phase-6/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-6/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - all_phase_requirements_verified: true
+  - regression_tests_pass: true
+  - active_stub_count: 0
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"

@@ -1,0 +1,34 @@
+{
+  "test": "failure_injection",
+  "timestamp": "2026-07-16T03:47:56.347449",
+  "failures_injected": 6,
+  "failures_detected": 6,
+  "all_detected": true,
+  "details": [
+    {
+      "failure": "missing_api_file",
+      "detected": true
+    },
+    {
+      "failure": "duplicate_requirement_id",
+      "detected": true
+    },
+    {
+      "failure": "empty_phase_requirements",
+      "detected": true
+    },
+    {
+      "failure": "pending_model_check",
+      "detected": true
+    },
+    {
+      "failure": "placeholder_ui",
+      "detected": true
+    },
+    {
+      "failure": "fake_pass_evidence",
+      "detected": true
+    }
+  ],
+  "result": "PASS"
+}

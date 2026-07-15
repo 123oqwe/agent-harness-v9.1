@@ -1,0 +1,608 @@
+{
+  "AH-CONTRACT-RUNPLAN-001": {
+    "requirement_id": "AH-CONTRACT-RUNPLAN-001",
+    "product_journey": "all",
+    "architecture_module": "contracts",
+    "contract": [
+      "contracts/run-plan.schema.json"
+    ],
+    "api": [],
+    "source_package": "contracts",
+    "test": [
+      "tests/contracts/run-plan.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-CONTRACT-RUNPLAN-001.json"
+  },
+  "AH-CONTRACT-TOOLSPEC-001": {
+    "requirement_id": "AH-CONTRACT-TOOLSPEC-001",
+    "product_journey": "all",
+    "architecture_module": "contracts",
+    "contract": [
+      "contracts/tool-spec.schema.json"
+    ],
+    "api": [],
+    "source_package": "contracts",
+    "test": [
+      "tests/contracts/tool-spec.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-CONTRACT-TOOLSPEC-001.json"
+  },
+  "AH-CONTRACT-EFFECTRISK-001": {
+    "requirement_id": "AH-CONTRACT-EFFECTRISK-001",
+    "product_journey": "all",
+    "architecture_module": "contracts",
+    "contract": [
+      "contracts/effect-risk.schema.json"
+    ],
+    "api": [],
+    "source_package": "contracts",
+    "test": [
+      "tests/contracts/effect-risk.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-CONTRACT-EFFECTRISK-001.json"
+  },
+  "AH-CONTRACT-CAPABILITY-001": {
+    "requirement_id": "AH-CONTRACT-CAPABILITY-001",
+    "product_journey": "all",
+    "architecture_module": "contracts",
+    "contract": [
+      "contracts/capability-token.schema.json"
+    ],
+    "api": [],
+    "source_package": "contracts",
+    "test": [
+      "tests/contracts/capability-token.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-CONTRACT-CAPABILITY-001.json"
+  },
+  "AH-CONTRACT-ACTIONMANIFEST-001": {
+    "requirement_id": "AH-CONTRACT-ACTIONMANIFEST-001",
+    "product_journey": "all",
+    "architecture_module": "contracts",
+    "contract": [
+      "contracts/action-manifest.schema.json"
+    ],
+    "api": [],
+    "source_package": "contracts",
+    "test": [
+      "tests/contracts/action-manifest.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-CONTRACT-ACTIONMANIFEST-001.json"
+  },
+  "AH-STATE-RUN-001": {
+    "requirement_id": "AH-STATE-RUN-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/run.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/run.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-RUN-001.json"
+  },
+  "AH-STATE-OPERATION-001": {
+    "requirement_id": "AH-STATE-OPERATION-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/operation.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/operation.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-OPERATION-001.json"
+  },
+  "AH-STATE-EXTERNAL-001": {
+    "requirement_id": "AH-STATE-EXTERNAL-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/external-effect.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/external-effect.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-EXTERNAL-001.json"
+  },
+  "AH-STATE-APPROVAL-001": {
+    "requirement_id": "AH-STATE-APPROVAL-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/approval.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/approval.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-APPROVAL-001.json"
+  },
+  "AH-STATE-STEP-001": {
+    "requirement_id": "AH-STATE-STEP-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/step.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/step.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-STEP-001.json"
+  },
+  "AH-STATE-ATTEMPT-001": {
+    "requirement_id": "AH-STATE-ATTEMPT-001",
+    "product_journey": "all",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/attempt.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/attempt.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-ATTEMPT-001.json"
+  },
+  "AH-STATE-MISSION-001": {
+    "requirement_id": "AH-STATE-MISSION-001",
+    "product_journey": "founder_operator",
+    "architecture_module": "state-machines",
+    "contract": [
+      "state-machines/mission.machine.json"
+    ],
+    "api": [],
+    "source_package": "state-machines",
+    "test": [
+      "tests/state-machines/mission.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-STATE-MISSION-001.json"
+  },
+  "AH-THREAT-001": {
+    "requirement_id": "AH-THREAT-001",
+    "product_journey": "all",
+    "architecture_module": "threat-model",
+    "contract": [],
+    "api": [],
+    "source_package": "threat-model",
+    "test": [
+      "tests/threat-model/threats.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-0.yaml",
+    "evidence": "artifacts/phase0/AH-THREAT-001.json"
+  },
+  "AH-RUNTIME-LOOP-001": {
+    "requirement_id": "AH-RUNTIME-LOOP-001",
+    "product_journey": "developer",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/runtime/loop.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-RUNTIME-LOOP-001.json"
+  },
+  "AH-RUNTIME-SESSION-001": {
+    "requirement_id": "AH-RUNTIME-SESSION-001",
+    "product_journey": "all",
+    "architecture_module": "session",
+    "contract": [],
+    "api": [],
+    "source_package": "session",
+    "test": [
+      "tests/session/durable.test.ts",
+      "tests/session/crash-restore.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-RUNTIME-SESSION-001.json"
+  },
+  "AH-SANDBOX-001": {
+    "requirement_id": "AH-SANDBOX-001",
+    "product_journey": "developer",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/sandbox/path-traversal.test.ts",
+      "tests/sandbox/symlink-escape.test.ts",
+      "tests/sandbox/network-denied.test.ts",
+      "tests/sandbox/limits.test.ts",
+      "tests/sandbox/shell-injection.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-SANDBOX-001.json"
+  },
+  "AH-POLICY-ENGINE-001": {
+    "requirement_id": "AH-POLICY-ENGINE-001",
+    "product_journey": "all",
+    "architecture_module": "security",
+    "contract": [],
+    "api": [],
+    "source_package": "security",
+    "test": [
+      "tests/policy/deny-by-default.test.ts",
+      "tests/policy/pep.test.ts",
+      "tests/policy/risk-derivation.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-POLICY-ENGINE-001.json"
+  },
+  "AH-CAPABILITY-001": {
+    "requirement_id": "AH-CAPABILITY-001",
+    "product_journey": "all",
+    "architecture_module": "security",
+    "contract": [],
+    "api": [],
+    "source_package": "security",
+    "test": [
+      "tests/security/capability-issue.test.ts",
+      "tests/security/capability-replay.test.ts",
+      "tests/security/capability-child.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-CAPABILITY-001.json"
+  },
+  "AH-TOOL-READ-001": {
+    "requirement_id": "AH-TOOL-READ-001",
+    "product_journey": "developer",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/tools/read-file.test.ts",
+      "tests/tools/read-file-security.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-TOOL-READ-001.json"
+  },
+  "AH-TOOL-WRITE-001": {
+    "requirement_id": "AH-TOOL-WRITE-001",
+    "product_journey": "developer",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/tools/write-file.test.ts",
+      "tests/tools/write-file-checkpoint.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-TOOL-WRITE-001.json"
+  },
+  "AH-TOOL-EDIT-001": {
+    "requirement_id": "AH-TOOL-EDIT-001",
+    "product_journey": "developer",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/tools/edit-file.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-TOOL-EDIT-001.json"
+  },
+  "AH-TOOL-EXEC-001": {
+    "requirement_id": "AH-TOOL-EXEC-001",
+    "product_journey": "developer",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/tools/execute-command.test.ts",
+      "tests/tools/execute-command-security.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-TOOL-EXEC-001.json"
+  },
+  "AH-TOOL-SEARCH-001": {
+    "requirement_id": "AH-TOOL-SEARCH-001",
+    "product_journey": "developer",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/tools/search-files.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-TOOL-SEARCH-001.json"
+  },
+  "AH-EVIDENCE-001": {
+    "requirement_id": "AH-EVIDENCE-001",
+    "product_journey": "all",
+    "architecture_module": "verification",
+    "contract": [],
+    "api": [],
+    "source_package": "verification",
+    "test": [
+      "tests/evidence/generation.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-EVIDENCE-001.json"
+  },
+  "AH-CODING-VERTICAL-001": {
+    "requirement_id": "AH-CODING-VERTICAL-001",
+    "product_journey": "developer",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/domain/coding-vertical.test.ts"
+    ],
+    "eval": "evals/coding/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-CODING-VERTICAL-001.json"
+  },
+  "AH-DOC-VERTICAL-001": {
+    "requirement_id": "AH-DOC-VERTICAL-001",
+    "product_journey": "knowledge_worker",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/domain/documents-vertical.test.ts"
+    ],
+    "eval": "evals/documents/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-DOC-VERTICAL-001.json"
+  },
+  "AH-RESEARCH-VERTICAL-001": {
+    "requirement_id": "AH-RESEARCH-VERTICAL-001",
+    "product_journey": "researcher",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/domain/research-vertical.test.ts"
+    ],
+    "eval": "evals/research/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-RESEARCH-VERTICAL-001.json"
+  },
+  "AH-WRITING-VERTICAL-001": {
+    "requirement_id": "AH-WRITING-VERTICAL-001",
+    "product_journey": "writer",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/domain/writing-vertical.test.ts"
+    ],
+    "eval": "evals/writing/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-WRITING-VERTICAL-001.json"
+  },
+  "AH-PLANNING-VERTICAL-001": {
+    "requirement_id": "AH-PLANNING-VERTICAL-001",
+    "product_journey": "all",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/domain/planning-vertical.test.ts"
+    ],
+    "eval": "evals/planning/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-PLANNING-VERTICAL-001.json"
+  },
+  "AH-PA-VERTICAL-001": {
+    "requirement_id": "AH-PA-VERTICAL-001",
+    "product_journey": "personal_assistant",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/domain/pa-vertical.test.ts"
+    ],
+    "eval": "evals/personal_assistant/",
+    "phase_gate": "phases/phase-1.yaml",
+    "evidence": "artifacts/phase1/AH-PA-VERTICAL-001.json"
+  },
+  "AH-RUNTIME-COMPACTION-001": {
+    "requirement_id": "AH-RUNTIME-COMPACTION-001",
+    "product_journey": "all",
+    "architecture_module": "context",
+    "contract": [],
+    "api": [],
+    "source_package": "context",
+    "test": [
+      "tests/context/compaction.test.ts",
+      "tests/context/compaction-loss.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-2.yaml",
+    "evidence": "artifacts/phase2/AH-RUNTIME-COMPACTION-001.json"
+  },
+  "AH-RUNTIME-STEERING-001": {
+    "requirement_id": "AH-RUNTIME-STEERING-001",
+    "product_journey": "all",
+    "architecture_module": "steering",
+    "contract": [],
+    "api": [],
+    "source_package": "steering",
+    "test": [
+      "tests/steering/three-queue.test.ts",
+      "tests/steering/priority.test.ts",
+      "tests/steering/in-flight.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-2.yaml",
+    "evidence": "artifacts/phase2/AH-RUNTIME-STEERING-001.json"
+  },
+  "AH-HOOK-001": {
+    "requirement_id": "AH-HOOK-001",
+    "product_journey": "all",
+    "architecture_module": "hooks",
+    "contract": [],
+    "api": [],
+    "source_package": "hooks",
+    "test": [
+      "tests/hooks/event-catalog.test.ts",
+      "tests/hooks/security.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-2.yaml",
+    "evidence": "artifacts/phase2/AH-HOOK-001.json"
+  },
+  "AH-PAUSE-RESUME-001": {
+    "requirement_id": "AH-PAUSE-RESUME-001",
+    "product_journey": "all",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/runtime/pause-resume.test.ts",
+      "tests/runtime/effect-state-resume.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-2.yaml",
+    "evidence": "artifacts/phase2/AH-PAUSE-RESUME-001.json"
+  },
+  "AH-ROUTER-DAG-001": {
+    "requirement_id": "AH-ROUTER-DAG-001",
+    "product_journey": "all",
+    "architecture_module": "router",
+    "contract": [],
+    "api": [],
+    "source_package": "router",
+    "test": [
+      "tests/router/dag-pipeline.test.ts",
+      "tests/router/no-parallel.test.ts",
+      "tests/router/policy-isolation.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-3.yaml",
+    "evidence": "artifacts/phase3/AH-ROUTER-DAG-001.json"
+  },
+  "AH-ROUTER-EVAL-001": {
+    "requirement_id": "AH-ROUTER-EVAL-001",
+    "product_journey": "all",
+    "architecture_module": "router",
+    "contract": [],
+    "api": [],
+    "source_package": "router",
+    "test": [
+      "tests/router/eval.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-3.yaml",
+    "evidence": "artifacts/phase3/AH-ROUTER-EVAL-001.json"
+  },
+  "AH-MULTIAGENT-MERGE-001": {
+    "requirement_id": "AH-MULTIAGENT-MERGE-001",
+    "product_journey": "all",
+    "architecture_module": "runtime",
+    "contract": [],
+    "api": [],
+    "source_package": "runtime",
+    "test": [
+      "tests/multiagent/merge-conflict.test.ts",
+      "tests/multiagent/stale-base.test.ts"
+    ],
+    "eval": null,
+    "phase_gate": "phases/phase-3.yaml",
+    "evidence": "artifacts/phase3/AH-MULTIAGENT-MERGE-001.json"
+  },
+  "AH-SUBAGENT-001": {
+    "requirement_id": "AH-SUBAGENT-001",
+    "product_journey": "all",
+    "architecture_module": "security",
+    "contract": [],
+    "api": [],
+    "source_package": "security",
+    "test": [
+      "tests/security/subagent-capability.test.ts",
+      "tests/security/parent-cannot-sign.test.ts"
+    ],
+    "eval": "evals/security/",
+    "phase_gate": "phases/phase-3.yaml",
+    "evidence": "artifacts/phase3/AH-SUBAGENT-001.json"
+  },
+  "AH-EXT-GMAIL-001": {
+    "requirement_id": "AH-EXT-GMAIL-001",
+    "product_journey": "personal_assistant",
+    "architecture_module": "tools",
+    "contract": [],
+    "api": [],
+    "source_package": "tools",
+    "test": [
+      "tests/external/gmail-send.test.ts",
+      "tests/external/gmail-fault-injection.test.ts"
+    ],
+    "eval": "evals/external_actions/",
+    "phase_gate": "phases/phase-5.yaml",
+    "evidence": "artifacts/phase5/AH-EXT-GMAIL-001.json"
+  },
+  "AH-RELEASE-001": {
+    "requirement_id": "AH-RELEASE-001",
+    "product_journey": "enterprise_admin",
+    "architecture_module": "deployment",
+    "contract": [],
+    "api": [],
+    "source_package": "deployment",
+    "test": [
+      "tests/deployment/release-approval.test.ts"
+    ],
+    "eval": "evals/enterprise/",
+    "phase_gate": "phases/phase-8.yaml",
+    "evidence": "artifacts/phase8/AH-RELEASE-001.json"
+  }
+}

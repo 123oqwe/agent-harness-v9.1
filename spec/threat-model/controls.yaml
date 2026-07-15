@@ -1,0 +1,25 @@
+# Controls
+- control_id: CTRL-REVALIDATE-001
+  name: Revalidate manifest hash at execution time
+  type: preventive
+- control_id: CTRL-EGRESS-001
+  name: Egress filter for all network requests
+  type: preventive
+- control_id: CTRL-TAINT-001
+  name: Taint labels on untrusted content
+  type: preventive
+- control_id: CTRL-MEMORY-VERIFY-001
+  name: Memory write verification
+  type: preventive
+- control_id: CTRL-PLUGIN-SIGN-001
+  name: Plugin signature verification
+  type: preventive
+- control_id: CTRL-CAPABILITY-SINGLE-USE-001
+  name: Capability token atomic single-use
+  type: preventive
+- control_id: CTRL-CONTEXT-ISOLATION-001
+  name: Context graph isolation
+  type: preventive
+- control_id: CTRL-BUDGET-PEP-001
+  name: Budget Guard in PEP
+  type: preventive

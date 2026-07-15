@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModelBinding",
+  "required": [
+    "provider",
+    "model_id",
+    "modality_role",
+    "capability_match_score"
+  ],
+  "properties": {
+    "provider": {
+      "type": "string"
+    },
+    "model_id": {
+      "type": "string"
+    },
+    "modality_role": {
+      "enum": [
+        "reasoning",
+        "vision",
+        "image_gen",
+        "code",
+        "speech",
+        "embedding",
+        "reranking"
+      ]
+    },
+    "capability_match_score": {
+      "type": "number"
+    },
+    "cost_estimate": {
+      "type": "object"
+    },
+    "latency_estimate_ms": {
+      "type": "number"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

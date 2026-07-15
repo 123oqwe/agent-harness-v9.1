@@ -1,0 +1,78 @@
+phase: 8
+name: "Production Launch & Post-Launch Operations"
+status: BLOCKED
+objective: "Production Launch & Post-Launch Operations"
+
+dependencies:
+  - phase-0
+  - phase-1
+  - phase-2
+  - phase-3
+  - phase-4
+  - phase-5
+  - phase-6
+  - phase-7
+
+enabled_domains:
+  - all
+
+disabled_capabilities:
+  []
+
+requirements:
+  - AH-RELEASE-001
+
+fixtures:
+  - fixtures/phase-8/valid/
+  - fixtures/phase-8/invalid/
+
+unit_tests: "tests/phase-8/unit/"
+integration_tests: "tests/phase-8/integration/"
+e2e_tests: "tests/phase-8/e2e/"
+security_tests: "tests/phase-8/security/"
+
+domain_evals:
+  all: "evals/all/phase-8.yaml"
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-8/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-8/"
+  consented_staging: "data-tests/consented-staging/phase-8/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-8/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - p0_bugs: 0
+  - critical_security_issues: 0
+  - human_signed_release_approval: PRESENT (WebAuthn)
+  - canary_slo: PASS
+  - independent_pentest: PASS
+  - backup_restore_drill: PASS
+  - rollback_drill: PASS
+  - kill_switch_drill: PASS
+  - privacy_review: PASS
+  - data_deletion_test: PASS
+  - billing_test: PASS
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"

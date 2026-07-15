@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReleaseManifest",
+  "type": "object",
+  "required": [
+    "release_id",
+    "version",
+    "build_digest",
+    "sbom_ref",
+    "migrations",
+    "feature_flags",
+    "canary_cohort",
+    "rollback_plan"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "build_digest": {
+      "type": "string"
+    },
+    "sbom_ref": {
+      "type": "string"
+    },
+    "migrations": {
+      "type": "array"
+    },
+    "feature_flags": {
+      "type": "object"
+    },
+    "canary_cohort": {
+      "type": "object"
+    },
+    "rollback_plan": {
+      "type": "string"
+    }
+  }
+}

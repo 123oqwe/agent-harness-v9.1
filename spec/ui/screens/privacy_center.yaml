@@ -1,0 +1,94 @@
+# Screen: privacy_center
+screen_id: privacy_center
+canonical_route: /privacy
+allowed_roles: ['user']
+experience_profile: advanced
+purpose: "Privacy Center screen"
+
+components:
+  - data_classifier
+  - retention_list
+  - delete_button
+  - export_button
+  - provider_policy
+
+data_dependencies:
+  - GET /vault/data
+  - DELETE /vault/data
+  - GET /vault/status
+
+API_operations:
+  - GET /vault/data
+  - DELETE /vault/data
+  - GET /vault/status
+
+stream_events:
+  - run_event_stream
+
+permissions:
+  - vault:read
+  - vault:delete
+
+loading_state:
+  component: progressive_loader
+  timeout_ms: 5000
+
+empty_state:
+  message: "No data available"
+  action: "Get started"
+
+partial_state:
+  message: "Loading partial results"
+  show_cached: true
+
+success_state:
+  message: "Complete"
+  show_evidence: true
+
+error_state:
+  message: "Something went wrong"
+  retry: true
+  show_details: true
+
+offline_state:
+  message: "You are offline"
+  cached_data: true
+  queue_actions: true
+
+blocked_state:
+  message: "This action is blocked"
+  reason: "policy_or_permission"
+
+approval_state:
+  message: "Waiting for approval"
+  show_preview: true
+
+accessibility:
+  keyboard_navigation: true
+  screen_reader: true
+  aria_labels: true
+  high_contrast: true
+  focus_indicators: true
+  reduced_motion: true
+
+keyboard_navigation:
+  - tab: next_element
+  - shift+tab: previous_element
+  - enter: activate
+  - escape: close_dialog
+
+responsive_behavior:
+  mobile: stacked_layout
+  tablet: sidebar_layout
+  desktop: full_layout
+
+analytics_events:
+  - screen_view
+  - user_action
+  - error_occurred
+
+E2E_tests:
+  - tests/e2e/privacy_center.spec.ts
+
+visual_regression_tests:
+  - tests/visual/privacy_center.spec.ts

@@ -1,0 +1,140 @@
+{
+  "total_contradictions": 15,
+  "p0_count": 6,
+  "p1_count": 9,
+  "contradictions": [
+    {
+      "id": "CON-001",
+      "severity": "P0",
+      "type": "status_contradiction",
+      "issue": "Phase 0 marked READY but model-check-report.txt says PENDING and says 'Phase 0 Gate CANNOT pass'",
+      "files": [
+        "phases/phase-0.yaml",
+        "state-machines/model-check-report.txt"
+      ]
+    },
+    {
+      "id": "CON-002",
+      "severity": "P0",
+      "type": "missing_files",
+      "issue": "6 API files referenced by SPECIFICATION_INDEX are MISSING: openapi.yaml, asyncapi.yaml, error-catalog.yaml, auth-scopes.yaml, rate-limits.yaml, compatibility-policy.md",
+      "files": [
+        "api/"
+      ]
+    },
+    {
+      "id": "CON-003",
+      "severity": "P0",
+      "type": "empty_phase",
+      "issue": "Phase 4 has 0 requirements but claims 'Memory, Assurance, Observability & Evolution Shadow'",
+      "files": [
+        "phases/phase-4.yaml"
+      ]
+    },
+    {
+      "id": "CON-004",
+      "severity": "P0",
+      "type": "empty_phase",
+      "issue": "Phase 6 has 0 requirements but claims 'Mission Layer, Routines & Proactive Assistant'",
+      "files": [
+        "phases/phase-6.yaml"
+      ]
+    },
+    {
+      "id": "CON-005",
+      "severity": "P0",
+      "type": "empty_phase",
+      "issue": "Phase 7 has 0 requirements but claims 'Enterprise Hardening & Production Candidate'",
+      "files": [
+        "phases/phase-7.yaml"
+      ]
+    },
+    {
+      "id": "CON-006",
+      "severity": "P1",
+      "type": "insufficient_coverage",
+      "issue": "Phase 2 has only 4 requirements but claims RAG, multimodal, product UX, context compiler, ingestion, citations, model fallback, session reliability",
+      "files": [
+        "phases/phase-2.yaml"
+      ]
+    },
+    {
+      "id": "CON-007",
+      "severity": "P1",
+      "type": "insufficient_coverage",
+      "issue": "Only 40 requirements total for a product with 85+ capabilities. Major gaps in documents, research, writing, planning, personal_assistant, multimodal, enterprise, operations",
+      "files": [
+        "requirements/requirements.ndjson"
+      ]
+    },
+    {
+      "id": "CON-008",
+      "severity": "P1",
+      "type": "unresolved_adr",
+      "issue": "6 ADRs are NEEDS_VERIFICATION, cannot be treated as accepted technology decisions",
+      "files": [
+        "adr/ADR-001",
+        "adr/ADR-002",
+        "adr/ADR-003",
+        "adr/ADR-004",
+        "adr/ADR-005",
+        "adr/ADR-008"
+      ]
+    },
+    {
+      "id": "CON-009",
+      "severity": "P1",
+      "type": "placeholder_ui",
+      "issue": "All 19 UI screens use identical generic template with 'GET /runs' as only API dependency, no real states, no real permissions",
+      "files": [
+        "ui/screens/"
+      ]
+    },
+    {
+      "id": "CON-010",
+      "severity": "P0",
+      "type": "fake_validation",
+      "issue": "validation-report.json claims 15/15 PASS but was manually generated, not from actual command execution. Model check was never run.",
+      "files": [
+        "validation-report.json"
+      ]
+    },
+    {
+      "id": "CON-011",
+      "severity": "P1",
+      "type": "no_orchestrator",
+      "issue": "No executable orchestrator exists. AI_EXECUTION_PROTOCOL.md describes protocol but no scripts/orchestrator/ exists",
+      "files": []
+    },
+    {
+      "id": "CON-012",
+      "severity": "P1",
+      "type": "no_ci_gates",
+      "issue": "No real CI phase gates exist. Phase manifests reference 'npm run gate:phaseN' but no gate scripts exist",
+      "files": []
+    },
+    {
+      "id": "CON-013",
+      "severity": "P1",
+      "type": "no_protection",
+      "issue": "No CODEOWNERS or branch protection. Implementation agents can modify contracts/, state-machines/, requirements/, phases/",
+      "files": []
+    },
+    {
+      "id": "CON-014",
+      "severity": "P1",
+      "type": "no_verifier",
+      "issue": "Independent verifier exists only as prose. No executable verifier separation.",
+      "files": []
+    },
+    {
+      "id": "CON-015",
+      "severity": "P1",
+      "type": "no_data_governance",
+      "issue": "Real-data and real-provider testing lack executable governance. dataset-registry.yaml exists but no validation scripts.",
+      "files": [
+        "data-tests/"
+      ]
+    }
+  ]
+}

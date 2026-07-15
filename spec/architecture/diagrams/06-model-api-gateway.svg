@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Model/API Gateway — Capability Registry + Provider Policy + Dynamic Selection -->
+<svg width="1400" height="620" viewBox="0 0 1400 620" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="620" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#fbbf24" font-size="15" font-weight="bold">Model/API Gateway — Capability Registry + Dynamic Routing (v8 NEW)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">v7: 静态 fallback 列表 · v8: Capability Registry → 能力匹配 → 隐私匹配 → 成本/延迟优化 · 多模型工作流</text>
+<rect x="20" y="65" width="1360" height="120" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="30" y="83" fill="#fbbf24" font-size="11" font-weight="bold">Model Capability Registry</text>
+<text x="30" y="88" fill="#fbbf24" font-size="10" font-weight="bold">provider + model_id</text>
+<text x="30" y="103" fill="#8b949e" font-size="10">modalities_in/out · coding_score · reasoning_score · vision_score · tool_calling_score · structured_output_score</text>
+<text x="30" y="118" fill="#8b949e" font-size="10">max_context_tokens · supports_parallel_tools · supports_streaming</text>
+<text x="30" y="133" fill="#8b949e" font-size="10">latency_class · cost_class · allowed_data_classes · allowed_regions · local_available · health_status</text>
+<text x="500" y="88" fill="#fbbf24" font-size="10" font-weight="bold">示例:</text>
+<text x="500" y="103" fill="#3fb950" font-size="9">GPT-5</text>
+<text x="680" y="103" fill="#8b949e" font-size="9">reasoning=0.95 · coding=0.90 · tool=0.95 · cost=high</text>
+<text x="500" y="118" fill="#3fb950" font-size="9">Claude-4.5-Sonnet</text>
+<text x="680" y="118" fill="#8b949e" font-size="9">reasoning=0.90 · coding=0.88 · tool=0.85 · cost=medium</text>
+<text x="500" y="133" fill="#3fb950" font-size="9">Nano Banana</text>
+<text x="680" y="133" fill="#8b949e" font-size="9">image_gen=0.92 · vision=0.85 · cost=medium</text>
+<text x="500" y="148" fill="#3fb950" font-size="9">GPT-5-mini</text>
+<text x="680" y="148" fill="#8b949e" font-size="9">reasoning=0.75 · cost=low · latency=low</text>
+<text x="500" y="163" fill="#3fb950" font-size="9">Llama-3-70B (local)</text>
+<text x="680" y="163" fill="#8b949e" font-size="9">reasoning=0.70 · local=true · cost=free · privacy=best</text>
+<text x="20" y="205" fill="#fbbf24" font-size="12" font-weight="bold">Model Router 选择流程:</text>
+<rect x="20" y="215" width="300" height="40" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="30" y="233" fill="#3fb950" font-size="11" font-weight="bold">1. 任务需要什么能力?</text>
+<text x="30" y="249" fill="#8b949e" font-size="10">modality · reasoning · coding · vision · tool_calling</text>
+<rect x="340" y="215" width="300" height="40" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="350" y="233" fill="#58a6ff" font-size="11" font-weight="bold">2. 哪些 Model 满足?</text>
+<text x="350" y="249" fill="#8b949e" font-size="10">Capability Registry 查询 + filter</text>
+<rect x="660" y="215" width="300" height="40" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="670" y="233" fill="#bc8cff" font-size="11" font-weight="bold">3. 隐私匹配</text>
+<text x="670" y="249" fill="#8b949e" font-size="10">ProviderPolicy: data_class · region · trainingOptOut</text>
+<rect x="980" y="215" width="380" height="40" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="990" y="233" fill="#fbbf24" font-size="11" font-weight="bold">4. 成本/延迟优化</text>
+<text x="990" y="249" fill="#8b949e" font-size="10">在满足条件的候选里选最优 cost/latency</text>
+<line x1="320" y1="235" x2="340" y2="235" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="640" y1="235" x2="660" y2="235" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="960" y1="235" x2="980" y2="235" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<text x="20" y="280" fill="#fbbf24" font-size="12" font-weight="bold">多模型工作流示例: 读产品文档 → 生成架构信息图</text>
+<rect x="20" y="290" width="280" height="50" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="30" y="308" fill="#58a6ff" font-size="11" font-weight="bold">1. Document Analysis</text>
+<text x="30" y="324" fill="#8b949e" font-size="10">文档理解/推理模型 (读 PDF)</text>
+<text x="30" y="338" fill="#8b949e" font-size="9">→ 文档内容摘要</text>
+<rect x="320" y="290" width="280" height="50" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="330" y="308" fill="#58a6ff" font-size="11" font-weight="bold">2. Visual Specification</text>
+<text x="330" y="324" fill="#8b949e" font-size="10">同一推理模型</text>
+<text x="330" y="338" fill="#8b949e" font-size="9">→ 生成 image brief</text>
+<rect x="620" y="290" width="280" height="50" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="630" y="308" fill="#fbbf24" font-size="11" font-weight="bold">3. Image Generation</text>
+<text x="630" y="324" fill="#8b949e" font-size="10">图像生成模型 (Nano Banana)</text>
+<text x="630" y="338" fill="#8b949e" font-size="9">→ 生成图片</text>
+<rect x="920" y="290" width="280" height="50" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="930" y="308" fill="#3fb950" font-size="11" font-weight="bold">4. Vision Verification</text>
+<text x="930" y="324" fill="#8b949e" font-size="10">Vision model</text>
+<text x="930" y="338" fill="#8b949e" font-size="9">→ 检查图片符合要求</text>
+<line x1="300" y1="315" x2="320" y2="315" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="600" y1="315" x2="620" y2="315" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="900" y1="315" x2="920" y2="315" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<rect x="20" y="360" width="660" height="80" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="30" y="378" fill="#58a6ff" font-size="11" font-weight="bold">Model API (推理/生成)</text>
+<text x="30" y="394" fill="#8b949e" font-size="10">OpenAI · Gemini · Anthropic · Image gen · Speech · Video · Embedding · Reranking</text>
+<text x="30" y="408" fill="#8b949e" font-size="9">负责: 推理 · 内容生成 · 理解</text>
+<text x="30" y="422" fill="#8b949e" font-size="9">Router: Model/API Router</text>
+<rect x="700" y="360" width="680" height="80" fill="#161b22" stroke="#e3b341" stroke-width="2" rx="6"/>
+<text x="710" y="378" fill="#e3b341" font-size="11" font-weight="bold">Action Tool/API (改变现实)</text>
+<text x="710" y="394" fill="#8b949e" font-size="10">Gmail · Calendar · GitHub · Slack · Database · Browser · Filesystem · Deploy · Payment</text>
+<text x="710" y="408" fill="#8b949e" font-size="9">负责: 读取或改变现实系统</text>
+<text x="710" y="422" fill="#8b949e" font-size="9">Router: Tool Router</text>
+<rect x="20" y="455" width="1360" height="45" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="30" y="473" fill="#f85149" font-size="11" font-weight="bold">Model Fallback (v8: 11种之一)</text>
+<text x="30" y="489" fill="#8b949e" font-size="10">primary → fallback_1 → fallback_2 → local · 必须满足 ProviderPolicy · 不能 fallback 回 primary · 记录到 trace</text>
+<rect x="20" y="515" width="1360" height="45" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="30" y="533" fill="#f85149" font-size="11" font-weight="bold">THREAT-MODEL-CONFUSION: 多模型工作流中模型间数据泄漏 → ProviderPolicy + data classification per model</text>
+<text x="30" y="549" fill="#8b949e" font-size="10">THREAT-ROUTING-MISCLASSIFY: Model 选择错误 → Router 校准 + fallback</text>
+<text x="20" y="585" fill="#8b949e" font-size="10">禁止在规范中把长期架构绑定到某一个具体版本的模型 · Capability Registry 可更新 · 模型可替换</text>
+</svg>

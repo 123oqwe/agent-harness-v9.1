@@ -1,0 +1,108 @@
+# Specification Index — Agent Harness v9.1
+# Master index of all specification files
+
+version: "9.1"
+status: "SPECIFICATION_READY"
+generated: "2026-07-16"
+
+normative_precedence: "NORMATIVE_PRECEDENCE.md"
+
+control_files:
+  agents: "AGENTS.md"
+  claude: "CLAUDE.md"
+  protocol: "AI_EXECUTION_PROTOCOL.md"
+
+product:
+  prd: "product/product-prd.md"
+  personas: "product/personas.md"
+  experience_profiles: "product/experience-profiles.md"
+  jtbd: "product/jobs-to-be-done.md"
+  user_journeys: "product/user-journeys.md"
+  ux: "product/ux-information-architecture.md"
+  onboarding: "product/onboarding.md"
+  privacy_ux: "product/privacy-ux.md"
+  accessibility: "product/accessibility.md"
+  notifications: "product/notifications.md"
+  billing: "product/billing-and-limits.md"
+  support: "product/support-and-abuse.md"
+  launch: "product/launch-plan.md"
+
+domains:
+  coding: "domains/coding/"
+  documents: "domains/documents/"
+  research: "domains/research/"
+  writing: "domains/writing/"
+  planning: "domains/planning/"
+  personal_assistant: "domains/personal-assistant/"
+  founder_operator: "domains/founder-operator/"
+  multimodal: "domains/multimodal/"
+  external_actions: "domains/external-actions/"
+  enterprise: "domains/enterprise/"
+
+architecture:
+  harness_boundary: "architecture/harness-boundary.md"
+  module_boundaries: "architecture/module-boundaries.md"
+  request_to_outcome: "architecture/request-to-outcome.md"
+  routing_system: "architecture/routing-system.md"
+  runtime_core: "architecture/runtime-core.md"
+  context_memory_rag: "architecture/context-memory-rag.md"
+  model_api_gateway: "architecture/model-api-gateway.md"
+  tool_skill_fabric: "architecture/tool-skill-fabric.md"
+  action_control: "architecture/action-control.md"
+  assurance: "architecture/assurance.md"
+  evolution: "architecture/evolution.md"
+  deployment_topology: "architecture/deployment-topology.md"
+  trust_boundaries: "architecture/trust-boundaries.md"
+
+requirements:
+  registry: "requirements/requirements.ndjson"
+  traceability: "requirements/traceability-matrix.json"
+  dependency_graph: "requirements/dependency-graph.json"
+  schema: "requirements/requirement-schema.json"
+
+contracts:
+  count: 18
+  directory: "contracts/"
+
+state_machines:
+  count: 7
+  directory: "state-machines/"
+  tla_spec: "state-machines/harness.tla"
+  model_check: "state-machines/model-check-report.txt"
+
+phases:
+  count: 9
+  directory: "phases/"
+
+threat_model:
+  directory: "threat-model/"
+
+api:
+  openapi: "api/openapi.yaml"
+  asyncapi: "api/asyncapi.yaml"
+  errors: "api/error-catalog.yaml"
+
+ui:
+  directory: "ui/"
+
+data_tests:
+  directory: "data-tests/"
+
+evals:
+  count: 14
+  directory: "evals/"
+
+deployment:
+  directory: "deployment/"
+
+operations:
+  directory: "operations/"
+
+adrs:
+  count: 12
+  directory: "adr/"
+
+appendix:
+  deprecated_v8: "appendix/appendix/deprecated-v8-content/"
+  evidence: "appendix/evidence-registry/"
+  originals: "appendix/original-documents/"

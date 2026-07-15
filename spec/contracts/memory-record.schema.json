@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MemoryRecord",
+  "required": [
+    "memory_id",
+    "type",
+    "content",
+    "provenance",
+    "created_at",
+    "ttl",
+    "trust_level"
+  ],
+  "properties": {
+    "memory_id": {
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "episodic",
+        "semantic",
+        "procedural",
+        "preference",
+        "relationship",
+        "goal"
+      ]
+    },
+    "content": {
+      "type": "object"
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ttl": {
+      "type": "string"
+    },
+    "trust_level": {
+      "enum": [
+        "untrusted",
+        "verified",
+        "trusted"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

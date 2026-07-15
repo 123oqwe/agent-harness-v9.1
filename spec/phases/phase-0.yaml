@@ -1,0 +1,84 @@
+phase: 0
+name: "Machine-Executable Contract Closure"
+status: READY
+objective: "Machine-Executable Contract Closure"
+
+dependencies:
+  []
+
+enabled_domains:
+  []
+
+disabled_capabilities:
+  - all_implementation
+
+requirements:
+  - AH-CONTRACT-RUNPLAN-001
+  - AH-CONTRACT-TOOLSPEC-001
+  - AH-CONTRACT-EFFECTRISK-001
+  - AH-CONTRACT-CAPABILITY-001
+  - AH-CONTRACT-ACTIONMANIFEST-001
+  - AH-STATE-RUN-001
+  - AH-STATE-OPERATION-001
+  - AH-STATE-EXTERNAL-001
+  - AH-STATE-APPROVAL-001
+  - AH-STATE-STEP-001
+  - AH-STATE-ATTEMPT-001
+  - AH-STATE-MISSION-001
+  - AH-THREAT-001
+
+fixtures:
+  - fixtures/phase-0/valid/
+  - fixtures/phase-0/invalid/
+
+unit_tests: "tests/phase-0/unit/"
+integration_tests: "tests/phase-0/integration/"
+e2e_tests: "tests/phase-0/e2e/"
+security_tests: "tests/phase-0/security/"
+
+domain_evals:
+  []
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-0/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-0/"
+  consented_staging: "data-tests/consented-staging/phase-0/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-0/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - schema_parse_rate: 1.0
+  - valid_fixtures_pass: 1.0
+  - invalid_fixtures_fail: 1.0
+  - typescript_schema_parity: 1.0
+  - state_machine_model_check: PASS
+  - p0_contract_conflicts: 0
+  - active_stub_count: 0
+  - requirement_registry_complete: true
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"
+
+# AR-014 fix: Test file verification
+  - test_files_exist_and_non_empty: true
+  - test_files_contain_actual_assertions: true

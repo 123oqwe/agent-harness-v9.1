@@ -1,0 +1,14 @@
+{
+  "name": "AttemptStateMachine",
+  "states": [
+    "INIT",
+    "DISPATCHING",
+    "COMPLETED",
+    "FAILED",
+    "EXPIRED"
+  ],
+  "invariants": [
+    "Each retry generates new attempt_id",
+    "Old CapabilityToken cannot be reused"
+  ]
+}

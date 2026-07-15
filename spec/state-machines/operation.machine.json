@@ -1,0 +1,487 @@
+{
+  "name": "OperationStateMachine",
+  "description": "Single tool call lifecycle. v9: extracted from v8 monolithic 37-state machine. All 35 states preserved but distributed across 6 machines.",
+  "states": [
+    {
+      "name": "CREATED",
+      "terminal": false
+    },
+    {
+      "name": "COMPILED",
+      "terminal": false
+    },
+    {
+      "name": "POLICY_EVALUATED",
+      "terminal": false
+    },
+    {
+      "name": "CONSENT_REQUIRED",
+      "terminal": false
+    },
+    {
+      "name": "CONSENT_EXEMPT",
+      "terminal": false
+    },
+    {
+      "name": "DENIED",
+      "terminal": true
+    },
+    {
+      "name": "HUMAN_APPROVED",
+      "terminal": false
+    },
+    {
+      "name": "HUMAN_REJECTED",
+      "terminal": true
+    },
+    {
+      "name": "EXPIRED",
+      "terminal": true
+    },
+    {
+      "name": "AUTHORIZED",
+      "terminal": false
+    },
+    {
+      "name": "PREPARING",
+      "terminal": false
+    },
+    {
+      "name": "PREPARED",
+      "terminal": false
+    },
+    {
+      "name": "COMMITTING",
+      "terminal": false
+    },
+    {
+      "name": "IN_FLIGHT",
+      "terminal": false
+    },
+    {
+      "name": "PROVIDER_ACCEPTED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_OBSERVED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_VERIFIED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_CONFIRMED",
+      "terminal": true
+    },
+    {
+      "name": "PRE_DISPATCH_FAILED",
+      "terminal": false
+    },
+    {
+      "name": "DISPATCH_REJECTED",
+      "terminal": true
+    },
+    {
+      "name": "EFFECT_UNKNOWN",
+      "terminal": false
+    },
+    {
+      "name": "POSTCONDITION_FAILED",
+      "terminal": false
+    },
+    {
+      "name": "VERIFICATION_FAILED",
+      "terminal": false
+    },
+    {
+      "name": "RECONCILING",
+      "terminal": false
+    },
+    {
+      "name": "RETRY_EVALUATED",
+      "terminal": false
+    },
+    {
+      "name": "RETRY_SCHEDULED",
+      "terminal": false
+    },
+    {
+      "name": "AWAITING_HUMAN",
+      "terminal": false,
+      "description": "Non-terminal - human can resolve"
+    },
+    {
+      "name": "CANCEL_REQUESTED",
+      "terminal": false
+    },
+    {
+      "name": "CANCELLED",
+      "terminal": true
+    },
+    {
+      "name": "ABORTED",
+      "terminal": true
+    },
+    {
+      "name": "TERMINAL_FAILED",
+      "terminal": true
+    },
+    {
+      "name": "PARTIAL_COMMIT",
+      "terminal": false
+    },
+    {
+      "name": "COMPENSATION_PENDING",
+      "terminal": false
+    },
+    {
+      "name": "COMPENSATED",
+      "terminal": true
+    },
+    {
+      "name": "COMPENSATION_FAILED",
+      "terminal": false
+    },
+    {
+      "name": "REMEDIATION_REQUIRED",
+      "terminal": true,
+      "description": "Terminal - needs new Run or human process"
+    },
+    {
+      "name": "ROLLBACK_FAILED",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "source": "CREATED",
+      "target": "COMPILED",
+      "actor": "action_compiler",
+      "guard": "manifest_valid",
+      "event": "ManifestCompiled",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMPILED",
+      "target": "POLICY_EVALUATED",
+      "actor": "policy_engine",
+      "guard": "policy_available",
+      "event": "PolicyEvaluated",
+      "retry_rule": "never"
+    },
+    {
+      "source": "POLICY_EVALUATED",
+      "target": "CONSENT_REQUIRED",
+      "actor": "policy_engine",
+      "guard": "risk_tier >= 2",
+      "event": "ConsentRequired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "POLICY_EVALUATED",
+      "target": "CONSENT_EXEMPT",
+      "actor": "policy_engine",
+      "guard": "risk_tier < 2",
+      "event": "ConsentExempt",
+      "retry_rule": "never"
+    },
+    {
+      "source": "POLICY_EVALUATED",
+      "target": "DENIED",
+      "actor": "policy_engine",
+      "guard": "policy_denies",
+      "event": "PolicyDenied",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_REQUIRED",
+      "target": "HUMAN_APPROVED",
+      "actor": "user",
+      "guard": "user_approves",
+      "event": "HumanApproved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_REQUIRED",
+      "target": "HUMAN_REJECTED",
+      "actor": "user",
+      "guard": "user_rejects",
+      "event": "HumanRejected",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_EXEMPT",
+      "target": "AUTHORIZED",
+      "actor": "authorization_service",
+      "guard": "capability_issued",
+      "event": "Authorized",
+      "retry_rule": "never"
+    },
+    {
+      "source": "HUMAN_APPROVED",
+      "target": "AUTHORIZED",
+      "actor": "authorization_service",
+      "guard": "capability_issued",
+      "event": "Authorized",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AUTHORIZED",
+      "target": "PREPARING",
+      "actor": "execution_supervisor",
+      "guard": "risk_tier >= 3",
+      "event": "Preparing",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AUTHORIZED",
+      "target": "COMMITTING",
+      "actor": "execution_supervisor",
+      "guard": "risk_tier < 3",
+      "event": "Committing",
+      "retry_rule": "never"
+    },
+    {
+      "source": "PREPARING",
+      "target": "PREPARED",
+      "actor": "execution_supervisor",
+      "guard": "prepare_success",
+      "event": "Prepared",
+      "retry_rule": "never"
+    },
+    {
+      "source": "PREPARED",
+      "target": "COMMITTING",
+      "actor": "execution_supervisor",
+      "guard": "not_expired",
+      "event": "Committing",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMMITTING",
+      "target": "IN_FLIGHT",
+      "actor": "pep",
+      "guard": "dispatch_occurred",
+      "event": "Dispatched",
+      "retry_rule": "never"
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "PROVIDER_ACCEPTED",
+      "actor": "provider",
+      "guard": "provider_202",
+      "event": "ProviderAccepted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "DISPATCH_REJECTED",
+      "actor": "provider",
+      "guard": "provider_4xx",
+      "event": "DispatchRejected",
+      "retry_rule": "never"
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "EFFECT_UNKNOWN",
+      "actor": "execution_supervisor",
+      "guard": "outcome_unobservable",
+      "event": "EffectBecameUnknown",
+      "retry_rule": "never",
+      "retry_allowed": false
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "PRE_DISPATCH_FAILED",
+      "actor": "pep",
+      "guard": "dispatch_failed_before_send",
+      "event": "PreDispatchFailed",
+      "retry_rule": "automatic"
+    },
+    {
+      "source": "PROVIDER_ACCEPTED",
+      "target": "EFFECT_OBSERVED",
+      "actor": "execution_supervisor",
+      "guard": "effect_observed",
+      "event": "EffectObserved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_OBSERVED",
+      "target": "EFFECT_VERIFIED",
+      "actor": "verifier",
+      "guard": "readback_confirmed",
+      "event": "EffectVerified",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_OBSERVED",
+      "target": "EFFECT_UNKNOWN",
+      "actor": "execution_supervisor",
+      "guard": "readback_inconclusive",
+      "event": "EffectUnknown",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_VERIFIED",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "verifier",
+      "guard": "postcondition_met",
+      "event": "EffectConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_VERIFIED",
+      "target": "POSTCONDITION_FAILED",
+      "actor": "verifier",
+      "guard": "postcondition_not_met",
+      "event": "PostconditionFailed",
+      "retry_rule": "reconcile_first"
+    },
+    {
+      "source": "EFFECT_UNKNOWN",
+      "target": "RECONCILING",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_started",
+      "event": "Reconciling",
+      "retry_rule": "never"
+    },
+    {
+      "source": "RECONCILING",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_success",
+      "event": "ReconciledConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "RECONCILING",
+      "target": "AWAITING_HUMAN",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_inconclusive",
+      "event": "AwaitingHuman",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "user",
+      "guard": "human_confirms",
+      "event": "HumanConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "REMEDIATION_REQUIRED",
+      "actor": "user",
+      "guard": "human_cannot_resolve",
+      "event": "RemediationRequired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "POSTCONDITION_FAILED",
+      "target": "COMPENSATION_PENDING",
+      "actor": "execution_supervisor",
+      "guard": "compensation_available",
+      "event": "CompensationPending",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMPENSATION_PENDING",
+      "target": "COMPENSATED",
+      "actor": "execution_supervisor",
+      "guard": "compensation_success",
+      "event": "Compensated",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMPENSATION_PENDING",
+      "target": "COMPENSATION_FAILED",
+      "actor": "execution_supervisor",
+      "guard": "compensation_failure",
+      "event": "CompensationFailed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMPENSATION_FAILED",
+      "target": "REMEDIATION_REQUIRED",
+      "actor": "system",
+      "guard": "compensation_exhausted",
+      "event": "RemediationRequired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "VERIFICATION_FAILED",
+      "target": "AWAITING_HUMAN",
+      "actor": "verifier",
+      "guard": "verification_failed",
+      "event": "VerificationFailed",
+      "retry_rule": "human_required"
+    },
+    {
+      "source": "PRE_DISPATCH_FAILED",
+      "target": "RETRY_EVALUATED",
+      "actor": "execution_supervisor",
+      "guard": "retry_possible",
+      "event": "RetryEvaluated",
+      "retry_rule": "automatic"
+    },
+    {
+      "source": "RETRY_EVALUATED",
+      "target": "RETRY_SCHEDULED",
+      "actor": "execution_supervisor",
+      "guard": "retry_approved",
+      "event": "RetryScheduled",
+      "retry_rule": "automatic"
+    },
+    {
+      "source": "CANCEL_REQUESTED",
+      "target": "CANCELLED",
+      "actor": "system",
+      "guard": "safe_to_cancel",
+      "event": "Cancelled",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CANCEL_REQUESTED",
+      "target": "ABORTED",
+      "actor": "system",
+      "guard": "unsafe_to_cancel",
+      "event": "Aborted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CANCEL_REQUESTED",
+      "target": "COMPENSATION_PENDING",
+      "actor": "execution_supervisor",
+      "guard": "partial_effects_exist",
+      "event": "CompensationPending",
+      "retry_rule": "never"
+    }
+  ],
+  "invariants": [
+    "No unauthorized execution (must pass POLICY_EVALUATED -> AUTHORIZED)",
+    "No double irreversible effect (same operation cannot commit twice)",
+    "Expired fencing cannot commit (EXPIRED is terminal)",
+    "Terminal states are not re-enterable",
+    "CONSENT_EXEMPT exists (low-risk auto-approve path)",
+    "Only PRE_DISPATCH_FAILED can automatic retry",
+    "EFFECT_UNKNOWN must read-back before retry (RECONCILING required)",
+    "AWAITING_HUMAN is non-terminal; REMEDIATION_REQUIRED is terminal",
+    "Each retry generates new attempt_id and new CapabilityToken"
+  ],
+  "failed_types": {
+    "PRE_DISPATCH_FAILED": "Request not sent, retry: automatic (safe)",
+    "DISPATCH_REJECTED": "Provider rejected, retry: never",
+    "EFFECT_UNKNOWN": "Sent but response lost, retry: reconcile_first",
+    "POSTCONDITION_FAILED": "Executed but postcondition not met, retry: reconcile_first",
+    "VERIFICATION_FAILED": "Verifier judged incorrect, retry: human_required"
+  },
+  "receipt_levels": {
+    "PROVIDER_ACCEPTED": "queued by provider",
+    "EFFECT_OBSERVED": "observed but not independently verified",
+    "EFFECT_VERIFIED": "independent read-back confirmed",
+    "EFFECT_CONFIRMED": "fully confirmed, terminal"
+  }
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+import json, sys
+req_id = sys.argv[1]
+base = sys.argv[2] if len(sys.argv) > 2 else "."
+with open(f"{base}/requirements/requirements.ndjson") as f:
+    for l in f:
+        r = json.loads(l)
+        if r["id"] == req_id:
+            packet = {"requirement_id": req_id, "title": r["title"], "acceptance_criteria": r.get("acceptance_criteria",[]), "security_invariants": r.get("security_invariants",[]), "allowed_files": r.get("source_files",[]), "required_tests": r.get("test_files",[]), "definition_of_done": "All acceptance criteria met + tests pass + evidence generated"}
+            print(json.dumps(packet, indent=2))
+            sys.exit(0)
+print(f"ERROR: {req_id} not found", file=sys.stderr)
+sys.exit(1)

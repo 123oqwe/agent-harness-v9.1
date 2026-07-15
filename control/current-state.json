@@ -1,0 +1,131 @@
+{
+  "version": "9.2.1",
+  "generated_at": "2026-07-16T04:27:35.172648",
+  "generated_by": "manual-audit-correction",
+  "specification": "VERIFIED",
+  "phase": 0,
+  "factory_status": "IMPLEMENTED",
+  "product_status": "NOT_STARTED",
+  "production_status": "BLOCKED",
+  "phases": {
+    "0R": {
+      "status": "VERIFIED",
+      "name": "Specification Repair and Factory Construction",
+      "blockers": []
+    },
+    "0": {
+      "status": "READY",
+      "name": "Factory Reference Project Gate",
+      "blockers": []
+    },
+    "1": {
+      "status": "BLOCKED",
+      "name": "Single-Agent Multi-Domain Foundation",
+      "blockers": [
+        "Phase 0 not passed"
+      ]
+    },
+    "2": {
+      "status": "BLOCKED",
+      "name": "Context, RAG, Multimodal & UX",
+      "blockers": [
+        "Phase 1 not passed"
+      ]
+    },
+    "3": {
+      "status": "BLOCKED",
+      "name": "Adaptive Routing & Multi-Agent",
+      "blockers": [
+        "Phase 2 not passed"
+      ]
+    },
+    "4": {
+      "status": "BLOCKED",
+      "name": "Memory, Assurance & Evolution Shadow",
+      "blockers": [
+        "Phase 3 not passed"
+      ]
+    },
+    "5": {
+      "status": "BLOCKED",
+      "name": "Certified External Actions",
+      "blockers": [
+        "Phase 4 not passed"
+      ]
+    },
+    "6": {
+      "status": "BLOCKED",
+      "name": "Mission Layer & Proactive Assistant",
+      "blockers": [
+        "Phase 5 not passed"
+      ]
+    },
+    "7": {
+      "status": "BLOCKED",
+      "name": "Enterprise Hardening",
+      "blockers": [
+        "Phase 6 not passed"
+      ]
+    },
+    "8": {
+      "status": "BLOCKED",
+      "name": "Production Launch",
+      "blockers": [
+        "Phase 7 not passed"
+      ]
+    }
+  },
+  "known_contradictions": [],
+  "rules": {
+    "status_source": "This file is the ONLY authoritative status source. All README, HTML, dashboards and reports must be generated from this file.",
+    "no_manual_status": "No generated report may be treated as a normative source.",
+    "no_circular_verification": "Registry status cannot be the source of Gate evidence. Gates must run real commands."
+  },
+  "repository_structure": {
+    "control/": "Authoritative state (current-state.json)",
+    "spec/": "Immutable specification (protected from workers)",
+    "factory/": "Autonomous engineering factory (real executable code)",
+    "product/": "Agent Harness product implementation (not yet started)",
+    "infra/": "CI/CD and infrastructure definitions",
+    "evidence/": "Immutable command output and verification records",
+    "archive/": "Superseded non-normative content"
+  },
+  "next_actions": [
+    "Implement factory/controller with durable state",
+    "Implement factory/state-store",
+    "Implement factory/requirement-queue",
+    "Implement factory/worker-adapters/codex and claude",
+    "Implement factory/verifier (real, not metadata linter)",
+    "Implement factory/phase-gates (real, not registry circular)",
+    "Run Phase 0 Reference Project Gate"
+  ],
+  "factory_test_results": {
+    "state_store": "PASS",
+    "controller": "PASS",
+    "spec_gate": "PASS",
+    "failure_injection": "PASS",
+    "blocker_service": "PASS",
+    "budget_ledger": "PASS",
+    "secret_service": "PASS",
+    "worktree_manager": "PASS",
+    "merge_queue": "PASS",
+    "dashboard": "PASS"
+  },
+  "last_updated": "2026-07-16T04:32:51.054131",
+  "verification_evidence": {
+    "model_check": "VERIFIED (TLC v2.19, 251 states, 0 errors)",
+    "spec_gate": "PASS (10/10 checks, actual file checks)",
+    "failure_injection": "PASS (10/10 failures detected)",
+    "factory_tests": "PASS (state store, controller, blocker, budget, secret, worktree, merge queue)",
+    "adrs_resolved": "12/12 (0 NEEDS_VERIFICATION)",
+    "capability_coverage": "100% (108/108 mapped)",
+    "requirements": 207
+  },
+  "cleanup_notes": {
+    "scripts_moved": "archive/non-normative/old-scripts/",
+    "agents_moved": "spec/.agents/",
+    "artifacts_audit_moved": "archive/non-normative/v9.1-audit/",
+    "phase_0R_fixed": "5 NOT DONE \u2192 DONE",
+    "bootstrap_fixed": "REPAIR_IN_PROGRESS \u2192 VERIFIED"
+  }
+}

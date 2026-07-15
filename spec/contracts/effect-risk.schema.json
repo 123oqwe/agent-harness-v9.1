@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EffectRisk",
+  "description": "Dynamic risk features. Replaces static tool risk classification.",
+  "type": "object",
+  "required": [
+    "locality",
+    "operation",
+    "reversibility",
+    "data_egress",
+    "network_access",
+    "credential_access",
+    "blast_radius",
+    "financial_impact_usd_micros",
+    "human_impact",
+    "external_visibility",
+    "regulatory_sensitivity"
+  ],
+  "properties": {
+    "locality": {
+      "enum": [
+        "local",
+        "remote",
+        "external"
+      ]
+    },
+    "operation": {
+      "enum": [
+        "read",
+        "create",
+        "write",
+        "delete",
+        "execute",
+        "publish",
+        "communicate",
+        "purchase"
+      ]
+    },
+    "reversibility": {
+      "enum": [
+        "guaranteed",
+        "best_effort",
+        "none"
+      ]
+    },
+    "data_egress": {
+      "enum": [
+        "none",
+        "metadata",
+        "content",
+        "sensitive"
+      ]
+    },
+    "network_access": {
+      "type": "boolean"
+    },
+    "credential_access": {
+      "type": "boolean"
+    },
+    "blast_radius": {
+      "enum": [
+        "single_resource",
+        "bounded_set",
+        "workspace",
+        "organization",
+        "public",
+        "unbounded"
+      ]
+    },
+    "financial_impact_usd_micros": {
+      "type": "string",
+      "description": "Decimal string, e.g. '5000000' for $5.00"
+    },
+    "human_impact": {
+      "enum": [
+        "none",
+        "self",
+        "internal_people",
+        "external_people",
+        "public"
+      ]
+    },
+    "external_visibility": {
+      "enum": [
+        "private",
+        "shared",
+        "public"
+      ]
+    },
+    "regulatory_sensitivity": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

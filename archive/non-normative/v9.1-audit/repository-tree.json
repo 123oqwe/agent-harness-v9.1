@@ -1,0 +1,729 @@
+{
+  "total_files": 181,
+  "files": [
+    {
+      "path": ".DS_Store",
+      "size": 10244
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 1694
+    },
+    {
+      "path": "AI_EXECUTION_PROTOCOL.md",
+      "size": 3989
+    },
+    {
+      "path": "CLAUDE.md",
+      "size": 484
+    },
+    {
+      "path": "EXECUTION_BOOTSTRAP_PROMPT.md",
+      "size": 2421
+    },
+    {
+      "path": "FINAL_REPORT.md",
+      "size": 2903
+    },
+    {
+      "path": "NORMATIVE_PRECEDENCE.md",
+      "size": 2859
+    },
+    {
+      "path": "README.md",
+      "size": 5229
+    },
+    {
+      "path": "SPECIFICATION_INDEX.yaml",
+      "size": 2942
+    },
+    {
+      "path": "adr/ADR-001-repository-and-monorepo.md",
+      "size": 660
+    },
+    {
+      "path": "adr/ADR-002-frontend-and-desktop.md",
+      "size": 500
+    },
+    {
+      "path": "adr/ADR-003-backend-and-api.md",
+      "size": 323
+    },
+    {
+      "path": "adr/ADR-004-database-and-migrations.md",
+      "size": 337
+    },
+    {
+      "path": "adr/ADR-005-workflow-and-queue.md",
+      "size": 296
+    },
+    {
+      "path": "adr/ADR-006-local-vault.md",
+      "size": 277
+    },
+    {
+      "path": "adr/ADR-007-rag-indexes.md",
+      "size": 236
+    },
+    {
+      "path": "adr/ADR-008-deployment-platform.md",
+      "size": 272
+    },
+    {
+      "path": "adr/ADR-009-secrets-and-identity.md",
+      "size": 236
+    },
+    {
+      "path": "adr/ADR-010-observability.md",
+      "size": 259
+    },
+    {
+      "path": "adr/ADR-011-admin-console.md",
+      "size": 231
+    },
+    {
+      "path": "adr/ADR-012-ci-cd.md",
+      "size": 321
+    },
+    {
+      "path": "appendix/competitor-research/README.md",
+      "size": 176
+    },
+    {
+      "path": "appendix/deprecated-v8-content/20-tool-phase1.md",
+      "size": 422
+    },
+    {
+      "path": "appendix/deprecated-v8-content/budget-pep-only.md",
+      "size": 430
+    },
+    {
+      "path": "appendix/deprecated-v8-content/edit-vs-delete-hardcode.md",
+      "size": 377
+    },
+    {
+      "path": "appendix/deprecated-v8-content/flat-runconfiguration.md",
+      "size": 451
+    },
+    {
+      "path": "appendix/deprecated-v8-content/generic-reexecute.md",
+      "size": 369
+    },
+    {
+      "path": "appendix/deprecated-v8-content/grep-verification.md",
+      "size": 372
+    },
+    {
+      "path": "appendix/deprecated-v8-content/monolithic-state-machine.md",
+      "size": 389
+    },
+    {
+      "path": "appendix/deprecated-v8-content/optional-default-rule.md",
+      "size": 444
+    },
+    {
+      "path": "appendix/deprecated-v8-content/parallel-routers.md",
+      "size": 393
+    },
+    {
+      "path": "appendix/deprecated-v8-content/parent-signs-capability.md",
+      "size": 387
+    },
+    {
+      "path": "appendix/deprecated-v8-content/retractable-email.md",
+      "size": 337
+    },
+    {
+      "path": "appendix/deprecated-v8-content/static-risk-tiers.md",
+      "size": 391
+    },
+    {
+      "path": "appendix/deprecated-v8-content/stub-returns-default.md",
+      "size": 434
+    },
+    {
+      "path": "appendix/deprecated-v8-content/swebench-sole-gate.md",
+      "size": 356
+    },
+    {
+      "path": "appendix/evidence-registry/README.md",
+      "size": 243
+    },
+    {
+      "path": "appendix/original-documents/README.md",
+      "size": 286
+    },
+    {
+      "path": "architecture/action-control.md",
+      "size": 867
+    },
+    {
+      "path": "architecture/assurance.md",
+      "size": 813
+    },
+    {
+      "path": "architecture/context-memory-rag.md",
+      "size": 1039
+    },
+    {
+      "path": "architecture/deployment-topology.md",
+      "size": 581
+    },
+    {
+      "path": "architecture/evolution.md",
+      "size": 685
+    },
+    {
+      "path": "architecture/harness-boundary.md",
+      "size": 1382
+    },
+    {
+      "path": "architecture/model-api-gateway.md",
+      "size": 976
+    },
+    {
+      "path": "architecture/module-boundaries.md",
+      "size": 1361
+    },
+    {
+      "path": "architecture/request-to-outcome.md",
+      "size": 1405
+    },
+    {
+      "path": "architecture/routing-system.md",
+      "size": 1122
+    },
+    {
+      "path": "architecture/runtime-core.md",
+      "size": 1566
+    },
+    {
+      "path": "architecture/tool-skill-fabric.md",
+      "size": 1182
+    },
+    {
+      "path": "architecture/trust-boundaries.md",
+      "size": 947
+    },
+    {
+      "path": "content-preservation-map.json",
+      "size": 28397
+    },
+    {
+      "path": "contracts/action-manifest.schema.json",
+      "size": 2444
+    },
+    {
+      "path": "contracts/agent-graph.schema.json",
+      "size": 297
+    },
+    {
+      "path": "contracts/capability-token.schema.json",
+      "size": 2206
+    },
+    {
+      "path": "contracts/child-capability-request.schema.json",
+      "size": 803
+    },
+    {
+      "path": "contracts/context-graph.schema.json",
+      "size": 808
+    },
+    {
+      "path": "contracts/effect-risk.schema.json",
+      "size": 1876
+    },
+    {
+      "path": "contracts/event.schema.json",
+      "size": 876
+    },
+    {
+      "path": "contracts/evidence-package.schema.json",
+      "size": 1040
+    },
+    {
+      "path": "contracts/memory-record.schema.json",
+      "size": 842
+    },
+    {
+      "path": "contracts/model-binding.schema.json",
+      "size": 727
+    },
+    {
+      "path": "contracts/release-approval.schema.json",
+      "size": 1210
+    },
+    {
+      "path": "contracts/run-defaults.schema.json",
+      "size": 525
+    },
+    {
+      "path": "contracts/run-plan.schema.json",
+      "size": 2829
+    },
+    {
+      "path": "contracts/skill-spec.schema.json",
+      "size": 1224
+    },
+    {
+      "path": "contracts/task-contract.schema.json",
+      "size": 471
+    },
+    {
+      "path": "contracts/tool-spec.schema.json",
+      "size": 2890
+    },
+    {
+      "path": "contracts/verification-graph.schema.json",
+      "size": 304
+    },
+    {
+      "path": "contracts/workflow-graph.schema.json",
+      "size": 300
+    },
+    {
+      "path": "data-tests/adversarial/README.md",
+      "size": 76
+    },
+    {
+      "path": "data-tests/consent-policy.md",
+      "size": 531
+    },
+    {
+      "path": "data-tests/consented-staging/README.md",
+      "size": 88
+    },
+    {
+      "path": "data-tests/dataset-registry.yaml",
+      "size": 1060
+    },
+    {
+      "path": "data-tests/deletion-log/README.md",
+      "size": 78
+    },
+    {
+      "path": "data-tests/golden-sets/README.md",
+      "size": 76
+    },
+    {
+      "path": "data-tests/licenses/README.md",
+      "size": 70
+    },
+    {
+      "path": "data-tests/pii-policy.md",
+      "size": 354
+    },
+    {
+      "path": "data-tests/provenance/README.md",
+      "size": 74
+    },
+    {
+      "path": "data-tests/public-benchmarks/README.md",
+      "size": 88
+    },
+    {
+      "path": "data-tests/synthetic/README.md",
+      "size": 72
+    },
+    {
+      "path": "deployment/canary-policy.md",
+      "size": 95
+    },
+    {
+      "path": "deployment/disaster-recovery.md",
+      "size": 127
+    },
+    {
+      "path": "deployment/environments.md",
+      "size": 124
+    },
+    {
+      "path": "deployment/feature-flags.md",
+      "size": 252
+    },
+    {
+      "path": "deployment/infrastructure-spec.md",
+      "size": 124
+    },
+    {
+      "path": "deployment/migration-policy.md",
+      "size": 152
+    },
+    {
+      "path": "deployment/release-manifest.schema.json",
+      "size": 710
+    },
+    {
+      "path": "deployment/rollback-policy.md",
+      "size": 176
+    },
+    {
+      "path": "deployment/secret-management.md",
+      "size": 193
+    },
+    {
+      "path": "evals/coding/README.md",
+      "size": 246
+    },
+    {
+      "path": "evals/documents/README.md",
+      "size": 252
+    },
+    {
+      "path": "evals/enterprise/README.md",
+      "size": 254
+    },
+    {
+      "path": "evals/external-actions/README.md",
+      "size": 266
+    },
+    {
+      "path": "evals/founder-operator/README.md",
+      "size": 266
+    },
+    {
+      "path": "evals/long-running-missions/README.md",
+      "size": 276
+    },
+    {
+      "path": "evals/memory/README.md",
+      "size": 246
+    },
+    {
+      "path": "evals/multimodal/README.md",
+      "size": 254
+    },
+    {
+      "path": "evals/personal-assistant/README.md",
+      "size": 270
+    },
+    {
+      "path": "evals/planning/README.md",
+      "size": 250
+    },
+    {
+      "path": "evals/research/README.md",
+      "size": 250
+    },
+    {
+      "path": "evals/routing/README.md",
+      "size": 248
+    },
+    {
+      "path": "evals/security/README.md",
+      "size": 250
+    },
+    {
+      "path": "evals/writing/README.md",
+      "size": 248
+    },
+    {
+      "path": "operations/alerts.yaml",
+      "size": 270
+    },
+    {
+      "path": "operations/incident-response.md",
+      "size": 137
+    },
+    {
+      "path": "operations/post-launch-review.md",
+      "size": 151
+    },
+    {
+      "path": "operations/runbooks/README.md",
+      "size": 64
+    },
+    {
+      "path": "operations/slos.yaml",
+      "size": 180
+    },
+    {
+      "path": "operations/status-page.md",
+      "size": 99
+    },
+    {
+      "path": "operations/support-workflow.md",
+      "size": 116
+    },
+    {
+      "path": "phases/phase-0.yaml",
+      "size": 1942
+    },
+    {
+      "path": "phases/phase-1.yaml",
+      "size": 2668
+    },
+    {
+      "path": "phases/phase-2.yaml",
+      "size": 1899
+    },
+    {
+      "path": "phases/phase-3.yaml",
+      "size": 1660
+    },
+    {
+      "path": "phases/phase-4.yaml",
+      "size": 1464
+    },
+    {
+      "path": "phases/phase-5.yaml",
+      "size": 1690
+    },
+    {
+      "path": "phases/phase-6.yaml",
+      "size": 1595
+    },
+    {
+      "path": "phases/phase-7.yaml",
+      "size": 1466
+    },
+    {
+      "path": "phases/phase-8.yaml",
+      "size": 1683
+    },
+    {
+      "path": "product/accessibility.md",
+      "size": 269
+    },
+    {
+      "path": "product/billing-and-limits.md",
+      "size": 376
+    },
+    {
+      "path": "product/experience-profiles.md",
+      "size": 435
+    },
+    {
+      "path": "product/jobs-to-be-done.md",
+      "size": 731
+    },
+    {
+      "path": "product/launch-plan.md",
+      "size": 411
+    },
+    {
+      "path": "product/notifications.md",
+      "size": 274
+    },
+    {
+      "path": "product/onboarding.md",
+      "size": 269
+    },
+    {
+      "path": "product/personas.md",
+      "size": 1203
+    },
+    {
+      "path": "product/privacy-ux.md",
+      "size": 321
+    },
+    {
+      "path": "product/product-prd.md",
+      "size": 935
+    },
+    {
+      "path": "product/support-and-abuse.md",
+      "size": 261
+    },
+    {
+      "path": "product/user-journeys.md",
+      "size": 324
+    },
+    {
+      "path": "product/ux-information-architecture.md",
+      "size": 506
+    },
+    {
+      "path": "requirements/dependency-graph.json",
+      "size": 2810
+    },
+    {
+      "path": "requirements/requirement-schema.json",
+      "size": 2908
+    },
+    {
+      "path": "requirements/requirements.ndjson",
+      "size": 46844
+    },
+    {
+      "path": "requirements/traceability-matrix.json",
+      "size": 18103
+    },
+    {
+      "path": "state-machines/approval.machine.json",
+      "size": 348
+    },
+    {
+      "path": "state-machines/attempt.machine.json",
+      "size": 239
+    },
+    {
+      "path": "state-machines/external-effect.machine.json",
+      "size": 423
+    },
+    {
+      "path": "state-machines/harness.cfg",
+      "size": 102
+    },
+    {
+      "path": "state-machines/harness.tla",
+      "size": 2090
+    },
+    {
+      "path": "state-machines/invariants.md",
+      "size": 1473
+    },
+    {
+      "path": "state-machines/mission.machine.json",
+      "size": 341
+    },
+    {
+      "path": "state-machines/model-check-report.txt",
+      "size": 204
+    },
+    {
+      "path": "state-machines/operation.machine.json",
+      "size": 12185
+    },
+    {
+      "path": "state-machines/run.machine.json",
+      "size": 3388
+    },
+    {
+      "path": "state-machines/step.machine.json",
+      "size": 273
+    },
+    {
+      "path": "threat-model/assets.yaml",
+      "size": 740
+    },
+    {
+      "path": "threat-model/control-test-map.yaml",
+      "size": 484
+    },
+    {
+      "path": "threat-model/controls.yaml",
+      "size": 763
+    },
+    {
+      "path": "threat-model/residual-risks.yaml",
+      "size": 3396
+    },
+    {
+      "path": "threat-model/threats.yaml",
+      "size": 2898
+    },
+    {
+      "path": "threat-model/trust-boundaries.yaml",
+      "size": 682
+    },
+    {
+      "path": "ui/.DS_Store",
+      "size": 8196
+    },
+    {
+      "path": "ui/accessibility/README.md",
+      "size": 71
+    },
+    {
+      "path": "ui/admin/README.md",
+      "size": 55
+    },
+    {
+      "path": "ui/component-contracts/README.md",
+      "size": 83
+    },
+    {
+      "path": "ui/routes.yaml",
+      "size": 1313
+    },
+    {
+      "path": "ui/screens/approval_center.yaml",
+      "size": 731
+    },
+    {
+      "path": "ui/screens/chat.yaml",
+      "size": 676
+    },
+    {
+      "path": "ui/screens/coding_workspace.yaml",
+      "size": 736
+    },
+    {
+      "path": "ui/screens/daily_brief.yaml",
+      "size": 711
+    },
+    {
+      "path": "ui/screens/document_workspace.yaml",
+      "size": 746
+    },
+    {
+      "path": "ui/screens/enterprise_admin.yaml",
+      "size": 736
+    },
+    {
+      "path": "ui/screens/evidence_viewer.yaml",
+      "size": 731
+    },
+    {
+      "path": "ui/screens/memory_center.yaml",
+      "size": 721
+    },
+    {
+      "path": "ui/screens/mission_control.yaml",
+      "size": 731
+    },
+    {
+      "path": "ui/screens/multimodal_studio.yaml",
+      "size": 741
+    },
+    {
+      "path": "ui/screens/notification_center.yaml",
+      "size": 751
+    },
+    {
+      "path": "ui/screens/onboarding.yaml",
+      "size": 706
+    },
+    {
+      "path": "ui/screens/planning_workspace.yaml",
+      "size": 746
+    },
+    {
+      "path": "ui/screens/privacy_center.yaml",
+      "size": 726
+    },
+    {
+      "path": "ui/screens/reconciliation_center.yaml",
+      "size": 761
+    },
+    {
+      "path": "ui/screens/research_workspace.yaml",
+      "size": 746
+    },
+    {
+      "path": "ui/screens/settings.yaml",
+      "size": 696
+    },
+    {
+      "path": "ui/screens/task_view.yaml",
+      "size": 701
+    },
+    {
+      "path": "ui/screens/writing_workspace.yaml",
+      "size": 741
+    },
+    {
+      "path": "ui/states/README.md",
+      "size": 57
+    },
+    {
+      "path": "ui/visual-regression/README.md",
+      "size": 79
+    },
+    {
+      "path": "validation-report.json",
+      "size": 532
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Three Orthogonal Dimensions + Workflow Overlay — Strategy × Workflow × Agent Topology -->
+<svg width="1400" height="680" viewBox="0 0 1400 680" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="680" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Three Orthogonal Dimensions + Workflow Overlay — Strategy × Workflow Pattern × Agent Topology (v8)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">v7 错误: ReAct / PlanExecute / DecomposeDelegate 混在同一个列表 · v8: 3 维度各自独立选择, 联合优化</text>
+<rect x="20" y="65" width="440" height="290" fill="#0d1117" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="30" y="83" fill="#3fb950" font-size="11" font-weight="bold">Dimension 1: Reasoning Strategy</text>
+<text x="30" y="99" fill="#8b949e" font-size="10">一个 Agent 如何推理和推进?</text>
+<rect x="30" y="95" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="113" fill="#3fb950" font-size="10" font-weight="bold">Direct / SingleShot</text>
+<text x="40" y="129" fill="#8b949e" font-size="9">单次生成 · 无工具 · 风险低</text>
+<rect x="30" y="137" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="155" fill="#3fb950" font-size="10" font-weight="bold">ReAct</text>
+<text x="40" y="171" fill="#8b949e" font-size="9">Reason→Act→Observe 交替 · 高探索性</text>
+<rect x="30" y="179" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="197" fill="#3fb950" font-size="10" font-weight="bold">Plan + Execute</text>
+<text x="40" y="213" fill="#8b949e" font-size="9">先拆步骤 · 步骤依赖 · 持续验证 · replan</text>
+<rect x="30" y="221" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="239" fill="#3fb950" font-size="10" font-weight="bold">ReWOO</text>
+<text x="40" y="255" fill="#8b949e" font-size="9">Planner→变量依赖图→Worker并行→Solver汇总 · 解耦推理与观察</text>
+<rect x="30" y="263" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="281" fill="#3fb950" font-size="10" font-weight="bold">Iterative Refinement</text>
+<text x="40" y="297" fill="#8b949e" font-size="9">Generate→Evaluate→Refine→Repeat</text>
+<rect x="30" y="305" width="420" height="35" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="40" y="323" fill="#3fb950" font-size="10" font-weight="bold">Deterministic Workflow</text>
+<text x="40" y="339" fill="#8b949e" font-size="9">预定义步骤 · LLM只做内容</text>
+<rect x="480" y="65" width="440" height="220" fill="#0d1117" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="490" y="83" fill="#58a6ff" font-size="11" font-weight="bold">Dimension 2: Workflow Pattern (可叠加)</text>
+<text x="490" y="99" fill="#8b949e" font-size="10">与 Strategy 叠加使用</text>
+<rect x="490" y="95" width="420" height="32" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="500" y="113" fill="#58a6ff" font-size="10" font-weight="bold">Research Then Act</text>
+<text x="500" y="129" fill="#8b949e" font-size="9">Research(read-only)→Synthesis→确认→Execute</text>
+<rect x="490" y="133" width="420" height="32" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="500" y="151" fill="#58a6ff" font-size="10" font-weight="bold">Clarify Then Act</text>
+<text x="500" y="167" fill="#8b949e" font-size="9">问1-3问题→重新评估→选新Strategy</text>
+<rect x="490" y="171" width="420" height="32" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="500" y="189" fill="#58a6ff" font-size="10" font-weight="bold">Map Reduce</text>
+<text x="500" y="205" fill="#8b949e" font-size="9">Map(独立处理)→Reduce(汇总)</text>
+<rect x="490" y="209" width="420" height="32" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="500" y="227" fill="#58a6ff" font-size="10" font-weight="bold">Planner Worker Verifier</text>
+<text x="500" y="243" fill="#8b949e" font-size="9">Planner→Workers→Verifier(blind)</text>
+<rect x="490" y="247" width="420" height="32" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="500" y="265" fill="#58a6ff" font-size="10" font-weight="bold">Deterministic Pipeline</text>
+<text x="500" y="281" fill="#8b949e" font-size="9">固定流程(CI/CD)</text>
+<rect x="940" y="65" width="440" height="290" fill="#0d1117" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="950" y="83" fill="#bc8cff" font-size="11" font-weight="bold">Dimension 3: Agent Topology</text>
+<text x="950" y="99" fill="#8b949e" font-size="10">用几个 Agent? 怎么编排?</text>
+<rect x="950" y="95" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="113" fill="#bc8cff" font-size="10" font-weight="bold">Single Agent</text>
+<text x="960" y="129" fill="#8b949e" font-size="9">默认优先 · 便宜 · 易调试 · 串行 · 领域单一</text>
+<rect x="950" y="137" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="155" fill="#bc8cff" font-size="10" font-weight="bold">Supervisor Workers</text>
+<text x="960" y="171" fill="#8b949e" font-size="9">Supervisor→N Workers→汇总 · decomposability+parallelizability高</text>
+<rect x="950" y="179" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="197" fill="#bc8cff" font-size="10" font-weight="bold">Planner Executor Verifier</text>
+<text x="960" y="213" fill="#8b949e" font-size="9">Planner→Executor→Verifier(blind) · 高风险需独立验证</text>
+<rect x="950" y="221" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="239" fill="#bc8cff" font-size="10" font-weight="bold">Parallel Specialists</text>
+<text x="960" y="255" fill="#8b949e" font-size="9">N个专家并行 · 不同领域独立子任务</text>
+<rect x="950" y="263" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="281" fill="#bc8cff" font-size="10" font-weight="bold">Peer Ensemble</text>
+<text x="960" y="297" fill="#8b949e" font-size="9">N个Agent独立解题→投票/择优 · 红蓝队</text>
+<rect x="950" y="305" width="420" height="35" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="960" y="323" fill="#bc8cff" font-size="10" font-weight="bold">Agent Swarm</text>
+<text x="960" y="339" fill="#8b949e" font-size="9">大量并行探索→Aggregator去重 · 搜索空间大 · 只读/沙箱 · 不拥有Action Capability</text>
+<rect x="480" y="300" width="440" height="55" fill="#1a1208" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="490" y="318" fill="#fbbf24" font-size="11" font-weight="bold">MultiAgentUtility 计算</text>
+<text x="490" y="334" fill="#8b949e" font-size="10">parallelism_gain + specialization_gain + context_relief + verification_independence</text>
+<text x="490" y="348" fill="#8b949e" font-size="9">- coordination_cost - token_cost - merge_risk - security_risk</text>
+<text x="490" y="362" fill="#8b949e" font-size="9">只有 MultiAgentUtility >> SingleAgentUtility 才选 Multi-Agent</text>
+<text x="20" y="380" fill="#fbcfe8" font-size="12" font-weight="bold">联合优化示例:</text>
+<rect x="20" y="390" width="1360" height="180" fill="#0d1117" stroke="#161b22" stroke-width="2" rx="6"/>
+<text x="30" y="408" fill="#161b22" font-size="11" font-weight="bold">三维度联合选择 (由 Global Route Optimizer 统一评分)</text>
+<text x="30" y="412" fill="#fbbf24" font-size="10" font-weight="bold">任务</text>
+<text x="300" y="412" fill="#3fb950" font-size="10" font-weight="bold">Strategy</text>
+<text x="550" y="412" fill="#58a6ff" font-size="10" font-weight="bold">Workflow</text>
+<text x="850" y="412" fill="#bc8cff" font-size="10" font-weight="bold">Topology</text>
+<text x="1150" y="412" fill="#f778ba" font-size="10" font-weight="bold">Context</text>
+<text x="30" y="430" fill="#8b949e" font-size="9">读文件并总结</text>
+<text x="300" y="430" fill="#3fb950" font-size="9">Direct</text>
+<text x="550" y="430" fill="#58a6ff" font-size="9">—</text>
+<text x="850" y="430" fill="#bc8cff" font-size="9">Single Agent</text>
+<text x="1150" y="430" fill="#f778ba" font-size="9">—</text>
+<text x="30" y="447" fill="#8b949e" font-size="9">单文件修bug</text>
+<text x="300" y="447" fill="#3fb950" font-size="9">ReAct</text>
+<text x="550" y="447" fill="#58a6ff" font-size="9">—</text>
+<text x="850" y="447" fill="#bc8cff" font-size="9">Single Agent</text>
+<text x="1150" y="447" fill="#f778ba" font-size="9">—</text>
+<text x="30" y="464" fill="#8b949e" font-size="9">跨文件重构</text>
+<text x="300" y="464" fill="#3fb950" font-size="9">PlanExecute</text>
+<text x="550" y="464" fill="#58a6ff" font-size="9">—</text>
+<text x="850" y="464" fill="#bc8cff" font-size="9">Single Agent</text>
+<text x="1150" y="464" fill="#f778ba" font-size="9">—</text>
+<text x="30" y="481" fill="#8b949e" font-size="9">大型代码迁移</text>
+<text x="300" y="481" fill="#3fb950" font-size="9">ReWOO</text>
+<text x="550" y="481" fill="#58a6ff" font-size="9">Planner-Worker-Verifier</text>
+<text x="850" y="481" fill="#bc8cff" font-size="9">Supervisor Workers</text>
+<text x="1150" y="481" fill="#f778ba" font-size="9">Parent-Child</text>
+<text x="30" y="498" fill="#8b949e" font-size="9">未知领域调研+实现</text>
+<text x="300" y="498" fill="#3fb950" font-size="9">PlanExecute</text>
+<text x="550" y="498" fill="#58a6ff" font-size="9">Research Then Act</text>
+<text x="850" y="498" fill="#bc8cff" font-size="9">Single→升级</text>
+<text x="1150" y="498" fill="#f778ba" font-size="9">Shared Selective</text>
+<text x="30" y="515" fill="#8b949e" font-size="9">大规模漏洞搜索</text>
+<text x="300" y="515" fill="#3fb950" font-size="9">ReAct</text>
+<text x="550" y="515" fill="#58a6ff" font-size="9">Map Reduce</text>
+<text x="850" y="515" fill="#bc8cff" font-size="9">Agent Swarm</text>
+<text x="1150" y="515" fill="#f778ba" font-size="9">Shared Blackboard</text>
+<text x="30" y="532" fill="#8b949e" font-size="9">多方案对比设计</text>
+<text x="300" y="532" fill="#3fb950" font-size="9">Direct</text>
+<text x="550" y="532" fill="#58a6ff" font-size="9">—</text>
+<text x="850" y="532" fill="#bc8cff" font-size="9">Peer Ensemble</text>
+<text x="1150" y="532" fill="#f778ba" font-size="9">Isolated</text>
+<text x="30" y="549" fill="#8b949e" font-size="9">需求模糊请求</text>
+<text x="300" y="549" fill="#3fb950" font-size="9">Direct</text>
+<text x="550" y="549" fill="#58a6ff" font-size="9">Clarify Then Act</text>
+<text x="850" y="549" fill="#bc8cff" font-size="9">Single Agent</text>
+<text x="1150" y="549" fill="#f778ba" font-size="9">—</text>
+<rect x="20" y="585" width="1360" height="55" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="30" y="603" fill="#f85149" font-size="11" font-weight="bold">Agent Swarm 约束</text>
+<text x="30" y="619" fill="#8b949e" font-size="10">Swarm 不作为复杂任务默认模式 · 只适合: 搜索空间大+独立假设+耦合低+并行提高成功率+有Aggregator+只读/沙箱</text>
+<text x="30" y="633" fill="#8b949e" font-size="9">Swarm 不直接拥有外部 Action Capability · 只有 Supervisor/最终执行Agent 可申请现实动作 · 不适合: 发邮件/支付/部署/DB写入</text>
+<text x="20" y="658" fill="#f85149" font-size="10">THREAT-SWARM-ACTION: Swarm 执行外部动作 → Control: Swarm 不拥有 Action Capability · THREAT-MULTI-AGENT-ESCAPE: 共享上下文逃逸 → Context isolation + capability attenuation</text>
+</svg>

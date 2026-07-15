@@ -1,0 +1,81 @@
+phase: 2
+name: "Context, RAG, Multimodal & Product UX"
+status: BLOCKED
+objective: "Context, RAG, Multimodal & Product UX"
+
+dependencies:
+  - phase-0
+  - phase-1
+
+enabled_domains:
+  - coding
+  - documents
+  - research
+  - writing
+  - planning
+  - personal_assistant
+  - multimodal
+
+disabled_capabilities:
+  - external_write
+  - multi_agent
+  - dynamic_tool_generation
+
+requirements:
+  - AH-RUNTIME-COMPACTION-001
+  - AH-RUNTIME-STEERING-001
+  - AH-HOOK-001
+  - AH-PAUSE-RESUME-001
+
+fixtures:
+  - fixtures/phase-2/valid/
+  - fixtures/phase-2/invalid/
+
+unit_tests: "tests/phase-2/unit/"
+integration_tests: "tests/phase-2/integration/"
+e2e_tests: "tests/phase-2/e2e/"
+security_tests: "tests/phase-2/security/"
+
+domain_evals:
+  coding: "evals/coding/phase-2.yaml"
+  documents: "evals/documents/phase-2.yaml"
+  research: "evals/research/phase-2.yaml"
+  writing: "evals/writing/phase-2.yaml"
+  planning: "evals/planning/phase-2.yaml"
+  personal_assistant: "evals/personal_assistant/phase-2.yaml"
+  multimodal: "evals/multimodal/phase-2.yaml"
+
+real_data_tests:
+  synthetic: "data-tests/synthetic/phase-2/"
+  public_benchmarks: "data-tests/public-benchmarks/phase-2/"
+  consented_staging: "data-tests/consented-staging/phase-2/"
+
+deployment_target:
+  phase_0: "N/A - specification only"
+  phase_1: "local"
+  phase_2: "local"
+  phase_3: "local"
+  phase_4: "local + staging"
+  phase_5: "staging"
+  phase_6: "staging"
+  phase_7: "canary"
+  phase_8: "production"
+
+rollback: "auto-rollback if gate fails"
+evidence: "artifacts/phase-2/"
+
+entry_criteria:
+  - "Previous phase gate passed"
+  - "All dependencies verified"
+  - "No open P0 blockers"
+
+exit_criteria:
+  - all_phase_requirements_verified: true
+  - regression_tests_pass: true
+  - active_stub_count: 0
+
+blocked_conditions:
+  - "Previous phase gate not passed"
+  - "Open P0 blockers"
+  - "Missing dependencies"
+  - "Test environment unavailable"

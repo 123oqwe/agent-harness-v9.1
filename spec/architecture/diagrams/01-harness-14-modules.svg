@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Agent Harness System Architecture — 14 Modules inside Harness Boundary -->
+<svg width="1400" height="1150" viewBox="0 0 1400 1150" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="1150" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Agent Harness v8 — System Architecture: 14 Modules inside Harness Boundary</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">Harness 永久存在 · Router 生成 RunConfiguration · 不重新造 Harness · 14 模块全部在 Harness 边界内</text>
+<rect x="5" y="55" width="1390" height="1085" fill="none" stroke="#fbcfe8" stroke-width="3" rx="12" stroke-dasharray="8,4"/>
+<text x="15" y="72" fill="#fbcfe8" font-size="14" font-weight="bold">AGENT HARNESS</text>
+<rect x="300" y="80" width="800" height="35" fill="#1a1a2e" stroke="#f0f0f5" stroke-width="2" rx="6"/>
+<text x="310" y="98" fill="#f0f0f5" font-size="11" font-weight="bold">Input / Prompt / Instructions (CLI / REPL / API 只是入口)</text>
+<rect x="400" y="125" width="600" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="410" y="143" fill="#58a6ff" font-size="11" font-weight="bold">Task Profiler (1 LLM call)</text>
+<text x="410" y="159" fill="#8b949e" font-size="10">Intent · Domain · Modality · Complexity · Risk · Budget</text>
+<text x="410" y="173" fill="#8b949e" font-size="9">确定性 preflight → 1次LLM → TaskProfile</text>
+<line x1="700" y1="115" x2="700" y2="125" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="100" y="195" width="1200" height="200" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="110" y="213" fill="#fbcfe8" font-size="11" font-weight="bold">Routing & Orchestration System (v8 REWRITE)</text>
+<line x1="700" y1="180" x2="700" y2="195" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="110" y="230" width="250" height="42" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="120" y="248" fill="#3fb950" font-size="10" font-weight="bold">Strategy Router</text>
+<text x="120" y="264" fill="#8b949e" font-size="9">Direct | ReAct | PlanExecute | ReWOO | IterativeRefine</text>
+<rect x="110" y="280" width="250" height="42" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="120" y="298" fill="#58a6ff" font-size="10" font-weight="bold">Agent Topology Router</text>
+<text x="120" y="314" fill="#8b949e" font-size="9">Single | Supervisor | Planner-Verifier | Swarm</text>
+<rect x="110" y="330" width="250" height="42" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="120" y="348" fill="#bc8cff" font-size="10" font-weight="bold">Context Topology Router v8</text>
+<text x="120" y="364" fill="#8b949e" font-size="9">Shared | Selective | Parent-Child | Isolated | Artifact | Blackboard | Blind</text>
+<rect x="660" y="230" width="250" height="42" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="670" y="248" fill="#fbbf24" font-size="10" font-weight="bold">Model/API Router v8</text>
+<text x="670" y="264" fill="#8b949e" font-size="9">Capability Registry → Provider Policy → 动态选择</text>
+<rect x="660" y="280" width="250" height="42" fill="#21262d" stroke="#e3b341" stroke-width="2" rx="6"/>
+<text x="670" y="298" fill="#e3b341" font-size="10" font-weight="bold">Tool Router</text>
+<text x="670" y="314" fill="#8b949e" font-size="9">20+ tools, each with schema + effect contract + risk tier</text>
+<rect x="660" y="330" width="250" height="42" fill="#21262d" stroke="#f778ba" stroke-width="2" rx="6"/>
+<text x="670" y="348" fill="#f778ba" font-size="10" font-weight="bold">Skill Router</text>
+<text x="670" y="364" fill="#8b949e" font-size="9">10+ skills, each with trigger + workflow + strategy</text>
+<rect x="1010" y="230" width="250" height="42" fill="#21262d" stroke="#39c5cf" stroke-width="2" rx="6"/>
+<text x="1020" y="248" fill="#39c5cf" font-size="10" font-weight="bold">Execution Env Router</text>
+<text x="1020" y="264" fill="#8b949e" font-size="9">Host | Sandbox | Container | MicroVM | Browser</text>
+<rect x="1010" y="280" width="250" height="42" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="1020" y="298" fill="#3fb950" font-size="10" font-weight="bold">Verification Router</text>
+<text x="1020" y="314" fill="#8b949e" font-size="9">Deterministic | Blind | Independent Verifier</text>
+<rect x="1010" y="330" width="250" height="42" fill="#21262d" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="1020" y="348" fill="#f85149" font-size="10" font-weight="bold">Global Route Optimizer</text>
+<text x="1020" y="364" fill="#8b949e" font-size="9">联合评分: success/cost/latency/risk</text>
+<line x1="360" y1="250" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="360" y1="300" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="910" y1="250" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<line x1="910" y1="300" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
+<rect x="400" y="405" width="600" height="40" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="410" y="423" fill="#fbcfe8" font-size="11" font-weight="bold">RunConfiguration (本次运行配置, 不是新 Harness)</text>
+<text x="410" y="439" fill="#8b949e" font-size="10">strategy + topology + context_topology + model + tools + skills + env + policies</text>
+<line x1="700" y1="400" x2="700" y2="405" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="200" y="460" width="1000" height="60" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="210" y="478" fill="#3fb950" font-size="11" font-weight="bold">Agent Runtime Core</text>
+<text x="210" y="494" fill="#8b949e" font-size="10">Loop · Scheduler · State · Streaming · Pause/Resume/Cancel · Subagent lifecycle</text>
+<text x="210" y="508" fill="#8b949e" font-size="9">Single Agent / Multi-Agent / Swarm lifecycle · Re-route when needed</text>
+<line x1="700" y1="445" x2="700" y2="460" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="200" y="535" width="1000" height="40" fill="#21262d" stroke="#e3b341" stroke-width="2" rx="6"/>
+<text x="210" y="553" fill="#e3b341" font-size="11" font-weight="bold">Tools / Skills / Function Call / MCP (20+ tools, 10+ skills)</text>
+<text x="210" y="569" fill="#8b949e" font-size="10">Tool Registry · Skill Registry · MCP host · v8: Tool/Skill/Model API 区分</text>
+<line x1="700" y1="520" x2="700" y2="535" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="200" y="590" width="1000" height="40" fill="#21262d" stroke="#39c5cf" stroke-width="2" rx="6"/>
+<text x="210" y="608" fill="#39c5cf" font-size="11" font-weight="bold">Execution Environment & Sandbox</text>
+<text x="210" y="624" fill="#8b949e" font-size="10">Host · Local sandbox · Container · MicroVM · Browser · Remote worker</text>
+<line x1="700" y1="575" x2="700" y2="590" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="100" y="645" width="1200" height="80" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="110" y="663" fill="#f85149" font-size="11" font-weight="bold">Action Control & Human Review (TCB 6组件, v6.1 不变)</text>
+<text x="110" y="679" fill="#8b949e" font-size="10">Policy Engine(deny-by-default) → Human Consent → Authorization(CapabilityToken) → PEP(verify+execute)</text>
+<text x="110" y="693" fill="#8b949e" font-size="9">Secrets Broker · Controlled Effect Protocol · ★BudgetGuard 硬执行 · Kill Switch</text>
+<line x1="700" y1="630" x2="700" y2="645" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="200" y="740" width="1000" height="55" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="210" y="758" fill="#3fb950" font-size="11" font-weight="bold">Assurance & Verification (独立 Verifier, 只读)</text>
+<text x="210" y="774" fill="#8b949e" font-size="10">确定性检查 → schema → 测试 → read-back → policy → outcome</text>
+<text x="210" y="788" fill="#8b949e" font-size="9">★TaskExecutionRecord → Evolution Engine · 恢复: retry/reconcile/compensate/revert/remediate</text>
+<line x1="700" y1="725" x2="700" y2="740" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="100" y="810" width="1200" height="45" fill="#1a1208" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="110" y="828" fill="#fbbf24" font-size="11" font-weight="bold">Harness Re-routing & Fallback (v8: 11 types)</text>
+<text x="110" y="844" fill="#8b949e" font-size="10">Model · Provider · Tool · Strategy · Topology upgrade/downgrade · Context change · Env · Verification escalation · Human · Budget degradation</text>
+<line x1="700" y1="795" x2="700" y2="810" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="100" y="870" width="1200" height="100" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="110" y="888" fill="#bc8cff" font-size="11" font-weight="bold">6 Cross-cutting Planes (贯穿全流程)</text>
+<text x="110" y="904" fill="#8b949e" font-size="10">A: Memory(v6.1) · B1: Observability(v8) · B2: Audit(v6.1) · C: Eval(v6.1) · D: Governance(v6.1) · E: Skill&Evolution(v8)</text>
+<text x="110" y="918" fill="#8b949e" font-size="9">B1: Tracing+Profiler+Replay+Anomaly · E: Skill Registry+Pattern Store+Evolution+Self-Model</text>
+<text x="110" y="932" fill="#8b949e" font-size="9">Budget Guard (Router→Runtime→PEP): Pre-flight→Reserve→Track→Degrade→Hard stop</text>
+<line x1="700" y1="855" x2="700" y2="870" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="100" y="985" width="1200" height="55" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="110" y="1003" fill="#f85149" font-size="11" font-weight="bold">安全内核 (v6.1 不变, v8 不修改)</text>
+<text x="110" y="1019" fill="#8b949e" font-size="10">TCB(6) · CapabilityToken · 状态机(35态) · Canonical Hash · Risk Tier(0-5) · Secrets Broker(双模式)</text>
+<text x="110" y="1033" fill="#8b949e" font-size="9">Identity Plane(7) · Local Vault · Controlled Effect Protocol · Evidence(8级) · Data Contracts</text>
+<path d="M 1050 770 Q 1100 500 1050 420" fill="none" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ab)"/>
+<text x="1080" y="580" fill="#58a6ff" font-size="10">L9 fail → re-route</text>
+<path d="M 350 770 Q 300 600 350 470" fill="none" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
+<text x="280" y="620" fill="#3fb950" font-size="9">Evolution → optimize Router</text>
+<text x="20" y="1065" fill="#fbcfe8" font-size="10">v8 NEW: Harness边界 · 8 Routers · RunConfiguration · Three Orthogonal Dimensions + Workflow Overlay · Context Topology · Model/API Gateway · 11 Fallback types</text>
+<text x="20" y="1080" fill="#8b949e" font-size="10">v6.1 保留: TCB · CapabilityToken · 状态机 · Canonical Hash · Risk Tier · Secrets Broker · Identity Plane · Local Vault · Data Contracts · Evidence</text>
+<text x="20" y="1095" fill="#8b949e" font-size="10">来源: CC(LSP/hooks/goal) + Codex(OS沙箱/subagents/fork) + pi(ExecutionEnv/hook链) + v6.1(TCB/Manifest/Capability) + v8(Router/Topology/Evolution)</text>
+</svg>

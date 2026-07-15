@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskContract",
+  "required": [
+    "goal",
+    "success_criteria",
+    "constraints"
+  ],
+  "properties": {
+    "goal": {
+      "type": "string"
+    },
+    "success_criteria": {
+      "type": "array"
+    },
+    "constraints": {
+      "type": "array"
+    },
+    "deadline": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

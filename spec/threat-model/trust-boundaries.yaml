@@ -1,0 +1,19 @@
+# Trust Boundaries
+- id: TB-001
+  name: User Approval -> Tool Execution
+  description: Time-of-check to time-of-use (TOCTOU) boundary
+- id: TB-002
+  name: Local Sandbox -> Host
+  description: Sandboxed code cannot access host resources
+- id: TB-003
+  name: Local Vault -> Cloud
+  description: Vault data cannot leave device without explicit consent
+- id: TB-004
+  name: Agent -> External Provider
+  description: Agent actions on external systems are controlled
+- id: TB-005
+  name: Tenant A -> Tenant B
+  description: Cross-tenant isolation in enterprise deployment
+- id: TB-006
+  name: Tool Output -> Agent Context
+  description: Untrusted tool output cannot override instructions

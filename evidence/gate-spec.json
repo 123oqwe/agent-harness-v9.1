@@ -1,0 +1,58 @@
+{
+  "gate": "spec",
+  "checks": [
+    {
+      "name": "current_state_exists",
+      "passed": true,
+      "detail": "specification=VERIFIED"
+    },
+    {
+      "name": "requirements_valid",
+      "passed": true,
+      "detail": "207 requirements, 0 duplicates"
+    },
+    {
+      "name": "model_check_verified",
+      "passed": true,
+      "detail": "Status: VERIFIED"
+    },
+    {
+      "name": "all_phases_have_requirements",
+      "passed": true,
+      "detail": "All phases have requirements"
+    },
+    {
+      "name": "no_status_contradictions",
+      "passed": true,
+      "detail": "No contradictions"
+    },
+    {
+      "name": "api_files_exist",
+      "passed": true,
+      "detail": "All API files exist and non-empty"
+    },
+    {
+      "name": "factory_controller_exists",
+      "passed": true,
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
+    },
+    {
+      "name": "codeowners_exists",
+      "passed": true,
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../spec/CODEOWNERS"
+    },
+    {
+      "name": "ui_screens_differentiated",
+      "passed": true,
+      "detail": "All UI screens differentiated"
+    },
+    {
+      "name": "adrs_resolved",
+      "passed": true,
+      "detail": "All ADRs resolved"
+    }
+  ],
+  "result": "PASS",
+  "timestamp": "2026-07-16T05:18:58.704851",
+  "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
+}

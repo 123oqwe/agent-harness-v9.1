@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReleaseApproval",
+  "description": "Human-signed production release authorization. No AI agent may approve its own release.",
+  "type": "object",
+  "required": [
+    "release_id",
+    "build_digest",
+    "release_manifest_hash",
+    "target_environment",
+    "approved_by",
+    "approved_at",
+    "expires_at",
+    "webauthn_signature"
+  ],
+  "properties": {
+    "release_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "build_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "release_manifest_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_environment": {
+      "const": "production"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Authorized human principal"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Approval TTL, e.g., 24h"
+    },
+    "webauthn_signature": {
+      "type": "string",
+      "description": "Unforgeable human signature"
+    }
+  },
+  "additionalProperties": false
+}

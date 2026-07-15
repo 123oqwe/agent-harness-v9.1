@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Requirement",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "description",
+    "domain",
+    "experience_profile",
+    "priority",
+    "delivery_phase",
+    "specification_maturity",
+    "implementation_maturity",
+    "owner_module",
+    "dependencies",
+    "inputs",
+    "outputs",
+    "preconditions",
+    "acceptance_criteria",
+    "security_invariants",
+    "privacy_invariants",
+    "test_files",
+    "source_files",
+    "evidence_path",
+    "blocked_conditions",
+    "rollback_or_compensation",
+    "feature_flag",
+    "production_certification_required"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^AH-[A-Z]+-[A-Z]+-\\d{3}$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "experience_profile": {
+      "type": "string"
+    },
+    "priority": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    "delivery_phase": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "specification_maturity": {
+      "enum": [
+        "draft",
+        "provisional",
+        "frozen",
+        "verified"
+      ]
+    },
+    "implementation_maturity": {
+      "enum": [
+        "not_started",
+        "stub",
+        "partial",
+        "implemented",
+        "verified",
+        "released"
+      ]
+    },
+    "owner_module": {
+      "type": "string"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "security_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "privacy_invariants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "test_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_path": {
+      "type": "string"
+    },
+    "blocked_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollback_or_compensation": {
+      "type": "string"
+    },
+    "feature_flag": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "production_certification_required": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

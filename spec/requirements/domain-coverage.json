@@ -1,0 +1,23 @@
+{
+  "architecture": 26,
+  "security": 14,
+  "coding": 7,
+  "documents": 24,
+  "research": 1,
+  "writing": 1,
+  "planning": 1,
+  "personal_assistant": 10,
+  "external_actions": 11,
+  "enterprise": 26,
+  "devops": 3,
+  "api": 3,
+  "multimodal": 6,
+  "frontend": 25,
+  "memory": 10,
+  "observability": 3,
+  "evaluation": 1,
+  "evolution": 4,
+  "founder_operator": 7,
+  "operations": 15,
+  "backend": 3
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContextGraph",
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "nodes": {
+      "type": "array"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_node",
+          "to_node",
+          "mode"
+        ],
+        "properties": {
+          "from_node": {
+            "type": "string"
+          },
+          "to_node": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "full",
+              "selective",
+              "artifact_only",
+              "blackboard",
+              "none"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

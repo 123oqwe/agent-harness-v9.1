@@ -1,0 +1,9 @@
+# Control to Test Mapping
+CTRL-REVALIDATE-001: tests/security/toctou.test.ts
+CTRL-EGRESS-001: tests/security/ssrf.test.ts
+CTRL-TAINT-001: tests/security/injection.test.ts
+CTRL-MEMORY-VERIFY-001: tests/security/memory-poison.test.ts
+CTRL-PLUGIN-SIGN-001: tests/security/tool-poison.test.ts
+CTRL-CAPABILITY-SINGLE-USE-001: tests/security/capability-replay.test.ts
+CTRL-CONTEXT-ISOLATION-001: tests/security/context-leak.test.ts
+CTRL-BUDGET-PEP-001: tests/security/budget-bypass.test.ts

@@ -1,0 +1,17 @@
+{
+  "name": "ApprovalStateMachine",
+  "states": [
+    "CONSENT_EXEMPT",
+    "CONSENT_REQUIRED",
+    "HUMAN_APPROVED",
+    "HUMAN_REJECTED",
+    "EXPIRED",
+    "AWAITING_HUMAN",
+    "REMEDIATION_REQUIRED"
+  ],
+  "invariants": [
+    "No execution without approval for T2+",
+    "AWAITING_HUMAN non-terminal",
+    "REMEDIATION_REQUIRED terminal"
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CapabilityToken",
+  "description": "Authorization token. Child tokens signed by Authorization Service, NOT parent.",
+  "type": "object",
+  "required": [
+    "token_id",
+    "operation_id",
+    "attempt_id",
+    "manifest_hash",
+    "policy_decision_hash",
+    "tool_effect_contract_hash",
+    "subject_workload",
+    "tenant_id",
+    "audience",
+    "tool_grant_hash",
+    "resource_grant_hash",
+    "budget_ceiling_hash",
+    "issued_at",
+    "not_before",
+    "expires_at",
+    "execution_epoch",
+    "use_limit",
+    "confirmation_key_thumbprint"
+  ],
+  "properties": {
+    "token_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "operation_id": {
+      "type": "string"
+    },
+    "attempt_id": {
+      "type": "string"
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_decision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_effect_contract_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "subject_workload": {
+      "type": "string"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string"
+    },
+    "tool_grant_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "resource_grant_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "budget_ceiling_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parent_delegation_proof": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Required for child tokens. Signed by Authorization Service."
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "not_before": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_epoch": {
+      "type": "string"
+    },
+    "use_limit": {
+      "const": 1,
+      "description": "Atomic single-use enforced"
+    },
+    "confirmation_key_thumbprint": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

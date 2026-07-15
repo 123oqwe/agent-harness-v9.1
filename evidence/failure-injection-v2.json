@@ -1,0 +1,50 @@
+{
+  "test": "failure_injection_v2",
+  "timestamp": "2026-07-16T04:30:28.840118",
+  "failures_injected": 10,
+  "failures_detected": 10,
+  "all_detected": true,
+  "details": [
+    {
+      "failure": "missing_requirements_file",
+      "detected": true
+    },
+    {
+      "failure": "duplicate_requirement_id",
+      "detected": true
+    },
+    {
+      "failure": "status_contradiction_in_readme",
+      "detected": true
+    },
+    {
+      "failure": "pending_model_check",
+      "detected": true
+    },
+    {
+      "failure": "generic_ui_template",
+      "detected": true
+    },
+    {
+      "failure": "adr_needs_verification",
+      "detected": true
+    },
+    {
+      "failure": "missing_api_file",
+      "detected": true
+    },
+    {
+      "failure": "missing_factory_controller",
+      "detected": true
+    },
+    {
+      "failure": "fake_pass_evidence",
+      "detected": true
+    },
+    {
+      "failure": "empty_phase_requirements",
+      "detected": true
+    }
+  ],
+  "result": "PASS"
+}

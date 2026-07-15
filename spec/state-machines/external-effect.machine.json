@@ -1,0 +1,20 @@
+{
+  "name": "ExternalEffectStateMachine",
+  "states": [
+    "PREPARING",
+    "PREPARED",
+    "COMMITTING",
+    "IN_FLIGHT",
+    "PROVIDER_ACCEPTED",
+    "EFFECT_OBSERVED",
+    "EFFECT_VERIFIED",
+    "EFFECT_CONFIRMED",
+    "EFFECT_UNKNOWN",
+    "RECONCILING"
+  ],
+  "invariants": [
+    "IN_FLIGHT cannot retry - must query first",
+    "EFFECT_UNKNOWN must reconcile",
+    "Prepare-Commit-Read-back two-phase protocol"
+  ]
+}

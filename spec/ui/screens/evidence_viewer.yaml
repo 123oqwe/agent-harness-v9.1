@@ -1,0 +1,91 @@
+# Screen: evidence_viewer
+screen_id: evidence_viewer
+canonical_route: /evidence
+allowed_roles: ['user', 'admin']
+experience_profile: advanced
+purpose: "Evidence Viewer screen"
+
+components:
+  - evidence_list
+  - evidence_detail
+  - test_results
+  - coverage_report
+  - verifier_signature
+
+data_dependencies:
+  - GET /evidence
+  - GET /evidence/{evidenceId}
+
+API_operations:
+  - GET /evidence
+  - GET /evidence/{evidenceId}
+
+stream_events:
+  - run_event_stream
+
+permissions:
+  - evidence:read
+
+loading_state:
+  component: progressive_loader
+  timeout_ms: 5000
+
+empty_state:
+  message: "No data available"
+  action: "Get started"
+
+partial_state:
+  message: "Loading partial results"
+  show_cached: true
+
+success_state:
+  message: "Complete"
+  show_evidence: true
+
+error_state:
+  message: "Something went wrong"
+  retry: true
+  show_details: true
+
+offline_state:
+  message: "You are offline"
+  cached_data: true
+  queue_actions: true
+
+blocked_state:
+  message: "This action is blocked"
+  reason: "policy_or_permission"
+
+approval_state:
+  message: "Waiting for approval"
+  show_preview: true
+
+accessibility:
+  keyboard_navigation: true
+  screen_reader: true
+  aria_labels: true
+  high_contrast: true
+  focus_indicators: true
+  reduced_motion: true
+
+keyboard_navigation:
+  - tab: next_element
+  - shift+tab: previous_element
+  - enter: activate
+  - escape: close_dialog
+
+responsive_behavior:
+  mobile: stacked_layout
+  tablet: sidebar_layout
+  desktop: full_layout
+
+analytics_events:
+  - screen_view
+  - user_action
+  - error_occurred
+
+E2E_tests:
+  - tests/e2e/evidence_viewer.spec.ts
+
+visual_regression_tests:
+  - tests/visual/evidence_viewer.spec.ts

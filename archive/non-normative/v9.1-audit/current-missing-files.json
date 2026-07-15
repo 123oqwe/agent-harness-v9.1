@@ -1,0 +1,55 @@
+{
+  "total_missing": 10,
+  "missing": [
+    {
+      "path": "api/openapi.yaml",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "api/asyncapi.yaml",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "api/error-catalog.yaml",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "api/auth-scopes.yaml",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "api/rate-limits.yaml",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "api/compatibility-policy.md",
+      "referenced_by": "SPECIFICATION_INDEX.yaml",
+      "severity": "P0"
+    },
+    {
+      "path": "scripts/orchestrator/main",
+      "referenced_by": "AI_EXECUTION_PROTOCOL.md",
+      "severity": "P1"
+    },
+    {
+      "path": "scripts/validate-specification.py",
+      "referenced_by": "README.md",
+      "severity": "P1"
+    },
+    {
+      "path": "CODEOWNERS",
+      "referenced_by": "NORMATIVE_PRECEDENCE.md (implied)",
+      "severity": "P1"
+    },
+    {
+      "path": ".agents/cto-orchestrator.md",
+      "referenced_by": "AI_EXECUTION_PROTOCOL.md (implied)",
+      "severity": "P2"
+    }
+  ]
+}

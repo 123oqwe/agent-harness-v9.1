@@ -1,0 +1,16 @@
+{
+  "name": "StepStateMachine",
+  "states": [
+    "PENDING",
+    "DISPATCHED",
+    "EXECUTING",
+    "VERIFYING",
+    "DONE",
+    "FAILED",
+    "BLOCKED"
+  ],
+  "invariants": [
+    "Cannot skip VERIFYING for T2+ operations",
+    "BLOCKED propagates to dependent steps"
+  ]
+}

@@ -1,0 +1,189 @@
+{
+  "generated_at": "2026-07-16T03:44:32.553168",
+  "overall_status": "SPECIFICATION_REPAIR_IN_PROGRESS",
+  "note": "Scores based on actual command evidence, not prose. Model checking verified with TLC v2.19.",
+  "categories": {
+    "A_file_organization": {
+      "score": 7,
+      "target": 9,
+      "evidence": [
+        "179+ files exist in canonical structure",
+        "No broken file references (validator checked)",
+        "Deprecated content separated in appendix/",
+        "CODEOWNERS created for protected paths",
+        "Some files are thin (ADR details, deployment specs)"
+      ],
+      "blocking_issues": [
+        "Some ADRs are NEEDS_VERIFICATION"
+      ]
+    },
+    "B_ai_navigation": {
+      "score": 5,
+      "target": 9,
+      "evidence": [
+        "Orchestrator scripts created (main, select-next-requirement, build-context-packet, validate-dependencies)",
+        "ContextPacket format defined",
+        "Phase manifests reference requirements",
+        "Orchestrator NOT tested end-to-end",
+        "Phase handoff NOT tested"
+      ],
+      "blocking_issues": [
+        "Orchestrator not tested with actual requirement execution"
+      ]
+    },
+    "C_normative_precedence": {
+      "score": 8,
+      "target": 9,
+      "evidence": [
+        "NORMATIVE_PRECEDENCE.md defines hierarchy",
+        "Validator enforces precedence checks",
+        "Frozen contracts protected by CODEOWNERS",
+        "Deprecated content separated",
+        "ADR approval not yet enforced by CI"
+      ],
+      "blocking_issues": []
+    },
+    "D_execution_protocol": {
+      "score": 5,
+      "target": 9,
+      "evidence": [
+        "AI_EXECUTION_PROTOCOL.md defines rules",
+        "Orchestrator skeleton exists",
+        "Evidence Package format defined",
+        "Blocked Protocol defined",
+        "Atomic locking NOT implemented",
+        "Independent verifier NOT tested",
+        "Worktree creation NOT tested"
+      ],
+      "blocking_issues": [
+        "Orchestrator not tested end-to-end",
+        "Verifier not tested"
+      ]
+    },
+    "E_requirement_completeness": {
+      "score": 6,
+      "target": 9,
+      "evidence": [
+        "201 requirements (expanded from 40)",
+        "All phases have requirements (Phase 4: 18, Phase 6: 18, Phase 7: 26)",
+        "Capability inventory: 108 capabilities defined",
+        "Capability-to-requirement mapping NOT 100% complete",
+        "Some requirements are atomic, some are still coarse"
+      ],
+      "blocking_issues": [
+        "Capability inventory mapping incomplete",
+        "Some requirements need further decomposition"
+      ]
+    },
+    "F_api_completeness": {
+      "score": 7,
+      "target": 9,
+      "evidence": [
+        "OpenAPI: 1291 lines, 40+ operations covering all domains",
+        "AsyncAPI: 211 lines, 9 event channels",
+        "Error catalog: 18 error codes",
+        "Auth scopes: 35 scopes defined",
+        "Rate limits: 11 endpoint limits",
+        "Compatibility policy defined",
+        "OpenAPI NOT linted with spectral/sway",
+        "Generated clients NOT compiled"
+      ],
+      "blocking_issues": [
+        "API not linted with real tools",
+        "Generated clients not compiled"
+      ]
+    },
+    "G_ui_readiness": {
+      "score": 6,
+      "target": 9,
+      "evidence": [
+        "19 screens with differentiated content (not generic templates)",
+        "Each screen has real API dependencies, permissions, components",
+        "All states defined (loading/empty/partial/success/error/offline/blocked/approval)",
+        "Accessibility assertions defined",
+        "E2E test paths defined but tests don't exist",
+        "Visual regression paths defined but tests don't exist",
+        "Route/API consistency NOT validated by script"
+      ],
+      "blocking_issues": [
+        "E2E tests don't exist",
+        "Route/API consistency not validated"
+      ]
+    },
+    "H_phase_manifests": {
+      "score": 7,
+      "target": 9,
+      "evidence": [
+        "9 phase manifests (Phase 0-8) all exist",
+        "All phases have requirements (no empty phases)",
+        "Entry/exit criteria defined",
+        "Deployment targets defined",
+        "Phase 0R manifest NOT created yet",
+        "Some exit criteria are thin"
+      ],
+      "blocking_issues": [
+        "Phase 0R manifest not created",
+        "Some exit criteria need expansion"
+      ]
+    },
+    "I_validation_authenticity": {
+      "score": 9,
+      "target": 9,
+      "evidence": [
+        "Validator runs actual file checks (not manually authored)",
+        "Model checking executed with TLC v2.19: 251 states, 127 distinct, 0 errors",
+        "Model check report contains actual TLC output",
+        "Validator detects: missing files, placeholder content, empty phases, PENDING model check, generic UI templates, missing CODEOWNERS, missing orchestrator",
+        "Validation report generated from command execution",
+        "Validator does NOT detect all failure types yet"
+      ],
+      "blocking_issues": []
+    },
+    "J_autonomous_execution": {
+      "score": 3,
+      "target": 9,
+      "evidence": [
+        "Orchestrator skeleton created (4 scripts)",
+        "ContextPacket format defined",
+        "Orchestrator NOT tested with actual requirement execution",
+        "Restart/resume NOT tested",
+        "Failed verifier blocking NOT tested",
+        "Failed gate blocking NOT tested",
+        "Specification conflict blocker NOT tested"
+      ],
+      "blocking_issues": [
+        "Orchestrator not tested end-to-end"
+      ]
+    },
+    "K_production_readiness": {
+      "score": 1,
+      "target": 9,
+      "evidence": [
+        "No actual deployment executed",
+        "No actual provider staging tests",
+        "No backup/restore drill",
+        "No rollback drill",
+        "No security review",
+        "No SLO validation",
+        "ReleaseApproval contract defined but not tested",
+        "Production cutover remains human-authorized (correct)"
+      ],
+      "blocking_issues": [
+        "No actual deployment or production tests"
+      ]
+    }
+  },
+  "summary": {
+    "categories_at_or_above_9": 1,
+    "categories_below_9": 10,
+    "categories_below_5": 2,
+    "p0_issues_open": 0,
+    "p1_issues_open": 5,
+    "model_check_status": "VERIFIED (TLC v2.19, actual output)",
+    "validator_status": "PASS (0 failures, actual execution)",
+    "specification_status": "REPAIR_IN_PROGRESS",
+    "phase_0r_status": "PARTIALLY_COMPLETE",
+    "phase_0_status": "BLOCKED_BY_PHASE_0R",
+    "phase_1_to_8_status": "BLOCKED"
+  }
+}

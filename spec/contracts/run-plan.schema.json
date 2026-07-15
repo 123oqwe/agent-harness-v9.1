@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RunPlan",
+  "description": "The only normative execution contract. Router outputs this; Runtime Core executes it.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "revision",
+    "run_plan_hash",
+    "task",
+    "experience_profile",
+    "workflow_graph",
+    "agent_graph",
+    "context_graph",
+    "verification_graph",
+    "model_bindings",
+    "tool_grants",
+    "skill_bindings",
+    "environment_bindings",
+    "policy_snapshot_ref",
+    "registry_snapshot_refs",
+    "derived_risk_assessment",
+    "required_consent",
+    "budget_allocation",
+    "persistence_policy",
+    "cancellation_policy",
+    "fallback_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "run-plan.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_plan_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "previous_revision_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task": {
+      "$ref": "task-contract.schema.json"
+    },
+    "experience_profile": {
+      "type": "string"
+    },
+    "workflow_graph": {
+      "$ref": "workflow-graph.schema.json"
+    },
+    "agent_graph": {
+      "$ref": "agent-graph.schema.json"
+    },
+    "context_graph": {
+      "$ref": "context-graph.schema.json"
+    },
+    "verification_graph": {
+      "$ref": "verification-graph.schema.json"
+    },
+    "model_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "model-binding.schema.json"
+      }
+    },
+    "tool_grants": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "skill_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "environment_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "schedule_binding": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "policy_snapshot_ref": {
+      "type": "string",
+      "description": "Referenced, not output by Router"
+    },
+    "registry_snapshot_refs": {
+      "type": "object"
+    },
+    "derived_risk_assessment": {
+      "type": "object",
+      "description": "Router outputs risk ASSESSMENT, not risk POLICY"
+    },
+    "required_consent": {
+      "type": "object",
+      "description": "Router outputs consent REQUIREMENT, not consent POLICY"
+    },
+    "budget_allocation": {
+      "type": "object"
+    },
+    "persistence_policy": {
+      "type": "object"
+    },
+    "cancellation_policy": {
+      "type": "object"
+    },
+    "fallback_policy": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

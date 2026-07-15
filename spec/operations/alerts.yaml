@@ -1,0 +1,10 @@
+alerts:
+  - name: high_error_rate
+    condition: error_rate > 5%
+    severity: critical
+  - name: unauthorized_effect
+    condition: unauthorized_effect > 0
+    severity: critical
+  - name: canary_slo_violation
+    condition: canary_error > 2x
+    action: auto_rollback

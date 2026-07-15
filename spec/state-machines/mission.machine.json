@@ -1,0 +1,19 @@
+{
+  "name": "MissionStateMachine",
+  "states": [
+    "CREATED",
+    "DISCOVER",
+    "DESIGN",
+    "BUILD",
+    "DEPLOY",
+    "OPERATE",
+    "ITERATE",
+    "COMPLETED",
+    "FAILED",
+    "ABORTED"
+  ],
+  "invariants": [
+    "Decision gates: spend, publish, irreversible, path, input",
+    "Cannot skip DEPLOY without BUILD verification"
+  ]
+}

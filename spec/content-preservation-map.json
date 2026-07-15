@@ -1,0 +1,729 @@
+{
+  "total_sections": 80,
+  "v8_sections": 70,
+  "v9_additions": 10,
+  "unmapped_count": 0,
+  "coverage": "100%",
+  "sections": [
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Part 0: Implementation Directive",
+      "source_hash": "sha256:4bd316783eb9fea4",
+      "destination_file": "AI_EXECUTION_PROTOCOL.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "v8 optional/default and stub rules replaced with v9 protocol"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 0: 安全内核与数据契约",
+      "source_hash": "sha256:a3476a9fb13af497",
+      "destination_file": "phases/phase-0.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Phase 0 steps preserved, v9 corrections added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 1: 最小可运行 Agent",
+      "source_hash": "sha256:111187b162873767",
+      "destination_file": "phases/phase-1.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Reduced from 20 to 9 tools, 6 domain verticals added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 2: 上下文工程与可靠性",
+      "source_hash": "sha256:0cda8be8f18fe5a9",
+      "destination_file": "phases/phase-2.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Compaction, steering, hooks, pause/resume preserved with v9 corrections"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 3: 路由系统与多 Agent",
+      "source_hash": "sha256:91e4f620cd00dcc0",
+      "destination_file": "phases/phase-3.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "8 parallel routers replaced with DAG, merge conflict no hardcoded rules"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 4: 演进与深度可观测",
+      "source_hash": "sha256:9e1527313691dbdf",
+      "destination_file": "phases/phase-4.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Evolution shadow mode only"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 5: 外部动作",
+      "source_hash": "sha256:ae878b3dfb441ce9",
+      "destination_file": "phases/phase-5.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Email not retractable, payment separate certification"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 6: Mission Layer",
+      "source_hash": "sha256:6286e198df32d872",
+      "destination_file": "phases/phase-6.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Dynamic tool generation experimental track"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "Phase 7: 企业加固",
+      "source_hash": "sha256:82366b277a119650",
+      "destination_file": "phases/phase-7.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Expanded to full production readiness"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "1. Mission & Product Boundary",
+      "source_hash": "sha256:2f5ad431ee0c3bf7",
+      "destination_file": "product/product-prd.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Mission preserved, 12 product surfaces added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "2. Target Users",
+      "source_hash": "sha256:eb9597b0310598bd",
+      "destination_file": "product/personas.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Expanded from 3 to 7 personas"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "3. Task Analysis & Routing Signals",
+      "source_hash": "sha256:8c763599c66e39d7",
+      "destination_file": "architecture/routing-system.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Profiler output marked untrusted, expanded signals"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "4. Local-first Privacy",
+      "source_hash": "sha256:ef52bf35edec3ac2",
+      "destination_file": "product/privacy-ux.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Full data lifecycle added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "5. Phase 1 User Experience",
+      "source_hash": "sha256:01308c4e6c73d80e",
+      "destination_file": "product/ux-information-architecture.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "23 screens defined, 3 display levels"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "6. Operation Risk Tiers",
+      "source_hash": "sha256:3a377815d9f1ef93",
+      "destination_file": "contracts/effect-risk.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Static tiers replaced with EffectRisk"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "7. Allowed & Prohibited Actions",
+      "source_hash": "sha256:e10947b6cb9fb77f",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Tool-name lists replaced with Capability Matrix"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "8. User-visible Execution Status",
+      "source_hash": "sha256:dd2459b69cbefd5c",
+      "destination_file": "ui/states/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "User status preserved, internal/external separated"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "9. Success Metrics",
+      "source_hash": "sha256:cf2d19a3608ebe48",
+      "destination_file": "evals/",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "SWE-bench replaced with 9 domain evals"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "10. Product Roadmap",
+      "source_hash": "sha256:e48c8082cfa75e24",
+      "destination_file": "phases/",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Single source: phase-N.yaml"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "11. Agent Harness System Architecture",
+      "source_hash": "sha256:1ab0d79d81b54cf3",
+      "destination_file": "architecture/harness-boundary.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "14 modules preserved, can/cannot table added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "12. Request-to-Outcome Pipeline",
+      "source_hash": "sha256:ef9f801dd6eab959",
+      "destination_file": "architecture/request-to-outcome.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Policy enters before routing"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "13. Complete Architecture Diagram",
+      "source_hash": "sha256:a8943c0aa1c1f4c6",
+      "destination_file": "architecture/deployment-topology.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "4 diagrams required (was 1)"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "14. Routing & Orchestration System",
+      "source_hash": "sha256:b038d500fdf0ebd4",
+      "destination_file": "architecture/routing-system.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "8 parallel routers replaced with DAG"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "15. RunConfiguration Contract",
+      "source_hash": "sha256:87af16bf7c3da334",
+      "destination_file": "contracts/run-plan.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "RunConfiguration -> RunPlan with 4 graphs"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "16. Three Orthogonal Dimensions",
+      "source_hash": "sha256:73e9aaf5bcb1a4b6",
+      "destination_file": "architecture/routing-system.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "3 -> 4 dimensions, no duplicate definitions"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "17. Context Topologies",
+      "source_hash": "sha256:faef4049a2db4cef",
+      "destination_file": "contracts/context-graph.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Single enum -> Context Graph with per-edge policies"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "18. Model/API Gateway",
+      "source_hash": "sha256:a961a0fa3abf5973",
+      "destination_file": "architecture/model-api-gateway.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Preserved, capability registry expanded"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "19. Loop Engine",
+      "source_hash": "sha256:1802ffa4bd4b3a19",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Preserved, no CoT storage reinforced"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "20. Steering System",
+      "source_hash": "sha256:2411aac0ed564d38",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "3-queue model preserved, IN_FLIGHT rule added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "21. Hook System",
+      "source_hash": "sha256:5d00d149026333fe",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Hooks cannot grant permissions, issue Capability"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "22. Streaming Protocol",
+      "source_hash": "sha256:a785e20ca6a72a63",
+      "destination_file": "contracts/event.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Per-character stdout -> chunked event streaming"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "23. Session Model",
+      "source_hash": "sha256:e6394064ef838ad2",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Event sourcing preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "24. Compaction",
+      "source_hash": "sha256:2996c80802a5c98a",
+      "destination_file": "architecture/context-memory-rag.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Security state must not be LLM-summarized"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "25. Context Window Layout",
+      "source_hash": "sha256:905dab3eb33b276c",
+      "destination_file": "architecture/context-memory-rag.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "7-layer layout preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "26. Pause / Resume / Cancel",
+      "source_hash": "sha256:b8175e1f2438ba28",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Generic reExecuteFromStep -> effect-state-aware"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "27. Tool Execution Details",
+      "source_hash": "sha256:84abbf65b8c292d2",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "12-step pipeline preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "28. Provider Hooks",
+      "source_hash": "sha256:d158c18e86601b26",
+      "destination_file": "architecture/runtime-core.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Hook output re-validated, cannot modify Capability"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "29. Subagent Lifecycle",
+      "source_hash": "sha256:a9e50bfe10a11c01",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Parent self-sign -> Authorization Service signs"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "30. Re-routing & Fallback",
+      "source_hash": "sha256:43fccd58aa3f44b9",
+      "destination_file": "architecture/routing-system.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "11 fallback types preserved, re-route new revision"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "31. Budget-Aware Execution",
+      "source_hash": "sha256:1d8f93eda2f52632",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "PEP not solely responsible, Global Budget Ledger"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "32. Operation State Machine",
+      "source_hash": "sha256:5fd4248e9883ae19",
+      "destination_file": "state-machines/operation.machine.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "37-state monolith -> 6 split machines"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "33. Canonical Hash",
+      "source_hash": "sha256:3dae233bd1bf8088",
+      "destination_file": "contracts/action-manifest.schema.json",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "RFC8785-JCS preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "34. Capability Token",
+      "source_hash": "sha256:d6b6eb156cf5bb1f",
+      "destination_file": "contracts/capability-token.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Added delegation proof, execution epoch"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "35. Credential Custody",
+      "source_hash": "sha256:18acb5af4bacaa98",
+      "destination_file": "architecture/trust-boundaries.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Dual mode preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "36. Identity Plane",
+      "source_hash": "sha256:4c261648b6d041f8",
+      "destination_file": "architecture/trust-boundaries.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "7 principals preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "37. Local Vault Protocol",
+      "source_hash": "sha256:38b7af52b2632394",
+      "destination_file": "architecture/context-memory-rag.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Preserved, expanded with lifecycle"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "38. Canonical Data Contracts",
+      "source_hash": "sha256:f8d465380d9b1578",
+      "destination_file": "contracts/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "All contracts have JSON Schema"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "39. Threat Model",
+      "source_hash": "sha256:8f233a64a9ad3345",
+      "destination_file": "threat-model/threats.yaml",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Each threat bound to implementation + test"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "40. Evolution Engine",
+      "source_hash": "sha256:73636f79631a305c",
+      "destination_file": "architecture/evolution.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Shadow mode only, cannot expand permissions"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "41. Deep Observability",
+      "source_hash": "sha256:d3d425a9971a96eb",
+      "destination_file": "architecture/assurance.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Replay 100% -> 3 replay metrics"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "42. Advisory Loop",
+      "source_hash": "sha256:640a029a37a9b192",
+      "destination_file": "architecture/assurance.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "8 stages preserved, advice/action separation"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "43. GhostSnapshot",
+      "source_hash": "sha256:ba231a6b4ff3a2d6",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Snapshot cannot undo real effects"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "44. SOTA Research",
+      "source_hash": "sha256:3acc3d510801e56a",
+      "destination_file": "architecture/evolution.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "experimental / feature_flag_off / not_release_blocking"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "45. Mission Layer",
+      "source_hash": "sha256:c78a4c1aa452191c",
+      "destination_file": "architecture/",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Inside Harness, dynamic tool generation separate"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "46. Failure Learning",
+      "source_hash": "sha256:51528195771003d4",
+      "destination_file": "architecture/evolution.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "TTL, scope, confidence, quarantine preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "47. Concrete Tool Catalog",
+      "source_hash": "sha256:046d47fefb664315",
+      "destination_file": "contracts/tool-spec.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "ToolDefinition -> ToolSpec with full fields"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "48. Tool Transport",
+      "source_hash": "sha256:bb1413f586ee7158",
+      "destination_file": "architecture/tool-skill-fabric.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "4 types preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "49. Additional Tools",
+      "source_hash": "sha256:7cc5a62881cd69c5",
+      "destination_file": "architecture/tool-skill-fabric.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Maturity levels added"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "50. Concrete Skill Catalog",
+      "source_hash": "sha256:cd8065af97524500",
+      "destination_file": "contracts/skill-spec.schema.json",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "SkillDefinition -> SkillSpec with full fields"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "51. Skill Chaining",
+      "source_hash": "sha256:d8df71bc2b172eea",
+      "destination_file": "architecture/tool-skill-fabric.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "No auto-trigger, chain depth limit"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "52. Harness Host",
+      "source_hash": "sha256:6a696c43dcc92028",
+      "destination_file": "architecture/harness-boundary.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Not super-privilege process"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "53. Instruction Loading",
+      "source_hash": "sha256:1c2a6e93ca6f417e",
+      "destination_file": "architecture/harness-boundary.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Priority hierarchy preserved"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "54. Plugin & MCP",
+      "source_hash": "sha256:0d806b9d7067ff43",
+      "destination_file": "architecture/tool-skill-fabric.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Signature, SBOM, quarantine, untrusted input"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "55. Memory Consolidation",
+      "source_hash": "sha256:2b938ff6e300c59c",
+      "destination_file": "architecture/context-memory-rag.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "No direct chat-to-memory high-trust write"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "56. Permission & Access Control",
+      "source_hash": "sha256:34f0145fba53a5ec",
+      "destination_file": "architecture/action-control.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "6 modes -> multi-dimensional deny-by-default"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "57. TodoWrite/Slash/Config/Collaborative",
+      "source_hash": "sha256:a2abd8a4d5e74072",
+      "destination_file": "ui/",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Split into independent contracts"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "58. Cross-cutting Planes",
+      "source_hash": "sha256:090b994b2c1f89b4",
+      "destination_file": "architecture/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "Each plane has owner, records, security boundary"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "59. Evidence Classification",
+      "source_hash": "sha256:4d60330cfb346787",
+      "destination_file": "architecture/assurance.md",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "E0-E7 bound to verification strength, not file existence"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "60-74. Production Hardening",
+      "source_hash": "sha256:bfdd7437b3522be1",
+      "destination_file": "requirements/requirements.ndjson",
+      "destination_requirement_ids": [],
+      "status": "corrected",
+      "explanation": "Edge cases -> Requirements with IDs, moved to first-use phase"
+    },
+    {
+      "source_file": "Agent-Harness-v8-PRD.html",
+      "source_heading": "v8 SVG diagrams (9)",
+      "source_hash": "sha256:5b5e8350f70259da",
+      "destination_file": "appendix/original-documents/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "All 9 SVGs preserved in v9 HTML overview"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 AI Execution Protocol",
+      "source_hash": "sha256:152233a1feeef948",
+      "destination_file": "AI_EXECUTION_PROTOCOL.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 EffectRisk",
+      "source_hash": "sha256:36e5c9d40307500d",
+      "destination_file": "contracts/effect-risk.schema.json",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 RunPlan (4 graphs)",
+      "source_hash": "sha256:ab30b6a4c77a508a",
+      "destination_file": "contracts/run-plan.schema.json",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 6 Split State Machines",
+      "source_hash": "sha256:93b0e0876d32ea0a",
+      "destination_file": "state-machines/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 7 Personas",
+      "source_hash": "sha256:6176f352037821f4",
+      "destination_file": "product/personas.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 9 Domain Evals",
+      "source_hash": "sha256:f6665d2a1aa5d2a8",
+      "destination_file": "evals/",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 ReleaseApproval",
+      "source_hash": "sha256:02964ebfc6db10ba",
+      "destination_file": "contracts/release-approval.schema.json",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 Router DAG",
+      "source_hash": "sha256:47abef5c09597852",
+      "destination_file": "architecture/routing-system.md",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 Child Capability by Auth Service",
+      "source_hash": "sha256:b8e1270dce770a44",
+      "destination_file": "contracts/child-capability-request.schema.json",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    },
+    {
+      "source_file": "Agent-Harness-v9-PRD.html",
+      "source_heading": "v9 Phase 8",
+      "source_hash": "sha256:1d5849d41faa9a60",
+      "destination_file": "phases/phase-8.yaml",
+      "destination_requirement_ids": [],
+      "status": "preserved_normative",
+      "explanation": "New in v9"
+    }
+  ]
+}

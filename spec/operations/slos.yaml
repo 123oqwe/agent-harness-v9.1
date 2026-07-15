@@ -1,0 +1,9 @@
+slos:
+  - name: availability
+    target: 99.9
+  - name: latency_p50
+    target: 3000
+  - name: task_completion_rate
+    target: 85
+  - name: unauthorized_effect_rate
+    target: 0
