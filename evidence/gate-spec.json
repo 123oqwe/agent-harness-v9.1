@@ -9,7 +9,7 @@
     {
       "name": "requirements_valid",
       "passed": true,
-      "detail": "207 requirements, 0 duplicates"
+      "detail": "213 requirements, 0 duplicates"
     },
     {
       "name": "model_check_verified",
@@ -39,7 +39,7 @@
     {
       "name": "codeowners_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/CODEOWNERS"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/CODEOWNERS"
     },
     {
       "name": "ui_screens_differentiated",
@@ -53,6 +53,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T05:34:02.870689",
+  "timestamp": "2026-07-16T07:00:38.551016",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

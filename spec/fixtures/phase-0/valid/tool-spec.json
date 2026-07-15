@@ -1,0 +1,23 @@
+{
+  "name": "valid-name",
+  "version": "valid-version",
+  "domains": [],
+  "implementation_status": "interface_only",
+  "input_schema_ref": "valid-input_schema_ref",
+  "output_schema_ref": "valid-output_schema_ref",
+  "effect_model": {},
+  "risk_feature_extractor": "valid-risk_feature_extractor",
+  "preconditions": [],
+  "postconditions": [],
+  "timeout_policy": {},
+  "cancellation_policy": {},
+  "retry_policy": {},
+  "idempotency_policy": {},
+  "sandbox_policy": {},
+  "network_policy": {},
+  "credential_requirements": [],
+  "data_egress_policy": {},
+  "receipt_schema_ref": "valid-receipt_schema_ref",
+  "verification_adapter": "valid-verification_adapter",
+  "maturity": "draft"
+}

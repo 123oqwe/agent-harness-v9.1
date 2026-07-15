@@ -1,13 +1,1 @@
-# Protected specification paths
-/contracts/                    @cto-orchestrator @security-architect
-/state-machines/               @cto-orchestrator @security-architect
-/requirements/                 @cto-orchestrator @product-requirements
-/phases/                       @cto-orchestrator
-/NORMATIVE_PRECEDENCE.md       @cto-orchestrator
-/AI_EXECUTION_PROTOCOL.md      @cto-orchestrator
-/contracts/release-approval.schema.json  @cto-orchestrator @security-architect
-/threat-model/                 @security-architect
-/AGENTS.md                     @cto-orchestrator
-/CLAUDE.md                     @cto-orchestrator
-/SPECIFICATION_INDEX.yaml      @cto-orchestrator
-/CODEOWNERS                    @cto-orchestrator
+# AH-SPEC-PROTECTION-001: Create CODEOWNERS and protected path configuration

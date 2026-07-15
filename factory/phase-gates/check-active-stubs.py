@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""[REAL] Check for active stubs in product code.
-Scans product/ for NotImplementedError that would be on active path.
+"""[REAL] Check for active stubs in harness code.
+Scans harness/ for NotImplementedError that would be on active path.
 """
 import os, sys, re
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PRODUCT_DIR = os.path.join(BASE, "product")
+PRODUCT_DIR = os.path.join(BASE, "harness")
 
 if not os.path.exists(PRODUCT_DIR):
-    print("PASS: no product/ directory yet")
+    print("PASS: no harness/ directory yet")
     sys.exit(0)
 
 stubs_found = []

@@ -64,6 +64,7 @@ deployment_target:
   phase_7: "canary"
   phase_8: "production"
 
+gate_command: "python3 factory/phase-gates/gate_runner.py phase4"
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-4/"
 

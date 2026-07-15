@@ -1,19 +1,150 @@
 {
   "name": "MissionStateMachine",
+  "description": "Long-running mission lifecycle.",
   "states": [
-    "CREATED",
-    "DISCOVER",
-    "DESIGN",
-    "BUILD",
-    "DEPLOY",
-    "OPERATE",
-    "ITERATE",
-    "COMPLETED",
-    "FAILED",
-    "ABORTED"
+    {
+      "name": "CREATED",
+      "terminal": false
+    },
+    {
+      "name": "DISCOVER",
+      "terminal": false
+    },
+    {
+      "name": "DESIGN",
+      "terminal": false
+    },
+    {
+      "name": "BUILD",
+      "terminal": false
+    },
+    {
+      "name": "DEPLOY",
+      "terminal": false
+    },
+    {
+      "name": "OPERATE",
+      "terminal": false
+    },
+    {
+      "name": "ITERATE",
+      "terminal": false
+    },
+    {
+      "name": "COMPLETED",
+      "terminal": true
+    },
+    {
+      "name": "FAILED",
+      "terminal": true
+    },
+    {
+      "name": "ABORTED",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "source": "CREATED",
+      "target": "DISCOVER",
+      "actor": "mission_planner",
+      "guard": "mission_contract_created",
+      "event": "MissionStarted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DISCOVER",
+      "target": "DESIGN",
+      "actor": "mission_planner",
+      "guard": "discovery_complete",
+      "event": "DiscoveryComplete",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DESIGN",
+      "target": "BUILD",
+      "actor": "mission_planner",
+      "guard": "design_approved",
+      "event": "DesignApproved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DESIGN",
+      "target": "DISCOVER",
+      "actor": "mission_planner",
+      "guard": "design_needs_more_info",
+      "event": "Rediscover",
+      "retry_rule": "never"
+    },
+    {
+      "source": "BUILD",
+      "target": "DEPLOY",
+      "actor": "mission_planner",
+      "guard": "build_verified",
+      "event": "BuildVerified",
+      "retry_rule": "never"
+    },
+    {
+      "source": "BUILD",
+      "target": "DESIGN",
+      "actor": "mission_planner",
+      "guard": "build_failed_redesign",
+      "event": "Redesign",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DEPLOY",
+      "target": "OPERATE",
+      "actor": "mission_planner",
+      "guard": "deploy_confirmed",
+      "event": "Deployed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "OPERATE",
+      "target": "ITERATE",
+      "actor": "mission_planner",
+      "guard": "operate_data_collected",
+      "event": "Iterate",
+      "retry_rule": "never"
+    },
+    {
+      "source": "ITERATE",
+      "target": "DISCOVER",
+      "actor": "mission_planner",
+      "guard": "iteration_needed",
+      "event": "NewIteration",
+      "retry_rule": "never"
+    },
+    {
+      "source": "ITERATE",
+      "target": "COMPLETED",
+      "actor": "mission_planner",
+      "guard": "mission_goals_met",
+      "event": "MissionCompleted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "ANY",
+      "target": "FAILED",
+      "actor": "system",
+      "guard": "terminal_failure",
+      "event": "MissionFailed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "ANY",
+      "target": "ABORTED",
+      "actor": "user",
+      "guard": "user_abort",
+      "event": "MissionAborted",
+      "retry_rule": "never"
+    }
   ],
   "invariants": [
-    "Decision gates: spend, publish, irreversible, path, input",
-    "Cannot skip DEPLOY without BUILD verification"
+    "Decision gates: spend, publish, irreversible, path, input \u2014 each gate must pass before advancing",
+    "Cannot skip DEPLOY without BUILD verification",
+    "COMPLETED, FAILED, ABORTED are terminal",
+    "ITERATE can loop back to DISCOVER (not a deadlock \u2014 it's intentional iteration)"
   ]
 }

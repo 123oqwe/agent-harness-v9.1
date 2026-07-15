@@ -1,0 +1,6 @@
+{
+  "provider": "valid-provider",
+  "model_id": "valid-model_id",
+  "modality_role": "reasoning",
+  "capability_match_score": "valid-capability_match_score"
+}

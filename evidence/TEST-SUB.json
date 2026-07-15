@@ -1,0 +1,1 @@
+{"requirement_id": "TEST-SUB", "exit_codes": [0], "stdout_hash": "abc123", "test_results": {"passed": 3, "failed": 0}, "stdout": "Tests: 3 passed, 0 failed"}

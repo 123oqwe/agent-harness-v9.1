@@ -9,6 +9,17 @@ python3 -c "import json; print(json.dumps(json.load(open('control/current-state.
 
 ## Repository Structure
 
+关系：
+
+```
+spec      → 规定应该做什么
+factory   → 调用 Codex / Claude Code 自动开发
+harness   → 最终用户真正使用的产品
+infra     → 构建、测试、部署和运行
+evidence  → 证明每项能力是否真的完成
+control   → 唯一权威状态来源
+```
+
 ```
 agent-harness-v9.1/
 ├── control/           ← Authoritative state (current-state.json)
@@ -37,6 +48,20 @@ agent-harness-v9.1/
 ├── domains/           ← Domain specs (moved to spec/)
 └── appendix/          ← Deprecated content
 ```
+
+## Factory Manual
+
+The autonomous engineering factory is documented in [factory/FACTORY_MANUAL.md](factory/FACTORY_MANUAL.md).
+
+It covers:
+- Factory architecture and module list
+- 15-step workflow (select → lock → dispatch → evidence → verify → merge)
+- 17 agent roles and their adapter assignments
+- Trigger mechanisms (manual, auto-loop, CI)
+- State management (current-state.json is the only authority)
+- Verification and gates (Spec Gate, Phase Gate, 12 check scripts)
+- Security and protections (protected paths, worker permissions, verifier isolation)
+- Verified capabilities and honest limitations
 
 ## Normative Precedence
 

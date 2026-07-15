@@ -2,8 +2,8 @@
 """[STUB] Sandbox runner.
 Runs test commands in an isolated environment.
 
-NOTE: This module depends on product code existing.
-When product/ is empty, sandbox runner has nothing to run.
+NOTE: This module depends on harness code existing.
+When harness/ is empty, sandbox runner has nothing to run.
 
 Future implementation:
 - Docker container isolation
@@ -19,8 +19,11 @@ def run_command(command, cwd=None, timeout=300, env=None):
     NOTE: Currently runs directly. Future: Docker/container isolation.
     """
     try:
+        # Use shell=False with shlex for safety (prevent injection)
+        import shlex
+        cmd_list = shlex.split(command) if isinstance(command, str) else command
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True,
+            cmd_list, shell=False, capture_output=True, text=True,
             cwd=cwd, timeout=timeout, env=env
         )
         return {
@@ -51,7 +54,7 @@ def run_command(command, cwd=None, timeout=300, env=None):
 def run_tests(test_commands, cwd=None):
     """Run multiple test commands.
     
-    NOTE: Depends on product code existing.
+    NOTE: Depends on harness code existing.
     """
     results = []
     for cmd in test_commands:

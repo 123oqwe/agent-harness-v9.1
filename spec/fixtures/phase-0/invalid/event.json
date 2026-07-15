@@ -1,0 +1,8 @@
+{
+  "sequence": 1,
+  "run_id": "valid-run_id",
+  "type": "valid-type",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "payload": {},
+  "redaction_applied": true
+}

@@ -1,5 +1,10 @@
 # ADR-012: CI/CD
 
+## Status: ACCEPTED
+
+## Rationale
+GitHub Actions + Turborepo cache is SOTA for monorepo CI. Docker build for containerization. Fly.io deploy for multi-region. Agent should verify Fly.io CLI integration in Phase 7. Canary deployment requires ReleaseApproval (human WebAuthn signature).
+
 ## Decision
 GitHub Actions + Turborepo cache + Docker build + Fly.io deploy.
 

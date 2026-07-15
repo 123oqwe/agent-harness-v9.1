@@ -1,0 +1,34 @@
+{
+  "gate": "phase1",
+  "checks": [
+    {
+      "name": "requirements_have_criteria",
+      "passed": true,
+      "detail": "All 30 requirements have criteria"
+    },
+    {
+      "name": "requirements_have_tests",
+      "passed": false,
+      "detail": "Missing on disk: ['AH-RUNTIME-LOOP-001:harness/tests/runtime/loop.test.ts', 'AH-RUNTIME-SESSION-001:harness/tests/session/durable.test.ts', 'AH-SANDBOX-001:harness/tests/sandbox/path-traversal.test.ts', 'AH-POLICY-ENGINE-001:harness/tests/policy/deny-by-default.test.ts', 'AH-CAPABILITY-001:harness/tests/security/capability-issue.test.ts']"
+    },
+    {
+      "name": "build",
+      "passed": false,
+      "detail": "exit_code=127",
+      "stdout_hash": "152e34a5956f2c6b"
+    },
+    {
+      "name": "type_check",
+      "passed": false,
+      "detail": "exit_code=1"
+    },
+    {
+      "name": "unit_tests",
+      "passed": false,
+      "detail": "exit_code=127, stdout_hash=b930af4b5cf42a0c"
+    }
+  ],
+  "result": "FAIL",
+  "timestamp": "2026-07-16T07:00:42.737241",
+  "note": "This gate runs REAL commands. Registry status is NOT evidence."
+}

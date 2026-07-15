@@ -72,4 +72,71 @@ def get(key, default=None):
     """Get a key from state."""
     return load_state().get(key, default)
 
+def atomic_check_and_set(dict_key, item_key, value, check_fn=None):
+    """[REAL] Atomically check-and-set an item inside a dict in state.
+    
+    The entire check-and-set is protected by flock — no TOCTOU gap.
+    If check_fn returns False (or item_key already exists and check_fn is None),
+    the operation is rejected and returns (False, None).
+    Otherwise, the value is set and returns (True, state).
+    
+    Usage:
+        # Atomic lock: only succeeds if req_id NOT already in active_worktrees
+        success, state = atomic_check_and_set(
+            "active_worktrees", req_id, lock_info
+        )
+        if not success:
+            # Already locked
+    """
+    fd = _lock()
+    try:
+        # Reload state under lock — this is the key: load AND save are both inside flock
+        if not os.path.exists(STATE_FILE):
+            state = {
+                "factory_version": "0.1.0",
+                "current_phase": 0,
+                "current_requirement": None,
+                "active_worktrees": {},
+                "worker_leases": {},
+                "requirement_status": {},
+                "phase_status": {"0": "BLOCKED"},
+                "command_history": [],
+                "evidence_refs": {},
+                "verifier_results": {},
+                "merge_queue": [],
+                "blockers": [],
+                "created_at": datetime.datetime.now().isoformat(),
+                "updated_at": datetime.datetime.now().isoformat(),
+                "restart_count": 0
+            }
+        else:
+            with open(STATE_FILE) as f:
+                state = json.load(f)
+        
+        target_dict = state.get(dict_key, {})
+        
+        # Check: if check_fn provided, use it; otherwise check item_key not in dict
+        if check_fn is not None:
+            allowed, reason = check_fn(state)
+            if not allowed:
+                return False, state
+        else:
+            if item_key in target_dict:
+                return False, state
+        
+        # Set
+        target_dict[item_key] = value
+        state[dict_key] = target_dict
+        state["updated_at"] = datetime.datetime.now().isoformat()
+        
+        # Atomic write (still inside flock)
+        tmp = STATE_FILE + ".tmp"
+        with open(tmp, 'w') as f:
+            json.dump(state, f, indent=2)
+        os.rename(tmp, STATE_FILE)
+        
+        return True, state
+    finally:
+        _unlock(fd)
+
 import datetime

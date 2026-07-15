@@ -1,14 +1,74 @@
 {
   "name": "AttemptStateMachine",
+  "description": "Single retry attempt within an Operation.",
   "states": [
-    "INIT",
-    "DISPATCHING",
-    "COMPLETED",
-    "FAILED",
-    "EXPIRED"
+    {
+      "name": "INIT",
+      "terminal": false
+    },
+    {
+      "name": "DISPATCHING",
+      "terminal": false
+    },
+    {
+      "name": "COMPLETED",
+      "terminal": true
+    },
+    {
+      "name": "FAILED",
+      "terminal": false
+    },
+    {
+      "name": "EXPIRED",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "source": "INIT",
+      "target": "DISPATCHING",
+      "actor": "pep",
+      "guard": "capability_token_valid",
+      "event": "AttemptDispatching",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DISPATCHING",
+      "target": "COMPLETED",
+      "actor": "tool_host",
+      "guard": "tool_succeeded",
+      "event": "AttemptCompleted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DISPATCHING",
+      "target": "FAILED",
+      "actor": "tool_host",
+      "guard": "tool_failed",
+      "event": "AttemptFailed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DISPATCHING",
+      "target": "EXPIRED",
+      "actor": "system",
+      "guard": "timeout OR capability_expired",
+      "event": "AttemptExpired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "FAILED",
+      "target": "INIT",
+      "actor": "controller",
+      "guard": "retry_allowed AND new_capability_issued",
+      "event": "AttemptRetryInit",
+      "retry_rule": "automatic"
+    }
   ],
   "invariants": [
     "Each retry generates new attempt_id",
-    "Old CapabilityToken cannot be reused"
+    "Old CapabilityToken cannot be reused",
+    "EXPIRED is terminal \u2014 cannot retry with same token",
+    "New CapabilityToken required for each retry"
   ]
 }

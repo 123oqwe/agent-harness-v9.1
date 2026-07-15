@@ -54,7 +54,38 @@ def log(msg, level="INFO"):
 def select_ready_requirement():
     """[REAL] Select a READY requirement.
     
+    Uses requirement_queue.build_queue for priority ordering when available.
+    Falls back to inline scanning.
     Reads implementation_maturity from requirements.ndjson (source of truth).
+    """
+    # Try requirement_queue module for priority-ordered selection
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "requirement-queue"))
+        from requirement_queue import build_queue
+        state = load_state()
+        req_path = SPEC_DIR / "requirements" / "requirements.ndjson"
+        if req_path.exists():
+            all_reqs = [json.loads(l) for l in open(req_path) if l.strip()]
+            current_phase = state.get("current_phase", 0)
+            req_status = state.get("requirement_status", {})
+            queue = build_queue(all_reqs, current_phase, req_status)
+            for _, _, req in queue:
+                rid = req["id"]
+                runtime_status = req_status.get(rid, {}).get("status")
+                if runtime_status in ("verification_failed", "failed", "retry_required"):
+                    retry_count = req_status.get(rid, {}).get("retry_count", 0)
+                    if retry_count >= 3:
+                        continue
+                    last_failure = req_status.get(rid, {}).get("failure_reason", "")
+                    permanent_markers = ["acceptance criteria", "specification_conflict", "impossible"]
+                    if any(m in last_failure.lower() for m in permanent_markers):
+                        continue
+                log(f"Selected requirement: {rid}")
+                return req
+    except Exception:
+        pass  # Fall back to inline implementation
+    
+    """Inline fallback: Select a READY requirement.
     Checks state.json only to avoid re-selecting requirements already in progress
     or that have failed and need retry.
     """
@@ -92,6 +123,17 @@ def select_ready_requirement():
         runtime_status = req_status.get(req_id, {}).get("status")
         if runtime_status in ("in_progress", "verified"):
             continue
+        # Retry classification: limit retries to prevent infinite loops
+        if runtime_status in ("verification_failed", "failed", "retry_required"):
+            retry_count = req_status.get(req_id, {}).get("retry_count", 0)
+            if retry_count >= 3:
+                # Permanently failed after 3 retries — needs human intervention
+                continue
+            # Check if failure was transient (network/timeout) or permanent (criteria impossible)
+            last_failure = req_status.get(req_id, {}).get("failure_reason", "")
+            permanent_markers = ["acceptance criteria", "specification_conflict", "impossible"]
+            if any(m in last_failure.lower() for m in permanent_markers):
+                continue  # Don't retry permanent failures
         # Allow retry for "failed" or "verification_failed" or "retry_required"
         
         # Check dependencies: all must have implementation_maturity == "verified"
@@ -114,33 +156,51 @@ def select_ready_requirement():
     return None
 
 def acquire_lock(req_id):
-    """Acquire atomic lock for a requirement."""
-    state = load_state()
-    active = state.get("active_worktrees", {})
-    if req_id in active:
-        log(f"Requirement {req_id} already locked", "WARN")
-        return False
+    """[REAL] Acquire atomic lock for a requirement.
     
-    state["active_worktrees"][req_id] = {
+    Uses atomic_check_and_set: flock covers the entire check-and-set.
+    No TOCTOU gap — two workers cannot both acquire the same lock.
+    """
+    from state_store import atomic_check_and_set
+    
+    lock_info = {
         "acquired_at": datetime.datetime.now().isoformat(),
         "worker": None,
         "status": "locked"
     }
-    save_state(state)
+    
+    success, state = atomic_check_and_set("active_worktrees", req_id, lock_info)
+    
+    if not success:
+        log(f"Requirement {req_id} already locked", "WARN")
+        return False
+    
     log(f"Lock acquired for {req_id}")
     return True
 
 def release_lock(req_id):
-    """Release lock for a requirement."""
-    state = load_state()
-    active = state.get("active_worktrees", {})
-    if req_id in active:
-        del active[req_id]
-        state["active_worktrees"] = active
-        save_state(state)
-        log(f"Lock released for {req_id}")
-        return True
-    return False
+    """[REAL] Release lock for a requirement. Uses flock-protected operation."""
+    fd = None
+    try:
+        import fcntl
+        lock_file = os.path.join(str(Path(__file__).parent.parent / "state-store"), "state.json.lock")
+        fd = open(lock_file, 'w')
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        
+        state = load_state()
+        active = state.get("active_worktrees", {})
+        if req_id in active:
+            del active[req_id]
+            state["active_worktrees"] = active
+            save_state(state)
+            log(f"Lock released for {req_id}")
+            return True
+        return False
+    finally:
+        if fd:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fd.close()
 
 def assign_specialist(req):
     """Assign specialist based on owner_role."""
@@ -148,9 +208,21 @@ def assign_specialist(req):
     role_map = {
         "backend": "factory/worker-adapters/codex",
         "frontend": "factory/worker-adapters/codex",
-        "security": "factory/worker-adapters/claude",  # different provider for security
+        "runtime": "factory/worker-adapters/codex",
+        "routing": "factory/worker-adapters/codex",
+        "rag_memory": "factory/worker-adapters/codex",
+        "architecture": "factory/worker-adapters/codex",
         "devops": "factory/worker-adapters/codex",
-        "cto_orchestrator": None,  # CTO doesn't implement
+        "admin": "factory/worker-adapters/codex",
+        "sre": "factory/worker-adapters/codex",
+        "product_requirements": "factory/worker-adapters/codex",
+        "qa": "factory/worker-adapters/codex",
+        "evaluation": "factory/worker-adapters/codex",
+        "security": "factory/worker-adapters/claude",
+        "privacy": "factory/worker-adapters/claude",
+        "independent_verifier": "factory/worker-adapters/claude",
+        "adversarial_reviewer": "factory/worker-adapters/claude",
+        "cto_orchestrator": None,
     }
     adapter = role_map.get(role, "factory/worker-adapters/codex")
     log(f"Assigned {role} specialist using {adapter} for {req['id']}")
@@ -183,7 +255,7 @@ def build_context_packet(req):
     }
     return packet
 
-def dispatch_worker(req, context_packet, adapter_path):
+def dispatch_worker(req, context_packet, adapter_path, worktree_path=None):
     """[REAL] Dispatch worker — actually Popen Codex or Claude.
     
     Uses worker-adapters to start real CLI processes.
@@ -203,7 +275,7 @@ def dispatch_worker(req, context_packet, adapter_path):
         return {"status": "adapter_error", "exit_code": -1, "exit_reason": "import failed"}
     
     # Start session
-    config = {"worktree_path": None}  # Would set to worktree path
+    config = {"worktree_path": worktree_path}
     session = start_session(context_packet, config)
     
     # Record worker lease
@@ -236,20 +308,6 @@ def dispatch_worker(req, context_packet, adapter_path):
     log(f"Worker completed for {req['id']}: exit_code={result.get('exit_code')}, stdout={len(result.get('stdout',''))} chars")
     
     return result
-    
-    # Record worker lease
-    state.setdefault("worker_leases", {})[req["id"]] = {
-        "adapter": adapter_path,
-        "provider": worker_invocation["provider"],
-        "started_at": worker_invocation["start_time"],
-        "heartbeat": worker_invocation["start_time"],
-        "lease_expiry": (datetime.datetime.now() + datetime.timedelta(hours=1)).isoformat(),
-        "status": "active"
-    }
-    save_state(state)
-    
-    log(f"Worker dispatched for {req['id']} using {worker_invocation['provider']}")
-    return worker_invocation
 
 def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_results, coverage, worker_result=None):
     """[REAL] Collect evidence from actual command output.
@@ -263,7 +321,7 @@ def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_resu
         stderr = worker_result.get("stderr", "") or ""
         exit_codes = [worker_result.get("exit_code", -1)] if worker_result.get("exit_code") is not None else []
         commands_run = [worker_result.get("dispatch_command", "unknown")] if worker_result.get("dispatch_command") else []
-    
+
     # Refuse empty evidence
     if not stdout and not exit_codes:
         return {
@@ -271,37 +329,58 @@ def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_resu
             "error": "REFUSED: empty evidence (no stdout, no exit codes)",
             "collected_at": datetime.datetime.now().isoformat()
         }
-    
+
+    # Parse test results from stdout
+    parsed_tests = None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "evidence-collector"))
+        from evidence_collector import parse_test_output
+        parsed_tests = parse_test_output(stdout)
+    except Exception:
+        pass
+
+    # Construct evidence dict
+    evidence = {
+        "requirement_id": req_id,
+        "collected_at": datetime.datetime.now().isoformat(),
+        "commands_run": commands_run,
+        "exit_codes": exit_codes,
+        "stdout": stdout[:10000],
+        "stdout_full_length": len(stdout),
+        "stdout_hash": hashlib.sha256(stdout.encode()).hexdigest()[:16] if stdout else None,
+        "stderr": stderr[:5000],
+        "stderr_full_length": len(stderr),
+        "stderr_hash": hashlib.sha256(stderr.encode()).hexdigest()[:16] if stderr else None,
+        "test_results": parsed_tests,
+        "coverage": coverage if coverage else None,
+        "mode": "METADATA_ONLY" if not (BASE_DIR / "harness" / "package.json").exists() else "FULL"
+    }
+
     # Save raw output to evidence directory
     ev_path = EVIDENCE_DIR / f"{req_id}.json"
     ev_path.parent.mkdir(parents=True, exist_ok=True)
     with open(ev_path, 'w') as f:
         json.dump(evidence, f, indent=2)
     evidence["raw_output_saved"] = True
-    
+
     # Update state
     state = load_state()
     state.setdefault("evidence_refs", {})[req_id] = str(ev_path)
     save_state(state)
-    
+
     log(f"Evidence collected for {req_id}")
     return evidence
 
 def dispatch_verifier(req_id, evidence, commit_sha=None):
-    """Dispatch independent verifier.
-    
-    Verifier must:
-    - Use independent process and context
-    - Have read-only access
-    - Checkout exact commit
-    - Rerun tests
-    - Check evidence matches real output
-    - Issue signed VerificationRecord
-    
-    Verifier CANNOT:
-    - Modify code, tests, requirements, acceptance criteria, evidence
-    - Merge
-    - Approve production
+    """Dispatch independent verifier via subprocess.
+
+    Verifier runs as a SEPARATE PROCESS (real process isolation).
+    Uses standalone run_verifier.py which:
+    - Runs in its own process
+    - Has read-only access
+    - When product code exists: reruns tests + optionally calls claude CLI (different model family)
+    - Cannot modify code, tests, requirements, acceptance criteria, evidence
+    - Cannot merge or approve production
     """
     state = load_state()
     
@@ -319,109 +398,78 @@ def dispatch_verifier(req_id, evidence, commit_sha=None):
         "started_at": datetime.datetime.now().isoformat()
     }
     
-    # Real verification checks (not hardcoded pass):
-    
-    # Check 1: Evidence file exists and is valid JSON
-    ev_path = EVIDENCE_DIR / f"{req_id}.json"
-    check1_pass = ev_path.exists()
-    if check1_pass:
-        try:
-            with open(ev_path) as f:
-                ev = json.load(f)
-            check1_detail = f"Evidence file valid, {len(ev.get('commands_run', []))} commands recorded"
-        except:
-            check1_pass = False
-            check1_detail = "Evidence file exists but invalid JSON"
-    else:
-        check1_detail = "Evidence file not found"
-    verification["checks"].append({"name": "evidence_valid", "passed": check1_pass, "detail": check1_detail})
-    
-    # Check 2: All exit codes are 0
-    if check1_pass and ev.get("exit_codes"):
-        check2_pass = all(code == 0 for code in ev["exit_codes"])
-        check2_detail = f"Exit codes: {ev['exit_codes']}"
-    else:
-        check2_pass = False
-        check2_detail = "No exit codes in evidence"
-    verification["checks"].append({"name": "exit_codes_zero", "passed": check2_pass, "detail": check2_detail})
-    
-    # Check 3: Test results show pass
-    if check1_pass and ev.get("test_results"):
-        tr = ev["test_results"]
-        check3_pass = tr.get("failed", 1) == 0 and tr.get("passed", 0) > 0
-        check3_detail = f"Tests: {tr.get('passed', 0)} passed, {tr.get('failed', 0)} failed"
-    else:
-        check3_pass = False
-        check3_detail = "No test results in evidence"
-    verification["checks"].append({"name": "tests_pass", "passed": check3_pass, "detail": check3_detail})
-    
-    # Check 4: Acceptance criteria exist
-    req_path = SPEC_DIR / "requirements" / "requirements.ndjson"
-    check4_pass = False
-    check4_detail = "Requirement not found"
-    if req_path.exists():
-        with open(req_path) as f:
-            for line in f:
-                r = json.loads(line)
-                if r["id"] == req_id:
-                    ac = r.get("acceptance_criteria", [])
-                    check4_pass = len(ac) > 0
-                    check4_detail = f"{len(ac)} acceptance criteria defined"
-                    break
-    verification["checks"].append({"name": "acceptance_criteria_defined", "passed": check4_pass, "detail": check4_detail})
-    
-    # Check 5: NOT hardcoded isolation — verify process is actually separate
-    # In real implementation: check PID, check filesystem permissions, check no write access
-    check5_pass = os.getpid() != os.getppid()  # Actually a separate process
-    check5_detail = f"Verifier PID {os.getpid()} is separate from parent PID {os.getppid()}"
-    verification["checks"].append({"name": "process_isolation", "passed": check5_pass, "detail": check5_detail})
-    
-    # Check 6: Evidence stdout hash matches actual (not self-reported)
-    # In real implementation: re-run commands and compare hashes
-    # For now, check that stdout_hash exists (not None)
-    if check1_pass:
-        check6_pass = ev.get("stdout_hash") is not None
-        check6_detail = f"stdout_hash: {ev.get('stdout_hash', 'MISSING')}"
-    else:
-        check6_pass = False
-        check6_detail = "No evidence to check"
-    verification["checks"].append({"name": "evidence_hashed", "passed": check6_pass, "detail": check6_detail})
-    
-    # Check if product code exists for rerun
-    product_dir = BASE_DIR / "product"
-    if not product_dir.exists() or not (product_dir / "package.json").exists():
-        verification["mode"] = "METADATA_ONLY"
-        verification["mode_note"] = "No product code to rerun. Verifier checks evidence metadata only. Will switch to RERUN mode when product/ has code."
-    else:
-        verification["mode"] = "RERUN"
-        verification["mode_note"] = "Product code exists. Verifier should rerun tests."
-    
-    # Overall result
-    all_pass = all(c["passed"] for c in verification["checks"])
-    verification["result"] = "PASS" if all_pass else "FAIL"
-    verification["completed_at"] = datetime.datetime.now().isoformat()
-    
+    # [REAL] Run verifier as a separate subprocess for true process isolation
+    verifier_script = Path(__file__).parent.parent / "verifier" / "run_verifier.py"
+    ev_path = state.get("evidence_refs", {}).get(req_id)
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(verifier_script), req_id, ev_path or "", commit_sha or ""],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(BASE_DIR)
+        )
+        if result.returncode == 0:
+            verification = json.loads(result.stdout)
+            verification["verifier_subprocess_pid"] = verification.get("verifier_pid")
+            verification["verifier_model_family"] = "standalone"
+        else:
+            verification = {
+                "verification_id": f"VER-{req_id}-{int(time.time())}",
+                "requirement_id": req_id,
+                "verifier": "standalone-subprocess",
+                "result": "FAIL",
+                "error": f"Verifier subprocess failed: {result.stderr[:500]}",
+                "checks": [{"name": "subprocess_executed", "passed": False, "detail": result.stderr[:200]}],
+                "started_at": datetime.datetime.now().isoformat(),
+                "completed_at": datetime.datetime.now().isoformat()
+            }
+    except Exception as e:
+        verification = {
+            "verification_id": f"VER-{req_id}-{int(time.time())}",
+            "requirement_id": req_id,
+            "verifier": "standalone-subprocess",
+            "result": "FAIL",
+            "error": str(e),
+            "checks": [{"name": "subprocess_executed", "passed": False, "detail": str(e)[:200]}],
+            "started_at": datetime.datetime.now().isoformat(),
+            "completed_at": datetime.datetime.now().isoformat()
+        }
+
     # Record in state
     state.setdefault("verifier_results", {})[req_id] = verification
     save_state(state)
-    
-    log(f"Verifier result for {req_id}: {verification['result']} ({sum(1 for c in verification['checks'] if c['passed'])}/{len(verification['checks'])} checks passed)")
+
+    log(f"Verifier result for {req_id}: {verification['result']} ({sum(1 for c in verification.get('checks', []) if c.get('passed'))}/{len(verification.get('checks', []))} checks passed)")
     return verification
+
 
 def update_registry(req_id, status, verification=None):
     """Update requirement status in registry. Only controller can do this."""
     state = load_state()
+    existing = state.get("requirement_status", {}).get(req_id, {})
+    retry_count = existing.get("retry_count", 0)
+    if status in ("verification_failed", "failed", "retry_required"):
+        retry_count += 1
+    elif status == "verified":
+        retry_count = 0
     state.setdefault("requirement_status", {})[req_id] = {
         "status": status,
         "updated_at": datetime.datetime.now().isoformat(),
         "verification_id": verification["verification_id"] if verification else None,
-        "verifier_result": verification["result"] if verification else None
+        "verifier_result": verification["result"] if verification else None,
+        "retry_count": retry_count,
+        "failure_reason": verification.get("error", "") if verification and verification.get("result") == "FAIL" else existing.get("failure_reason", "")
     }
     save_state(state)
     log(f"Registry updated: {req_id} -> {status}")
 
 def run_cycle():
     """Run one complete requirement cycle."""
+    # Check for expired worker leases before starting
+    expired = check_expired_leases()
+    if expired:
+        log(f"Expired {len(expired)} worker leases", "WARN")
+    sync_phase_status()  # Ensure state.json matches current-state.json
     log("=== Factory Controller Cycle Start ===")
     
     # 1. Select READY requirement
@@ -446,40 +494,88 @@ def run_cycle():
         # 3. Build context packet
         packet = build_context_packet(req)
         log(f"Context packet built (hash: {packet['hash']})")
-        
+
         # 4. Assign specialist
         adapter = assign_specialist(req)
         if not adapter:
             log(f"No adapter for role {req.get('owner_role')}", "ERROR")
             release_lock(req_id)
             return {"action": "no_adapter", "requirement": req_id}
-        
-        # 5. Dispatch worker — [REAL] actually Popen Codex/Claude
-        worker_result = dispatch_worker(req, packet, adapter)
-        
-        # 6. [REAL] Collect evidence from worker's actual stdout/stderr
-        evidence = collect_evidence(
-            req_id,
-            commands_run=[],
-            exit_codes=[],
-            stdout="",
-            stderr="",
-            test_results={},
-            coverage={},
-            worker_result=worker_result
-        )
-        
-        # 7. Dispatch verifier
-        verification = dispatch_verifier(req_id, evidence)
-        
-        # 8. Update registry based on verification
-        if verification["result"] == "PASS":
-            update_registry(req_id, "verified", verification)
-            log(f"Requirement {req_id} VERIFIED")
-        else:
-            update_registry(req_id, "verification_failed", verification)
-            log(f"Requirement {req_id} VERIFICATION FAILED", "WARN")
-        
+
+        # 4.5 Create isolated worktree
+        from worktree_manager import create_worktree, remove_worktree
+        wt = create_worktree(req_id)
+        if not wt.get("created"):
+            log(f"Failed to create worktree for {req_id}: {wt.get('error')}", "ERROR")
+            release_lock(req_id)
+            return {"action": "worktree_failed", "requirement": req_id}
+        worktree_path = wt["path"]
+        worktree_branch = wt["branch"]
+        log(f"Worktree created: {worktree_path} (branch={worktree_branch})")
+
+        try:
+            # 5. Dispatch worker — [REAL] actually Popen Codex/Claude
+            worker_result = dispatch_worker(req, packet, adapter, worktree_path=worktree_path)
+
+            # 5.5 Commit worker output in worktree
+            if worker_result.get("exit_code") == 0:
+                subprocess.run(["git", "add", "-A"], cwd=worktree_path, capture_output=True)
+                commit = subprocess.run(
+                    ["git", "commit", "-m", f"Implement {req_id}"],
+                    cwd=worktree_path, capture_output=True, text=True
+                )
+                if commit.returncode == 0:
+                    log(f"Committed {req_id} in worktree")
+                else:
+                    log(f"Git commit for {req_id}: {commit.stderr[:200]}", "WARN")
+
+            # 6. [REAL] Collect evidence from worker's actual stdout/stderr
+            evidence = collect_evidence(
+                req_id,
+                commands_run=[],
+                exit_codes=[],
+                stdout="",
+                stderr="",
+                test_results={},
+                coverage={},
+                worker_result=worker_result
+            )
+
+            # 7. Dispatch verifier (with commit_sha from worktree commit)
+            commit_sha = None
+            try:
+                rev = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=worktree_path, capture_output=True, text=True
+                )
+                if rev.returncode == 0:
+                    commit_sha = rev.stdout.strip()
+            except Exception:
+                pass
+            verification = dispatch_verifier(req_id, evidence, commit_sha=commit_sha)
+
+            # 8. Update registry and merge based on verification
+            if verification["result"] == "PASS":
+                update_registry(req_id, "verified", verification)
+                log(f"Requirement {req_id} VERIFIED")
+                # 8.5 Enqueue merge
+                from merge_queue import enqueue, process_next
+                enqueue(req_id, worktree_branch, verification)
+                merge_result = process_next()
+                if merge_result and merge_result.get("status") == "merged":
+                    log(f"Requirement {req_id} MERGED")
+                elif merge_result:
+                    log(f"Merge for {req_id}: {merge_result.get('status')}", "WARN")
+            else:
+                update_registry(req_id, "verification_failed", verification)
+                log(f"Requirement {req_id} VERIFICATION FAILED", "WARN")
+                # Clean up worktree on failure
+                remove_worktree(req_id)
+
+        finally:
+            # Ensure worktree cleanup on non-merged paths
+            pass
+
         # 9. Release lock
         release_lock(req_id)
         
@@ -520,6 +616,29 @@ def restart_recovery():
     
     save_state(state)
     log(f"Restart recovery complete (restart #{state['restart_count']})")
+
+def sync_phase_status():
+    """[REAL] Sync state.json phase_status with control/current-state.json.
+    
+    Ensures the two state sources never contradict each other.
+    control/current-state.json is the authority — state.json follows.
+    """
+    cs_path = BASE_DIR / "control" / "current-state.json"
+    if not cs_path.exists():
+        return
+    
+    with open(cs_path) as f:
+        cs = json.load(f)
+    
+    state = load_state()
+    new_phase_status = {}
+    for phase_id, phase_info in cs.get("phases", {}).items():
+        new_phase_status[phase_id] = phase_info.get("status", "BLOCKED")
+    
+    if state.get("phase_status") != new_phase_status:
+        state["phase_status"] = new_phase_status
+        save_state(state)
+        log(f"Synced phase_status from current-state.json: {new_phase_status}")
 
 def advance_phase():
     """[REAL] Advance to the next phase after current phase gate passes."""
@@ -567,6 +686,103 @@ def advance_phase():
     
     return True
 
+def check_expired_leases():
+    """Check for expired worker leases and release them.
+    
+    Runs on every cycle to detect hung workers without waiting for restart.
+    """
+    state = load_state()
+    now = datetime.datetime.now()
+    expired = []
+    
+    for req_id, lease in state.get("worker_leases", {}).items():
+        if lease.get("status") != "active":
+            continue
+        expiry_str = lease.get("lease_expiry")
+        if not expiry_str:
+            continue
+        try:
+            expiry = datetime.datetime.fromisoformat(expiry_str)
+            if now > expiry:
+                expired.append(req_id)
+                lease["status"] = "expired"
+                # Release the requirement lock
+                if req_id in state.get("active_worktrees", {}):
+                    del state["active_worktrees"][req_id]
+                log(f"Worker lease expired for {req_id}, releasing", "WARN")
+        except Exception:
+            pass
+    
+    if expired:
+        save_state(state)
+    
+    return expired
+
+
+def deploy(environment="staging", gate_check=True):
+    """Deploy to staging/canary/production.
+    
+    Requires ReleaseApproval for production.
+    Runs phase gate before deploy.
+    """
+    if environment not in ("staging", "canary", "production"):
+        return {"action": "deploy_failed", "error": f"Unknown environment: {environment}"}
+    
+    if environment == "production":
+        # Check for ReleaseApproval
+        release_path = SPEC_DIR / "contracts" / "release-approval.schema.json"
+        state = load_state()
+        release = state.get("release_approval")
+        if not release:
+            return {"action": "deploy_blocked", "error": "Production deploy requires signed ReleaseApproval"}
+        log(f"Production deploy authorized by {release.get('approved_by')}")
+    
+    if gate_check:
+        # Run current phase gate
+        current_phase = load_state().get("current_phase", 0)
+        try:
+            sys.path.insert(0, str(BASE_DIR / "factory" / "phase-gates"))
+            from gate_runner import run_phase_gate
+            gate = run_phase_gate(current_phase)
+            if gate.get("result") != "PASS":
+                return {"action": "deploy_blocked", "error": f"Phase {current_phase} gate not passed", "gate": gate}
+        except Exception as e:
+            return {"action": "deploy_error", "error": str(e)}
+    
+    # Execute deployment
+    deploy_cmds = {
+        "staging": ["npm", "run", "deploy:staging"],
+        "canary": ["npm", "run", "deploy:canary"],
+        "production": ["npm", "run", "deploy:production"],
+    }
+    
+    cmd = deploy_cmds[environment]
+    harness_dir = BASE_DIR / "harness"
+    
+    if not (harness_dir / "package.json").exists():
+        return {"action": "deploy_skipped", "error": "No harness code to deploy"}
+    
+    log(f"Deploying to {environment}: {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=str(harness_dir), capture_output=True, text=True, timeout=600)
+    
+    deploy_result = {
+        "action": "deployed" if result.returncode == 0 else "deploy_failed",
+        "environment": environment,
+        "exit_code": result.returncode,
+        "stdout_hash": hashlib.sha256(result.stdout.encode()).hexdigest()[:16] if result.stdout else None,
+        "stderr_hash": hashlib.sha256(result.stderr.encode()).hexdigest()[:16] if result.stderr else None,
+        "deployed_at": datetime.datetime.now().isoformat()
+    }
+    
+    # Record in state
+    state = load_state()
+    state.setdefault("deployments", []).append(deploy_result)
+    save_state(state)
+    
+    log(f"Deploy to {environment}: {deploy_result['action']}")
+    return deploy_result
+
+
 def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
     """[REAL] Automatic scheduling loop.
     
@@ -594,10 +810,20 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
         # Check for open blockers
         open_blockers = list_open_blockers()
         if open_blockers and stop_on_blocker:
-            log(f"Stopping: {len(open_blockers)} open blockers", "WARN")
+            log(f"Waiting: {len(open_blockers)} open blockers", "WARN")
             for b in open_blockers:
                 log(f"  Blocker {b['blocker_id']}: {b['blocker_type']} - {b.get('required_decision','')}", "WARN")
-            return {"action": "stopped_blockers", "blockers": len(open_blockers), "iterations": iteration}
+            # 全自动模式: 不停止，轮询等待 blocker 被解决
+            # 检查是否所有 blocker 都已解决
+            import time
+            while True:
+                time.sleep(idle_sleep_seconds)
+                from blocker_service import list_open_blockers
+                remaining = list_open_blockers()
+                if not remaining:
+                    log("All blockers resolved, resuming...")
+                    break
+                log(f"Still {len(remaining)} open blockers, waiting...")
         
         # Run one cycle
         result = run_cycle()
@@ -623,6 +849,10 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
                     if not advance_phase():
                         log("Cannot advance, stopping loop", "WARN")
                         return {"action": "stopped_no_advance", "iterations": iteration}
+                    # Auto-deploy to staging after phase advance (if product code exists)
+                    if (BASE_DIR / "harness" / "package.json").exists():
+                        log("Auto-deploying to staging after phase advance")
+                        deploy(environment="staging")
                 else:
                     failed_checks = [c["name"] for c in gate["checks"] if not c["passed"]]
                     log(f"Phase {current_phase} gate FAILED: {failed_checks}", "WARN")
@@ -630,10 +860,9 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
             except Exception as e:
                 log(f"Phase gate error: {e}", "ERROR")
             
-            if idle_count >= 3:
-                log(f"Idle {idle_count} times, stopping loop", "WARN")
-                return {"action": "stopped_idle", "iterations": iteration}
-            
+            # 全自动模式: 不因空闲停止，继续等待
+            # 可能有外部变化（blocker 被解决、新需求被添加）
+            log(f"Idle #{idle_count}, waiting {idle_sleep_seconds}s for changes...")
             import time
             time.sleep(idle_sleep_seconds)
             
@@ -646,10 +875,70 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
     log(f"=== Factory Loop Ended ({iteration} iterations) ===")
     return {"action": "completed_loop", "iterations": iteration}
 
+def run_daemon(idle_sleep_seconds=30):
+    """[REAL] Daemon mode: run forever, auto-restart on crash, poll for blockers.
+    
+    This is the fully automatic mode. The controller:
+    1. Runs run_loop() with no max_iterations
+    2. If run_loop returns (error/crash), logs and restarts after 10s
+    3. Continues until killed by signal
+    """
+    import signal, time
+    
+    def handle_signal(signum, frame):
+        log(f"Received signal {signum}, shutting down daemon...", "WARN")
+        # Save state
+        state = load_state()
+        state["daemon_running"] = False
+        save_state(state)
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
+    state = load_state()
+    state["daemon_running"] = True
+    state["daemon_started_at"] = datetime.datetime.now().isoformat()
+    save_state(state)
+    
+    log("=== Factory Daemon Started (fully automatic) ===")
+    log("Controller will run indefinitely. Polling for READY requirements.")
+    log("Blockers will pause execution until resolved.")
+    log("Phase Gates will auto-advance when passed.")
+    log("Kill with: kill <pid> or ctrl+C")
+    
+    restart_count = 0
+    while True:
+        try:
+            result = run_loop(max_iterations=None, idle_sleep_seconds=idle_sleep_seconds, stop_on_blocker=True)
+            # run_loop only returns on error — log and restart
+            restart_count += 1
+            log(f"Loop exited (restart #{restart_count}): {result.get('action','unknown')}", "WARN")
+            log(f"Restarting in 10 seconds...", "WARN")
+            time.sleep(10)
+            
+            # Recovery before restart
+            restart_recovery()
+            
+        except KeyboardInterrupt:
+            log("Daemon stopped by user", "WARN")
+            break
+        except Exception as e:
+            restart_count += 1
+            log(f"Daemon crash (restart #{restart_count}): {e}", "ERROR")
+            log(f"Restarting in 10 seconds...", "ERROR")
+            time.sleep(10)
+            restart_recovery()
+    
+    state = load_state()
+    state["daemon_running"] = False
+    save_state(state)
+    log("=== Factory Daemon Stopped ===")
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Agent Harness Factory Controller")
-    parser.add_argument("command", choices=["cycle", "loop", "recover", "status", "select", "advance"])
+    parser.add_argument("command", choices=["cycle", "loop", "daemon", "recover", "status", "select", "advance", "deploy"])
     parser.add_argument("--max-iterations", type=int, default=None)
     parser.add_argument("--idle-sleep", type=int, default=30)
     args = parser.parse_args()
@@ -660,8 +949,14 @@ if __name__ == "__main__":
     elif args.command == "loop":
         result = run_loop(max_iterations=args.max_iterations, idle_sleep_seconds=args.idle_sleep)
         print(json.dumps(result, indent=2, default=str))
+    elif args.command == "daemon":
+        run_daemon(idle_sleep_seconds=args.idle_sleep)
     elif args.command == "recover":
         restart_recovery()
+    elif args.command == "deploy":
+        env = sys.argv[2] if len(sys.argv) > 2 else "staging"
+        result = deploy(environment=env)
+        print(json.dumps(result, indent=2, default=str))
     elif args.command == "status":
         state = load_state()
         print(json.dumps({

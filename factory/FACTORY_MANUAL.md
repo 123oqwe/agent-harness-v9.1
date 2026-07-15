@@ -114,8 +114,8 @@ Factory 是用来开发产品的施工设备。
    - evidence_not_refused（证据不是空数据）
    
    模式:
-   - METADATA_ONLY: 当 product/ 不存在时，只检查元数据
-   - RERUN: 当 product/ 存在时，checkout commit 重跑测试
+   - METADATA_ONLY: 当 harness/ 不存在时，只检查元数据
+   - RERUN: 当 harness/ 存在时，checkout commit 重跑测试
    
    验证器 CANNOT: 修改代码/测试/需求/证据/合并/批准生产
    ↓
@@ -280,9 +280,9 @@ State Store 使用：
 Phase Gate 运行真实命令（不是查 Registry）：
 - requirements_have_criteria（验收标准非空）
 - requirements_have_tests（测试文件非空）
-- build（`npm run build`，如果 product/ 存在）
-- type_check（`npx tsc --noEmit`，如果 product/ 存在）
-- unit_tests（`npm test`，如果 product/ 存在）
+- build（`npm run build`，如果 harness/ 存在）
+- type_check（`npx tsc --noEmit`，如果 harness/ 存在）
+- unit_tests（`npm test`，如果 harness/ 存在）
 - model_check（Phase 0 专属）
 - factory_exists（Phase 0 专属）
 
@@ -290,7 +290,7 @@ Phase Gate 运行真实命令（不是查 Registry）：
 
 | 脚本 | 检查 | 状态 |
 |------|------|------|
-| check-active-stubs | 扫描 product/ 的 NotImplementedError | [REAL] |
+| check-active-stubs | 扫描 harness/ 的 NotImplementedError | [REAL] |
 | check-deprecated-references | 规范文件不引用废弃内容 | [REAL] |
 | check-phase-coverage | Phase manifest 覆盖所有需求 | [REAL] |
 | check-placeholder-content | 规范文件无 TODO/FIXME | [REAL] |
@@ -335,7 +335,7 @@ Phase Gate 运行真实命令（不是查 Registry）：
 
 ### Worker 权限
 
-- Worker 只能修改 `product/`、`factory/`、`infra/`
+- Worker 只能修改 `harness/`、`factory/`、`infra/`
 - Worker 不能修改 `spec/`、`control/`、`evidence/`
 - Worker 通过 ContextPacket 获得最小化上下文
 - Worker 不能直接访问密钥（通过 Secret Service 请求）
@@ -395,7 +395,7 @@ Phase Gate 运行真实命令（不是查 Registry）：
 ### 当前限制（诚实声明）
 
 1. **Sandbox Runner 是 STUB**: 直接运行命令，没有 Docker/MicroVM 隔离
-2. **验证器是 METADATA_ONLY**: 当 product/ 不存在时只检查元数据，不 rerun 测试
+2. **验证器是 METADATA_ONLY**: 当 harness/ 不存在时只检查元数据，不 rerun 测试
 3. **没有 cron/daemon**: 必须手动或 CI 触发 `controller.py loop`
 4. **Worker 超时 600 秒**: 复杂需求可能需要更长时间
 5. **没有并发 Worker**: 一次只处理一个需求
@@ -403,7 +403,7 @@ Phase Gate 运行真实命令（不是查 Registry）：
 
 ### 需要产品代码后才能完整工作的
 
-- 验证器 RERUN 模式（需要 product/ 有代码和测试）
+- 验证器 RERUN 模式（需要 harness/ 有代码和测试）
 - Sandbox Runner 容器隔离（需要 Docker）
-- Phase Gate 的 build/type-check/unit-tests（需要 product/ 有 package.json）
-- 域评估（需要 product/ 有评估代码）
+- Phase Gate 的 build/type-check/unit-tests（需要 harness/ 有 package.json）
+- 域评估（需要 harness/ 有评估代码）

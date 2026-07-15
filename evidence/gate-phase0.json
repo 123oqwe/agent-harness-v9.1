@@ -9,22 +9,22 @@
     {
       "name": "requirements_have_tests",
       "passed": true,
-      "detail": "All 31 requirements have test files"
+      "detail": "All 31 requirements have test files on disk"
     },
     {
       "name": "build",
       "passed": true,
-      "detail": "No product code yet (Phase 0)"
+      "detail": "SKIPPED: Phase 0 is specification only"
     },
     {
       "name": "type_check",
       "passed": true,
-      "detail": "No product code yet (Phase 0)"
+      "detail": "SKIPPED: Phase 0 is specification only"
     },
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "No tests yet (Phase 0)"
+      "detail": "SKIPPED: Phase 0 is specification only"
     },
     {
       "name": "model_check",
@@ -34,10 +34,10 @@
     {
       "name": "factory_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/factory/controller/controller.py"
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T05:18:58.804129",
+  "timestamp": "2026-07-16T07:00:38.626426",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

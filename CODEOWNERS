@@ -1,0 +1,32 @@
+# Protected specification paths
+# Implementation agents may submit ADR/spec change proposals but cannot approve or merge them.
+
+# Contracts (JSON Schemas)
+/spec/contracts/                    @cto-orchestrator @security-architect
+
+# State machines
+/spec/state-machines/               @cto-orchestrator @security-architect
+
+# Requirement registry
+/spec/requirements/                 @cto-orchestrator @product-requirements
+
+# Phase manifests
+/spec/phases/                       @cto-orchestrator
+
+# Normative precedence and execution protocol
+/spec/NORMATIVE_PRECEDENCE.md       @cto-orchestrator
+/spec/AI_EXECUTION_PROTOCOL.md      @cto-orchestrator
+
+# Security invariants and release schemas
+/spec/contracts/release-approval.schema.json  @cto-orchestrator @security-architect
+
+# Threat model
+/spec/threat-model/                 @security-architect
+
+# Control files (root)
+/AGENTS.md                          @cto-orchestrator
+/CLAUDE.md                          @cto-orchestrator
+/spec/SPECIFICATION_INDEX.yaml      @cto-orchestrator
+/CODEOWNERS                         @cto-orchestrator
+/control/                           @cto-orchestrator
+/evidence/                          @cto-orchestrator @security-architect

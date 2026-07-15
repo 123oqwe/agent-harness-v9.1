@@ -1,0 +1,15 @@
+{
+  "name": "valid-name",
+  "version": "valid-version",
+  "supported_experience_profiles": [],
+  "input_schema_ref": "valid-input_schema_ref",
+  "output_schema_ref": "valid-output_schema_ref",
+  "required_context": [],
+  "required_tools": [],
+  "allowed_effect_classes": [],
+  "workflow_template_ref": "valid-workflow_template_ref",
+  "verification_template_ref": "valid-verification_template_ref",
+  "failure_policy": {},
+  "risk_ceiling": "valid-risk_ceiling",
+  "eval_suite_ref": "valid-eval_suite_ref"
+}

@@ -16,9 +16,15 @@ disabled_capabilities:
   - dynamic_tool_generation
 
 requirements:
+  - AH-MULTIAGENT-DAG-001
   - AH-MULTIAGENT-MERGE-001
+  - AH-ROUTER-BUDGET-DYNAMIC-001
+  - AH-ROUTER-CONTEXT-TOPOLOGY-001
   - AH-ROUTER-DAG-001
+  - AH-ROUTER-DAG-FAILURE-001
   - AH-ROUTER-EVAL-001
+  - AH-ROUTER-FALLBACK-11-001
+  - AH-ROUTER-SKILL-CHAIN-001
   - AH-SUBAGENT-001
 
 fixtures:
@@ -49,6 +55,7 @@ deployment_target:
   phase_7: "canary"
   phase_8: "production"
 
+gate_command: "python3 factory/phase-gates/gate_runner.py phase3"
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-3/"
 

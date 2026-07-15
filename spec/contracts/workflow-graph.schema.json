@@ -1,18 +1,108 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "WorkflowGraph",
+  "description": "Workflow step DAG. Defines execution order and dependencies.",
+  "type": "object",
   "required": [
     "nodes",
     "edges"
   ],
   "properties": {
     "nodes": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "step_type",
+          "status"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string"
+          },
+          "step_type": {
+            "enum": [
+              "model_call",
+              "tool_call",
+              "verification",
+              "decision",
+              "parallel_fork",
+              "parallel_join",
+              "human_input",
+              "compensation"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "dispatched",
+              "executing",
+              "verifying",
+              "done",
+              "failed",
+              "blocked",
+              "skipped"
+            ]
+          },
+          "agent_id_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Which agent executes this step"
+          },
+          "tool_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For tool_call steps"
+          },
+          "retry_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_retries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Agent can tune during implementation"
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 100,
+            "description": "Agent can tune during implementation"
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "edges": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_step",
+          "to_step"
+        ],
+        "properties": {
+          "from_step": {
+            "type": "string"
+          },
+          "to_step": {
+            "type": "string"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional condition expression for conditional edges (e.g., 'result.success == true')"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
-  "type": "object",
   "additionalProperties": false
 }

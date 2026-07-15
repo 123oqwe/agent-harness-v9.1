@@ -170,7 +170,7 @@ def run_spec_gate():
     checks.append(check7)
     
     # Check 8: CODEOWNERS exists
-    co_path = spec_dir / "CODEOWNERS"
+    co_path = BASE_DIR / "CODEOWNERS"
     check8 = {"name": "codeowners_exists", "passed": co_path.exists(), "detail": str(co_path)}
     checks.append(check8)
     
@@ -250,42 +250,62 @@ def run_phase_gate(phase_num):
             check1["detail"] = f"All {len(phase_reqs)} requirements have criteria"
     checks.append(check1)
     
-    # Check 2: All phase requirements have test files
+    # Check 2: All phase requirements have test files ON DISK
     check2 = {"name": "requirements_have_tests", "passed": True, "detail": ""}
     if req_path.exists():
-        no_tests = [r["id"] for r in phase_reqs if not r.get("test_files")]
-        if no_tests:
+        missing = []
+        for r in phase_reqs:
+            for tf in r.get("test_files", []):
+                found = False
+                for base in [str(BASE_DIR), str(BASE_DIR / "spec"), str(BASE_DIR / "harness"), str(BASE_DIR / "product")]:
+                    if os.path.exists(os.path.join(base, tf)):
+                        found = True
+                        break
+                if not found:
+                    missing.append(f"{r['id']}:{tf}")
+                    break
+            if not r.get("test_files"):
+                missing.append(f"{r['id']}:no_test_files_declared")
+        if missing:
             check2["passed"] = False
-            check2["detail"] = f"Missing tests: {no_tests[:5]}"
+            check2["detail"] = f"Missing on disk: {missing[:5]}"
         else:
-            check2["detail"] = f"All {len(phase_reqs)} requirements have test files"
+            check2["detail"] = f"All {len(phase_reqs)} requirements have test files on disk"
     checks.append(check2)
     
-    # Check 3: Build check (run actual build if product code exists)
-    product_dir = BASE_DIR / "product"
-    check3 = {"name": "build", "passed": True, "detail": "No product code yet (Phase 0)"}
-    if product_dir.exists() and (product_dir / "package.json").exists():
+    # Check 3: Build check
+    # Phase 0: SKIP (specification only, no product code expected)
+    # Phase 1+: MUST have product code and build must pass
+    product_dir = BASE_DIR / "harness"
+    if phase_num == 0:
+        check3 = {"name": "build", "passed": True, "detail": "SKIPPED: Phase 0 is specification only"}
+    elif product_dir.exists() and (product_dir / "package.json").exists():
         result = run_command("npm run build", cwd=str(product_dir))
-        check3["passed"] = result["exit_code"] == 0
-        check3["detail"] = f"exit_code={result['exit_code']}"
-        check3["stdout_hash"] = result.get("stdout_hash")
+        check3 = {"name": "build", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}", "stdout_hash": result.get("stdout_hash")}
+    else:
+        check3 = {"name": "build", "passed": False, "detail": "FAIL: No harness/package.json — Phase 1+ requires product code"}
     checks.append(check3)
     
-    # Check 4: Type check (run actual tsc if product code exists)
-    check4 = {"name": "type_check", "passed": True, "detail": "No product code yet (Phase 0)"}
-    if product_dir.exists() and (product_dir / "tsconfig.json").exists():
+    # Check 4: Type check
+    if phase_num == 0:
+        check4 = {"name": "type_check", "passed": True, "detail": "SKIPPED: Phase 0 is specification only"}
+    elif product_dir.exists() and (product_dir / "tsconfig.json").exists():
         result = run_command("npx tsc --noEmit", cwd=str(product_dir))
-        check4["passed"] = result["exit_code"] == 0
-        check4["detail"] = f"exit_code={result['exit_code']}"
+        check4 = {"name": "type_check", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}"}
+    else:
+        check4 = {"name": "type_check", "passed": False, "detail": "FAIL: No harness/tsconfig.json — Phase 1+ requires type checking"}
     checks.append(check4)
     
-    # Check 5: Unit tests (run actual tests if they exist)
-    check5 = {"name": "unit_tests", "passed": True, "detail": "No tests yet (Phase 0)"}
-    test_dir = product_dir / "tests"
-    if test_dir.exists() and (product_dir / "package.json").exists():
-        result = run_command("npm test", cwd=str(product_dir), timeout=120)
-        check5["passed"] = result["exit_code"] == 0
-        check5["detail"] = f"exit_code={result['exit_code']}, stdout_hash={result.get('stdout_hash')}"
+    # Check 5: Unit tests
+    if phase_num == 0:
+        check5 = {"name": "unit_tests", "passed": True, "detail": "SKIPPED: Phase 0 is specification only"}
+    else:
+        test_dir = product_dir / "tests"
+        if test_dir.exists() and (product_dir / "package.json").exists():
+            result = run_command("npm test", cwd=str(product_dir), timeout=120)
+            check5 = {"name": "unit_tests", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}, stdout_hash={result.get('stdout_hash')}"}
+        else:
+            check5 = {"name": "unit_tests", "passed": False, "detail": "FAIL: No tests directory or package.json — Phase 1+ requires unit tests"}
     checks.append(check5)
     
     # Check 6: Model check (for Phase 0)

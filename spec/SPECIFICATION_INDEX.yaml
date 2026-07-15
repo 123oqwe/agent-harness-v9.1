@@ -8,8 +8,8 @@ generated: "2026-07-16"
 normative_precedence: "NORMATIVE_PRECEDENCE.md"
 
 control_files:
-  agents: "AGENTS.md"
-  claude: "CLAUDE.md"
+  agents: "../AGENTS.md"
+  claude: "../CLAUDE.md"
   protocol: "AI_EXECUTION_PROTOCOL.md"
 
 product:
@@ -97,6 +97,17 @@ deployment:
 
 operations:
   directory: "operations/"
+
+factory:
+  manual: "../factory/FACTORY_MANUAL.md"
+  controller: "../factory/controller/controller.py"
+  state_store: "../factory/state-store/state_store.py"
+  gate_runner: "../factory/phase-gates/gate_runner.py"
+  codex_adapter: "../factory/worker-adapters/codex/adapter.py"
+  claude_adapter: "../factory/worker-adapters/claude/adapter.py"
+  verifier: "../factory/verifier/verifier.py"
+  merge_queue: "../factory/merge-queue/merge_queue.py"
+  worktree_manager: "../factory/worktree-manager/worktree_manager.py"
 
 adrs:
   count: 12

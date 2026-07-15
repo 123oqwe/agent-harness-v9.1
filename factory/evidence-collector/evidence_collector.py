@@ -3,8 +3,8 @@
 Extracts structured evidence from subprocess stdout/stderr.
 Calculates hashes, saves raw output.
 
-NOTE: Full functionality depends on product code existing.
-When product/ is empty, evidence collection is limited to
+NOTE: Full functionality depends on harness code existing.
+When harness/ is empty, evidence collection is limited to
 worker stdout (model output), not test execution output.
 """
 import json, os, hashlib, datetime
@@ -42,7 +42,7 @@ def collect_from_worker(worker_result, requirement_id, evidence_dir="evidence"):
         "stderr": stderr[:5000],
         "stderr_full_length": len(stderr),
         "stderr_hash": hashlib.sha256(stderr.encode()).hexdigest()[:16] if stderr else None,
-        "test_results": None,  # Would be parsed from stdout if product code exists
+        "test_results": None,  # Would be parsed from stdout if harness code exists
         "coverage": None,  # Would be parsed from test output
         "files_changed": [],  # Would be from git diff
         "mode": "METADATA_ONLY" if not os.path.exists("product") else "FULL"

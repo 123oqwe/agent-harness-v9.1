@@ -1,0 +1,19 @@
+{
+  "operation_id": "valid-operation_id",
+  "attempt_id": "valid-attempt_id",
+  "manifest_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "policy_decision_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tool_effect_contract_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "subject_workload": "valid-subject_workload",
+  "tenant_id": "valid-tenant_id",
+  "audience": "valid-audience",
+  "tool_grant_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "resource_grant_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "budget_ceiling_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "issued_at": "2026-01-01T00:00:00Z",
+  "not_before": "2026-01-01T00:00:00Z",
+  "expires_at": "2026-01-01T00:00:00Z",
+  "execution_epoch": "valid-execution_epoch",
+  "use_limit": 1,
+  "confirmation_key_thumbprint": "valid-confirmation_key_thumbprint"
+}

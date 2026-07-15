@@ -37,3 +37,45 @@ See requirements and module-boundaries.md for detailed can/cannot table for each
 
 ## Mission Layer Architecture
 ![Mission Layer](diagrams/08-mission-layer.svg)
+
+
+## Implementation Notes
+
+### Module Package Structure
+
+```
+harness/
+├── runtime/          # Loop Engine, Session, Scheduler
+├── router/           # Router DAG, Task Profiler, Constraint Solver
+├── security/         # Policy Engine, PEP, Capability, Authorization Service
+├── tools/            # Tool implementations (read_file, write_file, etc.)
+├── context/          # Context Compiler, Compaction, Context Window Layout
+├── memory/           # Memory Store, Consolidation, Provenance
+├── rag/              # Ingestion, Indexing, Retrieval, Reranking
+├── sandbox/          # Process isolation, resource limits
+├── hooks/            # Hook system
+├── steering/         # 3-queue steering
+├── verification/     # Independent verifier, evidence collection
+├── observability/    # Tracing, metrics, OTel export
+├── evolution/        # Evolution shadow mode
+├── missions/         # Mission layer, routines, watches
+├── external/         # External action adapters (Gmail, Calendar, etc.)
+├── enterprise/       # Multi-tenant, RBAC, admin
+├── ui/               # Frontend (Next.js, shared with apps/)
+├── ingestion/        # Document ingestion (PDF, DOCX, etc.)
+├── multimodal/       # Image gen, vision, audio
+└── tests/            # Test files
+```
+
+### Inter-Module Communication
+Modules communicate via:
+1. Typed function calls (same process, Phase 1-3)
+2. Event bus (for async, Phase 4+)
+3. tRPC (for API exposure, Phase 2+)
+
+### Module Independence
+Each module has its own package.json exports. Dependencies flow downward:
+- runtime depends on: security, context
+- router depends on: runtime (for Re-router), security
+- tools depend on: security (for PEP), sandbox
+- No circular dependencies. Agent should verify with `madge --circular` during build.

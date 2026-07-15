@@ -1,20 +1,168 @@
 {
   "name": "ExternalEffectStateMachine",
+  "description": "External side effect tracking. Two-phase Prepare\u2192Commit\u2192Read-back protocol.",
   "states": [
-    "PREPARING",
-    "PREPARED",
-    "COMMITTING",
-    "IN_FLIGHT",
-    "PROVIDER_ACCEPTED",
-    "EFFECT_OBSERVED",
-    "EFFECT_VERIFIED",
-    "EFFECT_CONFIRMED",
-    "EFFECT_UNKNOWN",
-    "RECONCILING"
+    {
+      "name": "PREPARING",
+      "terminal": false
+    },
+    {
+      "name": "PREPARED",
+      "terminal": false
+    },
+    {
+      "name": "COMMITTING",
+      "terminal": false
+    },
+    {
+      "name": "IN_FLIGHT",
+      "terminal": false
+    },
+    {
+      "name": "PROVIDER_ACCEPTED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_OBSERVED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_VERIFIED",
+      "terminal": false
+    },
+    {
+      "name": "EFFECT_CONFIRMED",
+      "terminal": true
+    },
+    {
+      "name": "EFFECT_UNKNOWN",
+      "terminal": false
+    },
+    {
+      "name": "RECONCILING",
+      "terminal": false
+    }
+  ],
+  "transitions": [
+    {
+      "source": "PREPARING",
+      "target": "PREPARED",
+      "actor": "execution_supervisor",
+      "guard": "prepare_success",
+      "event": "Prepared",
+      "retry_rule": "never"
+    },
+    {
+      "source": "PREPARING",
+      "target": "FAILED",
+      "actor": "execution_supervisor",
+      "guard": "prepare_failed",
+      "event": "PrepareFailed",
+      "retry_rule": "automatic"
+    },
+    {
+      "source": "PREPARED",
+      "target": "COMMITTING",
+      "actor": "execution_supervisor",
+      "guard": "not_expired",
+      "event": "Committing",
+      "retry_rule": "never"
+    },
+    {
+      "source": "PREPARED",
+      "target": "EXPIRED",
+      "actor": "system",
+      "guard": "timeout_5min",
+      "event": "PreparedExpired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "COMMITTING",
+      "target": "IN_FLIGHT",
+      "actor": "pep",
+      "guard": "dispatch_occurred",
+      "event": "Dispatched",
+      "retry_rule": "never"
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "PROVIDER_ACCEPTED",
+      "actor": "provider",
+      "guard": "provider_202",
+      "event": "ProviderAccepted",
+      "retry_rule": "never"
+    },
+    {
+      "source": "IN_FLIGHT",
+      "target": "EFFECT_UNKNOWN",
+      "actor": "execution_supervisor",
+      "guard": "outcome_unobservable",
+      "event": "EffectBecameUnknown",
+      "retry_rule": "never",
+      "retry_allowed": false
+    },
+    {
+      "source": "PROVIDER_ACCEPTED",
+      "target": "EFFECT_OBSERVED",
+      "actor": "execution_supervisor",
+      "guard": "effect_observed",
+      "event": "EffectObserved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_OBSERVED",
+      "target": "EFFECT_VERIFIED",
+      "actor": "verifier",
+      "guard": "readback_confirmed",
+      "event": "EffectVerified",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_OBSERVED",
+      "target": "EFFECT_UNKNOWN",
+      "actor": "execution_supervisor",
+      "guard": "readback_inconclusive",
+      "event": "EffectUnknown",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_VERIFIED",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "verifier",
+      "guard": "postcondition_met",
+      "event": "EffectConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EFFECT_UNKNOWN",
+      "target": "RECONCILING",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_started",
+      "event": "Reconciling",
+      "retry_rule": "never"
+    },
+    {
+      "source": "RECONCILING",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_success",
+      "event": "ReconciledConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "RECONCILING",
+      "target": "AWAITING_HUMAN",
+      "actor": "execution_supervisor",
+      "guard": "reconciliation_inconclusive",
+      "event": "AwaitingHuman",
+      "retry_rule": "never"
+    }
   ],
   "invariants": [
-    "IN_FLIGHT cannot retry - must query first",
-    "EFFECT_UNKNOWN must reconcile",
-    "Prepare-Commit-Read-back two-phase protocol"
+    "IN_FLIGHT cannot retry \u2014 must query provider or local effect ledger first",
+    "EFFECT_UNKNOWN must enter RECONCILING",
+    "Prepare \u2192 Commit \u2192 Read-back two-phase protocol enforced",
+    "EFFECT_CONFIRMED is terminal",
+    "Read-back required before confirming any external effect"
   ]
 }

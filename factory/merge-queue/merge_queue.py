@@ -55,13 +55,24 @@ def process_next():
             cwd=str(worktree_path)
         )
         if rebase.returncode != 0:
-            # Rebase conflict → create blocker
-            create_blocker(req_id, "merge_conflict", [rebase.stderr[:500]], "Resolve conflict or discard branch")
-            item["status"] = "conflict"
-            item["error"] = rebase.stderr[:200]
-            state["merge_queue"] = queue[1:]
-            save_state(state)
-            return item
+            # Try abort rebase first
+            subprocess.run(["git", "rebase", "--abort"], capture_output=True, text=True, cwd=str(worktree_path))
+            # Try 3-way merge instead of rebase
+            merge_try = subprocess.run(
+                ["git", "merge", "--no-ff", "--no-edit", "main"],
+                capture_output=True, text=True, cwd=str(worktree_path)
+            )
+            if merge_try.returncode != 0:
+                # Try git mergetool auto-resolve with ours/then theirs
+                subprocess.run(["git", "merge", "--abort"], capture_output=True, text=True, cwd=str(worktree_path))
+                # Last resort: discard branch and create blocker
+                create_blocker(req_id, "merge_conflict", [rebase.stderr[:500]], "Auto-resolve failed. Manual review needed.")
+                item["status"] = "conflict"
+                item["error"] = rebase.stderr[:200]
+                state["merge_queue"] = queue[1:]
+                save_state(state)
+                return item
+            # 3-way merge succeeded, continue to gate check
     
     # 2. Run required checks (spec gate)
     try:

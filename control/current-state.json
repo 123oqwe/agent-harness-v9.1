@@ -4,7 +4,7 @@
   "generated_by": "manual-audit-correction",
   "specification": "VERIFIED",
   "phase": 0,
-  "factory_status": "IMPLEMENTED_AND_TESTED",
+  "factory_status": "IMPLEMENTED",
   "product_status": "NOT_STARTED",
   "production_status": "BLOCKED",
   "phases": {
@@ -82,22 +82,19 @@
     "no_circular_verification": "Registry status cannot be the source of Gate evidence. Gates must run real commands."
   },
   "repository_structure": {
-    "control/": "Authoritative state (current-state.json)",
-    "spec/": "Immutable specification (protected from workers)",
-    "factory/": "Autonomous engineering factory (real executable code)",
-    "product/": "Agent Harness product implementation (not yet started)",
-    "infra/": "CI/CD and infrastructure definitions",
-    "evidence/": "Immutable command output and verification records",
-    "archive/": "Superseded non-normative content"
+    "spec/": "Harness \u7684\u4e0d\u53ef\u53d8\u4ea7\u54c1\u4e0e\u5de5\u7a0b\u89c4\u8303",
+    "factory/": "\u4f7f\u7528 Codex / Claude Code \u5f00\u53d1 Harness \u7684\u81ea\u4e3b\u5de5\u7a0b\u5de5\u5382",
+    "harness/": "\u771f\u6b63\u7684 Agent Harness \u4ea7\u54c1\u4ee3\u7801",
+    "infra/": "Harness \u4e0e Factory \u7684 CI/CD\u3001\u4e91\u8d44\u6e90\u548c\u90e8\u7f72",
+    "evidence/": "Requirement\u3001\u6d4b\u8bd5\u3001\u5b89\u5168\u3001\u90e8\u7f72\u4ea7\u751f\u7684\u4e0d\u53ef\u4f2a\u9020\u8bc1\u636e",
+    "control/": "\u552f\u4e00\u6743\u5a01\u72b6\u6001\u6765\u6e90 (current-state.json)"
   },
   "next_actions": [
-    "Implement factory/controller with durable state",
-    "Implement factory/state-store",
-    "Implement factory/requirement-queue",
-    "Implement factory/worker-adapters/codex and claude",
-    "Implement factory/verifier (real, not metadata linter)",
-    "Implement factory/phase-gates (real, not registry circular)",
-    "Run Phase 0 Reference Project Gate"
+    "Run Phase 0 Reference Project Gate (factory must autonomously build a reference app)",
+    "When Phase 0 passes, begin Phase 1: Single-Agent Multi-Domain Foundation",
+    "Implement Sandbox Runner container isolation (currently STUB, needs Docker)",
+    "Switch verifier to RERUN mode when harness/ has code",
+    "Create test files for Phase 1-8 requirements (currently only Phase 0 has test files on disk)"
   ],
   "factory_test_results": {
     "state_store": "PASS",
@@ -152,5 +149,15 @@
     "worktree_test": "PASS (create/list/remove all real)",
     "run_loop_test": "PASS (3 iterations, correct cycle)",
     "injection_tests": "PASS (placeholder detected, deprecated detected)"
+  },
+  "factory_manual": "factory/FACTORY_MANUAL.md",
+  "control_files": {
+    "AGENTS.md": "\u6839\u76ee\u5f55 (Codex \u5165\u53e3)",
+    "CLAUDE.md": "\u6839\u76ee\u5f55 (Claude Code \u5165\u53e3)",
+    "CODEOWNERS": "\u6839\u76ee\u5f55 (GitHub \u4fdd\u62a4)",
+    "spec/AI_EXECUTION_PROTOCOL.md": "\u6267\u884c\u534f\u8bae",
+    "spec/NORMATIVE_PRECEDENCE.md": "\u89c4\u8303\u4f18\u5148\u7ea7",
+    "spec/SPECIFICATION_INDEX.yaml": "\u4e3b\u7d22\u5f15",
+    "control/current-state.json": "\u552f\u4e00\u6743\u5a01\u72b6\u6001"
   }
 }

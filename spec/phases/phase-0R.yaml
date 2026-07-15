@@ -22,7 +22,7 @@ exit_criteria:
   - "Orchestrator skeleton created (DONE: 4 scripts)"
   - ".agents/ role files created (DONE: 17 files)"
   - "Adversarial review complete (DONE: 55 issues, P0=0, P1=0)"
-  - "ADRs resolved or spikes created (PARTIAL: 7 spikes created, not yet executed)"
+  - "ADRs resolved (DONE: 12/12 ACCEPTED, 0 NEEDS_VERIFICATION)"
   - "Capability-to-requirement mapping 100% (DONE - 108/108 mapped)"
   - "CI phase gates executable (DONE - infra/ci-gate-*.sh + factory/phase-gates/gate_runner.py)"
   - "Orchestrator tested end-to-end (DONE - factory/controller/controller.py)"
@@ -69,10 +69,10 @@ requirements:
   - AH-SPIKE-006
   - AH-SPIKE-007
 
-gate_command: "python3 scripts/validate-specification.py"
+gate_command: "python3 factory/phase-gates/gate_runner.py spec"
 rollback: "N/A - specification only"
 blocked_conditions:
-  - "ADRs not resolved (6 still NEEDS_VERIFICATION)"
-  - "Capability mapping incomplete"
-  - "Orchestrator not tested"
-  - "CI gates not executable"
+  - "ADRs not resolved (0 remaining — all 12 ACCEPTED)"
+  - "Capability mapping incomplete (DONE: 108/108 mapped)"
+  - "Orchestrator not tested (DONE: run_loop tested)"
+  - "CI gates not executable (DONE: 9 phase gates + spec gate)"

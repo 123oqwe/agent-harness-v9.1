@@ -1,18 +1,132 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AgentGraph",
+  "description": "Agent topology graph. Defines which agents participate and how they communicate.",
+  "type": "object",
   "required": [
     "nodes",
     "edges"
   ],
   "properties": {
     "nodes": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role",
+          "model_binding_ref",
+          "budget_ceiling",
+          "status"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Unique agent identifier"
+          },
+          "role": {
+            "enum": [
+              "supervisor",
+              "worker",
+              "verifier",
+              "planner",
+              "specialist"
+            ],
+            "description": "Agent role in topology"
+          },
+          "model_binding_ref": {
+            "type": "string",
+            "description": "Reference to ModelBinding in RunPlan.model_bindings"
+          },
+          "budget_ceiling": {
+            "type": "object",
+            "required": [
+              "token_limit",
+              "usd_micros"
+            ],
+            "properties": {
+              "token_limit": {
+                "type": "string"
+              },
+              "usd_micros": {
+                "type": "string"
+              }
+            }
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "parent_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Parent agent for subagent delegation"
+          },
+          "delegation_depth": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 for root agent, decremented for children"
+          },
+          "tool_grant_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "References to ToolGrant IDs in RunPlan.tool_grants"
+          },
+          "skill_binding_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "edges": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_agent",
+          "to_agent",
+          "edge_type"
+        ],
+        "properties": {
+          "from_agent": {
+            "type": "string"
+          },
+          "to_agent": {
+            "type": "string"
+          },
+          "edge_type": {
+            "enum": [
+              "dependency",
+              "communication",
+              "delegation",
+              "result_handoff"
+            ],
+            "description": "dependency=wait for, communication=send message, delegation=parent-child, result_handoff=artifact transfer"
+          },
+          "artifact_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What artifact types flow on this edge"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
-  "type": "object",
   "additionalProperties": false
 }

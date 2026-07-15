@@ -3,316 +3,33 @@
   "current_phase": 0,
   "current_requirement": null,
   "active_worktrees": {},
-  "worker_leases": {
-    "AH-CONTRACT-RUNPLAN-001": {
-      "adapter": "factory/worker-adapters/codex",
-      "provider": "codex",
-      "started_at": "2026-07-16T05:24:29.168510",
-      "heartbeat": "2026-07-16T05:24:29.168510",
-      "lease_expiry": "2026-07-16T06:24:29.168513",
-      "status": "active"
-    }
-  },
-  "requirement_status": {
-    "AH-CONTRACT-RUNPLAN-001": {
-      "status": "verification_failed",
-      "updated_at": "2026-07-16T05:24:29.172095",
-      "verification_id": "VER-AH-CONTRACT-RUNPLAN-001-1784150669",
-      "verifier_result": "FAIL"
-    }
-  },
+  "worker_leases": {},
+  "requirement_status": {},
   "phase_status": {
-    "0": "BLOCKED"
+    "0R": "VERIFIED",
+    "0": "READY",
+    "1": "BLOCKED",
+    "2": "BLOCKED",
+    "3": "BLOCKED",
+    "4": "BLOCKED",
+    "5": "BLOCKED",
+    "6": "BLOCKED",
+    "7": "BLOCKED",
+    "8": "BLOCKED"
   },
   "command_history": [
     {
-      "timestamp": "2026-07-16T04:30:00.841501",
+      "timestamp": "2026-07-16T06:00:00.000000",
       "level": "INFO",
-      "message": "Restart recovery complete (restart #1)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:15.178406",
-      "level": "INFO",
-      "message": "=== Factory Loop Started (max=2, sleep=1s) ==="
-    },
-    {
-      "timestamp": "2026-07-16T05:24:15.179373",
-      "level": "WARN",
-      "message": "Stopping: 1 open blockers"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:15.179912",
-      "level": "WARN",
-      "message": "  Blocker BLK-TEST-001-1784147400: specification_conflict - Test decision"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.128482",
-      "level": "INFO",
-      "message": "=== Factory Loop Started (max=3, sleep=1s) ==="
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.129161",
-      "level": "INFO",
-      "message": "=== Factory Controller Cycle Start ==="
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.135280",
-      "level": "INFO",
-      "message": "Selected requirement: AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.136204",
-      "level": "INFO",
-      "message": "Lock acquired for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.136678",
-      "level": "INFO",
-      "message": "Context packet built (hash: d1a54f6da6307b43)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.137036",
-      "level": "INFO",
-      "message": "Assigned backend specialist using factory/worker-adapters/codex for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.137792",
-      "level": "INFO",
-      "message": "Worker dispatched for AH-CONTRACT-RUNPLAN-001 using codex"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.138779",
-      "level": "INFO",
-      "message": "Evidence collected for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.139763",
-      "level": "INFO",
-      "message": "Verifier result for AH-CONTRACT-RUNPLAN-001: FAIL (3/6 checks passed)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.140646",
-      "level": "INFO",
-      "message": "Registry updated: AH-CONTRACT-RUNPLAN-001 -> verification_failed"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.141085",
-      "level": "WARN",
-      "message": "Requirement AH-CONTRACT-RUNPLAN-001 VERIFICATION FAILED"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.142495",
-      "level": "INFO",
-      "message": "Lock released for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.143015",
-      "level": "INFO",
-      "message": "Iteration 1: completed AH-CONTRACT-RUNPLAN-001 -> FAIL"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.143541",
-      "level": "INFO",
-      "message": "=== Factory Controller Cycle Start ==="
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.146848",
-      "level": "INFO",
-      "message": "Selected requirement: AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.153757",
-      "level": "INFO",
-      "message": "Lock acquired for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.154425",
-      "level": "INFO",
-      "message": "Context packet built (hash: d1a54f6da6307b43)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.155097",
-      "level": "INFO",
-      "message": "Assigned backend specialist using factory/worker-adapters/codex for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.156138",
-      "level": "INFO",
-      "message": "Worker dispatched for AH-CONTRACT-RUNPLAN-001 using codex"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.157547",
-      "level": "INFO",
-      "message": "Evidence collected for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.158724",
-      "level": "INFO",
-      "message": "Verifier result for AH-CONTRACT-RUNPLAN-001: FAIL (3/6 checks passed)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.159698",
-      "level": "INFO",
-      "message": "Registry updated: AH-CONTRACT-RUNPLAN-001 -> verification_failed"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.160398",
-      "level": "WARN",
-      "message": "Requirement AH-CONTRACT-RUNPLAN-001 VERIFICATION FAILED"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.161395",
-      "level": "INFO",
-      "message": "Lock released for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.162065",
-      "level": "INFO",
-      "message": "Iteration 2: completed AH-CONTRACT-RUNPLAN-001 -> FAIL"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.162617",
-      "level": "INFO",
-      "message": "=== Factory Controller Cycle Start ==="
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.165595",
-      "level": "INFO",
-      "message": "Selected requirement: AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.166736",
-      "level": "INFO",
-      "message": "Lock acquired for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.167405",
-      "level": "INFO",
-      "message": "Context packet built (hash: d1a54f6da6307b43)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.167969",
-      "level": "INFO",
-      "message": "Assigned backend specialist using factory/worker-adapters/codex for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.169048",
-      "level": "INFO",
-      "message": "Worker dispatched for AH-CONTRACT-RUNPLAN-001 using codex"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.170297",
-      "level": "INFO",
-      "message": "Evidence collected for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.171523",
-      "level": "INFO",
-      "message": "Verifier result for AH-CONTRACT-RUNPLAN-001: FAIL (3/6 checks passed)"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.172638",
-      "level": "INFO",
-      "message": "Registry updated: AH-CONTRACT-RUNPLAN-001 -> verification_failed"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.173199",
-      "level": "WARN",
-      "message": "Requirement AH-CONTRACT-RUNPLAN-001 VERIFICATION FAILED"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.174298",
-      "level": "INFO",
-      "message": "Lock released for AH-CONTRACT-RUNPLAN-001"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.174946",
-      "level": "INFO",
-      "message": "Iteration 3: completed AH-CONTRACT-RUNPLAN-001 -> FAIL"
-    },
-    {
-      "timestamp": "2026-07-16T05:24:29.175508",
-      "level": "INFO",
-      "message": "=== Factory Loop Ended (3 iterations) ==="
+      "message": "State cleaned: test residue removed"
     }
   ],
-  "evidence_refs": {
-    "AH-CONTRACT-RUNPLAN-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-CONTRACT-RUNPLAN-001.json"
-  },
-  "verifier_results": {
-    "AH-CONTRACT-RUNPLAN-001": {
-      "verification_id": "VER-AH-CONTRACT-RUNPLAN-001-1784150669",
-      "requirement_id": "AH-CONTRACT-RUNPLAN-001",
-      "verifier": "independent-verifier",
-      "verifier_process": "separate",
-      "verifier_read_only": true,
-      "commit_sha": null,
-      "evidence_ref": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-CONTRACT-RUNPLAN-001.json",
-      "checks": [
-        {
-          "name": "evidence_valid",
-          "passed": true,
-          "detail": "Evidence file valid, 0 commands recorded"
-        },
-        {
-          "name": "exit_codes_zero",
-          "passed": false,
-          "detail": "No exit codes in evidence"
-        },
-        {
-          "name": "tests_pass",
-          "passed": false,
-          "detail": "No test results in evidence"
-        },
-        {
-          "name": "acceptance_criteria_defined",
-          "passed": true,
-          "detail": "4 acceptance criteria defined"
-        },
-        {
-          "name": "process_isolation",
-          "passed": true,
-          "detail": "Verifier PID 87078 is separate from parent PID 23462"
-        },
-        {
-          "name": "evidence_hashed",
-          "passed": false,
-          "detail": "stdout_hash: None"
-        }
-      ],
-      "result": "FAIL",
-      "cannot_modify": [
-        "code",
-        "tests",
-        "requirements",
-        "acceptance_criteria",
-        "evidence",
-        "merge",
-        "production_approval"
-      ],
-      "started_at": "2026-07-16T05:24:29.170845",
-      "completed_at": "2026-07-16T05:24:29.170968"
-    }
-  },
+  "evidence_refs": {},
+  "verifier_results": {},
   "merge_queue": [],
-  "blockers": [
-    {
-      "blocker_id": "BLK-TEST-001-1784147400",
-      "requirement_id": "TEST-001",
-      "blocker_type": "specification_conflict",
-      "evidence": [
-        "Test evidence"
-      ],
-      "required_decision": "Test decision",
-      "status": "resolved",
-      "created_at": "2026-07-16T04:30:00.859696",
-      "resolved_at": "2026-07-16T05:24:29.039659",
-      "resolved_by": "test",
-      "resolution": "Test blocker resolved for verification"
-    }
-  ],
+  "blockers": [],
   "created_at": "2026-07-16T04:30:00.841000",
-  "updated_at": "2026-07-16T05:29:13.303793",
+  "updated_at": "2026-07-16T05:43:41.254028",
   "restart_count": 1,
   "worker_registry": {
     "codex": {

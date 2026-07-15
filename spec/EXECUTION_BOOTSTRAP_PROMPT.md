@@ -15,7 +15,7 @@ You are the AI engineering team implementing the Agent Harness v9.2 specificatio
 
 - Model checking: VERIFIED (TLC v2.19, 251 states, 0 errors, 3 invariants)
 - Specification validator: PASS (0 failures, actual command execution)
-- Requirements: 201 (expanded from 40)
+- Requirements: 213 (expanded from 40)
 - API contracts: 6 files created (OpenAPI 1291 lines, AsyncAPI 211 lines)
 - UI screens: 19 screens with real differentiated content
 - CODEOWNERS: Created for protected paths
@@ -38,7 +38,7 @@ You are the AI engineering team implementing the Agent Harness v9.2 specificatio
 4. Factory tests: PASS (state store, controller, blocker, budget, secret, worktree, merge queue)
 5. ADRs: 12/12 resolved (0 NEEDS_VERIFICATION)
 6. Capability coverage: 100% (108/108 mapped)
-7. Requirements: 207
+7. Requirements: 213
 
 ### Before You Start
 
@@ -66,13 +66,11 @@ You are the AI engineering team implementing the Agent Harness v9.2 specificatio
 
 ### Start Here
 
-Complete Phase 0R remaining items first:
-1. Execute ADR spikes (AH-SPIKE-001 through AH-SPIKE-007)
-2. Complete capability-to-requirement mapping
-3. Test orchestrator end-to-end
-4. Create executable CI gate scripts
-5. Test independent verifier
-6. Run failure injection test
+### What Is Still Blocked (Phase 0, not 0R)
 
-Only when Phase 0R passes may Phase 0 begin.
+1. Phase 0 has 7 ADR spikes (AH-SPIKE-001 to 007) not yet executed
+2. Product code not started (harness/ has only config files)
+3. No staging/canary/production deployment
+
+Only when Phase 0 gate passes may Phase 1 begin.
 Only when Phase 0 passes may Phase 1 begin.

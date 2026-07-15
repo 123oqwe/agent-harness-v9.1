@@ -17,3 +17,27 @@
 - quarantined: suspicious content, pending review
 
 Rule: Low-trust content CANNOT override high-trust instructions.
+
+
+## Implementation Notes
+
+### Cross-Cutting Planes
+
+| Plane | Owner | Records | Security Boundary |
+|-------|-------|---------|-------------------|
+| Control | Router + Policy | RunPlan, Policy decisions | Only CTO can modify |
+| Data | Runtime + Tool Host | Tool I/O, file changes | Worker can modify harness/ |
+| Observability | Audit + Trace | Spans, metrics, logs | Read-only for workers |
+| Identity | Auth Service | Principals, tokens, capabilities | Only Auth Service can issue |
+| Budget | Budget Guard + PEP | Budget ledger, consumption | Hard-enforced in PEP |
+
+### Instruction Priority (highest to lowest)
+1. Platform policy
+2. Organization policy
+3. Project policy
+4. User instruction
+5. Task instruction
+6. Retrieved content (RAG, web)
+7. Tool output
+
+Retrieved content and Tool output can NEVER override upper-layer instructions.
