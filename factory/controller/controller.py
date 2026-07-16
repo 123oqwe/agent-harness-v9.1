@@ -552,6 +552,14 @@ def run_cycle():
         adapter = assign_specialist(req)
         if not adapter:
             log(f"No adapter for role {req.get('owner_role')}", "ERROR")
+            # Create blocker so run_loop stops retrying (provider unavailable)
+            try:
+                from blocker_service import create_blocker
+                create_blocker(req_id, "provider_unavailable",
+                    [f"Provider CLI not available for role {req.get('owner_role')}"],
+                    "Install provider CLI or assign different role")
+            except Exception:
+                pass
             release_lock(req_id)
             return {"action": "no_adapter", "requirement": req_id}
 
@@ -591,18 +599,52 @@ def run_cycle():
                 pass
 
             # 5.5 Commit worker output in worktree
+            worker_committed = False
             if worker_result.get("exit_code") == 0:
-                subprocess.run(["git", "add", "-A"], cwd=worktree_path, capture_output=True)
-                commit = subprocess.run(
-                    ["git", "commit", "-m", f"Implement {req_id}"],
-                    cwd=worktree_path, capture_output=True, text=True
+                # Check if there are actual changes to commit (prevent empty commit fake PASS)
+                diff_check = subprocess.run(
+                    ["git", "add", "-A"], cwd=worktree_path, capture_output=True
                 )
-                if commit.returncode == 0:
-                    log(f"Committed {req_id} in worktree")
+                diff_cached = subprocess.run(
+                    ["git", "diff", "--cached", "--quiet"],
+                    cwd=worktree_path, capture_output=True
+                )
+                # exit code 1 = there are staged changes, 0 = nothing staged
+                if diff_cached.returncode == 1:
+                    commit = subprocess.run(
+                        ["git", "commit", "-m", f"Implement {req_id}"],
+                        cwd=worktree_path, capture_output=True, text=True
+                    )
+                    if commit.returncode == 0:
+                        worker_committed = True
+                        log(f"Committed {req_id} in worktree")
+                    else:
+                        log(f"Git commit failed for {req_id}: {commit.stderr[:200]}", "WARN")
                 else:
-                    log(f"Git commit for {req_id}: {commit.stderr[:200]}", "WARN")
+                    log(f"No file changes from worker for {req_id} — empty commit, marking as failed", "WARN")
 
-            # 6. [REAL] Collect evidence from worker's actual stdout/stderr
+            # 6. If worker didn't commit anything, fail immediately without verifier
+            if not worker_committed:
+                verification = {
+                    "verification_id": f"VER-{req_id}-{int(time.time())}",
+                    "requirement_id": req_id,
+                    "verifier": "controller-precheck",
+                    "result": "FAIL",
+                    "error": "git commit failed: no files changed by worker. Worker produced no output.",
+                    "checks": [{"name": "worker_produced_output", "passed": False, "detail": "No staged changes after worker execution"}],
+                    "started_at": datetime.datetime.now().isoformat(),
+                    "completed_at": datetime.datetime.now().isoformat()
+                }
+                state = load_state()
+                state.setdefault("verifier_results", {})[req_id] = verification
+                save_state(state)
+                update_registry(req_id, "verification_failed", verification)
+                log(f"Requirement {req_id} FAILED: no output from worker", "WARN")
+                remove_worktree(req_id)
+                release_lock(req_id)
+                return {"action": "completed", "requirement": req_id, "verification": "FAIL", "evidence": {"error": "no output"}}
+
+            # 7. Collect evidence from worker's actual stdout/stderr
             evidence = collect_evidence(
                 req_id,
                 commands_run=[],
@@ -614,7 +656,7 @@ def run_cycle():
                 worker_result=worker_result
             )
 
-            # 7. Dispatch verifier (with commit_sha from worktree commit)
+            # 8. Dispatch verifier (with real commit_sha from the new commit)
             commit_sha = None
             try:
                 rev = subprocess.run(
@@ -646,8 +688,15 @@ def run_cycle():
                 remove_worktree(req_id)
 
         finally:
-            # Ensure worktree cleanup on non-merged paths
-            pass
+            # Clean up worktree on any non-merged path (prevents leak on exception)
+            try:
+                state = load_state()
+                # Check if this requirement was merged (not in active_worktrees = already cleaned)
+                if req_id in state.get("active_worktrees", {}):
+                    remove_worktree(req_id)
+                    log(f"Worktree cleanup for {req_id} (exception/non-merged path)")
+            except Exception:
+                pass
 
         # 9. Release lock
         release_lock(req_id)

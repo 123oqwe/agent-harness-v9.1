@@ -182,8 +182,19 @@ def run(req_id, evidence_path=None, commit_sha=None):
             import shutil
             # Checkout the exact commit in a temp clone
             rerun_dir = BASE_DIR / "evidence" / "rerun" / req_id
+            # Clean up any stale worktree reference first (prevents "already exists" error)
+            try:
+                subprocess.run(["git", "worktree", "remove", str(rerun_dir), "--force"],
+                             capture_output=True, cwd=str(BASE_DIR))
+            except Exception:
+                pass
+            try:
+                subprocess.run(["git", "worktree", "prune"],
+                             capture_output=True, cwd=str(BASE_DIR))
+            except Exception:
+                pass
             if rerun_dir.exists():
-                shutil.rmtree(rerun_dir)
+                shutil.rmtree(rerun_dir, ignore_errors=True)
             rerun_dir.mkdir(parents=True, exist_ok=True)
             try:
                 # Clone worktree branch at the exact commit
