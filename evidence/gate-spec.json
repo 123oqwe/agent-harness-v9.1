@@ -48,11 +48,11 @@
     },
     {
       "name": "adrs_resolved",
-      "passed": true,
-      "detail": "All ADRs resolved"
+      "passed": false,
+      "detail": "0 NEEDS_VERIFICATION, 2 CONDITIONAL"
     }
   ],
-  "result": "PASS",
-  "timestamp": "2026-07-16T07:20:21.007630",
+  "result": "FAIL",
+  "timestamp": "2026-07-16T15:30:17.057173",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

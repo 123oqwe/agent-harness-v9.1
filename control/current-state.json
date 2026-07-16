@@ -9,9 +9,11 @@
   "production_status": "BLOCKED",
   "phases": {
     "0R": {
-      "status": "VERIFIED",
+      "status": "BLOCKED",
       "name": "Specification Repair and Factory Construction",
-      "blockers": []
+      "blockers": [
+        "7 spikes require human prototype verification: AH-SPIKE-001~007"
+      ]
     },
     "0": {
       "status": "VERIFIED",

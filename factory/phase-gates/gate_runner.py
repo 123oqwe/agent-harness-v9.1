@@ -187,16 +187,24 @@ def run_spec_gate():
         check9["detail"] = "All UI screens differentiated"
     checks.append(check9)
     
-    # Check 10: No NEEDS_VERIFICATION in ADRs
+    # Check 10: No NEEDS_VERIFICATION or CONDITIONAL in ADRs
     adr_dir = spec_dir / "adr"
     check10 = {"name": "adrs_resolved", "passed": True, "detail": ""}
     if adr_dir.exists():
+        needs_ver = 0
+        conditional = 0
         for af in adr_dir.glob("ADR-*.md"):
-            if "NEEDS_VERIFICATION" in open(af).read():
+            content = open(af).read()
+            if "NEEDS_VERIFICATION" in content:
+                needs_ver += 1
                 check10["passed"] = False
-                check10["detail"] += f" {af.name}."
-    if check10["passed"]:
-        check10["detail"] = "All ADRs resolved"
+            if "CONDITIONAL" in content:
+                conditional += 1
+                check10["passed"] = False
+        if needs_ver > 0 or conditional > 0:
+            check10["detail"] = f"{needs_ver} NEEDS_VERIFICATION, {conditional} CONDITIONAL"
+        else:
+            check10["detail"] = "All ADRs ACCEPTED"
     checks.append(check10)
     
     all_pass = all(c["passed"] for c in checks)
@@ -280,6 +288,11 @@ def run_phase_gate(phase_num):
     if phase_num == 0:
         check3 = {"name": "build", "passed": True, "detail": "SKIPPED: Phase 0 is specification only"}
     elif product_dir.exists() and (product_dir / "package.json").exists():
+        # Install dependencies before building (prevents exit_code=127 from missing vitest)
+        if (product_dir / "package-lock.json").exists():
+            run_command("npm ci", cwd=str(product_dir), timeout=300)
+        else:
+            run_command("npm install", cwd=str(product_dir), timeout=300)
         result = run_command("npm run build", cwd=str(product_dir))
         check3 = {"name": "build", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}", "stdout_hash": result.get("stdout_hash")}
     else:
@@ -302,6 +315,12 @@ def run_phase_gate(phase_num):
     else:
         test_dir = product_dir / "tests"
         if test_dir.exists() and (product_dir / "package.json").exists():
+            # Ensure node_modules installed (may already be done in build check)
+            if not (product_dir / "node_modules").exists():
+                if (product_dir / "package-lock.json").exists():
+                    run_command("npm ci", cwd=str(product_dir), timeout=300)
+                else:
+                    run_command("npm install", cwd=str(product_dir), timeout=300)
             result = run_command("npm test", cwd=str(product_dir), timeout=120)
             check5 = {"name": "unit_tests", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}, stdout_hash={result.get('stdout_hash')}"}
         else:

@@ -187,20 +187,16 @@ def run(req_id, evidence_path=None, commit_sha=None):
             rerun_dir.mkdir(parents=True, exist_ok=True)
             try:
                 # Clone worktree branch at the exact commit
+                # Use --detach to checkout exact commit without creating a branch
                 clone = subprocess.run(
-                    ["git", "worktree", "add", str(rerun_dir), "HEAD"],
+                    ["git", "worktree", "add", "--detach", str(rerun_dir), commit_sha],
                     capture_output=True, text=True, cwd=str(BASE_DIR)
                 )
-                # Checkout the exact commit
-                checkout = subprocess.run(
-                    ["git", "checkout", commit_sha],
-                    capture_output=True, text=True, cwd=str(rerun_dir)
-                )
-                if checkout.returncode != 0:
+                if clone.returncode != 0:
                     verification["checks"].append({
                         "name": "test_rerun",
                         "passed": False,
-                        "detail": f"git checkout failed: {checkout.stderr[:200]}"
+                        "detail": f"git worktree add failed: {clone.stderr[:200]}"
                     })
                 else:
                     # Install dependencies
@@ -281,6 +277,13 @@ def run(req_id, evidence_path=None, commit_sha=None):
     all_pass = all(c["passed"] for c in verification["checks"])
     verification["result"] = "PASS" if all_pass else "FAIL"
     verification["completed_at"] = datetime.datetime.now().isoformat()
+
+    # Set error field for retry classification (controller reads this for permanent/transient)
+    if not all_pass:
+        failed_checks = [c for c in verification["checks"] if not c["passed"]]
+        failed_names = [c["name"] for c in failed_checks]
+        failed_details = "; ".join(f"{c['name']}: {c['detail']}" for c in failed_checks[:3])
+        verification["error"] = f"Failed checks: {failed_names}. {failed_details}"
 
     return verification
 

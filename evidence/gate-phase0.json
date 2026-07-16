@@ -34,10 +34,10 @@
     {
       "name": "factory_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/factory/controller/controller.py"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T07:19:05.675940",
+  "timestamp": "2026-07-16T15:30:16.967049",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

@@ -823,18 +823,27 @@ def deploy(environment="staging", gate_check=True):
             return {"action": "deploy_error", "error": str(e)}
     
     # Execute deployment
-    deploy_cmds = {
-        "staging": ["npm", "run", "deploy:staging"],
-        "canary": ["npm", "run", "deploy:canary"],
-        "production": ["npm", "run", "deploy:production"],
+    deploy_script_map = {
+        "staging": "deploy:staging",
+        "canary": "deploy:canary",
+        "production": "deploy:production",
     }
     
-    cmd = deploy_cmds[environment]
     harness_dir = BASE_DIR / "harness"
     
     if not (harness_dir / "package.json").exists():
         return {"action": "deploy_skipped", "error": "No harness code to deploy"}
     
+    # Check if deploy script exists in package.json before calling
+    try:
+        pkg = json.load(open(harness_dir / "package.json"))
+        script_name = deploy_script_map[environment]
+        if script_name not in pkg.get("scripts", {}):
+            return {"action": "deploy_skipped", "detail": f"No '{script_name}' script in package.json. Available: {list(pkg.get('scripts',{}).keys())}"}
+    except Exception as e:
+        return {"action": "deploy_error", "error": f"Cannot read package.json: {e}"}
+    
+    cmd = ["npm", "run", script_name]
     log(f"Deploying to {environment}: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=str(harness_dir), capture_output=True, text=True, timeout=600)
     

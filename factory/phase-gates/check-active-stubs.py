@@ -20,12 +20,31 @@ for root, dirs, files in os.walk(PRODUCT_DIR):
         try:
             with open(fpath) as f:
                 content = f.read()
-            if "NotImplementedError" in content:
-                # Check if it returns a default value instead of throwing
-                lines = content.split('\n')
-                for i, line in enumerate(lines):
-                    if "NotImplementedError" in line:
-                        stubs_found.append(f"{fpath}:{i+1}")
+            # Scan for multiple stub patterns (not just NotImplementedError)
+            stub_patterns = [
+                "NotImplementedError",
+                "return null", "return None", "return undefined",
+                "pass  # stub", "pass  # TODO", "pass  # placeholder",
+                "throw new Error('not implemented')",
+                "throw new Error('TODO')",
+                "throw new Error('placeholder')",
+            ]
+            found_in_file = False
+            for pattern in stub_patterns:
+                if pattern.lower() in content.lower():
+                    lines = content.split('\n')
+                    for i, line in enumerate(lines):
+                        if pattern.lower() in line.lower():
+                            stubs_found.append(f"{fpath}:{i+1}: {line.strip()[:60]}")
+                            found_in_file = True
+            # Also scan for TODO/FIXME in code (not comments)
+            import re
+            for i, line in enumerate(content.split('\n')):
+                stripped = line.strip()
+                if stripped.startswith('#') or stripped.startswith('//'):
+                    continue
+                if re.search(r'\bTODO\b|\bFIXME\b', line, re.IGNORECASE):
+                    stubs_found.append(f"{fpath}:{i+1}: {line.strip()[:60]}")
         except:
             pass
 

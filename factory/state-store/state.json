@@ -6,7 +6,7 @@
   "worker_leases": {},
   "requirement_status": {},
   "phase_status": {
-    "0R": "VERIFIED",
+    "0R": "BLOCKED",
     "0": "VERIFIED",
     "1": "READY",
     "2": "BLOCKED",
