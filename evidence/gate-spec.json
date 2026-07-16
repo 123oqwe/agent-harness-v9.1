@@ -34,12 +34,12 @@
     {
       "name": "factory_controller_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/factory/controller/controller.py"
     },
     {
       "name": "codeowners_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../CODEOWNERS"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/CODEOWNERS"
     },
     {
       "name": "ui_screens_differentiated",
@@ -53,6 +53,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T16:08:33.821885",
+  "timestamp": "2026-07-16T16:10:24.765369",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

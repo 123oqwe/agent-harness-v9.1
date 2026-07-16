@@ -66,25 +66,25 @@ def parse_test_output(stdout):
     """
     import re
     
-    # vitest v2.x pattern: "Tests  58 passed (58)" or "Tests  58 passed (58) | 2 failed (2)"
-    match = re.search(r'Tests\s+(\d+)\s+passed(?:\s+\((\d+)\))?(?:.*?(\d+)\s+failed)?', stdout)
+    # vitest v2.x pattern: "Tests  58 passed (58)" or "Tests  56 passed (56) | 2 failed (2)"
+    # Also matches colon variant "Tests: 58 passed, 2 failed"
+    # Greedy match for failed to ensure it's captured when present
+    match = re.search(r'Tests:?\s+(\d+)\s+passed.*?(\d+)\s+failed', stdout)
     if match:
-        passed = int(match.group(1))
-        failed = int(match.group(3)) if match.group(3) else 0
-        return {"passed": passed, "failed": failed}
+        return {"passed": int(match.group(1)), "failed": int(match.group(2))}
 
-    # vitest/jest pattern with colon: "Tests: 58 passed, 2 failed"
-    match = re.search(r'Tests:\s+(\d+)\s+passed.*?(?:(\d+)\s+failed)?', stdout)
+    # 0-failed case: "Tests  58 passed (58)" or "Tests: 58 passed" (no "failed" in output)
+    match = re.search(r'Tests:?\s+(\d+)\s+passed', stdout)
     if match:
-        passed = int(match.group(1))
-        failed = int(match.group(2)) if match.group(2) else 0
-        return {"passed": passed, "failed": failed}
+        return {"passed": int(match.group(1)), "failed": 0}
 
     # pytest pattern: "58 passed, 2 failed" or "58 passed"
-    match = re.search(r'(\d+)\s+passed(?:.*?(\d+)\s+failed)?', stdout)
+    match = re.search(r'(\d+)\s+passed.*?(\d+)\s+failed', stdout)
     if match:
-        passed = int(match.group(1))
-        failed = int(match.group(2)) if match.group(2) else 0
-        return {"passed": passed, "failed": failed}
+        return {"passed": int(match.group(1)), "failed": int(match.group(2))}
+
+    match = re.search(r'(\d+)\s+passed', stdout)
+    if match:
+        return {"passed": int(match.group(1)), "failed": 0}
 
     return None
