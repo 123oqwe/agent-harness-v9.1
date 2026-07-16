@@ -345,6 +345,25 @@ def run_phase_gate(phase_num):
         check7 = {"name": "factory_exists", "passed": ctrl.exists(), "detail": str(ctrl)}
         checks.append(check7)
     
+    # Check 8: All phase requirements must be verified (not just have criteria)
+    check8 = {"name": "all_requirements_verified", "passed": True, "detail": ""}
+    if req_path.exists():
+        phase_reqs = [json.loads(l) for l in open(req_path) if l.strip() and json.loads(l).get("delivery_phase") == phase_num]
+        # Skip requirements that are deferred or blocked (they don't block the phase gate)
+        not_verified = [r["id"] for r in phase_reqs
+                       if r.get("implementation_maturity") != "verified"
+                       and "deferred_to_phase_1" not in r.get("blocked_conditions", [])
+                       and "human_approval_required" not in r.get("blocked_conditions", [])]
+        if not_verified:
+            check8["passed"] = False
+            check8["detail"] = f"{len(not_verified)} requirements not verified: {not_verified[:5]}"
+        else:
+            check8["detail"] = f"All {len(phase_reqs)} requirements verified"
+    else:
+        check8["passed"] = False
+        check8["detail"] = "Requirements file not found"
+    checks.append(check8)
+
     all_pass = all(c["passed"] for c in checks)
     
     result = {

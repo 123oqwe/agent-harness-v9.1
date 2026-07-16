@@ -37,19 +37,28 @@ BASE_DIR = Path(__file__).parent.parent.parent
 SPEC_DIR = BASE_DIR / "spec"
 EVIDENCE_DIR = BASE_DIR / "evidence"
 
+_log_buffer = []
+
 def log(msg, level="INFO"):
-    """Log to state command_history."""
-    state = load_state()
-    entry = {
+    """Log to in-memory buffer (flushed by flush_logs)."""
+    _log_buffer.append({
         "timestamp": datetime.datetime.now().isoformat(),
         "level": level,
         "message": msg
-    }
-    state.setdefault("command_history", []).append(entry)
-    # Keep last 1000 entries
+    })
+    if len(_log_buffer) > 200:
+        _log_buffer[:] = _log_buffer[-200:]
+    print(f"[{level}] {msg}")
+
+def flush_logs():
+    """Flush buffered logs to state.json."""
+    if not _log_buffer:
+        return
+    state = load_state()
+    state.setdefault("command_history", []).extend(_log_buffer)
     state["command_history"] = state["command_history"][-1000:]
     save_state(state)
-    print(f"[{level}] {msg}")
+    _log_buffer.clear()
 
 def select_ready_requirement():
     """[REAL] Select a READY requirement.
@@ -514,6 +523,29 @@ def update_registry(req_id, status, verification=None):
         "failure_reason": verification.get("error", "") if verification and verification.get("result") == "FAIL" else existing.get("failure_reason", "")
     }
     save_state(state)
+
+    # Sync ndjson implementation_maturity (source of truth for dependency checks)
+    ndjson_maturity = {"verified": "verified", "in_progress": "in_progress"}.get(status)
+    if ndjson_maturity:
+        try:
+            req_path = SPEC_DIR / "requirements" / "requirements.ndjson"
+            lines = open(req_path).readlines()
+            for i, line in enumerate(lines):
+                if not line.strip():
+                    continue
+                r = json.loads(line)
+                if r["id"] == req_id and r.get("implementation_maturity") != ndjson_maturity:
+                    r["implementation_maturity"] = ndjson_maturity
+                    lines[i] = json.dumps(r, ensure_ascii=False) + "\n"
+                    break
+            else:
+                lines = None
+            if lines:
+                with open(req_path, 'w') as f:
+                    f.writelines(lines)
+        except Exception as e:
+            log(f"Failed to sync ndjson for {req_id}: {e}", "WARN")
+
     log(f"Registry updated: {req_id} -> {status}")
 
 def run_cycle():
@@ -544,6 +576,9 @@ def run_cycle():
         return {"action": "lock_failed", "requirement": req_id}
     
     try:
+        # 2.5 Mark in_progress (prevents re-selection on crash)
+        update_registry(req_id, "in_progress")
+
         # 3. Build context packet
         packet = build_context_packet(req)
         log(f"Context packet built (hash: {packet['hash']})")
@@ -582,7 +617,10 @@ def run_cycle():
                 budget_usd = int(packet.get("budget", {}).get("usd_micros", "500000"))
                 reserve(req_id, budget_usd, category="model")
                 if not check_budget(req_id, budget_usd):
-                    log(f"Budget insufficient for {req_id}", "WARN")
+                    log(f"Budget insufficient for {req_id} — blocking dispatch", "ERROR")
+                    release_lock(req_id)
+                    remove_worktree(req_id)
+                    return {"action": "budget_exhausted", "requirement": req_id}
             except Exception:
                 pass
 
@@ -700,7 +738,8 @@ def run_cycle():
 
         # 9. Release lock
         release_lock(req_id)
-        
+        flush_logs()
+
         return {
             "action": "completed",
             "requirement": req_id,
@@ -712,6 +751,7 @@ def run_cycle():
         log(f"Error in cycle for {req_id}: {e}", "ERROR")
         release_lock(req_id)
         update_registry(req_id, "failed")
+        flush_logs()
         return {"action": "error", "requirement": req_id, "error": str(e)}
 
 def restart_recovery():
@@ -1003,7 +1043,10 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
             import time
             time.sleep(idle_sleep_seconds)
             
-        elif result["action"] in ("error", "lock_failed", "no_adapter"):
+        elif result["action"] == "no_adapter":
+            # no_adapter already created a blocker — don't sleep, check blockers immediately
+            log(f"Iteration {iteration}: no_adapter (blocker created), checking blockers next cycle")
+        elif result["action"] in ("error", "lock_failed"):
             idle_count += 1
             log(f"Iteration {iteration}: {result['action']} for {result.get('requirement','')}", "ERROR")
             import time
