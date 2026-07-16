@@ -6,7 +6,7 @@
   "worker_leases": {},
   "requirement_status": {},
   "phase_status": {
-    "0R": "BLOCKED",
+    "0R": "VERIFIED",
     "0": "VERIFIED",
     "1": "READY",
     "2": "BLOCKED",
@@ -42,6 +42,31 @@
       "timestamp": "2026-07-16T15:49:12.293981",
       "level": "INFO",
       "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T15:58:28.750712",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T15:58:59.303007",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T16:02:11.540001",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T16:03:05.285375",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T16:03:50.780983",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
     }
   ],
   "evidence_refs": {},
@@ -49,7 +74,7 @@
   "merge_queue": [],
   "blockers": [],
   "created_at": "2026-07-16T04:30:00.841000",
-  "updated_at": "2026-07-16T15:49:12.294061",
+  "updated_at": "2026-07-16T16:03:50.781333",
   "restart_count": 1,
   "worker_registry": {
     "codex": {

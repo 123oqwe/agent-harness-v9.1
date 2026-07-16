@@ -61,13 +61,13 @@ requirements:
   - AH-SPEC-API-001
   - AH-SPEC-API-002
   - AH-SPEC-API-003
-  - AH-SPIKE-001
-  - AH-SPIKE-002
-  - AH-SPIKE-003
-  - AH-SPIKE-004
-  - AH-SPIKE-005
-  - AH-SPIKE-006
-  - AH-SPIKE-007
+  - AH-SPIKE-001  # deferred to Phase 1
+  - AH-SPIKE-002  # deferred to Phase 1
+  - AH-SPIKE-003  # deferred to Phase 1
+  - AH-SPIKE-004  # deferred to Phase 1
+  - AH-SPIKE-005  # deferred to Phase 1
+  - AH-SPIKE-006  # deferred to Phase 1
+  - AH-SPIKE-007  # deferred to Phase 1
 
 gate_command: "python3 factory/phase-gates/gate_runner.py spec"
 rollback: "N/A - specification only"

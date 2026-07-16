@@ -25,10 +25,10 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=f3c813ee64e07e7e"
+      "detail": "exit_code=0, stdout_hash=4bf036e2b1dd3b67"
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-16T15:48:52.554646",
+  "timestamp": "2026-07-16T15:58:39.468396",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

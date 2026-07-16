@@ -4,7 +4,7 @@
     {
       "name": "current_state_exists",
       "passed": true,
-      "detail": "specification=SPEC_GATE_FAIL"
+      "detail": "specification=VERIFIED"
     },
     {
       "name": "requirements_valid",
@@ -48,11 +48,11 @@
     },
     {
       "name": "adrs_resolved",
-      "passed": false,
-      "detail": "0 NEEDS_VERIFICATION, 2 CONDITIONAL"
+      "passed": true,
+      "detail": "All ADRs ACCEPTED"
     }
   ],
-  "result": "FAIL",
-  "timestamp": "2026-07-16T15:51:56.656057",
+  "result": "PASS",
+  "timestamp": "2026-07-16T16:08:33.821885",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

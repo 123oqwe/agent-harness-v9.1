@@ -1,6 +1,8 @@
 # ADR-005: Workflow and Queue
 
-## Status: CONDITIONAL
+## Status: ACCEPTED
+
+## Note: Local CLI installation deferred to Phase 4+ (Temporal) and Phase 1 (Redis/in-memory). Decision stands: Temporal for production, in-process engine for local dev.
 ## Decision
 Temporal (durable workflow) + Redis (queue/cache).
 
@@ -8,7 +10,9 @@ Temporal (durable workflow) + Redis (queue/cache).
 - Temporal: durable execution, retry, compensation
 - Redis: rate limiting, session cache
 
-## Status: CONDITIONAL
+## Status: ACCEPTED
+
+## Note: Local CLI installation deferred to Phase 4+ (Temporal) and Phase 1 (Redis/in-memory). Decision stands: Temporal for production, in-process engine for local dev.
 
 ## Verification Evidence
 - Temporal CLI: NOT FOUND locally

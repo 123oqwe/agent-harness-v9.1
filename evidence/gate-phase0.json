@@ -4,12 +4,12 @@
     {
       "name": "requirements_have_criteria",
       "passed": true,
-      "detail": "All 24 requirements have criteria"
+      "detail": "All 31 requirements have criteria"
     },
     {
       "name": "requirements_have_tests",
       "passed": true,
-      "detail": "All 24 requirements have test files on disk"
+      "detail": "All 31 requirements have test files on disk"
     },
     {
       "name": "build",
@@ -38,6 +38,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T15:51:56.735733",
+  "timestamp": "2026-07-16T16:08:33.908120",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

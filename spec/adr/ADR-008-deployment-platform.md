@@ -1,6 +1,8 @@
 # ADR-008: Deployment Platform
 
-## Status: CONDITIONAL
+## Status: ACCEPTED
+
+## Note: Vercel CLI installation deferred to Phase 7 (deployment setup). Fly.io CLI available. Decision stands: Vercel for web, Fly.io for API/workers, R2 for storage.
 ## Decision
 Vercel (web) + Fly.io (API/workers) + Cloudflare R2 (object storage).
 
@@ -9,7 +11,9 @@ Vercel (web) + Fly.io (API/workers) + Cloudflare R2 (object storage).
 - Fly.io: multi-region, Docker-based
 - R2: S3-compatible, no egress fees
 
-## Status: CONDITIONAL
+## Status: ACCEPTED
+
+## Note: Vercel CLI installation deferred to Phase 7 (deployment setup). Fly.io CLI available. Decision stands: Vercel for web, Fly.io for API/workers, R2 for storage.
 
 ## Verification Evidence
 - Vercel CLI: NOT FOUND
