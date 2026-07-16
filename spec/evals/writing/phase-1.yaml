@@ -14,5 +14,10 @@ test_cases:
     input: "spec/fixtures/phase-1/writing-brief.md"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "explains what Agent Harness is"
+      - "lists 14 modules"
+      - "explains Request-to-Outcome pipeline"
+      - "mentions CapabilityToken security model"
+      - "word count 500-1000"
+      - "tone is technical, no marketing language"
     scoring_function: "deterministic_pass_fail"

@@ -11,7 +11,7 @@ agent-harness-v9.1/
 │   ├── product/       ← PRD, personas, UX, journeys
 │   ├── architecture/  ← 14 module specs
 │   ├── requirements/  ← Requirement registry (NDJSON)
-│   ├── contracts/     ← 18 JSON Schemas
+│   ├── contracts/     ← 19 JSON Schemas
 │   ├── state-machines/← 7 state machines + TLA+
 │   ├── phases/        ← 9 phase manifests
 │   ├── api/           ← OpenAPI, AsyncAPI, error catalog

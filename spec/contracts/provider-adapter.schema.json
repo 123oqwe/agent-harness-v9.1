@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProviderAdapter",
+  "description": "Contract for model provider adapters. Real providers and ScriptedTestProvider must implement this interface.",
+  "type": "object",
+  "required": [
+    "provider_type",
+    "normalize_request",
+    "parse_response",
+    "normalize_tool_call",
+    "stream_events",
+    "map_error",
+    "meter_usage",
+    "check_health",
+    "validate_data_policy"
+  ],
+  "properties": {
+    "provider_type": {
+      "enum": ["openai", "anthropic", "google", "local", "scripted_test"]
+    },
+    "normalize_request": {
+      "type": "boolean",
+      "description": "Transforms internal request to provider-specific format"
+    },
+    "parse_response": {
+      "type": "boolean",
+      "description": "Parses provider response into internal ParsedResponse"
+    },
+    "normalize_tool_call": {
+      "type": "boolean",
+      "description": "Normalizes tool call format across providers"
+    },
+    "stream_events": {
+      "type": "boolean",
+      "description": "Handles streaming event protocol"
+    },
+    "map_error": {
+      "type": "boolean",
+      "description": "Maps provider errors to internal error taxonomy"
+    },
+    "meter_usage": {
+      "type": "boolean",
+      "description": "Tracks token usage and cost"
+    },
+    "check_health": {
+      "type": "boolean",
+      "description": "Returns provider health status"
+    },
+    "validate_data_policy": {
+      "type": "boolean",
+      "description": "Validates request against data policy (region, retention)"
+    },
+    "fallback_compatibility_checker": {
+      "type": "boolean",
+      "description": "Checks if fallback provider is compatible"
+    },
+    "rate_limiter": {
+      "type": "boolean",
+      "description": "Rate limiting support"
+    },
+    "circuit_breaker": {
+      "type": "boolean",
+      "description": "Circuit breaker support"
+    }
+  },
+  "additionalProperties": false
+}

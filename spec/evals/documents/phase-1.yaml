@@ -14,5 +14,8 @@ test_cases:
     input: "spec/fixtures/phase-1/sample.pdf"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "summary mentions Agent Harness"
+      - "citations reference correct page numbers (1-5)"
+      - "page 2 cited for 14 modules"
+      - "page 4 cited for 9 tools"
     scoring_function: "deterministic_pass_fail"

@@ -14,5 +14,7 @@ test_cases:
     input: "spec/fixtures/phase-1/coding-bug-repo/"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "diff modifies src/calculate.ts"
+      - "diff changes return sum to return sum / numbers.length"
+      - "npm test passes after diff applied"
     scoring_function: "deterministic_pass_fail"

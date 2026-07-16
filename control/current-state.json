@@ -88,11 +88,10 @@
     "control/": "\u552f\u4e00\u6743\u5a01\u72b6\u6001\u6765\u6e90 (current-state.json)"
   },
   "next_actions": [
-    "Run Phase 0 Reference Project Gate (factory must autonomously build a reference app)",
-    "When Phase 0 passes, begin Phase 1: Single-Agent Multi-Domain Foundation",
-    "Implement Sandbox Runner container isolation (currently STUB, needs Docker)",
+    "Begin Phase 1: Single-Agent Multi-Domain Foundation (Phase 0 verified, Phase 1 ready)",
+    "Implement AH-GATEWAY-TESTPROVIDER-001 first (all verticals depend on it)",
     "Switch verifier to RERUN mode when harness/ has code",
-    "Create test files for Phase 1-8 requirements (currently only Phase 0 has test files on disk)"
+    "Create test files for Phase 1-8 requirements as they are implemented"
   ],
   "factory_test_results": {
     "state_store": "PASS",

@@ -14,5 +14,9 @@ test_cases:
     input: "spec/fixtures/phase-1/planning-goal.md"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "plan includes all 5 dependencies"
+      - "plan has no dependency cycles"
+      - "budget constraint ($0) satisfied"
+      - "timeline within 1 week"
+      - "static site generator chosen"
     scoring_function: "deterministic_pass_fail"

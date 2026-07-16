@@ -14,5 +14,9 @@ test_cases:
     input: "spec/fixtures/phase-1/task-list.json"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "all 5 tasks scheduled"
+      - "no external actions in plan"
+      - "high priority tasks (T1, T3) scheduled first"
+      - "total scheduled time <= 4 hours available"
+      - "breaks included"
     scoring_function: "deterministic_pass_fail"

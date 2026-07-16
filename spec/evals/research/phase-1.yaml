@@ -14,5 +14,9 @@ test_cases:
     input: "spec/fixtures/phase-1/research-sources/"
     expected_properties:
       - "output is non-empty"
-      - "output addresses all acceptance criteria"
+      - "all 3 sources cited (A, B, C)"
+      - "Router DAG mentioned with source A citation"
+      - "state machine split mentioned with source B citation"
+      - "shadow mode mentioned with source C citation"
+      - "conflict detected: source A says DAG, no source contradicts"
     scoring_function: "deterministic_pass_fail"
