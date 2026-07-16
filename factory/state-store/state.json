@@ -32,6 +32,16 @@
       "timestamp": "2026-07-16T07:19:05.458238",
       "level": "INFO",
       "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T15:48:42.740081",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-16T15:49:12.293981",
+      "level": "INFO",
+      "message": "Selected requirement: AH-EVIDENCE-001"
     }
   ],
   "evidence_refs": {},
@@ -39,7 +49,7 @@
   "merge_queue": [],
   "blockers": [],
   "created_at": "2026-07-16T04:30:00.841000",
-  "updated_at": "2026-07-16T07:19:05.458321",
+  "updated_at": "2026-07-16T15:49:12.294061",
   "restart_count": 1,
   "worker_registry": {
     "codex": {

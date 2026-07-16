@@ -2,7 +2,7 @@
   "version": "9.2.1",
   "generated_at": "2026-07-16T04:27:35.172648",
   "generated_by": "manual-audit-correction",
-  "specification": "VERIFIED",
+  "specification": "SPEC_GATE_FAIL",
   "phase": 1,
   "factory_status": "IMPLEMENTED",
   "product_status": "NOT_STARTED",
@@ -114,7 +114,7 @@
     "spec_gate": "PASS (10/10 checks, actual file checks)",
     "failure_injection": "PASS (10/10 failures detected)",
     "factory_tests": "PASS (state store, controller, blocker, budget, secret, worktree, merge queue)",
-    "adrs_resolved": "12/12 (0 NEEDS_VERIFICATION)",
+    "adrs_resolved": "10/12 ACCEPTED, 2 CONDITIONAL (ADR-005, ADR-008), 0 NEEDS_VERIFICATION",
     "capability_coverage": "100% (108/108 mapped)",
     "requirements": 213
   },

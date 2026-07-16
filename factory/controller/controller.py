@@ -931,10 +931,16 @@ def run_loop(max_iterations=None, idle_sleep_seconds=30, stop_on_blocker=True):
                     if not advance_phase():
                         log("Cannot advance, stopping loop", "WARN")
                         return {"action": "stopped_no_advance", "iterations": iteration}
-                    # Auto-deploy to staging after phase advance (if product code exists)
-                    if (BASE_DIR / "harness" / "package.json").exists():
-                        log("Auto-deploying to staging after phase advance")
-                        deploy(environment="staging")
+                    # Auto-deploy to staging after phase advance (only if deploy script exists)
+                    pkg_path = BASE_DIR / "harness" / "package.json"
+                    if pkg_path.exists():
+                        try:
+                            pkg = json.load(open(pkg_path))
+                            if "deploy:staging" in pkg.get("scripts", {}):
+                                log("Auto-deploying to staging after phase advance")
+                                deploy(environment="staging")
+                        except Exception:
+                            pass  # No deploy script yet, skip silently
                 else:
                     failed_checks = [c["name"] for c in gate["checks"] if not c["passed"]]
                     log(f"Phase {current_phase} gate FAILED: {failed_checks}", "WARN")

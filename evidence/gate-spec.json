@@ -4,7 +4,7 @@
     {
       "name": "current_state_exists",
       "passed": true,
-      "detail": "specification=VERIFIED"
+      "detail": "specification=SPEC_GATE_FAIL"
     },
     {
       "name": "requirements_valid",
@@ -53,6 +53,6 @@
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-16T15:30:17.057173",
+  "timestamp": "2026-07-16T15:51:56.656057",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

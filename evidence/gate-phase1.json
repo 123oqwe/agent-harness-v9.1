@@ -14,21 +14,21 @@
     {
       "name": "build",
       "passed": false,
-      "detail": "exit_code=127",
-      "stdout_hash": "152e34a5956f2c6b"
+      "detail": "exit_code=2",
+      "stdout_hash": "af2ee32aeb90be9c"
     },
     {
       "name": "type_check",
       "passed": false,
-      "detail": "exit_code=1"
+      "detail": "exit_code=2"
     },
     {
       "name": "unit_tests",
-      "passed": false,
-      "detail": "exit_code=127, stdout_hash=b930af4b5cf42a0c"
+      "passed": true,
+      "detail": "exit_code=0, stdout_hash=f3c813ee64e07e7e"
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-16T07:19:09.786836",
+  "timestamp": "2026-07-16T15:48:52.554646",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }
