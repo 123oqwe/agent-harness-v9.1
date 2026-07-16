@@ -94,3 +94,26 @@ E2E_tests:
 
 visual_regression_tests:
   - tests/visual/chat.spec.ts
+
+states:
+  idle:
+    description: "No active run"
+    visible_components: [message_list, input_bar, model_selector]
+    disabled_components: [tool_status_panel, budget_indicator]
+  running:
+    description: "Run in progress"
+    visible_components: [message_list, input_bar, tool_status_panel, budget_indicator, run_plan_preview]
+    input_bar_state: "disabled"
+    cancel_button: visible
+  awaiting_approval:
+    description: "Tool execution awaiting user approval"
+    visible_components: [message_list, approval_panel]
+    input_bar_state: "disabled"
+  error:
+    description: "Run failed"
+    visible_components: [message_list, error_banner, retry_button]
+    error_banner: "Shows error classification and suggested action"
+  completed:
+    description: "Run finished successfully"
+    visible_components: [message_list, evidence_panel, input_bar]
+    evidence_panel: "Shows evidence package summary"

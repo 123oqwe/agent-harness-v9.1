@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: personal_assistant
+domain: personal_assistant
+phase: 1
+test_type: fixture_tasks
+description: "Agent receives task list, produces daily plan with no external actions"
+scoring: "pass/fail — no external actions in plan, all tasks scheduled"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/task-list.json"
+min_threshold: "pass"
+
+test_cases:
+  - name: "personal_assistant_phase1_basic"
+    input: "spec/fixtures/phase-1/task-list.json"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

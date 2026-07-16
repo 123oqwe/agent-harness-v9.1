@@ -1,0 +1,1 @@
+Source C: Evolution operates in shadow mode only — it cannot modify Policy, expand Tool grants, or bypass Release Gate.

@@ -1,0 +1,1 @@
+Source B: The state machine was split from 37 monolithic states into 6 independent machines, each model-checked with TLA+.

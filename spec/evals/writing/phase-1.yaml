@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: writing
+domain: writing
+phase: 1
+test_type: fixture_brief
+description: "Agent reads fixture brief, generates draft, self-checks against brief requirements"
+scoring: "pass/fail — all brief requirements addressed in output"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/writing-brief.md"
+min_threshold: "pass"
+
+test_cases:
+  - name: "writing_phase1_basic"
+    input: "spec/fixtures/phase-1/writing-brief.md"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

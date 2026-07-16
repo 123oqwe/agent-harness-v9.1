@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: planning
+domain: planning
+phase: 1
+test_type: fixture_goal
+description: "Agent receives goal + constraints, produces plan, validates dependencies"
+scoring: "pass/fail — plan has no dependency cycles, all constraints satisfied"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/planning-goal.md"
+min_threshold: "pass"
+
+test_cases:
+  - name: "planning_phase1_basic"
+    input: "spec/fixtures/phase-1/planning-goal.md"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

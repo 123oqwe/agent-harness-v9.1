@@ -1,0 +1,1 @@
+Source A: Agent Harness v9 uses a dependency-aware Router DAG, replacing v8's 8 parallel routers.

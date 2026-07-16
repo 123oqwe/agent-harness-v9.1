@@ -284,6 +284,16 @@ def run(req_id, evidence_path=None, commit_sha=None):
                 except Exception:
                     pass
 
+    # Check: Rerun test count matches evidence
+    if ev and verification.get("rerun_tests_passed") is not None:
+        ev_passed = ev.get("test_results", {}).get("passed", 0) if ev.get("test_results") else 0
+        rerun_passed = verification.get("rerun_tests_passed", 0)
+        verification["checks"].append({
+            "name": "test_count_match",
+            "passed": ev_passed == rerun_passed,
+            "detail": f"evidence={ev_passed}, rerun={rerun_passed}"
+        })
+
     # Overall result
     all_pass = all(c["passed"] for c in verification["checks"])
     verification["result"] = "PASS" if all_pass else "FAIL"

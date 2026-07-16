@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: coding
+domain: coding
+phase: 1
+test_type: fixture_repo
+description: "Agent reads fixture TypeScript repo, locates known bug, produces diff that makes test suite pass"
+scoring: "pass/fail — diff applied, npm test passes"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/coding-bug-repo/"
+min_threshold: "pass"
+
+test_cases:
+  - name: "coding_phase1_basic"
+    input: "spec/fixtures/phase-1/coding-bug-repo/"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

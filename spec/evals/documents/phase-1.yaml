@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: documents
+domain: documents
+phase: 1
+test_type: fixture_pdf
+description: "Agent reads fixture PDF, extracts text, summarizes, cites page numbers correctly"
+scoring: "pass/fail — citations match known page content"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/sample.pdf"
+min_threshold: "pass"
+
+test_cases:
+  - name: "documents_phase1_basic"
+    input: "spec/fixtures/phase-1/sample.pdf"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

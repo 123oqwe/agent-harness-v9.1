@@ -154,6 +154,87 @@
     },
     "production_certification_required": {
       "type": "boolean"
+    },
+    "experience_profiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "capability_inventory_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blocked_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "performance_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "accessibility_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "observability_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "eval_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "API_operations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "UI_screens": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "state_transitions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "threat_controls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "real_data_required": {
+      "type": "boolean"
+    },
+    "provider_verification_required": {
+      "type": "boolean"
+    },
+    "owner_role": {
+      "type": "string"
     }
   },
   "additionalProperties": false

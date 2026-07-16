@@ -1,0 +1,18 @@
+# Phase 1 Domain Eval: research
+domain: research
+phase: 1
+test_type: fixture_sources
+description: "Agent reads 3 fixture sources, organizes evidence, cites sources correctly"
+scoring: "pass/fail — all citations match source content"
+requires_llm: false
+uses_test_provider: true
+fixture: "spec/fixtures/phase-1/research-sources/"
+min_threshold: "pass"
+
+test_cases:
+  - name: "research_phase1_basic"
+    input: "spec/fixtures/phase-1/research-sources/"
+    expected_properties:
+      - "output is non-empty"
+      - "output addresses all acceptance criteria"
+    scoring_function: "deterministic_pass_fail"

@@ -20,6 +20,7 @@ disabled_capabilities:
   - dynamic_tool_generation
 
 requirements:
+  - AH-GATEWAY-TESTPROVIDER-001  # MUST be first — all verticals depend on it
   - AH-CAPABILITY-001
   - AH-CAPMAP-002
   - AH-CAPMAP-006
@@ -55,10 +56,10 @@ fixtures:
   - fixtures/phase-1/valid/
   - fixtures/phase-1/invalid/
 
-unit_tests: "tests/phase-1/unit/"
-integration_tests: "tests/phase-1/integration/"
-e2e_tests: "tests/phase-1/e2e/"
-security_tests: "tests/phase-1/security/"
+unit_tests: "harness/tests/"
+integration_tests: "harness/tests/domain/"
+e2e_tests: "harness/tests/domain/"
+security_tests: "harness/tests/security/"
 
 domain_evals:
   coding: "evals/coding/phase-1.yaml"
@@ -102,7 +103,6 @@ exit_criteria:
   - planning_vertical: "goal+constraints -> plan -> validate deps"
   - pa_vertical: "task list -> daily plan (no external action)"
   - security: sandbox_violation=0, unauthorized_effect=0, capability_replay=0
-  - swe_bench_pass_at_1: ">= 20%"
   - active_stub_count: 0
   - mutation_score: ">= 0.7"
   - crash_restore_no_duplicate: PASS

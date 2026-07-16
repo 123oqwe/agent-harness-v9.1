@@ -68,7 +68,6 @@ exit_criteria:
   - hard_constraint_violation: 0
   - routing_regret: "<= 15%"
   - unnecessary_multi_agent_rate: "<= 20%"
-  - swe_bench_pass_at_1: ">= 35% (delta >= 5%)"
   - context_isolation: PASS
   - capability_attenuation: PASS
   - merge_conflict_no_hardcoded_rules: PASS

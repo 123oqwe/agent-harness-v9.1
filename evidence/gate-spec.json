@@ -9,7 +9,7 @@
     {
       "name": "requirements_valid",
       "passed": true,
-      "detail": "213 requirements, 0 duplicates"
+      "detail": "214 requirements, 0 duplicates"
     },
     {
       "name": "model_check_verified",
@@ -53,6 +53,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-16T16:50:18.385556",
+  "timestamp": "2026-07-16T17:17:35.005584",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }
