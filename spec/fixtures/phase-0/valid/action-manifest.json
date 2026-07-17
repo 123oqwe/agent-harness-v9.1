@@ -16,7 +16,11 @@
   "side_effect_class": "pure",
   "credential_scope": [],
   "max_attempts": 1,
-  "max_cost": {},
+  "max_cost": {
+    "token_limit": "100000",
+    "usd_micros": "5000000",
+    "currency": "USD"
+  },
   "expires_at": "2026-01-01T00:00:00Z",
   "compensation_plan": "valid-compensation_plan",
   "policy_version": "valid-policy_version",

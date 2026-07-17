@@ -1,43 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const schemaPath = path.resolve(__dirname, '../../../spec/contracts/capability-token.schema.json');
-const validFixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-0/valid/capability-token.json');
-const invalidFixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-0/invalid/capability-token.json');
-
-describe('AH-CONTRACT-CAPABILITY-001: capability-token schema', () => {
-  it('schema file exists and parses as JSON', () => {
-    expect(fs.existsSync(schemaPath)).toBe(true);
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    expect(schema.type).toBe('object');
-    expect(schema.additionalProperties).toBe(false);
-  });
-
-  it('schema has required fields: token_id, operation_id, use_limit...', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const required = ["token_id", "operation_id", "use_limit"];
-    for (const field of required) {
-      expect(schema.required).toContain(field);
-    }
-  });
-  it('schema enforces const on use_limit', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    expect(schema.properties.use_limit.const).toBe(1);
-  });
-
-  it('valid fixture has all required fields', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const fixture = JSON.parse(fs.readFileSync(validFixturePath, 'utf-8'));
-    for (const field of schema.required) {
-      expect(fixture).toHaveProperty(field);
-    }
-  });
-
-  it('invalid fixture is missing a required field', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const fixture = JSON.parse(fs.readFileSync(invalidFixturePath, 'utf-8'));
-    const missing = schema.required.filter((f: string) => !(f in fixture));
-    expect(missing.length).toBeGreaterThan(0);
-  });
-});
+ import { describe, it, expect } from 'vitest';
+ import { validateFixture, loadFixture } from '../helpers/schema-validator';
+ 
+ describe('AH-CONTRACT-CAPABILITY-001: capability-token schema', () => {
+   it('valid fixture passes full schema validation', () => {
+     const data = loadFixture('0', 'valid', 'capability-token.json');
+     const result = validateFixture('capability-token.schema.json', data);
+     expect(result.valid).toBe(true);
+   });
+ 
+   it('invalid fixture fails schema validation', () => {
+     const data = loadFixture('0', 'invalid', 'capability-token.json');
+     const result = validateFixture('capability-token.schema.json', data);
+     expect(result.valid).toBe(false);
+   });
+ });

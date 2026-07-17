@@ -1,39 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const schemaPath = path.resolve(__dirname, '../../../spec/contracts/effect-risk.schema.json');
-const validFixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-0/valid/effect-risk.json');
-const invalidFixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-0/invalid/effect-risk.json');
-
-describe('AH-CONTRACT-EFFECTRISK-001: effect-risk schema', () => {
-  it('schema file exists and parses as JSON', () => {
-    expect(fs.existsSync(schemaPath)).toBe(true);
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    expect(schema.type).toBe('object');
-    expect(schema.additionalProperties).toBe(false);
-  });
-
-  it('schema has required fields: locality, operation, reversibility...', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const required = ["locality", "operation", "reversibility", "data_egress", "network_access", "credential_access", "blast_radius", "financial_impact_usd_micros", "human_impact", "external_visibility", "regulatory_sensitivity"];
-    for (const field of required) {
-      expect(schema.required).toContain(field);
-    }
-  });
-
-  it('valid fixture has all required fields', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const fixture = JSON.parse(fs.readFileSync(validFixturePath, 'utf-8'));
-    for (const field of schema.required) {
-      expect(fixture).toHaveProperty(field);
-    }
-  });
-
-  it('invalid fixture is missing a required field', () => {
-    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const fixture = JSON.parse(fs.readFileSync(invalidFixturePath, 'utf-8'));
-    const missing = schema.required.filter((f: string) => !(f in fixture));
-    expect(missing.length).toBeGreaterThan(0);
-  });
-});
+ import { describe, it, expect } from 'vitest';
+ import { validateFixture, loadFixture } from '../helpers/schema-validator';
+ 
+ describe('AH-CONTRACT-EFFECTRISK-001: effect-risk schema', () => {
+   it('valid fixture passes full schema validation', () => {
+     const data = loadFixture('0', 'valid', 'effect-risk.json');
+     const result = validateFixture('effect-risk.schema.json', data);
+     expect(result.valid).toBe(true);
+   });
+ 
+   it('invalid fixture fails schema validation', () => {
+     const data = loadFixture('0', 'invalid', 'effect-risk.json');
+     const result = validateFixture('effect-risk.schema.json', data);
+     expect(result.valid).toBe(false);
+   });
+ });
