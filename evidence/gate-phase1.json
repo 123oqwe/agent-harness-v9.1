@@ -4,7 +4,7 @@
     {
       "name": "requirements_have_criteria",
       "passed": true,
-      "detail": "All 30 requirements have criteria"
+      "detail": "All 31 requirements have criteria"
     },
     {
       "name": "requirements_have_tests",
@@ -15,7 +15,7 @@
       "name": "build",
       "passed": false,
       "detail": "exit_code=2",
-      "stdout_hash": "af2ee32aeb90be9c"
+      "stdout_hash": "14ab6bb9f8691a46"
     },
     {
       "name": "type_check",
@@ -25,10 +25,15 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=38cc21ed94e5b355"
+      "detail": "exit_code=0, stdout_hash=170bdbca7e59db04"
+    },
+    {
+      "name": "all_requirements_verified",
+      "passed": false,
+      "detail": "31 requirements not verified: ['AH-RUNTIME-LOOP-001', 'AH-RUNTIME-SESSION-001', 'AH-SANDBOX-001', 'AH-POLICY-ENGINE-001', 'AH-CAPABILITY-001']"
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-16T16:11:26.391968",
+  "timestamp": "2026-07-18T03:54:38.992870",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }
