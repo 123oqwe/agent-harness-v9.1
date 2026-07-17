@@ -16,7 +16,7 @@ describe('AH-CONTRACT-TOOLSPEC-001: tool-spec schema', () => {
 
   it('schema has required fields: ...', () => {
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
-    const required = [];
+    const required: string[] = ['name', 'version', 'domains', 'implementation_status', 'input_schema_ref', 'output_schema_ref', 'effect_model', 'risk_feature_extractor', 'preconditions', 'postconditions', 'timeout_policy'];
     for (const field of required) {
       expect(schema.required).toContain(field);
     }
