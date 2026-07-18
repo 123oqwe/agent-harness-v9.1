@@ -3,8 +3,10 @@
   "testRunner": "vitest",
   "coverageAnalysis": "perTest",
   "mutate": [
-    "src/**/*.ts",
-    "!src/**/*.test.ts"
+    "**/*.ts",
+    "!**/*.test.ts",
+    "!node_modules/**",
+    "!tests/**"
   ],
   "thresholds": {
     "high": 80,

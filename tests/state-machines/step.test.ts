@@ -1,26 +1,40 @@
-import { describe, it, expect } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const machinePath = path.resolve(__dirname, '../../../spec/state-machines/step.machine.json');
-
-describe('AH-STATE-STEP-001: step state machine', () => {
-  it('machine file exists and parses as JSON', () => {
-    expect(fs.existsSync(machinePath)).toBe(true);
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    expect(machine.name || machine.states).toBeDefined();
-  });
-
-  it('machine has at least 2 states', () => {
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    const states = Array.isArray(machine.states) ? machine.states : machine.states;
-    expect(states.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('machine has at least 1 transition or invariant', () => {
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    const hasTransitions = machine.transitions && machine.transitions.length > 0;
-    const hasInvariants = machine.invariants && machine.invariants.length > 0;
-    expect(hasTransitions || hasInvariants).toBe(true);
-  });
-});
+ import { describe, it, expect } from 'vitest';
+ import { loadMachine, assertStatesExist, assertTerminalStates, assertTransitionsExist, assertNoDeadStates, assertAllTransitionsValid } from '../helpers/machine-validator';
+ 
+ describe('AH-STATE-STEP-001: step state machine', () => {
+   const machine = loadMachine('step.machine.json');
+ 
+   it('has exactly 7 states', () => {
+     expect(machine.states.length).toBe(7);
+   });
+ 
+   it('has correct state names', () => {
+     assertStatesExist(machine, ['PENDING', 'DISPATCHED', 'EXECUTING', 'VERIFYING', 'DONE', 'FAILED', 'BLOCKED']);
+   });
+ 
+   it('has correct terminal states', () => {
+     assertTerminalStates(machine, ['DONE']);
+   });
+ 
+   it('has key transitions', () => {
+     assertTransitionsExist(machine, [
+       ['PENDING', 'DISPATCHED'],
+       ['PENDING', 'BLOCKED'],
+       ['DISPATCHED', 'EXECUTING'],
+       ['EXECUTING', 'VERIFYING'],
+       ['EXECUTING', 'FAILED'],
+       ['VERIFYING', 'DONE'],
+       ['VERIFYING', 'FAILED'],
+       ['FAILED', 'PENDING'],
+       ['BLOCKED', 'PENDING'],
+     ]);
+   });
+ 
+   it('has no dead states', () => {
+     assertNoDeadStates(machine);
+   });
+ 
+   it('all transitions reference valid states', () => {
+     assertAllTransitionsValid(machine);
+   });
+ });

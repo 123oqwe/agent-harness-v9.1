@@ -1,26 +1,39 @@
-import { describe, it, expect } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const machinePath = path.resolve(__dirname, '../../../spec/state-machines/run.machine.json');
-
-describe('AH-STATE-RUN-001: run state machine', () => {
-  it('machine file exists and parses as JSON', () => {
-    expect(fs.existsSync(machinePath)).toBe(true);
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    expect(machine.name || machine.states).toBeDefined();
-  });
-
-  it('machine has at least 2 states', () => {
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    const states = Array.isArray(machine.states) ? machine.states : machine.states;
-    expect(states.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('machine has at least 1 transition or invariant', () => {
-    const machine = JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
-    const hasTransitions = machine.transitions && machine.transitions.length > 0;
-    const hasInvariants = machine.invariants && machine.invariants.length > 0;
-    expect(hasTransitions || hasInvariants).toBe(true);
-  });
-});
+ import { describe, it, expect } from 'vitest';
+ import { loadMachine, assertStatesExist, assertTerminalStates, assertTransitionsExist, assertNoDeadStates, assertAllTransitionsValid } from '../helpers/machine-validator';
+ 
+ describe('AH-STATE-RUN-001: run state machine', () => {
+   const machine = loadMachine('run.machine.json');
+ 
+   it('has exactly 7 states', () => {
+     expect(machine.states.length).toBe(7);
+   });
+ 
+   it('has correct state names', () => {
+     assertStatesExist(machine, ['CREATED', 'PLANNING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED']);
+   });
+ 
+   it('has correct terminal states', () => {
+     assertTerminalStates(machine, ['COMPLETED', 'FAILED', 'CANCELLED']);
+   });
+ 
+   it('has key transitions', () => {
+     assertTransitionsExist(machine, [
+       ['CREATED', 'PLANNING'],
+       ['PLANNING', 'RUNNING'],
+       ['RUNNING', 'PAUSED'],
+       ['PAUSED', 'RUNNING'],
+       ['RUNNING', 'COMPLETED'],
+       ['RUNNING', 'FAILED'],
+       ['RUNNING', 'CANCELLED'],
+       ['PAUSED', 'CANCELLED'],
+     ]);
+   });
+ 
+   it('has no dead states (non-terminal without outgoing)', () => {
+     assertNoDeadStates(machine);
+   });
+ 
+   it('all transitions reference valid states', () => {
+     assertAllTransitionsValid(machine);
+   });
+ });
