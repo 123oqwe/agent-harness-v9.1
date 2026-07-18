@@ -330,9 +330,9 @@ paths:
           required: true
           schema:
             type: string
-     responses:
-       '204':
-         description: Deleted
+      responses:
+        '204':
+          description: Deleted
 
   /vault/secrets:
     get:
