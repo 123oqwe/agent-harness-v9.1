@@ -458,6 +458,24 @@
       "guard": "partial_effects_exist",
       "event": "CompensationPending",
       "retry_rule": "never"
+    },
+    {
+      "source": "RETRY_SCHEDULED",
+      "target": "CREATED",
+      "actor": "runtime",
+      "guard": "retry_triggered",
+      "event": "RetryStarted",
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "PARTIAL_COMMIT",
+      "target": "COMPENSATION_PENDING",
+      "actor": "execution_supervisor",
+      "guard": "partial_commit_detected",
+      "event": "CompensationTriggered",
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
     }
   ],
   "invariants": [

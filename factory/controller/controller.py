@@ -78,7 +78,7 @@ def select_ready_requirement():
             current_phase = state.get("current_phase", 0)
             req_status = state.get("requirement_status", {})
             queue = build_queue(all_reqs, current_phase, req_status)
-            for _, _, req in queue:
+            for _, _, _, req in queue:
                 rid = req["id"]
                 runtime_status = req_status.get(rid, {}).get("status")
                 if runtime_status in ("verification_failed", "failed", "retry_required"):

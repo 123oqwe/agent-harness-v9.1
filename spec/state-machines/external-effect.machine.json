@@ -41,6 +41,26 @@
     {
       "name": "RECONCILING",
       "terminal": false
+    },
+    {
+      "name": "FAILED",
+      "terminal": true,
+      "description": "Prepare failed — automatic retry allowed"
+    },
+    {
+      "name": "EXPIRED",
+      "terminal": true,
+      "description": "Prepared state timed out before commit"
+    },
+    {
+      "name": "AWAITING_HUMAN",
+      "terminal": false,
+      "description": "Reconciliation inconclusive — human must resolve"
+    },
+    {
+      "name": "RECONCILIATION_FAILED",
+      "terminal": true,
+      "description": "Human cannot resolve — terminal, needs new operation"
     }
   ],
   "transitions": [
@@ -155,6 +175,22 @@
       "actor": "execution_supervisor",
       "guard": "reconciliation_inconclusive",
       "event": "AwaitingHuman",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "EFFECT_CONFIRMED",
+      "actor": "user",
+      "guard": "human_confirms_effect",
+      "event": "HumanConfirmedEffect",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "RECONCILIATION_FAILED",
+      "actor": "user",
+      "guard": "human_cannot_resolve",
+      "event": "ReconciliationFailed",
       "retry_rule": "never"
     }
   ],

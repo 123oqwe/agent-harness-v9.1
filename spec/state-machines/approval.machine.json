@@ -12,7 +12,8 @@
     },
     {
       "name": "HUMAN_APPROVED",
-      "terminal": false
+      "terminal": true,
+      "description": "Approval granted — terminal, OperationStateMachine takes over"
     },
     {
       "name": "HUMAN_REJECTED",

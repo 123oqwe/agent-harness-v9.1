@@ -22,6 +22,12 @@ def build_queue(requirements, current_phase, req_status):
     req_map = {r["id"]: r for r in requirements}
     queue = []
     
+    # Count how many other requirements depend on each requirement
+    dependents_count = {}
+    for req in requirements:
+        for dep_id in req.get("dependencies", []):
+            dependents_count[dep_id] = dependents_count.get(dep_id, 0) + 1
+    
     for req in requirements:
         req_id = req["id"]
         
@@ -47,7 +53,9 @@ def build_queue(requirements, current_phase, req_status):
             continue
         
         priority = PRIORITY_ORDER.get(req.get("priority", "P3"), 3)
-        heapq.heappush(queue, (priority, req_id, req))
+        # Secondary sort: more dependents = higher priority (negative for min-heap)
+        deps_count = dependents_count.get(req_id, 0)
+        heapq.heappush(queue, (priority, -deps_count, req_id, req))
     
     return queue
 
@@ -55,7 +63,7 @@ def pop_next(queue):
     """Atomically pop the next requirement from queue."""
     if not queue:
         return None
-    _, req_id, req = heapq.heappop(queue)
+    _, _, req_id, req = heapq.heappop(queue)
     return req
 
 def queue_size(queue):
