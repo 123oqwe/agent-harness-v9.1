@@ -274,11 +274,12 @@ def run(req_id, evidence_path=None, commit_sha=None):
                         "detail": f"git worktree add failed: {clone.stderr[:200]}"
                     })
                 else:
-                    # Install dependencies
-                    if (rerun_dir / "package.json").exists():
+                    # Install dependencies (package.json lives in harness/, not repo root)
+                    harness_rerun_dir = rerun_dir / "harness"
+                    if (harness_rerun_dir / "package.json").exists():
                         npm_ci = subprocess.run(
                             ["npm", "ci"],
-                            capture_output=True, text=True, cwd=str(rerun_dir), timeout=120
+                            capture_output=True, text=True, cwd=str(harness_rerun_dir), timeout=120
                         )
                         if npm_ci.returncode != 0:
                             verification["checks"].append({
@@ -290,7 +291,7 @@ def run(req_id, evidence_path=None, commit_sha=None):
                             # Run tests
                             npm_test = subprocess.run(
                                 ["npm", "test", "--", "--run"],
-                                capture_output=True, text=True, cwd=str(rerun_dir), timeout=300
+                                capture_output=True, text=True, cwd=str(harness_rerun_dir), timeout=300
                             )
                             rerun_stdout = npm_test.stdout
                             # Compare exit code

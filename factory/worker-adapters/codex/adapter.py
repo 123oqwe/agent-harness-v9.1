@@ -100,6 +100,11 @@ def dispatch(session, timeout=1800):
     session["status"] = "running"
     session["dispatched_at"] = datetime.datetime.now().isoformat()
     
+    # Ignore signals that can kill us when codex's stdout/stderr pipes close
+    import signal as _signal
+    _signal.signal(_signal.SIGPIPE, _signal.SIG_IGN)
+    _signal.signal(_signal.SIGHUP, _signal.SIG_IGN)
+
     try:
         # REAL Popen — actually start the process
         proc = subprocess.Popen(
