@@ -7,7 +7,7 @@
 - secrets
 
 ## Allowed Paths
-- src/security/, threat-model/
+- harness/security/, threat-model/
 
 ## Forbidden Paths
 - requirements/acceptance

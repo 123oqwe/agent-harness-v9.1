@@ -11,7 +11,7 @@
 - issue_id: AR-001
   severity: P2
   category: undefined_terms
-  description: 'ExperienceProfile' referenced in RunPlan but not defined as a schema
+  description: "ExperienceProfile referenced in RunPlan but not defined as a schema"
   file: contracts/run-plan.schema.json
   proposed_fix: Add experience-profile.schema.json or define inline
 
@@ -39,9 +39,9 @@
 - issue_id: AR-006
   severity: P2
   category: unmeasurable_metrics
-  description: 'routing_regret' metric defined but no formula or measurement method specified
+  description: "routing_regret metric defined but no formula or measurement method specified"
   file: phases/phase-3.yaml
-  proposed_fix: Define: routing_regret = (best_possible_score - actual_score) / best_possible_score
+  proposed_fix: "Define: routing_regret = (best_possible_score - actual_score) / best_possible_score"
 
 - issue_id: AR-009
   severity: P2
@@ -62,7 +62,7 @@
   category: missing_data_controls
   description: No data contamination detection mechanism between training and eval datasets
   file: data-tests/
-  proposed_fix: Add contamination check: hash overlap detection between eval and training data
+  proposed_fix: "Add contamination check: hash overlap detection between eval and training data"
 
 - issue_id: AR-012
   severity: P2
@@ -76,7 +76,7 @@
   category: circular_dependency
   description: Evolution optimizes Router, but Router feeds data to Evolution. Potential feedback loop.
   file: architecture/evolution.md
-  proposed_fix: Already mitigated by: Evolution shadow mode only, cold start safety, Self-Model protection
+  proposed_fix: "Already mitigated by: Evolution shadow mode only, cold start safety, Self-Model protection"
 
 - issue_id: AR-015
   severity: P2
@@ -85,7 +85,7 @@
   file: contracts/
   proposed_fix: Add contract-parity.test.ts that validates TS interfaces against JSON Schemas
 
-- issue_id: AR-001
+- issue_id: AR-PROD-001
   severity: P2
   category: product_completeness
   description: No requirement for offline mode synchronization when connectivity returns
@@ -95,7 +95,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553772
 
-- issue_id: AR-002
+- issue_id: AR-PROD-002
   severity: P2
   category: product_completeness
   description: No requirement for multi-language UI support
@@ -105,7 +105,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553778
 
-- issue_id: AR-003
+- issue_id: AR-PROD-003
   severity: P3
   category: product_completeness
   description: No requirement for dark mode / theme switching
@@ -115,7 +115,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553782
 
-- issue_id: AR-004
+- issue_id: AR-PROD-004
   severity: P2
   category: requirement_completeness
   description: Research domain has only 1 requirement (AH-RESEARCH-VERTICAL-001) but needs source retrieval, citation, conflict detection requirements
@@ -125,7 +125,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553784
 
-- issue_id: AR-005
+- issue_id: AR-PROD-005
   severity: P2
   category: requirement_completeness
   description: Writing domain has only 1 requirement (AH-WRITING-VERTICAL-001) but needs drafting, revision, style checking requirements
@@ -135,7 +135,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553787
 
-- issue_id: AR-006
+- issue_id: AR-PROD-006
   severity: P2
   category: requirement_completeness
   description: Planning domain has only 1 requirement (AH-PLANNING-VERTICAL-001) but needs decomposition, dependency validation, schedule requirements
@@ -145,7 +145,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553789
 
-- issue_id: AR-007
+- issue_id: AR-PROD-007
   severity: P2
   category: api_contracts
   description: OpenAPI does not define idempotency keys for POST /runs, POST /approvals, POST /reconciliation
@@ -155,7 +155,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553791
 
-- issue_id: AR-008
+- issue_id: AR-PROD-008
   severity: P2
   category: api_contracts
   description: OpenAPI does not define pagination cursor format
@@ -165,7 +165,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553792
 
-- issue_id: AR-009
+- issue_id: AR-PROD-009
   severity: P3
   category: api_contracts
   description: OpenAPI does not define versioning header (e.g., X-API-Version)
@@ -175,7 +175,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553794
 
-- issue_id: AR-010
+- issue_id: AR-PROD-010
   severity: P2
   category: frontend
   description: No requirement for frontend error boundary component
@@ -185,7 +185,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553797
 
-- issue_id: AR-011
+- issue_id: AR-PROD-011
   severity: P2
   category: frontend
   description: No requirement for frontend optimistic updates
@@ -195,7 +195,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553798
 
-- issue_id: AR-012
+- issue_id: AR-PROD-012
   severity: P3
   category: frontend
   description: No requirement for frontend skeleton loading for async content
@@ -205,7 +205,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553801
 
-- issue_id: AR-013
+- issue_id: AR-PROD-013
   severity: P2
   category: admin
   description: Admin console does not define SCIM endpoint mapping
@@ -215,7 +215,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553802
 
-- issue_id: AR-014
+- issue_id: AR-PROD-014
   severity: P2
   category: admin
   description: Admin console does not define data residency enforcement UI
@@ -225,7 +225,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553804
 
-- issue_id: AR-015
+- issue_id: AR-PROD-015
   severity: P3
   category: admin
   description: No requirement for admin audit log real-time streaming
@@ -235,7 +235,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553806
 
-- issue_id: AR-016
+- issue_id: AR-PROD-016
   severity: P2
   category: state_machines
   description: MissionStateMachine has no formal TLA+ model check (only OperationStateMachine was checked)
@@ -245,7 +245,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553808
 
-- issue_id: AR-017
+- issue_id: AR-PROD-017
   severity: P2
   category: state_machines
   description: RunStateMachine has no formal TLA+ model check
@@ -255,7 +255,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553810
 
-- issue_id: AR-018
+- issue_id: AR-PROD-018
   severity: P2
   category: state_machines
   description: ExternalEffectStateMachine has no formal TLA+ model check
@@ -265,7 +265,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553812
 
-- issue_id: AR-019
+- issue_id: AR-PROD-019
   severity: P3
   category: state_machines
   description: ApprovalStateMachine has no formal TLA+ model check
@@ -275,7 +275,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553814
 
-- issue_id: AR-020
+- issue_id: AR-PROD-020
   severity: P2
   category: routing
   description: Router DAG pipeline has no requirement for timeout per stage
@@ -285,7 +285,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553816
 
-- issue_id: AR-021
+- issue_id: AR-PROD-021
   severity: P2
   category: routing
   description: Router DAG has no requirement for abstain behavior when no candidate meets constraints
@@ -295,7 +295,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553818
 
-- issue_id: AR-022
+- issue_id: AR-PROD-022
   severity: P3
   category: routing
   description: Router DAG has no requirement for audit evidence per stage
@@ -305,7 +305,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553820
 
-- issue_id: AR-023
+- issue_id: AR-PROD-023
   severity: P2
   category: multi_agent
   description: No requirement for budget reclamation when agent is killed
@@ -315,7 +315,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553822
 
-- issue_id: AR-024
+- issue_id: AR-PROD-024
   severity: P2
   category: multi_agent
   description: No requirement for agent heartbeat and liveness detection
@@ -325,7 +325,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553823
 
-- issue_id: AR-025
+- issue_id: AR-PROD-025
   severity: P3
   category: multi_agent
   description: No requirement for agent context window size reporting
@@ -335,7 +335,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553825
 
-- issue_id: AR-026
+- issue_id: AR-PROD-026
   severity: P2
   category: memory
   description: No requirement for memory contamination detection
@@ -345,7 +345,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553830
 
-- issue_id: AR-027
+- issue_id: AR-PROD-027
   severity: P2
   category: memory
   description: No requirement for memory export/import for backup
@@ -355,7 +355,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553832
 
-- issue_id: AR-028
+- issue_id: AR-PROD-028
   severity: P3
   category: memory
   description: No requirement for memory conflict resolution UI
@@ -365,7 +365,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553834
 
-- issue_id: AR-029
+- issue_id: AR-PROD-029
   severity: P2
   category: rag
   description: No requirement for RAG index corruption recovery
@@ -375,7 +375,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553836
 
-- issue_id: AR-030
+- issue_id: AR-PROD-030
   severity: P2
   category: rag
   description: No requirement for RAG embedding model version migration
@@ -385,7 +385,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553838
 
-- issue_id: AR-031
+- issue_id: AR-PROD-031
   severity: P3
   category: rag
   description: No requirement for RAG query caching
@@ -395,7 +395,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553840
 
-- issue_id: AR-032
+- issue_id: AR-PROD-032
   severity: P2
   category: security
   description: No requirement for secret rotation in Local Vault
@@ -405,7 +405,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553841
 
-- issue_id: AR-033
+- issue_id: AR-PROD-033
   severity: P2
   category: security
   description: No requirement for capability token revocation propagation
@@ -415,7 +415,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553843
 
-- issue_id: AR-034
+- issue_id: AR-PROD-034
   severity: P2
   category: security
   description: No requirement for PEP denial event alerting
@@ -425,7 +425,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553845
 
-- issue_id: AR-035
+- issue_id: AR-PROD-035
   severity: P3
   category: security
   description: No requirement for security event correlation engine
@@ -435,7 +435,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553847
 
-- issue_id: AR-036
+- issue_id: AR-PROD-036
   severity: P2
   category: privacy
   description: No requirement for GDPR right-to-erasure implementation
@@ -445,7 +445,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553849
 
-- issue_id: AR-037
+- issue_id: AR-PROD-037
   severity: P2
   category: privacy
   description: No requirement for data residency enforcement in cloud model calls
@@ -455,7 +455,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553851
 
-- issue_id: AR-038
+- issue_id: AR-PROD-038
   severity: P3
   category: privacy
   description: No requirement for privacy impact assessment workflow
@@ -465,7 +465,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553853
 
-- issue_id: AR-039
+- issue_id: AR-PROD-039
   severity: P2
   category: data_governance
   description: No requirement for dataset contamination detection between eval and training data
@@ -475,7 +475,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553855
 
-- issue_id: AR-040
+- issue_id: AR-PROD-040
   severity: P2
   category: data_governance
   description: No requirement for consented staging data expiry enforcement
@@ -485,7 +485,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553857
 
-- issue_id: AR-041
+- issue_id: AR-PROD-041
   severity: P3
   category: data_governance
   description: No requirement for dataset provenance chain verification
@@ -495,7 +495,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553858
 
-- issue_id: AR-042
+- issue_id: AR-PROD-042
   severity: P2
   category: provider_assumptions
   description: Gmail adapter assumes sent-folder readback but this may not be available in all email providers
@@ -505,7 +505,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553860
 
-- issue_id: AR-043
+- issue_id: AR-PROD-043
   severity: P2
   category: provider_assumptions
   description: Google Calendar adapter assumes create returns event ID but this should be NEEDS_PROVIDER_VERIFICATION
@@ -515,7 +515,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553862
 
-- issue_id: AR-044
+- issue_id: AR-PROD-044
   severity: P2
   category: provider_assumptions
   description: Slack adapter assumes message ID return but API version differences exist
@@ -525,7 +525,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553864
 
-- issue_id: AR-045
+- issue_id: AR-PROD-045
   severity: P3
   category: provider_assumptions
   description: GitHub PR adapter assumes branch protection check but this depends on repo settings
@@ -535,7 +535,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553866
 
-- issue_id: AR-046
+- issue_id: AR-PROD-046
   severity: P2
   category: deployment
   description: No requirement for blue-green deployment strategy
@@ -545,7 +545,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553868
 
-- issue_id: AR-047
+- issue_id: AR-PROD-047
   severity: P2
   category: deployment
   description: No requirement for infrastructure as code (Terraform/Pulumi)
@@ -555,7 +555,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553870
 
-- issue_id: AR-048
+- issue_id: AR-PROD-048
   severity: P3
   category: deployment
   description: No requirement for deployment rollback automation
@@ -565,7 +565,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553872
 
-- issue_id: AR-049
+- issue_id: AR-PROD-049
   severity: P2
   category: sre
   description: No requirement for error budget policy enforcement
@@ -575,7 +575,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553873
 
-- issue_id: AR-050
+- issue_id: AR-PROD-050
   severity: P2
   category: sre
   description: No requirement for SLO-based alerting thresholds
@@ -585,7 +585,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553875
 
-- issue_id: AR-051
+- issue_id: AR-PROD-051
   severity: P3
   category: sre
   description: No requirement for on-call rotation schedule management
@@ -595,7 +595,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553877
 
-- issue_id: AR-052
+- issue_id: AR-PROD-052
   severity: P2
   category: autonomous_orchestration
   description: Orchestrator has no requirement for concurrent requirement execution (max parallelism)
@@ -605,7 +605,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553879
 
-- issue_id: AR-053
+- issue_id: AR-PROD-053
   severity: P2
   category: autonomous_orchestration
   description: Orchestrator has no requirement for context packet size limit
@@ -615,7 +615,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553881
 
-- issue_id: AR-054
+- issue_id: AR-PROD-054
   severity: P3
   category: autonomous_orchestration
   description: Orchestrator has no requirement for orchestrator crash recovery
@@ -625,7 +625,7 @@
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553883
 
-- issue_id: AR-055
+- issue_id: AR-PROD-055
   severity: P2
   category: autonomous_orchestration
   description: Orchestrator has no requirement for specialist agent assignment based on owner_role
@@ -634,3 +634,35 @@
   accepted_risk: False
   mitigation: Recorded in residual-risks.yaml
   review_date: 2026-07-16T03:44:32.553885
+- issue_id: AR-FG5
+  severity: P1
+  category: performance_control
+  description: CTRL-TOOL-MASK-001 (tool-masking state machine) is a performance/cost control, not a security threat mitigation. It prevents KV-cache invalidation from dynamic tool-set changes. Not bound to a threat because its failure mode is economic (BudgetGuard kills run), not a security breach.
+  file: architecture/model-api-gateway.md
+  accepted_risk: False
+  mitigation: Enforced in Phase 3 multi-agent; without it, BudgetGuard terminates runs due to all-miss cache cost.
+  review_date: 2026-07-18T00:00:00
+- issue_id: AR-TS-001
+  severity: P3
+  category: schema_ts_drift
+  description: "run-plan.schema.json registry_snapshot_refs is type object, but run-plan.ts declares string[]. Pre-existing drift (json2ts not available). Fix when implementing Phase 1 by regenerating ts from schema."
+  file: contracts/run-plan.schema.json, types/run-plan.ts
+  accepted_risk: True
+  mitigation: Documented; will be fixed when json2ts pipeline is available
+  review_date: 2026-07-19T00:00:00
+- issue_id: AR-INV-001
+  severity: P3
+  category: inventory_field_drift
+  description: "product-capability-inventory.json framework_gap field uses mixed value styles: FG1-FG11 for framework-gap capabilities, but also free-text values (mobile, microvm, fanout) for capabilities added in a prior session. Should be normalized to a consistent scheme (all FG or all free-text) when inventory schema is formalized."
+  file: requirements/product-capability-inventory.json
+  accepted_risk: True
+  mitigation: Pre-existing; not introduced by FG1-FG11 framework work. Documented for cleanup.
+  review_date: 2026-07-19T00:00:00
+- issue_id: AR-TRAC-001
+  severity: P3
+  category: traceability_coverage
+  description: "traceability-matrix.json only covers Phase 0 requirements (31). Phase 1-8 requirements (190) are absent. Pre-existing; should be generated by traceability tooling during Phase 1 implementation."
+  file: requirements/traceability-matrix.json
+  accepted_risk: True
+  mitigation: Phase 0 gate does not check matrix coverage; will be populated by tooling
+  review_date: 2026-07-19T00:00:00

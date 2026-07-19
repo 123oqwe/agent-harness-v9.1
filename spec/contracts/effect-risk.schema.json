@@ -52,7 +52,94 @@
       ]
     },
     "network_access": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Summary boolean. Authoritative network control lives in egress_policy. Kept for backward-compatible risk scoring."
+    },
+    "egress_policy": {
+      "type": "object",
+      "description": "Authoritative network policy (FG3). Replaces boolean network_access as the enforcement target. network_access remains as a derived summary for risk scoring.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "disabled",
+            "allowlist",
+            "denylist",
+            "open"
+          ]
+        },
+        "domain_rules": {
+          "type": "array",
+          "description": "Ordered allow/deny rules. deny always wins. Supports exact hosts, scoped wildcards (*.example.com), and global *.",
+          "items": {
+            "type": "object",
+            "required": [
+              "action",
+              "host"
+            ],
+            "properties": {
+              "action": {
+                "enum": [
+                  "allow",
+                  "deny"
+                ]
+              },
+              "host": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "unix_sockets": {
+          "enum": [
+            "denied",
+            "allowlist"
+          ]
+        },
+        "allow_local_binding": {
+          "type": "boolean",
+          "description": "Default false: blocks local/private-network destinations unless explicitly allowed."
+        },
+        "socks5": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "screen_access": {
+      "type": "object",
+      "description": "Screen/desktop operation risk dimensions (FG1 Computer Use). Absent = no screen access.",
+      "properties": {
+        "surface": {
+          "enum": [
+            "none",
+            "browser",
+            "native_app",
+            "desktop",
+            "fullscreen"
+          ]
+        },
+        "input_modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "screenshot",
+              "click",
+              "type",
+              "key",
+              "clipboard"
+            ]
+          }
+        },
+        "app_scope": {
+          "enum": [
+            "per_app_approved",
+            "workspace",
+            "system"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "credential_access": {
       "type": "boolean"

@@ -3,7 +3,13 @@ slos:
     target: 99.9
   - name: latency_p50
     target: 3000
+  - name: latency_p95
+    target: 2000
   - name: task_completion_rate
     target: 85
   - name: unauthorized_effect_rate
     target: 0
+  - name: error_rate
+    target: 0.1
+  - name: kv_cache_hit_rate
+    target: 70

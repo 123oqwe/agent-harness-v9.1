@@ -1,5 +1,6 @@
 # Action Control
 
+![10-capability-token-lifecycle.svg](diagrams/10-capability-token-lifecycle.svg)
 
 ![07-operation-state-machine.svg](diagrams/07-operation-state-machine.svg)
 
@@ -8,11 +9,13 @@
 2. Effect classification (EffectRisk)
 3. Risk derivation (EffectRisk + Policy + Context -> DerivedRiskTier)
 4. Policy evaluation (PEP)
-5. Consent check
+5a. Pre-Approval Auto-Review (G-CX1, only if DerivedRiskTier >= T3): reviewer agent evaluates ActionManifest; may downgrade (advisory) / confirm / escalate (binding)
+5b. Consent check (original step 5)
 6. Capability issuance (Authorization Service signs)
 7. PEP validation (verify token valid, not expired, not used)
-8. Credential exchange (Secret Broker provides short-lived credential)
-9. Sandbox/environment dispatch
+   - 7b. TOCTOU re-validation: recompute ActionManifest hash, compare to hash captured at approval time (CTRL-REVALIDATE-001). Mismatch → deny.
+8. Credential exchange (Secret Broker provides short-lived credential, single-use, scoped to this dispatch). In agent phase, credential is NOT placed in process env; it is injected into the tool dispatch and zeroed after. See FG2 RunPhase / CTRL-CRED-REACH-001.
+9. Sandbox/environment dispatch (file-touching tools dispatch through VFS — see architecture/virtual-filesystem.md FG4; VFS enforces permission rules for both tool calls and RAG retrieval, closing the read_file-deny bypass)
 10. Receipt capture
 11. Postcondition verification
 12. Audit (immutable audit event)
@@ -24,6 +27,8 @@
 - EffectRisk replaces static risk tiers
 - Email compensation = unavailable (NOT retractable)
 - Re-route creates new RunPlan revision + revokes old capabilities
+- PEP enforces deny-by-default (per trust-boundaries.md): every action denied unless explicitly allowed by Policy
+- step 5 split into 5a (Pre-Approval Auto-Review, G-CX1) + 5b (Consent check)
 
 
 ## Implementation Notes
@@ -46,12 +51,20 @@ async function executeToolCall(call: ToolCall, ctx: ExecutionContext): Promise<T
   if (consentReq.required) await requestHumanConsent(call, consentReq);
   // 6. Capability issuance
   const capability = await authorizationService.issueCapability(call, policyDecision, consentReq);
-  // 7. PEP validation
-  pep.validate(capability); // throws if expired, used, or invalid
-  // 8. Credential exchange
-  const credential = await secretBroker.exchange(capability.credential_scope);
-  // 9. Sandbox dispatch
-  const result = await sandbox.execute(call, credential, ctx.environment);
+ // 7. PEP validation
+ pep.validate(capability); // throws if expired, used, or invalid
+  // 7b. TOCTOU re-validation: recompute ActionManifest hash and compare to the hash captured at approval time (CTRL-REVALIDATE-001). Mismatch means the manifest was modified between approval and execution — deny.
+  const approvedHash = capability.manifest_hash;
+  const currentHash = computeActionManifestHash(call);
+  if (approvedHash !== currentHash) throw new ManifestTamperedError('ActionManifest hash mismatch — TOCTOU detected');
+  // 8. Credential exchange (FG2: single-use, scoped, never persisted in agent env)
+  const credential = await secretBroker.exchange(capability.credential_scope, {
+    runPhase: ctx.runPhase,           // setup | agent
+    singleUse: true,
+    noEnvLeak: ctx.runPhase === "agent", // agent phase: strip from env after dispatch
+  });
+  // 9. Sandbox dispatch (file-touching tools go through VFS — FG4)
+  const result = await sandbox.execute(call, credential, ctx.environment, { vfs: isFileTouching(call) });
   // 10. Receipt capture
   const receipt = captureReceipt(result);
   // 11. Postcondition verification

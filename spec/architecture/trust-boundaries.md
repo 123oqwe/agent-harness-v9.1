@@ -17,6 +17,15 @@
 - quarantined: suspicious content, pending review
 
 Rule: Low-trust content CANNOT override high-trust instructions.
+### Cross-Process Message Trust (FG8)
+
+The TCB above is an in-process/service trust model. When agents execute across processes or hosts (Phase 3, 7 context topologies), the channel (TLS) is not sufficient: once a message is queued or persisted on a broker, the channel trust boundary breaks. Cross-process AgentGraph messages carry their own proof:
+
+- `obo_token` (On-Behalf-Of): the agent chain cannot exceed the originating user permissions. Required for Phase 5 external-action delegation.
+- `jws_signature` (JOSE/JWS): message integrity + authenticity. Optional `jwe` for confidentiality on shared brokers.
+
+This complements the Capability Token (per-call authorization, signed by Authorization Service). Capability authorizes a call; the message signature guarantees the message was not tampered in transit or at rest. Control: CTRL-MSG-INTEGRITY-001. See routing-system.md FG8.
+
 
 
 ## Implementation Notes

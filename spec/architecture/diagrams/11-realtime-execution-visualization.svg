@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Real-time Execution Visualization Data Path (v9) — Loop Engine StreamEvent → Event Bus → asyncapi → UI -->
+<svg width="1400" height="780" viewBox="0 0 1400 780" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="ared" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f85149"/></marker>
+<marker id="apur" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#bc8cff"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="780" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Real-time Execution Visualization — 数据通路 (v9)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">Loop Engine AsyncGenerator&lt;StreamEvent&gt; → Event Bus → asyncapi run_event_stream → UI 组件 · 含背压 + 安全约束 + steering 反向路径 · realtime-execution-visualization.md</text>
+
+<!-- Source: Loop Engine -->
+<rect x="40" y="90" width="200" height="120" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="140" y="110" fill="#3fb950" font-size="12" font-weight="bold">Loop Engine</text>
+<text x="140" y="125" fill="#8b949e" font-size="9">run(plan): AsyncGenerator</text>
+<text x="140" y="140" fill="#8b949e" font-size="9">&lt;StreamEvent&gt;</text>
+<text x="50" y="160" fill="#f0f6fc" font-size="9">执行边界发事件:</text>
+<text x="50" y="174" fill="#8b949e" font-size="9">· tool_call_start</text>
+<text x="50" y="187" fill="#8b949e" font-size="9">· step_transition</text>
+<text x="50" y="200" fill="#8b949e" font-size="9">· file_change / error</text>
+
+<!-- Event Bus -->
+<rect x="320" y="90" width="220" height="120" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="430" y="110" fill="#fbcfe8" font-size="12" font-weight="bold">Event Bus</text>
+<text x="430" y="125" fill="#8b949e" font-size="9">Phase 1-3: in-process</text>
+<text x="430" y="138" fill="#8b949e" font-size="9">Phase 4+: cross-process</text>
+<text x="330" y="160" fill="#f0f6fc" font-size="9">fan-out:</text>
+<text x="330" y="174" fill="#8b949e" font-size="9">→ asyncapi channel</text>
+<text x="330" y="187" fill="#8b949e" font-size="9">→ Observability span</text>
+<text x="330" y="200" fill="#8b949e" font-size="9">→ VFS event log</text>
+
+<line x1="240" y1="150" x2="320" y2="150" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ag)"/>
+
+<!-- asyncapi channel -->
+<rect x="620" y="90" width="240" height="120" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="740" y="110" fill="#58a6ff" font-size="12" font-weight="bold">asyncapi run_event_stream</text>
+<text x="740" y="125" fill="#8b949e" font-size="9">WebSocket / SSE</text>
+<text x="740" y="140" fill="#8b949e" font-size="9">api/asyncapi.yaml</text>
+<text x="630" y="160" fill="#f0f6fc" font-size="9">payload:</text>
+<text x="630" y="174" fill="#8b949e" font-size="9">{run_id, step_id,</text>
+<text x="630" y="187" fill="#8b949e" font-size="9"> event_type, timestamp,</text>
+<text x="630" y="200" fill="#8b949e" font-size="9"> payload}</text>
+
+<line x1="540" y1="150" x2="620" y2="150" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+
+<!-- UI Renderer -->
+<rect x="940" y="70" width="440" height="500" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="1160" y="90" fill="#bc8cff" font-size="12" font-weight="bold">UI Renderer (contextBridge-isolated)</text>
+
+<!-- UI Components -->
+<rect x="960" y="110" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1055" y="128" fill="#39c5cf" font-size="10" font-weight="bold">ToolCallCard</text>
+<text x="970" y="142" fill="#8b949e" font-size="8">tool_call_start → result</text>
+<text x="970" y="154" fill="#8b949e" font-size="8">args, status, authorized badge</text>
+
+<rect x="1170" y="110" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1265" y="128" fill="#39c5cf" font-size="10" font-weight="bold">StepProgress</text>
+<text x="1180" y="142" fill="#8b949e" font-size="8">step_transition</text>
+<text x="1180" y="154" fill="#8b949e" font-size="8">PENDING→DISPATCHED→DONE</text>
+
+<rect x="960" y="180" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1055" y="198" fill="#39c5cf" font-size="10" font-weight="bold">TerminalStream</text>
+<text x="970" y="212" fill="#8b949e" font-size="8">command_output (batched 50ms)</text>
+<text x="970" y="224" fill="#8b949e" font-size="8">output_mode aware (F10)</text>
+
+<rect x="1170" y="180" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1265" y="198" fill="#39c5cf" font-size="10" font-weight="bold">FileTreeDiff</text>
+<text x="1180" y="212" fill="#8b949e" font-size="8">file_change (VFS /scratch/*)</text>
+<text x="1180" y="224" fill="#8b949e" font-size="8">diff view</text>
+
+<rect x="960" y="250" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1055" y="268" fill="#39c5cf" font-size="10" font-weight="bold">ReasoningTrace</text>
+<text x="970" y="282" fill="#8b949e" font-size="8">model_decision (collapsed)</text>
+<text x="970" y="294" fill="#f85149" font-size="8" font-weight="bold">NO private CoT</text>
+
+<rect x="1170" y="250" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1265" y="268" fill="#39c5cf" font-size="10" font-weight="bold">ErrorPanel</text>
+<text x="1180" y="282" fill="#8b949e" font-size="8">error_event</text>
+<text x="1180" y="294" fill="#8b949e" font-size="8">network/tool/model/truncation</text>
+
+<rect x="960" y="320" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1055" y="338" fill="#39c5cf" font-size="10" font-weight="bold">BudgetIndicator</text>
+<text x="970" y="352" fill="#8b949e" font-size="8">budget_update</text>
+<text x="970" y="364" fill="#8b949e" font-size="8">CTRL-BUDGET-PEP-001</text>
+
+<rect x="1170" y="320" width="190" height="55" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="1265" y="338" fill="#39c5cf" font-size="10" font-weight="bold">RunStatusBar</text>
+<text x="1180" y="352" fill="#8b949e" font-size="8">run_state_change</text>
+<text x="1180" y="364" fill="#8b949e" font-size="8">RUNNING→PAUSED→DONE</text>
+
+<line x1="860" y1="150" x2="940" y2="150" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+
+<!-- Latency budget annotations -->
+<rect x="960" y="400" width="400" height="50" fill="#1a0808" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="1160" y="418" fill="#fbbf24" font-size="10" font-weight="bold">延迟预算</text>
+<text x="970" y="435" fill="#8b949e" font-size="9">tool_call_start &lt;100ms · tool_result &lt;200ms · command_output &lt;50ms/chunk · step_transition &lt;100ms</text>
+
+<!-- Security constraints -->
+<rect x="960" y="465" width="400" height="90" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1160" y="483" fill="#f85149" font-size="10" font-weight="bold">安全约束</text>
+<text x="970" y="500" fill="#8b949e" font-size="9">✗ 无 private CoT (runtime-core.md)</text>
+<text x="970" y="513" fill="#8b949e" font-size="9">✓ untrusted 内容标注 (CTRL-TAINT-001)</text>
+<text x="970" y="526" fill="#8b949e" font-size="9">✓ screen 隔离 (F6 / CTRL-SCREEN-ISOLATION-001)</text>
+<text x="970" y="539" fill="#8b949e" font-size="9">✓ T2+ consent gating (Capability 签发前)</text>
+
+<!-- Backpressure -->
+<rect x="40" y="250" width="780" height="100" fill="#161b22" stroke="#fbbf24" stroke-width="1" rx="6"/>
+<text x="430" y="270" fill="#fbbf24" font-size="12" font-weight="bold" text-anchor="middle">背压策略</text>
+<text x="50" y="290" fill="#f0f6fc" font-size="9">1. output_mode 透传: success=最小输出, failure=完整诊断</text>
+<text x="50" y="305" fill="#8b949e" font-size="9">2. 事件批合并: command_output 50ms 间隔 (10000行→200事件)</text>
+<text x="50" y="320" fill="#8b949e" font-size="9">3. F10 offload: tool结果&gt;20000token → VFS, UI收指针+10行预览</text>
+<text x="50" y="335" fill="#8b949e" font-size="9">4. context_reset: UI 收 handoff 事件, 渲染"session已交接"</text>
+
+<!-- Steering reverse path -->
+<rect x="40" y="380" width="780" height="180" fill="#161b22" stroke="#bc8cff" stroke-width="2" stroke-dasharray="6,3" rx="6"/>
+<text x="430" y="400" fill="#bc8cff" font-size="12" font-weight="bold" text-anchor="middle">Steering 反向路径 (用户中断/重定向)</text>
+<rect x="960" y="570" width="200" height="40" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="4"/>
+<text x="1060" y="588" fill="#bc8cff" font-size="10" font-weight="bold">用户输入</text>
+<text x="1060" y="602" fill="#8b949e" font-size="9">(interrupt/redirect)</text>
+<line x1="960" y1="590" x2="820" y2="470" stroke="#bc8cff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#apur)"/>
+<text x="60" y="425" fill="#f0f6fc" font-size="10">POST /runs/{runId}/steer</text>
+<text x="60" y="440" fill="#8b949e" font-size="9">ui/screens/chat.yaml</text>
+<rect x="60" y="455" width="200" height="50" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="160" y="473" fill="#3fb950" font-size="10" font-weight="bold">Loop Engine 3 队列</text>
+<text x="70" y="488" fill="#8b949e" font-size="9">steerQueue (当前turn内)</text>
+<text x="70" y="500" fill="#8b949e" font-size="9">followUpQueue (turn后)</text>
+<text x="70" y="512" fill="#8b949e" font-size="9">nextTurnQueue (下turn)</text>
+<text x="300" y="473" fill="#f0f6fc" font-size="9">优先级:</text>
+<text x="300" y="488" fill="#f85149" font-size="9">Kill &gt; Security &gt; Cancel</text>
+<text x="300" y="502" fill="#8b949e" font-size="9">&gt; Correction &gt; Admin &gt; User</text>
+<text x="300" y="516" fill="#8b949e" font-size="9">&gt; Supervisor &gt; Agent</text>
+<text x="540" y="473" fill="#f0f6fc" font-size="9">IN_FLIGHT 不可 cancel:</text>
+<text x="540" y="488" fill="#8b949e" font-size="9">必须先 reconcile</text>
+<text x="540" y="502" fill="#8b949e" font-size="9">(failure-recovery.md)</text>
+
+<!-- Phase 1 scope -->
+<rect x="40" y="580" width="780" height="80" fill="#0d1117" stroke="#3fb950" stroke-width="1" rx="6"/>
+<text x="430" y="600" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">Phase 1 实现 scope</text>
+<text x="50" y="618" fill="#3fb950" font-size="9">✓ tool_call_start→result · step_transition · error_event · run_state_change · command_output · steer</text>
+<text x="50" y="633" fill="#8b949e" font-size="9">✗ file_change/FileTreeDiff (需VFS) · computer_operate screen (Phase3+) · model_decision trace (Phase2+)</text>
+<text x="50" y="648" fill="#8b949e" font-size="9">订阅: UI 按 active run_id 订阅 run_event_stream channel</text>
+</svg>

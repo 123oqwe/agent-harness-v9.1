@@ -52,6 +52,20 @@
     },
     "verifier_model": {
       "type": "string"
+    },
+    "test_output": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Raw stdout from running the test suite (npm test -- --run). Collected by evidence-collector when product code exists. Used by verifier Check 9/10."
+    },
+    "test_output_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "SHA-256 hash of test_output (first 16 chars). Proves test output was not tampered."
     }
   },
   "type": "object",

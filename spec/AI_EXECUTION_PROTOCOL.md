@@ -33,7 +33,7 @@
 
 ```
 1.  Read phases/phase-N.yaml
-2.  Read requirements/requirements.ndjson → select one READY requirement
+2.  Read requirements/requirements.ndjson → select one READY requirement (READY = implementation_maturity: not_started AND delivery_phase == current phase AND all dependencies implementation_maturity: verified AND current phase not BLOCKED). Prefer the order listed in phases/phase-N.yaml (the manifest sequences requirements by dependency priority, e.g. AH-GATEWAY-TESTPROVIDER-001 MUST be first in Phase 1).
 3.  Verify dependencies are all VERIFIED
 4.  Create worktree: req/AH-DOMAIN-TOPIC-NNN
 5.  Read the requirement's contract schema and acceptance criteria
@@ -45,9 +45,18 @@
 11. Generate Evidence Package from actual output
 12. Independent verifier checks (different model family)
 13. Commit
-14. Update requirement status in registry
-15. Proceed to next requirement
+14. Update requirement status in registry: rewrite the single NDJSON line for this requirement, changing `implementation_maturity` from `not_started` to `verified` (or `implemented` if partial). Use a script: `python3 -c "import json,sys; lines=open('spec/requirements/requirements.ndjson').readlines(); out=[]; [out.append(json.dumps({**json.loads(l),'implementation_maturity':'verified'} if json.loads(l)['id']=='REQ_ID' else l.rstrip(), ensure_ascii=False)) if l.strip() else out.append(l) for l in lines]; open('spec/requirements/requirements.ndjson','w').write('\\n'.join(out)+'\\n')"`. Replace REQ_ID with the actual requirement ID. Do NOT rewrite the entire file by hand.
+15. Write evidence to the path in the requirement's `evidence_path` field (e.g. `artifacts/phase1/AH-XXX-001.json`). The `artifacts/` directory exists; create the phase subdirectory if missing.
+16. Proceed to next requirement
 ```
+
+### Test file convention
+
+Each requirement's `test_files` field lists test paths. These are **targets to create or extend**, not pre-existing files. Note:
+- Phase 0 tests (in `harness/tests/`) validate **spec artifacts** (schemas, fixtures, state machines) — they exist and pass already.
+- Phase 1+ tests validate **product code** (in `harness/<module>/`, e.g. `harness/runtime/`, `harness/tools/`, `harness/security/`) — you write these alongside implementation.
+- A requirement's `test_files` may already exist (from Phase 0 spec validation) but test different concerns than the implementation. You MUST add implementation-specific tests for the requirement's acceptance criteria.
+- Run `cd harness && npm test` to execute. `npm run build` (tsc --noEmit) type-checks. `npm run lint` is a no-op until `harness/` source files exist.
 
 ## Blocked Protocol
 

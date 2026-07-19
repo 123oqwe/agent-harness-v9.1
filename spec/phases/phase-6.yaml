@@ -37,6 +37,7 @@ requirements:
   - AH-UI-DAILYBRIEF-001
   - AH-UI-MISSION-001
   - AH-WATCH-COND-001
+  - AH-EVOL-DOCCLEAN-001
 
 fixtures:
   - fixtures/phase-6/valid/

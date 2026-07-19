@@ -57,5 +57,8 @@
   "budget_allocation": {},
   "persistence_policy": {},
   "cancellation_policy": {},
-  "fallback_policy": {}
+  "fallback_policy": {},
+  "context_strategy": {
+    "active_plan_injection": true
+  }
 }

@@ -3,7 +3,7 @@
 ## Mission
 Build a general-purpose Agent Harness for individuals, developers, knowledge workers, researchers, writers, founders, and enterprises.
 
-## Product Surfaces (12)
+## Product Surfaces (13)
 1. Coding Workspace (Phase 1)
 2. Document Workspace (Phase 2)
 3. Research Workspace (Phase 2)
@@ -14,8 +14,9 @@ Build a general-purpose Agent Harness for individuals, developers, knowledge wor
 8. Multimodal Creation Workspace (Phase 2-6)
 9. Team Collaboration Workspace (Phase 7)
 10. Enterprise Admin Console (Phase 7)
-11. CLI/IDE (Phase 1)
+11. CLI (TUI) / IDE (Phase 1-2) — CLI uses TUI (diff-render, G-PI2); IDE integration Phase 2
 12. SDK/API (Phase 2)
+13. Mobile + Remote Control + Channels (Phase 6)
 
 ## 7 Personas
 See personas.md

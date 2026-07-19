@@ -45,8 +45,18 @@ def collect_from_worker(worker_result, requirement_id, evidence_dir="evidence"):
         "test_results": None,  # Would be parsed from stdout if harness code exists
         "coverage": None,  # Would be parsed from test output
         "files_changed": [],  # Would be from git diff
-        "mode": "METADATA_ONLY" if not os.path.exists("product") else "FULL"
+        "mode": "METADATA_ONLY" if not os.path.exists("harness") else "FULL",
     }
+    
+    # [REAL] Collect test output when product code exists
+    test_stdout, test_hash = collect_test_output()
+    evidence["test_output"] = test_stdout
+    evidence["test_output_hash"] = test_hash
+    # Parse test results from test_output (more reliable than worker stdout)
+    if test_stdout:
+        parsed = parse_test_output(test_stdout)
+        if parsed:
+            evidence["test_results"] = parsed
     
     # Save to evidence directory
     ev_path = Path(evidence_dir) / f"{requirement_id}.json"
@@ -55,6 +65,31 @@ def collect_from_worker(worker_result, requirement_id, evidence_dir="evidence"):
         json.dump(evidence, f, indent=2)
     
     return evidence
+
+
+def collect_test_output(base_dir=None):
+    """base_dir defaults to the repository root (parent of factory/)."""
+    if base_dir is None:
+        base_dir = Path(__file__).parent.parent.parent
+    """[REAL] Run the test suite and collect stdout.
+    
+    Called by collect_from_worker when product code exists.
+    Returns (test_stdout, test_hash) or (None, None) if no product code.
+    """
+    import subprocess
+    harness_dir = Path(base_dir) / "harness"
+    if not (harness_dir / "package.json").exists():
+        return None, None
+    try:
+        result = subprocess.run(
+            ["npm", "test", "--", "--run"],
+            capture_output=True, text=True, cwd=str(harness_dir), timeout=120
+        )
+        test_stdout = result.stdout or ""
+        test_hash = hashlib.sha256(test_stdout.encode()).hexdigest()[:16] if test_stdout else None
+        return test_stdout[:20000], test_hash  # Truncate for storage
+    except Exception:
+        return None, None
 
 def parse_test_output(stdout):
     """Parse test results from stdout.

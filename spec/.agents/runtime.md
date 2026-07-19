@@ -6,7 +6,7 @@
 - sandbox
 
 ## Allowed Paths
-- src/runtime/
+- harness/runtime/
 
 ## Forbidden Paths
 - contracts/

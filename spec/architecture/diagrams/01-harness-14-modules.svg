@@ -1,102 +1,204 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Agent Harness System Architecture — 14 Modules inside Harness Boundary -->
-<svg width="1400" height="1150" viewBox="0 0 1400 1150" xmlns="http://www.w3.org/2000/svg">
+<!-- Harness 14 Modules (v9) — Router produces RunPlan, no Re-router, 15 tools -->
+<svg width="1400" height="1180" viewBox="0 0 1400 1180" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
 <marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
 <marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
 </defs>
-<rect x="0" y="0" width="1400" height="1150" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Agent Harness v8 — System Architecture: 14 Modules inside Harness Boundary</text>
-<text x="20" y="46" fill="#8b949e" font-size="11">Harness 永久存在 · Router 生成 RunConfiguration · 不重新造 Harness · 14 模块全部在 Harness 边界内</text>
-<rect x="5" y="55" width="1390" height="1085" fill="none" stroke="#fbcfe8" stroke-width="3" rx="12" stroke-dasharray="8,4"/>
+<rect x="0" y="0" width="1400" height="1180" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Agent Harness v9 — System Architecture: 14 Modules inside Harness Boundary</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">Harness 永久存在 · Router 生成 RunPlan(非 RunConfiguration) · 无独立 Re-router(re-route=新 RunPlan revision) · 15 tools(非 20+)</text>
+<rect x="5" y="55" width="1390" height="1115" fill="none" stroke="#fbcfe8" stroke-width="3" rx="12" stroke-dasharray="8,4"/>
 <text x="15" y="72" fill="#fbcfe8" font-size="14" font-weight="bold">AGENT HARNESS</text>
+
+<!-- Input -->
 <rect x="300" y="80" width="800" height="35" fill="#1a1a2e" stroke="#f0f0f5" stroke-width="2" rx="6"/>
-<text x="310" y="98" fill="#f0f0f5" font-size="11" font-weight="bold">Input / Prompt / Instructions (CLI / REPL / API 只是入口)</text>
-<rect x="400" y="125" width="600" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
-<text x="410" y="143" fill="#58a6ff" font-size="11" font-weight="bold">Task Profiler (1 LLM call)</text>
-<text x="410" y="159" fill="#8b949e" font-size="10">Intent · Domain · Modality · Complexity · Risk · Budget</text>
-<text x="410" y="173" fill="#8b949e" font-size="9">确定性 preflight → 1次LLM → TaskProfile</text>
+<text x="700" y="98" fill="#f0f0f5" font-size="11" font-weight="bold" text-anchor="middle">Input / Prompt / Instructions (CLI / REPL / API / Quick Ask 只是入口)</text>
+
+<!-- M1 Prompt & Instruction -->
+<rect x="475" y="125" width="450" height="40" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
+<text x="700" y="143" fill="#58a6ff" font-size="11" font-weight="bold" text-anchor="middle">M1: Prompt & Instruction System</text>
+<text x="700" y="158" fill="#8b949e" font-size="9" text-anchor="middle">入口归一化 · 指令优先级 7 层(Platform&gt;Org&gt;Project&gt;User&gt;Task&gt;Retrieved&gt;ToolOutput)</text>
 <line x1="700" y1="115" x2="700" y2="125" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="100" y="195" width="1200" height="200" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
-<text x="110" y="213" fill="#fbcfe8" font-size="11" font-weight="bold">Routing & Orchestration System (v8 REWRITE)</text>
-<line x1="700" y1="180" x2="700" y2="195" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="110" y="230" width="250" height="42" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="120" y="248" fill="#3fb950" font-size="10" font-weight="bold">Strategy Router</text>
-<text x="120" y="264" fill="#8b949e" font-size="9">Direct | ReAct | PlanExecute | ReWOO | IterativeRefine</text>
-<rect x="110" y="280" width="250" height="42" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="6"/>
-<text x="120" y="298" fill="#58a6ff" font-size="10" font-weight="bold">Agent Topology Router</text>
-<text x="120" y="314" fill="#8b949e" font-size="9">Single | Supervisor | Planner-Verifier | Swarm</text>
-<rect x="110" y="330" width="250" height="42" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="6"/>
-<text x="120" y="348" fill="#bc8cff" font-size="10" font-weight="bold">Context Topology Router v8</text>
-<text x="120" y="364" fill="#8b949e" font-size="9">Shared | Selective | Parent-Child | Isolated | Artifact | Blackboard | Blind</text>
-<rect x="660" y="230" width="250" height="42" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="6"/>
-<text x="670" y="248" fill="#fbbf24" font-size="10" font-weight="bold">Model/API Router v8</text>
-<text x="670" y="264" fill="#8b949e" font-size="9">Capability Registry → Provider Policy → 动态选择</text>
-<rect x="660" y="280" width="250" height="42" fill="#21262d" stroke="#e3b341" stroke-width="2" rx="6"/>
-<text x="670" y="298" fill="#e3b341" font-size="10" font-weight="bold">Tool Router</text>
-<text x="670" y="314" fill="#8b949e" font-size="9">20+ tools, each with schema + effect contract + risk tier</text>
-<rect x="660" y="330" width="250" height="42" fill="#21262d" stroke="#f778ba" stroke-width="2" rx="6"/>
-<text x="670" y="348" fill="#f778ba" font-size="10" font-weight="bold">Skill Router</text>
-<text x="670" y="364" fill="#8b949e" font-size="9">10+ skills, each with trigger + workflow + strategy</text>
-<rect x="1010" y="230" width="250" height="42" fill="#21262d" stroke="#39c5cf" stroke-width="2" rx="6"/>
-<text x="1020" y="248" fill="#39c5cf" font-size="10" font-weight="bold">Execution Env Router</text>
-<text x="1020" y="264" fill="#8b949e" font-size="9">Host | Sandbox | Container | MicroVM | Browser</text>
-<rect x="1010" y="280" width="250" height="42" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="1020" y="298" fill="#3fb950" font-size="10" font-weight="bold">Verification Router</text>
-<text x="1020" y="314" fill="#8b949e" font-size="9">Deterministic | Blind | Independent Verifier</text>
-<rect x="1010" y="330" width="250" height="42" fill="#21262d" stroke="#f85149" stroke-width="2" rx="6"/>
-<text x="1020" y="348" fill="#f85149" font-size="10" font-weight="bold">Global Route Optimizer</text>
-<text x="1020" y="364" fill="#8b949e" font-size="9">联合评分: success/cost/latency/risk</text>
-<line x1="360" y1="250" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="360" y1="300" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="910" y1="250" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="910" y1="300" x2="1010" y2="345" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<rect x="400" y="405" width="600" height="40" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
-<text x="410" y="423" fill="#fbcfe8" font-size="11" font-weight="bold">RunConfiguration (本次运行配置, 不是新 Harness)</text>
-<text x="410" y="439" fill="#8b949e" font-size="10">strategy + topology + context_topology + model + tools + skills + env + policies</text>
-<line x1="700" y1="400" x2="700" y2="405" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="200" y="460" width="1000" height="60" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="210" y="478" fill="#3fb950" font-size="11" font-weight="bold">Agent Runtime Core</text>
-<text x="210" y="494" fill="#8b949e" font-size="10">Loop · Scheduler · State · Streaming · Pause/Resume/Cancel · Subagent lifecycle</text>
-<text x="210" y="508" fill="#8b949e" font-size="9">Single Agent / Multi-Agent / Swarm lifecycle · Re-route when needed</text>
-<line x1="700" y1="445" x2="700" y2="460" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="200" y="535" width="1000" height="40" fill="#21262d" stroke="#e3b341" stroke-width="2" rx="6"/>
-<text x="210" y="553" fill="#e3b341" font-size="11" font-weight="bold">Tools / Skills / Function Call / MCP (20+ tools, 10+ skills)</text>
-<text x="210" y="569" fill="#8b949e" font-size="10">Tool Registry · Skill Registry · MCP host · v8: Tool/Skill/Model API 区分</text>
-<line x1="700" y1="520" x2="700" y2="535" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="200" y="590" width="1000" height="40" fill="#21262d" stroke="#39c5cf" stroke-width="2" rx="6"/>
-<text x="210" y="608" fill="#39c5cf" font-size="11" font-weight="bold">Execution Environment & Sandbox</text>
-<text x="210" y="624" fill="#8b949e" font-size="10">Host · Local sandbox · Container · MicroVM · Browser · Remote worker</text>
-<line x1="700" y1="575" x2="700" y2="590" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="100" y="645" width="1200" height="80" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
-<text x="110" y="663" fill="#f85149" font-size="11" font-weight="bold">Action Control & Human Review (TCB 6组件, v6.1 不变)</text>
-<text x="110" y="679" fill="#8b949e" font-size="10">Policy Engine(deny-by-default) → Human Consent → Authorization(CapabilityToken) → PEP(verify+execute)</text>
-<text x="110" y="693" fill="#8b949e" font-size="9">Secrets Broker · Controlled Effect Protocol · ★BudgetGuard 硬执行 · Kill Switch</text>
-<line x1="700" y1="630" x2="700" y2="645" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="200" y="740" width="1000" height="55" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="210" y="758" fill="#3fb950" font-size="11" font-weight="bold">Assurance & Verification (独立 Verifier, 只读)</text>
-<text x="210" y="774" fill="#8b949e" font-size="10">确定性检查 → schema → 测试 → read-back → policy → outcome</text>
-<text x="210" y="788" fill="#8b949e" font-size="9">★TaskExecutionRecord → Evolution Engine · 恢复: retry/reconcile/compensate/revert/remediate</text>
-<line x1="700" y1="725" x2="700" y2="740" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="100" y="810" width="1200" height="45" fill="#1a1208" stroke="#fbbf24" stroke-width="2" rx="6"/>
-<text x="110" y="828" fill="#fbbf24" font-size="11" font-weight="bold">Harness Re-routing & Fallback (v8: 11 types)</text>
-<text x="110" y="844" fill="#8b949e" font-size="10">Model · Provider · Tool · Strategy · Topology upgrade/downgrade · Context change · Env · Verification escalation · Human · Budget degradation</text>
-<line x1="700" y1="795" x2="700" y2="810" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="100" y="870" width="1200" height="100" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="6"/>
-<text x="110" y="888" fill="#bc8cff" font-size="11" font-weight="bold">6 Cross-cutting Planes (贯穿全流程)</text>
-<text x="110" y="904" fill="#8b949e" font-size="10">A: Memory(v6.1) · B1: Observability(v8) · B2: Audit(v6.1) · C: Eval(v6.1) · D: Governance(v6.1) · E: Skill&Evolution(v8)</text>
-<text x="110" y="918" fill="#8b949e" font-size="9">B1: Tracing+Profiler+Replay+Anomaly · E: Skill Registry+Pattern Store+Evolution+Self-Model</text>
-<text x="110" y="932" fill="#8b949e" font-size="9">Budget Guard (Router→Runtime→PEP): Pre-flight→Reserve→Track→Degrade→Hard stop</text>
-<line x1="700" y1="855" x2="700" y2="870" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
-<rect x="100" y="985" width="1200" height="55" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
-<text x="110" y="1003" fill="#f85149" font-size="11" font-weight="bold">安全内核 (v6.1 不变, v8 不修改)</text>
-<text x="110" y="1019" fill="#8b949e" font-size="10">TCB(6) · CapabilityToken · 状态机(35态) · Canonical Hash · Risk Tier(0-5) · Secrets Broker(双模式)</text>
-<text x="110" y="1033" fill="#8b949e" font-size="9">Identity Plane(7) · Local Vault · Controlled Effect Protocol · Evidence(8级) · Data Contracts</text>
-<path d="M 1050 770 Q 1100 500 1050 420" fill="none" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ab)"/>
-<text x="1080" y="580" fill="#58a6ff" font-size="10">L9 fail → re-route</text>
-<path d="M 350 770 Q 300 600 350 470" fill="none" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
-<text x="280" y="620" fill="#3fb950" font-size="9">Evolution → optimize Router</text>
-<text x="20" y="1065" fill="#fbcfe8" font-size="10">v8 NEW: Harness边界 · 8 Routers · RunConfiguration · Three Orthogonal Dimensions + Workflow Overlay · Context Topology · Model/API Gateway · 11 Fallback types</text>
-<text x="20" y="1080" fill="#8b949e" font-size="10">v6.1 保留: TCB · CapabilityToken · 状态机 · Canonical Hash · Risk Tier · Secrets Broker · Identity Plane · Local Vault · Data Contracts · Evidence</text>
-<text x="20" y="1095" fill="#8b949e" font-size="10">来源: CC(LSP/hooks/goal) + Codex(OS沙箱/subagents/fork) + pi(ExecutionEnv/hook链) + v6.1(TCB/Manifest/Capability) + v8(Router/Topology/Evolution)</text>
+
+<!-- Routing (v9 DAG, not 8 parallel routers) -->
+<rect x="50" y="180" width="1300" height="200" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="60" y="198" fill="#fbcfe8" font-size="12" font-weight="bold">M4: Router & Orchestration (v9 Dependency-Aware DAG, 非 v8 8-parallel-routers)</text>
+<line x1="700" y1="165" x2="700" y2="180" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="70" y="210" width="180" height="30" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="160" y="228" fill="#f85149" font-size="9" text-anchor="middle">S0 Identity + Policy(路由前)</text>
+<rect x="270" y="210" width="140" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="340" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S1 Task Profile (1 LLM)</text>
+<rect x="430" y="210" width="120" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="490" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S2 Exp/Domain</text>
+<rect x="570" y="210" width="130" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="635" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S3 Ctx/Cap probe</text>
+<rect x="720" y="210" width="120" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="780" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S4 Workflow</text>
+<rect x="860" y="210" width="120" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="920" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S5 Reasoning</text>
+<rect x="1000" y="210" width="120" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="1060" y="228" fill="#8b949e" font-size="9" text-anchor="middle">S6 Binding</text>
+<rect x="1140" y="210" width="190" height="30" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="1235" y="228" fill="#bc8cff" font-size="9" text-anchor="middle">S7 AgentGraph (F7)</text>
+<line x1="250" y1="225" x2="270" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="410" y1="225" x2="430" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="550" y1="225" x2="570" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="225" x2="720" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="840" y1="225" x2="860" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="980" y1="225" x2="1000" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="1120" y1="225" x2="1140" y2="225" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+
+<rect x="70" y="250" width="140" height="30" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="140" y="268" fill="#bc8cff" font-size="9" text-anchor="middle">S8 ContextGraph</text>
+<rect x="230" y="250" width="140" height="30" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="300" y="268" fill="#8b949e" font-size="9" text-anchor="middle">S9 Schedule/Trigger</text>
+<rect x="390" y="250" width="140" height="30" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="460" y="268" fill="#e3b341" font-size="9" text-anchor="middle">S10 VerificationGraph</text>
+<rect x="550" y="250" width="140" height="30" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="620" y="268" fill="#fbbf24" font-size="9" text-anchor="middle">S11 Constraint Solver</text>
+<rect x="710" y="250" width="120" height="30" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="770" y="268" fill="#f85149" font-size="9" text-anchor="middle">S12 Policy validate</text>
+<rect x="850" y="250" width="200" height="30" fill="#1a0808" stroke="#fbcfe8" stroke-width="3" rx="4"/>
+<text x="950" y="268" fill="#fbcfe8" font-size="10" font-weight="bold" text-anchor="middle">★ RunPlan Freeze (22 字段)</text>
+<line x1="210" y1="265" x2="230" y2="265" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="370" y1="265" x2="390" y2="265" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="530" y1="265" x2="550" y2="265" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="690" y1="265" x2="710" y2="265" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="830" y1="265" x2="850" y2="265" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="240" x2="140" y2="250" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+
+<text x="700" y="300" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">v9: 13 阶段顺序依赖 DAG · 非 v8 Promise.all 8 并行 · 无独立 Re-router(re-route=新 RunPlan revision + 撤旧 Capability)</text>
+<text x="700" y="315" fill="#8b949e" font-size="9" text-anchor="middle">Router 输出: derived_risk_assessment(非 risk_policy) + proposed route + resource bindings · Policy authority 供 immutable 约束</text>
+<text x="700" y="330" fill="#8b949e" font-size="9" text-anchor="middle">3 层: 0 LLM preflight → 1 LLM profiler → 0 LLM optimizer · 评分: success×1.0+quality×0.8−cost×0.3−latency×0.2−risk×0.5−coord×0.4</text>
+<text x="700" y="355" fill="#fbbf24" font-size="9" text-anchor="middle">详细见 diagram 03 (routing DAG) + routing-system.md</text>
+<line x1="700" y1="380" x2="700" y2="400" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Runtime Core -->
+<rect x="100" y="400" width="1200" height="55" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="700" y="418" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">M5: Agent Runtime Core</text>
+<text x="700" y="434" fill="#8b949e" font-size="10" text-anchor="middle">Loop Engine · Session(事件溯源,11 entry) · 两阶段 F2(setup→agent, 凭证剥离) · Steering 3 队列 · 9 停止条件</text>
+<text x="700" y="448" fill="#8b949e" font-size="9" text-anchor="middle">无独立 Re-router · 需调整=新 RunPlan revision · 见 runtime-core.md + diagram 11(实时可视化)</text>
+
+<!-- 14 modules grid -->
+<text x="700" y="478" fill="#fbcfe8" font-size="11" font-weight="bold" text-anchor="middle">14 Modules (M1-M14)</text>
+<rect x="50" y="490" width="220" height="70" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="160" y="510" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">M1 Prompt & Instruction</text>
+<text x="160" y="526" fill="#8b949e" font-size="8" text-anchor="middle">入口归一化 · 7层优先级</text>
+<text x="160" y="540" fill="#8b949e" font-size="8" text-anchor="middle">CLI/REPL/API/QuickAsk</text>
+<text x="160" y="552" fill="#6e7681" font-size="7" text-anchor="middle">runtime-core.md</text>
+<rect x="290" y="490" width="220" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="400" y="510" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">M2 Context & Data (RAG)</text>
+<text x="400" y="526" fill="#8b949e" font-size="8" text-anchor="middle">9层窗口 · 5子系统RAG</text>
+<text x="400" y="540" fill="#8b949e" font-size="8" text-anchor="middle">ACL先过滤 · F10 offload</text>
+<text x="400" y="552" fill="#f85149" font-size="7" text-anchor="middle">CTRL-TAINT-001</text>
+<rect x="530" y="490" width="220" height="70" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="640" y="510" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">M3 Model & API Gateway</text>
+<text x="640" y="526" fill="#8b949e" font-size="8" text-anchor="middle">Capability Registry(20)</text>
+<text x="640" y="540" fill="#8b949e" font-size="8" text-anchor="middle">F5/F11 Prompt Cache</text>
+<text x="640" y="552" fill="#f85149" font-size="7" text-anchor="middle">CTRL-TOOL-MASK-001</text>
+<rect x="770" y="490" width="220" height="70" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="880" y="510" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">M4 Router (v9 DAG)</text>
+<text x="880" y="526" fill="#8b949e" font-size="8" text-anchor="middle">13阶段顺序依赖</text>
+<text x="880" y="540" fill="#8b949e" font-size="8" text-anchor="middle">3层 · F7 执行模式</text>
+<text x="880" y="552" fill="#6e7681" font-size="7" text-anchor="middle">routing-system.md</text>
+<rect x="1010" y="490" width="220" height="70" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="1120" y="510" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">M5 Runtime Core</text>
+<text x="1120" y="526" fill="#8b949e" font-size="8" text-anchor="middle">Loop · Session · F2两阶段</text>
+<text x="1120" y="540" fill="#8b949e" font-size="8" text-anchor="middle">Steering · 9停止条件</text>
+<text x="1120" y="552" fill="#f85149" font-size="7" text-anchor="middle">CTRL-RUNPHASE-001</text>
+
+<rect x="50" y="575" width="220" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="160" y="595" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">M6 State System</text>
+<text x="160" y="611" fill="#8b949e" font-size="8" text-anchor="middle">Conversation + Workflow</text>
+<text x="160" y="625" fill="#8b949e" font-size="8" text-anchor="middle">progress.json 桥接(P1)</text>
+<text x="160" y="637" fill="#6e7681" font-size="7" text-anchor="middle">→ full Memory P4</text>
+<rect x="290" y="575" width="220" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="400" y="595" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">M7 Memory System</text>
+<text x="400" y="611" fill="#8b949e" font-size="8" text-anchor="middle">6类型 + Provenance</text>
+<text x="400" y="625" fill="#8b949e" font-size="8" text-anchor="middle">PII检查 · 冷启动安全</text>
+<text x="400" y="637" fill="#f85149" font-size="7" text-anchor="middle">CTRL-MEMORY-VERIFY-001</text>
+<rect x="530" y="575" width="220" height="70" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="640" y="595" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">M8 Tools/Skills/MCP</text>
+<text x="640" y="611" fill="#8b949e" font-size="8" text-anchor="middle">15 tools(9 P1 + 6 P2-3)</text>
+<text x="640" y="625" fill="#8b949e" font-size="8" text-anchor="middle">F1 Computer Use · MCP Allowlist</text>
+<text x="640" y="637" fill="#f85149" font-size="7" text-anchor="middle">CTRL-PLUGIN-SIGN-001</text>
+<rect x="770" y="575" width="220" height="70" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="880" y="595" fill="#39c5cf" font-size="10" font-weight="bold" text-anchor="middle">M9 Execution & Sandbox</text>
+<text x="880" y="611" fill="#8b949e" font-size="8" text-anchor="middle">进程隔离 · 资源限制</text>
+<text x="880" y="625" fill="#8b949e" font-size="8" text-anchor="middle">F4 VFS 单一文件权威</text>
+<text x="880" y="637" fill="#f85149" font-size="7" text-anchor="middle">CTRL-VFS-001 · CTRL-EGRESS-002</text>
+<rect x="1010" y="575" width="220" height="70" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="1120" y="595" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">M10 Action Control</text>
+<text x="1120" y="611" fill="#8b949e" font-size="8" text-anchor="middle">12步pipeline · PEP每动作</text>
+<text x="1120" y="625" fill="#8b949e" font-size="8" text-anchor="middle">Capability · Consent T0-T5</text>
+<text x="1120" y="637" fill="#f85149" font-size="7" text-anchor="middle">5 CTRL(见diagram 13)</text>
+
+<rect x="50" y="660" width="220" height="70" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="160" y="680" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">M11 Retry/Recovery</text>
+<text x="160" y="696" fill="#8b949e" font-size="8" text-anchor="middle">effect-state-aware resume</text>
+<text x="160" y="710" fill="#8b949e" font-size="8" text-anchor="middle">补偿(revert/compensate/remediate)</text>
+<text x="160" y="722" fill="#6e7681" font-size="7" text-anchor="middle">见 diagram 12</text>
+<rect x="290" y="660" width="220" height="70" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="400" y="680" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">M12 Assurance & Verify</text>
+<text x="400" y="696" fill="#8b949e" font-size="8" text-anchor="middle">独立验证器(不同模型族)</text>
+<text x="400" y="710" fill="#8b949e" font-size="8" text-anchor="middle">E0-E7 evidence · 4维评分</text>
+<text x="400" y="722" fill="#6e7681" font-size="7" text-anchor="middle">assurance.md</text>
+<rect x="530" y="660" width="220" height="70" fill="#21262d" stroke="#39c5cf" stroke-width="1" rx="4"/>
+<text x="640" y="680" fill="#39c5cf" font-size="10" font-weight="bold" text-anchor="middle">M13 Observability & Audit</text>
+<text x="640" y="696" fill="#8b949e" font-size="8" text-anchor="middle">Tracing · Profiler · Replay</text>
+<text x="640" y="710" fill="#8b949e" font-size="8" text-anchor="middle">WORM Audit(不可改)</text>
+<text x="640" y="722" fill="#6e7681" font-size="7" text-anchor="middle">TCB 6组件之一</text>
+<rect x="770" y="660" width="220" height="70" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="880" y="680" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">M14 Eval & Evolution</text>
+<text x="880" y="696" fill="#8b949e" font-size="8" text-anchor="middle">Shadow mode(双路执行)</text>
+<text x="880" y="710" fill="#8b949e" font-size="8" text-anchor="middle">4演化agent · 冷启动安全</text>
+<text x="880" y="722" fill="#6e7681" font-size="7" text-anchor="middle">见 diagram 16</text>
+
+<!-- VFS as central authority -->
+<rect x="1010" y="660" width="340" height="70" fill="#0d1117" stroke="#39c5cf" stroke-width="2" rx="4"/>
+<text x="1180" y="680" fill="#39c5cf" font-size="10" font-weight="bold" text-anchor="middle">F4 VFS (单一文件访问权威)</text>
+<text x="1180" y="696" fill="#8b949e" font-size="8" text-anchor="middle">4入口(tool/RAG/memory/evidence) → 5 backend</text>
+<text x="1180" y="710" fill="#8b949e" font-size="8" text-anchor="middle">OverlayBackend = per-RunPlan 事务</text>
+<text x="1180" y="722" fill="#f85149" font-size="7" text-anchor="middle">CTRL-VFS-001 · 见 diagram 15</text>
+
+<!-- TCB -->
+<rect x="50" y="750" width="1300" height="120" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="700" y="770" fill="#f85149" font-size="12" font-weight="bold" text-anchor="middle">TCB (Trusted Computing Base) — 6 独立组件, 职责分离, 不可旁路</text>
+<rect x="70" y="785" width="200" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="170" y="803" fill="#f85149" font-size="9" text-anchor="middle">Workflow Control Plane</text>
+<text x="170" y="815" fill="#8b949e" font-size="7" text-anchor="middle">Scheduler+DAG+lease · ✗不能签Cap/读Secret</text>
+<rect x="290" y="785" width="200" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="390" y="803" fill="#f85149" font-size="9" text-anchor="middle">Policy Decision Point</text>
+<text x="390" y="815" fill="#8b949e" font-size="7" text-anchor="middle">Deny-by-default · ✗不读Secret/改manifest</text>
+<rect x="510" y="785" width="200" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="610" y="803" fill="#f85149" font-size="9" text-anchor="middle">Authorization Service</text>
+<text x="610" y="815" fill="#8b949e" font-size="7" text-anchor="middle">签CapabilityToken · ✗不改manifest/定policy</text>
+<rect x="730" y="785" width="200" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="830" y="803" fill="#f85149" font-size="9" text-anchor="middle">Secrets Broker</text>
+<text x="830" y="815" fill="#8b949e" font-size="7" text-anchor="middle">短命凭证单次 · ✗不持长期Secret</text>
+<rect x="950" y="785" width="200" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1050" y="803" fill="#f85149" font-size="9" text-anchor="middle">Execution Supervisor/PEP</text>
+<text x="1050" y="815" fill="#8b949e" font-size="7" text-anchor="middle">验token+执行 · ✗不签token/改policy</text>
+<rect x="1170" y="785" width="160" height="35" fill="#21262d" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1250" y="803" fill="#f85149" font-size="9" text-anchor="middle">Audit Sink</text>
+<text x="1250" y="815" fill="#8b949e" font-size="7" text-anchor="middle">WORM+前向安全 · 独立写</text>
+<text x="700" y="855" fill="#8b949e" font-size="9" text-anchor="middle">信任级: trusted(用户/policy) · untrusted(tool/RAG/web) · quarantined(可疑) · 低信任不可覆盖高信任</text>
+
+<!-- 5 cross-cutting planes -->
+<rect x="50" y="885" width="1300" height="50" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="700" y="905" fill="#fbcfe8" font-size="11" font-weight="bold" text-anchor="middle">5 横切平面</text>
+<text x="700" y="922" fill="#8b949e" font-size="9" text-anchor="middle">Control(Router+Policy) · Data(Runtime+ToolHost) · Observability(Audit+Trace) · Identity(AuthService) · Budget(BudgetGuard+PEP)</text>
+
+<!-- Non-goals -->
+<rect x="50" y="950" width="1300" height="80" fill="#0d1117" stroke="#30363d" rx="6"/>
+<text x="700" y="970" fill="#8b949e" font-size="10" font-weight="bold" text-anchor="middle">Non-Goals</text>
+<text x="700" y="988" fill="#8b949e" font-size="9" text-anchor="middle">✗ 不训练基础模型 · ✗ 不允许模型自授权限 · ✗ 不要求所有任务用 Agent · ✗ 不承诺所有 provider 支持事务</text>
+<text x="700" y="1005" fill="#8b949e" font-size="9" text-anchor="middle">✗ 不存储 private CoT · ✗ 不允许 generated tool 自动获生产权限 · ✗ 不调用"rollback"(用 compensation)</text>
+
+<!-- Bottom references -->
+<text x="700" y="1060" fill="#fbbf24" font-size="9" text-anchor="middle">详细图: 02(request-to-outcome) · 03(routing DAG) · 10(Capability) · 11(实时可视化) · 12(失败恢复) · 13(CTRL映射) · 14(拓扑) · 15(VFS) · 16(Shadow) · 17(Mission) · 18(Hook)</text>
+<text x="700" y="1078" fill="#8b949e" font-size="9" text-anchor="middle">v9 修正: RunConfiguration→RunPlan · 8 parallel routers→13 DAG · Re-router 删除 · 20+tools→15 · 35 states→37 · 7 layers→9</text>
 </svg>

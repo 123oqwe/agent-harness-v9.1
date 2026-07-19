@@ -227,10 +227,10 @@ def assign_specialist(req):
         "product_requirements": "factory/worker-adapters/codex",
         "qa": "factory/worker-adapters/codex",
         "evaluation": "factory/worker-adapters/codex",
-        "security": "factory/worker-adapters/claude",
-        "privacy": "factory/worker-adapters/claude",
-        "independent_verifier": "factory/worker-adapters/claude",
-        "adversarial_reviewer": "factory/worker-adapters/claude",
+        "security": "factory/worker-adapters/codex",
+        "privacy": "factory/worker-adapters/codex",
+        "independent_verifier": "factory/worker-adapters/codex",
+        "adversarial_reviewer": "factory/worker-adapters/codex",
         "cto_orchestrator": None,
     }
     adapter = role_map.get(role, "factory/worker-adapters/codex")
@@ -327,7 +327,7 @@ def dispatch_worker(req, context_packet, adapter_path, worktree_path=None):
     log(f"Worker dispatched for {req['id']} using {provider} (session={session['session_id']})")
     
     # [REAL] Actually dispatch — Popen the CLI process
-    session = adapter_dispatch(session, timeout=600)
+    session = adapter_dispatch(session, timeout=1800)
     
     # [REAL] Collect result with real stdout/stderr
     result = collect_result(session)
@@ -357,9 +357,12 @@ def collect_evidence(req_id, commands_run, exit_codes, stdout, stderr, test_resu
             ev_path_obj = collect_from_worker(worker_result, req_id, str(EVIDENCE_DIR))
             if ev_path_obj:
                 # Enhance: parse test results from stdout
+                # Only parse from worker stdout if collect_from_worker didn't already
+                # set test_results (from collect_test_output which runs npm test).
+                # collect_test_output's parse is more reliable (real test output).
                 parsed = parse_test_output(worker_result.get("stdout", "") or "")
-                if parsed:
-                    ev_path_obj["test_results"] = parsed
+                if parsed and not ev_path_obj.get("test_results"):
+                   ev_path_obj["test_results"] = parsed
                 # Add exit_codes for verifier compatibility
                 ec = worker_result.get("exit_code")
                 ev_path_obj["exit_codes"] = [ec] if ec is not None else []

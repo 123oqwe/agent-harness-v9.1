@@ -56,3 +56,41 @@ primary → fallback_1 → fallback_2 → local_model → cascade_failure_handle
 
 ### Multi-Model Workflow
 Agent should implement as a DAG of model calls, not a sequence. Each node specifies which model capability is needed. The Gateway resolves to a specific provider+model.
+
+## Prompt Cache Engineering (FG5 / FG11)
+
+The 7-layer context window (context-memory-rag.md) already assumes prefix caching (system/policy layer and recent-conversation layer are marked "cached prefix"). The Gateway must manage the cache, not just assume it. KV-cache hit rate is the single most important production metric for long agent loops and multi-agent DAGs (Phase 3): uncached input tokens cost ~10x cached tokens on frontier models, and a 50-tool-call x N-agent DAG with all-miss cache is economically infeasible inside BudgetGuard.
+
+### Cache layers and invalidation matrix
+
+| Layer | Content | Invalidated when |
+|-------|---------|------------------|
+| System prompt | Core instructions, tool definitions | Set of tool definitions changes, model upgrade |
+| Conversation | Messages, tool results | Every turn (only new tail is uncached) |
+
+Cache key includes: model id, effort level, fast-mode flag. Switching any of these recomputes the full request.
+
+Actions that invalidate the cache (Gateway must track and minimize):
+- Model switch (including fallback chain hops and plan-mode model toggle)
+- Effort level change
+- Connecting/disconnecting an MCP server whose tools are loaded into the prefix
+- Compaction / context_reset (rewrites or clears the conversation layer)
+- RunPhase switch (setup→agent) (G-CC2): setup phase credentials stripped and setup-only tools unavailable at agent phase entry. If system prompt or tool-definition block referenced setup-phase state, System prompt cache layer invalidates. If tool definitions stable (setup tools masked via FG5, not removed) and credentials never in prompt, cache preserved. Gateway checks: did setup phase write anything into stable prefix?
+
+### Tool-masking state machine (FG5)
+
+Dynamic tool addition/removal (MCP allowlist, generated tools, skill chaining) re-serializes the tool-definition block and invalidates the system-prompt cache layer. To preserve the cache, AH keeps tool definitions STABLE in the prompt and constrains action selection at decode time:
+- Tool names use consistent prefixes (`fs_*`, `web_*`, `browser_*`, `screen_*`) so a state machine can mask groups without editing definitions.
+- A context-aware state machine masks tool-name token logits during decoding (where the provider supports response prefill / constrained decoding) to enable/disable tools per state without touching definitions.
+- Where masking is unsupported, prefer deferring tool definitions via tool-search (load on demand) so the prefix stays stable; never hot-swap definitions mid-loop.
+
+This control is CTRL-TOOL-MASK-001. It is a launch blocker for Phase 3 multi-agent, not an optimization: without it, BudgetGuard kills runs because cache all-miss makes each multi-agent DAG node a full forward pass.
+
+Enabled via RunPlan `context_strategy.tool_masking = true`. The Gateway reads `context_strategy.cache_breakpoints` to place explicit cache breakpoints at stable-prefix boundaries (system prompt end, tool-definition block end).
+
+### Cache-aware compaction (FG10 coupling)
+
+Compaction (context-memory-rag.md) and context_reset rewrite the conversation layer and break the cached prefix. Compaction triggers must align with cache breakpoints: compact at a breakpoint boundary so the post-compaction prefix is still a cache hit for the stable portion. See context-memory-rag.md FG10 for mechanical offloading that defers compaction.
+
+Summarization threshold is `context_strategy.summarize_at_window_ratio` (default 0.85 of max_input_tokens); it triggers only after offloading (FG10) cannot keep the window under the Smart-Zone boundary.
+

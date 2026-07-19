@@ -1,6 +1,6 @@
 {
   "name": "OperationStateMachine",
-  "description": "Single tool call lifecycle. v9: extracted from v8 monolithic 37-state machine. All 35 states preserved but distributed across 6 machines.",
+  "description": "Single tool call lifecycle. v9: extracted from v8 monolithic 37-state machine. All 37 states preserved and distributed across 7 state-machine files (operation + run + step + mission + attempt + approval + external-effect). This file contains the 37 operation states.",
   "states": [
     {
       "name": "CREATED",

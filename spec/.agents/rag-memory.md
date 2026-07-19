@@ -6,7 +6,7 @@
 - context
 
 ## Allowed Paths
-- src/context/, src/memory/
+- harness/context/, harness/memory/
 
 ## Forbidden Paths
 - contracts/

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Capability Token Lifecycle (v9) — Authorization Service signs → PEP validates → TOCTOU revalidate → single-use → expire -->
+<svg width="1400" height="820" viewBox="0 0 1400 820" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="ared" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f85149"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="820" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Capability Token Lifecycle (v9) — 签发 → 验证 → TOCTOU 重验 → 单次使用 → 失效</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">capability-token.schema.json: 18 必填字段 · use_limit=1 · manifest_hash 用于 TOCTOU · 子 token 由 Authorization Service 签(非父 agent)</text>
+
+<!-- Lanes -->
+<rect x="10" y="70" width="200" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="110" y="92" fill="#58a6ff" font-size="12" font-weight="bold" text-anchor="middle">Router</text>
+<rect x="230" y="70" width="240" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="350" y="92" fill="#f85149" font-size="12" font-weight="bold" text-anchor="middle">Authorization Service (TCB)</text>
+<rect x="490" y="70" width="200" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="590" y="92" fill="#e3b341" font-size="12" font-weight="bold" text-anchor="middle">PEP (TCB)</text>
+<rect x="710" y="70" width="200" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="810" y="92" fill="#39c5cf" font-size="12" font-weight="bold" text-anchor="middle">Sandbox / VFS</text>
+<rect x="930" y="70" width="200" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="1030" y="92" fill="#bc8cff" font-size="12" font-weight="bold" text-anchor="middle">Audit Sink (TCB)</text>
+<rect x="1150" y="70" width="240" height="700" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="1270" y="92" fill="#3fb950" font-size="12" font-weight="bold" text-anchor="middle">Secrets Broker (TCB)</text>
+
+<!-- Step 1: Router requests capability -->
+<line x1="210" y1="140" x2="230" y2="140" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="120" y="135" fill="#f0f6fc" font-size="10">1. 请求 Capability</text>
+<text x="120" y="148" fill="#8b949e" font-size="9">(task + policy_decision + consent)</text>
+
+<!-- Step 2: Auth Service signs token -->
+<rect x="250" y="120" width="200" height="80" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="350" y="138" fill="#f85149" font-size="11" font-weight="bold">2. 签发 CapabilityToken</text>
+<text x="350" y="154" fill="#8b949e" font-size="9">token_id (UUID)</text>
+<text x="350" y="167" fill="#8b949e" font-size="9">operation_id, attempt_id</text>
+<text x="350" y="180" fill="#fbbf24" font-size="9" font-weight="bold">manifest_hash (approval-time)</text>
+<text x="350" y="193" fill="#8b949e" font-size="9">policy_decision_hash, use_limit=1</text>
+<text x="350" y="206" fill="#8b949e" font-size="9">issued_at, not_before, expires_at</text>
+
+<!-- Step 3: Token to PEP -->
+<line x1="450" y1="160" x2="490" y2="160" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<text x="460" y="155" fill="#58a6ff" font-size="10">3. 传递 Token</text>
+
+<!-- Step 4: PEP validates -->
+<rect x="510" y="140" width="160" height="60" fill="#21262d" stroke="#e3b341" stroke-width="2" rx="6"/>
+<text x="590" y="158" fill="#e3b341" font-size="11" font-weight="bold">4. PEP 验证</text>
+<text x="590" y="173" fill="#8b949e" font-size="9">CTRL-CAPABILITY-</text>
+<text x="590" y="185" fill="#8b949e" font-size="9">SINGLE-USE-001</text>
+<text x="590" y="197" fill="#8b949e" font-size="9">token 有效?未用?未过期?</text>
+
+<!-- Step 5: TOCTOU revalidation -->
+<rect x="510" y="220" width="160" height="80" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="590" y="238" fill="#f85149" font-size="11" font-weight="bold">5. TOCTOU 重验</text>
+<text x="590" y="253" fill="#fbbf24" font-size="9" font-weight="bold">CTRL-REVALIDATE-001</text>
+<text x="590" y="268" fill="#8b949e" font-size="9">重算 ActionManifest hash</text>
+<text x="590" y="281" fill="#8b949e" font-size="9">对比 approval-time hash</text>
+<text x="590" y="294" fill="#f85149" font-size="9" font-weight="bold">不匹配 → DENY</text>
+
+<!-- TOCTOU window annotation -->
+<rect x="460" y="210" width="260" height="100" fill="none" stroke="#f85149" stroke-width="1" stroke-dasharray="4,3" rx="4"/>
+<text x="590" y="325" fill="#f85149" font-size="9" text-anchor="middle">⚠ TOCTOU 窗口: 签发(步骤2)→ 使用(步骤6)之间 manifest 可被篡改</text>
+
+<!-- Step 6: Credential exchange -->
+<line x1="590" y1="310" x2="590" y2="360" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ag)"/>
+<line x1="670" y1="380" x2="1150" y2="380" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ag)"/>
+<text x="850" y="375" fill="#3fb950" font-size="10">6. 凭证交换 (单次, 不入 env)</text>
+<rect x="1170" y="360" width="200" height="60" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="1270" y="378" fill="#3fb950" font-size="11" font-weight="bold">Secrets Broker</text>
+<text x="1270" y="393" fill="#8b949e" font-size="9">CTRL-CRED-REACH-001</text>
+<text x="1270" y="405" fill="#8b949e" font-size="9">短命凭证, scoped, single-use</text>
+<text x="1270" y="417" fill="#f85149" font-size="9">agent phase: 不入 process env</text>
+
+<!-- Step 7: Execute -->
+<line x1="590" y1="310" x2="590" y2="440" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<line x1="670" y1="460" x2="710" y2="460" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<rect x="730" y="440" width="160" height="60" fill="#21262d" stroke="#39c5cf" stroke-width="2" rx="6"/>
+<text x="810" y="458" fill="#39c5cf" font-size="11" font-weight="bold">7. 执行(单次)</text>
+<text x="810" y="473" fill="#8b949e" font-size="9">Sandbox / VFS dispatch</text>
+<text x="810" y="485" fill="#8b949e" font-size="9">CTRL-VFS-001 (文件工具)</text>
+<text x="810" y="497" fill="#8b949e" font-size="9">CTRL-EGRESS-002 (网络)</text>
+
+<!-- Step 8: Mark used -->
+<line x1="590" y1="500" x2="590" y2="540" stroke="#f85149" stroke-width="1.5" marker-end="url(#ared)"/>
+<rect x="510" y="540" width="160" height="50" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="590" y="558" fill="#f85149" font-size="11" font-weight="bold">8. 标记已用</text>
+<text x="590" y="573" fill="#8b949e" font-size="9">use_limit=1 原子强制</text>
+<text x="590" y="585" fill="#8b949e" font-size="9">再次使用 → REJECTED</text>
+
+<!-- Step 9: Audit -->
+<line x1="670" y1="565" x2="930" y2="565" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="950" y="545" width="180" height="50" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="1030" y="563" fill="#bc8cff" font-size="11" font-weight="bold">9. Audit (不可变)</text>
+<text x="1030" y="578" fill="#8b949e" font-size="9">WORM + 前向安全</text>
+<text x="1030" y="590" fill="#8b949e" font-size="9">独立写入通道</text>
+
+<!-- Child token section -->
+<rect x="250" y="620" width="900" height="140" fill="#0d1117" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,3" rx="6"/>
+<text x="700" y="642" fill="#fbbf24" font-size="12" font-weight="bold" text-anchor="middle">子 Token 签发规则 (delegation_depth &gt; 0)</text>
+<text x="270" y="664" fill="#f0f6fc" font-size="10">父 agent 不可直接签发子 token</text>
+<text x="270" y="680" fill="#8b949e" font-size="9">父 agent 只能向 Authorization Service 请求</text>
+<line x1="450" y1="672" x2="470" y2="672" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="490" y="652" width="280" height="50" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="630" y="670" fill="#f85149" font-size="10" font-weight="bold">Authorization Service 签子 token</text>
+<text x="630" y="685" fill="#8b949e" font-size="9">parent_delegation_proof (签名)</text>
+<text x="630" y="697" fill="#8b949e" font-size="9">delegation_depth 递减, 不可越权</text>
+<line x1="770" y1="672" x2="790" y2="672" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="800" y="664" fill="#3fb950" font-size="10">子 token 给 Worker agent</text>
+<text x="800" y="680" fill="#8b949e" font-size="9">子 token 权限 ⊆ 父 token</text>
+<text x="800" y="694" fill="#8b949e" font-size="9">obo_token: 链不超过原用户权限</text>
+<text x="800" y="708" fill="#fbbf24" font-size="9">F8 / CTRL-MSG-INTEGRITY-001</text>
+
+<!-- 18 fields legend -->
+<rect x="10" y="780" width="1380" height="30" fill="#161b22" stroke="#30363d" rx="4"/>
+<text x="20" y="798" fill="#8b949e" font-size="9">CapabilityToken 18 必填字段: token_id · operation_id · attempt_id · manifest_hash · policy_decision_hash · tool_effect_contract_hash · subject_workload · tenant_id · audience · tool_grant_hash · resource_grant_hash · budget_ceiling_hash · issued_at · not_before · expires_at · execution_epoch · use_limit(=1) · confirmation_key_thumbprint · (parent_delegation_proof 可选)</text>
+</svg>

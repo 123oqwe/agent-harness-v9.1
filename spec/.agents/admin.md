@@ -6,7 +6,7 @@
 - enterprise features
 
 ## Allowed Paths
-- src/admin/
+- harness/admin/
 
 ## Forbidden Paths
 - contracts/

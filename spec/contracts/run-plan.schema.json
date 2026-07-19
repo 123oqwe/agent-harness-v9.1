@@ -124,6 +124,50 @@
     },
     "fallback_policy": {
       "type": "object"
+    },
+    "run_phase": {
+      "type": "object",
+      "description": "FG2 two-phase runtime configuration. Defines setup (network-enabled) and agent (offline-by-default, credentials stripped) phases.",
+      "properties": {
+        "setup": {
+          "type": "object",
+          "description": "Network-enabled phase for dependency install. egress_policy.mode may be open/allowlist."
+        },
+        "agent": {
+          "type": "object",
+          "description": "Offline-by-default phase. egress_policy.mode = disabled unless explicit allowlist. Credentials stripped from env; single-exchange at dispatch."
+        }
+      },
+      "additionalProperties": false
+    },
+    "context_strategy": {
+      "type": "object",
+      "description": "FG5/FG10/FG11 context engineering knobs. cache_breakpoints, offload_token_threshold, summarize_at_window_ratio, tool_masking.",
+      "properties": {
+        "cache_breakpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offload_token_threshold": {
+          "type": "integer"
+        },
+        "summarize_at_window_ratio": {
+          "type": "number"
+        },
+        "tool_masking": {
+          "type": "boolean"
+        },
+        "active_plan_injection": {
+          "type": "boolean",
+          "description": "G-MAN1: inject active plan (current step, remaining steps) into context at each turn. Default true."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "active_plan_injection"
+      ]
     }
   },
   "additionalProperties": false

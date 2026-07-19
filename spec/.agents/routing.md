@@ -6,7 +6,7 @@
 - graphs
 
 ## Allowed Paths
-- src/router/
+- harness/router/
 
 ## Forbidden Paths
 - contracts/

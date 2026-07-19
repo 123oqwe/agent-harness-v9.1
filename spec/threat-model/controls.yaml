@@ -3,8 +3,12 @@
   name: Revalidate manifest hash at execution time
   type: preventive
 - control_id: CTRL-EGRESS-001
-  name: Egress filter for all network requests
+  name: Egress filter for all network requests (SSRF, private IP)
   type: preventive
+- control_id: CTRL-EGRESS-002
+  name: Fine-grained network policy engine (domain allow/deny, unix socket, local binding, SOCKS5)
+  type: preventive
+  supersedes_detail_of: CTRL-EGRESS-001
 - control_id: CTRL-TAINT-001
   name: Taint labels on untrusted content
   type: preventive
@@ -22,4 +26,22 @@
   type: preventive
 - control_id: CTRL-BUDGET-PEP-001
   name: Budget Guard in PEP
+  type: preventive
+- control_id: CTRL-SCREEN-ISOLATION-001
+  name: Screenshot isolation and per-app approval for computer use
+  type: preventive
+- control_id: CTRL-RUNPHASE-001
+  name: Two-phase runtime (setup network-enabled, agent offline) with credential stripping before agent phase
+  type: preventive
+- control_id: CTRL-CRED-REACH-001
+  name: Credentials absent from agent process environment; single-exchange at dispatch point
+  type: preventive
+- control_id: CTRL-MSG-INTEGRITY-001
+  name: Cross-process message integrity via JWS signature and OBO delegation token
+  type: preventive
+- control_id: CTRL-TOOL-MASK-001
+  name: Tool-masking state machine (stable tool definitions, decode-time logits mask) to preserve KV-cache
+  type: preventive
+- control_id: CTRL-VFS-001
+  name: Virtual filesystem as single file-access authority with backend routing and permission rules
   type: preventive

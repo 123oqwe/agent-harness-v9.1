@@ -15,7 +15,7 @@ When sources conflict, the higher-priority source wins.
 | 6 | Architecture specifications | `architecture/*.md` | Markdown |
 | 7 | Product specifications | `product/*.md` + `domains/` | Markdown |
 | 8 | Examples and explanatory prose | Inline in spec files | Code/Prose |
-| 9 | Deprecated appendices | `appendix/appendix/deprecated-v8-content/` | Markdown |
+| 9 | Deprecated appendices | `appendix/deprecated-v8-content/` | Markdown |
 
 ## Rules
 
@@ -24,6 +24,7 @@ When sources conflict, the higher-priority source wins.
 3. **When a contract is frozen, lower-priority sources cannot contradict it.** A frozen schema cannot be overridden by a markdown note.
 4. **TLA+ model-check results override prose claims.** If prose says "this transition is safe" but TLA+ finds a violation, the TLA+ result wins.
 5. **Phase manifests define what is in scope.** A requirement not listed in the current phase manifest is not ready for implementation, even if its specification_maturity is "frozen".
+6. **Runtime state authority is `control/current-state.json`.** The `status` field of a phase manifest MUST match `control/current-state.json` for that phase. If they differ, `current-state.json` wins for runtime status (which phase is VERIFIED/READY/BLOCKED); the phase manifest's scope/requirements/enabled_domains remain normative for content. Phase manifests MUST be updated to match current-state.json when status changes.
 
 ## Conflict Resolution Process
 
@@ -43,7 +44,7 @@ When sources conflict, the higher-priority source wins.
 
 ## Deprecated Content Handling
 
-All deprecated v8 content is in `appendix/appendix/deprecated-v8-content/`.
+All deprecated v8 content is in `appendix/deprecated-v8-content/`.
 Each deprecated section includes:
 - source_file
 - source_section

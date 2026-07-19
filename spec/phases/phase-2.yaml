@@ -1,26 +1,22 @@
 phase: 2
-name: "Context, RAG, Multimodal & Product UX"
+name: Context, RAG, Multimodal & Product UX
 status: BLOCKED
-objective: "Context, RAG, Multimodal & Product UX"
-
+objective: Context, RAG, Multimodal & Product UX
 dependencies:
-  - phase-0
-  - phase-1
-
+- phase-0
+- phase-1
 enabled_domains:
-  - coding
-  - documents
-  - research
-  - writing
-  - planning
-  - personal_assistant
-  - multimodal
-
+- coding
+- documents
+- research
+- writing
+- planning
+- personal_assistant
+- multimodal
 disabled_capabilities:
-  - external_write
-  - multi_agent
-  - dynamic_tool_generation
-
+- external_write
+- multi_agent
+- dynamic_tool_generation
 requirements:
   - AH-CONTEXT-COMPILER-001
   - AH-DOC-INGEST-DOCX-001
@@ -61,6 +57,9 @@ requirements:
   - AH-RUNTIME-MODELFALLBACK-001
   - AH-RUNTIME-SESSIONTREE-001
   - AH-RUNTIME-STEERING-001
+  - AH-TOOL-BEHAVIOR-VERIFY-001
+  - AH-TOOL-WEB-FETCH-001
+  - AH-TOOL-WEB-SEARCH-001
   - AH-UI-DOC-001
   - AH-UI-MEMORY-001
   - AH-UI-MM-001
@@ -68,63 +67,55 @@ requirements:
   - AH-UI-PLANNING-001
   - AH-UI-RECONCILE-001
   - AH-UI-RESEARCH-001
+  - AH-UI-TUI-001
   - AH-UI-WRITING-001
   - AH-UX-API-001
   - AH-UX-CONTRACT-001
   - AH-UX-DESKTOP-001
   - AH-UX-STATES-001
   - AH-UX-WEB-001
-
 fixtures:
-  - fixtures/phase-2/valid/
-  - fixtures/phase-2/invalid/
-
-unit_tests: "tests/phase-2/unit/"
-integration_tests: "tests/phase-2/integration/"
-e2e_tests: "tests/phase-2/e2e/"
-security_tests: "tests/phase-2/security/"
-
+- fixtures/phase-2/valid/
+- fixtures/phase-2/invalid/
+unit_tests: tests/phase-2/unit/
+integration_tests: tests/phase-2/integration/
+e2e_tests: tests/phase-2/e2e/
+security_tests: tests/phase-2/security/
 domain_evals:
-  coding: "evals/coding/phase-2.yaml"
-  documents: "evals/documents/phase-2.yaml"
-  research: "evals/research/phase-2.yaml"
-  writing: "evals/writing/phase-2.yaml"
-  planning: "evals/planning/phase-2.yaml"
-  personal_assistant: "evals/personal_assistant/phase-2.yaml"
-  multimodal: "evals/multimodal/phase-2.yaml"
-
+  coding: evals/coding/phase-2.yaml
+  documents: evals/documents/phase-2.yaml
+  research: evals/research/phase-2.yaml
+  writing: evals/writing/phase-2.yaml
+  planning: evals/planning/phase-2.yaml
+  personal_assistant: evals/personal_assistant/phase-2.yaml
+  multimodal: evals/multimodal/phase-2.yaml
 real_data_tests:
-  synthetic: "data-tests/synthetic/phase-2/"
-  public_benchmarks: "data-tests/public-benchmarks/phase-2/"
-  consented_staging: "data-tests/consented-staging/phase-2/"
-
+  synthetic: data-tests/synthetic/phase-2/
+  public_benchmarks: data-tests/public-benchmarks/phase-2/
+  consented_staging: data-tests/consented-staging/phase-2/
 deployment_target:
-  phase_0: "N/A - specification only"
-  phase_1: "local"
-  phase_2: "local"
-  phase_3: "local"
-  phase_4: "local + staging"
-  phase_5: "staging"
-  phase_6: "staging"
-  phase_7: "canary"
-  phase_8: "production"
-
-gate_command: "python3 factory/phase-gates/gate_runner.py phase2"
-rollback: "auto-rollback if gate fails"
-evidence: "artifacts/phase-2/"
-
+  phase_0: N/A - specification only
+  phase_1: local
+  phase_2: local
+  phase_3: local
+  phase_4: local + staging
+  phase_5: staging
+  phase_6: staging
+  phase_7: canary
+  phase_8: production
+gate_command: python3 factory/phase-gates/gate_runner.py phase2
+rollback: auto-rollback if gate fails
+evidence: artifacts/phase-2/
 entry_criteria:
-  - "Previous phase gate passed"
-  - "All dependencies verified"
-  - "No open P0 blockers"
-
+- Previous phase gate passed
+- All dependencies verified
+- No open P0 blockers
 exit_criteria:
-  - all_phase_requirements_verified: true
-  - regression_tests_pass: true
-  - active_stub_count: 0
-
+- all_phase_requirements_verified: true
+- regression_tests_pass: true
+- active_stub_count: 0
 blocked_conditions:
-  - "Previous phase gate not passed"
-  - "Open P0 blockers"
-  - "Missing dependencies"
-  - "Test environment unavailable"
+- Previous phase gate not passed
+- Open P0 blockers
+- Missing dependencies
+- Test environment unavailable

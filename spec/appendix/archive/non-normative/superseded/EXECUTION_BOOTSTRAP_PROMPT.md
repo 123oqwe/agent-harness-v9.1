@@ -1,3 +1,7 @@
+> ⚠️ ARCHIVED (2026-07-20): This file contained stale phase status ("Phase 0: READY" when it is VERIFIED, "Phase 1-8: BLOCKED" when Phase 1 is READY).
+> It is superseded by `AGENTS.md` (root) and `control/current-state.json` (authoritative status).
+> Retained for historical reference only. DO NOT use this file for current status — read `control/current-state.json`.
+
 # Execution Bootstrap Prompt
 
 ## For: AI Engineering Team (Codex / Claude Code)

@@ -92,6 +92,56 @@
     "network_policy": {
       "type": "object"
     },
+    "egress_policy_ref": {
+      "type": "string",
+      "description": "Reference to EffectRisk.egress_policy binding used by this tool (FG3). The authoritative network policy; tool-spec.network_policy is kept as the declarative summary."
+    },
+    "display_policy": {
+      "type": "object",
+      "description": "Screen/desktop operation policy (FG1 Computer Use). Required only by tools whose effect_model involves screen_access.",
+      "properties": {
+        "surface_scope": {
+          "enum": [
+            "browser_only",
+            "native_app_approved",
+            "desktop",
+            "fullscreen"
+          ]
+        },
+        "approved_apps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Per-app approval list (bundle IDs / window titles). Sentinel apps (terminals, Finder, system settings) require escalated consent."
+        },
+        "screenshot_isolation": {
+          "enum": [
+            "exclude_self_output",
+            "full"
+          ],
+          "description": "exclude_self_output: agent's own UI/terminal never enters screenshots (prevents prompt-injection feedback). Default exclude_self_output."
+        },
+        "global_interrupt_consumed": {
+          "type": "boolean",
+          "description": "If true, the global interrupt key is consumed so injected content cannot dismiss dialogs."
+        },
+        "single_session_lock": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "run_phase_binding": {
+      "type": "array",
+      "description": "Which RunPlan phases may invoke this tool (FG2 two-phase runtime). setup = network-enabled dependency install; agent = offline execution. Tools requiring credentials must bind to agent phase only via broker single-exchange.",
+      "items": {
+        "enum": [
+          "setup",
+          "agent"
+        ]
+      }
+    },
     "credential_requirements": {
       "type": "array",
       "items": {

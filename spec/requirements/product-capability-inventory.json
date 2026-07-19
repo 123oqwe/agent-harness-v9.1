@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "total_families": 5,
-  "total_capabilities": 108,
+  "total_capabilities": 124,
   "families": {
     "A_product_surfaces": [
       {
@@ -308,6 +308,30 @@
           "AH-ENT-ABAC-001",
           "AH-ENT-CONNECTOR-POLICY-001"
         ]
+      },
+      {
+        "capability_id": "CAP-A-024",
+        "name": "mobile_surface",
+        "requirement_ids": [],
+        "framework_gap": "mobile",
+        "description": "Mobile delivery surface (iOS/Android): push notifications, remote steer, cross-device session continuation",
+        "requirement_pending": "Phase 6"
+      },
+      {
+        "capability_id": "CAP-A-025",
+        "name": "remote_control",
+        "requirement_ids": [],
+        "framework_gap": "mobile",
+        "description": "Remote control: continue local session from another device, bidirectional state sync",
+        "requirement_pending": "Phase 6"
+      },
+      {
+        "capability_id": "CAP-A-026",
+        "name": "channels",
+        "requirement_ids": [],
+        "framework_gap": "mobile",
+        "description": "External channel injection: Telegram/Discord/iMessage/webhook messages pushed into session, 2-way steer",
+        "requirement_pending": "Phase 6"
       }
     ],
     "B_core_harness": [
@@ -583,6 +607,54 @@
           "AH-EVOL-OFFLINE-001",
           "AH-EVOL-SHADOW-001"
         ]
+      },
+      {
+        "capability_id": "CAP-B-026",
+        "name": "virtual_filesystem",
+        "requirement_ids": [],
+        "framework_gap": "FG4",
+        "description": "Single file-access authority with backend routing, OverlayBackend transactions (architecture/virtual-filesystem.md)",
+        "requirement_pending": "Phase 1"
+      },
+      {
+        "capability_id": "CAP-B-027",
+        "name": "routing_slip_choreography",
+        "requirement_ids": [],
+        "framework_gap": "FG7",
+        "description": "Decentralized choreography: itinerary travels with message, agents insert steps up to insert_limit, no central orchestrator (architecture/routing-system.md Mode B)",
+        "requirement_pending": "Phase 3"
+      },
+      {
+        "capability_id": "CAP-B-028",
+        "name": "workflow_script_orchestration",
+        "requirement_ids": [],
+        "framework_gap": "FG9",
+        "description": "Orchestration as executable script: intermediate results in script variables not agent context, resumable, adversarial cross-check pattern (architecture/routing-system.md Mode C)",
+        "requirement_pending": "Phase 3"
+      },
+      {
+        "capability_id": "CAP-B-029",
+        "name": "context_offloading",
+        "requirement_ids": [],
+        "framework_gap": "FG10",
+        "description": "Mechanical offloading: tool I/O exceeding offload_token_threshold written to VFS, context keeps pointer + preview, reversible (architecture/context-memory-rag.md)",
+        "requirement_pending": "Phase 2"
+      },
+      {
+        "capability_id": "CAP-B-030",
+        "name": "long_session_hibernation",
+        "requirement_ids": [],
+        "framework_gap": "microvm",
+        "description": "Sandbox sleep/wake: long-running sessions hibernate (state persisted to VFS), wake rebuilds context, files preserved across sleep (architecture/runtime-core.md)",
+        "requirement_pending": "Phase 7"
+      },
+      {
+        "capability_id": "CAP-B-031",
+        "name": "mass_fan_out",
+        "requirement_ids": [],
+        "framework_gap": "fanout",
+        "description": "Large-scale clone fan-out: N homogeneous clones (default max 6 bounded by AH-SUBAGENT-001, configurable to ~100 with elevated concurrency grant), each independent context+sandbox, results aggregated and deduplicated (architecture/routing-system.md Mode D)",
+        "requirement_pending": "Phase 3"
       }
     ],
     "C_safety_governance": [
@@ -708,6 +780,62 @@
         "requirement_ids": [
           "AH-SPEC-VERIFIER-001"
         ]
+      },
+      {
+        "capability_id": "CAP-C-016",
+        "name": "computer_use",
+        "requirement_ids": [],
+        "framework_gap": "FG1",
+        "description": "Screen/desktop operation surface with per-app approval and screenshot isolation",
+        "requirement_pending": "Phase 3"
+      },
+      {
+        "capability_id": "CAP-C-017",
+        "name": "screen_injection_isolation",
+        "requirement_ids": [],
+        "framework_gap": "FG6",
+        "description": "Screenshot self-output exclusion and global interrupt consumption",
+        "requirement_pending": "Phase 3"
+      },
+      {
+        "capability_id": "CAP-C-018",
+        "name": "two_phase_runtime",
+        "requirement_ids": [],
+        "framework_gap": "FG2",
+        "description": "Setup(network) -> agent(offline) with credential stripping",
+        "requirement_pending": "Phase 1"
+      },
+      {
+        "capability_id": "CAP-C-019",
+        "name": "credential_reach_isolation",
+        "requirement_ids": [],
+        "framework_gap": "FG2",
+        "description": "Credentials absent from agent env; single-exchange at dispatch",
+        "requirement_pending": "Phase 1"
+      },
+      {
+        "capability_id": "CAP-C-020",
+        "name": "network_policy_engine",
+        "requirement_ids": [],
+        "framework_gap": "FG3",
+        "description": "Domain allow/deny, unix socket, local binding, SOCKS5",
+        "requirement_pending": "Phase 1"
+      },
+      {
+        "capability_id": "CAP-C-021",
+        "name": "tool_masking_state_machine",
+        "requirement_ids": [],
+        "framework_gap": "FG5",
+        "description": "Stable tool defs + decode-time logits mask to preserve KV-cache",
+        "requirement_pending": "Phase 2"
+      },
+      {
+        "capability_id": "CAP-C-022",
+        "name": "cross_process_msg_integrity",
+        "requirement_ids": [],
+        "framework_gap": "FG8",
+        "description": "JWS signature + OBO delegation token for cross-process agent messages",
+        "requirement_pending": "Phase 3"
       }
     ],
     "D_domains": [

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Mission → Run → Session → Memory Hierarchy (v9) -->
+<svg width="1400" height="820" viewBox="0 0 1400 820" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="820" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Mission → Run → Session → Memory 层级衔接 (v9)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">progress.json (Phase 1 桥接) → full Memory (Phase 4) · mission.machine.json (10态) · run.machine.json (7态) · runtime-core.md</text>
+
+<!-- Mission layer -->
+<rect x="40" y="70" width="1320" height="160" fill="#161b22" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="700" y="90" fill="#fbcfe8" font-size="13" font-weight="bold" text-anchor="middle">Mission Layer (长周期, 跨天/跨周)</text>
+<text x="60" y="110" fill="#8b949e" font-size="9">mission.machine.json (10态):</text>
+<text x="60" y="125" fill="#f0f6fc" font-size="9">CREATED → DISCOVER → DESIGN → BUILD → DEPLOY → OPERATE → ITERATE → COMPLETED/FAILED/ABORTED</text>
+<text x="60" y="145" fill="#bc8cff" font-size="9" font-weight="bold">Mission Memory (跨 Run 复用):</text>
+<text x="60" y="160" fill="#8b949e" font-size="9">user_preference · connected_account · asset_registry · decision_history</text>
+<text x="60" y="175" fill="#8b949e" font-size="9">routing_slip 模式 (F7): itinerary 随消息走, agent 可插步 (insert_limit=3)</text>
+<text x="60" y="195" fill="#8b949e" font-size="9">Decision Gates: spend / publish / irreversible / path / input</text>
+<text x="60" y="215" fill="#8b949e" font-size="9">Mission Templates: launch_web_app / ai_short_drama / ai_accounting / start_newsletter / incorporate_company</text>
+<text x="900" y="110" fill="#fbbf24" font-size="9" font-weight="bold">spawn 多个 Run:</text>
+<line x1="700" y1="200" x2="300" y2="260" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="700" y1="200" x2="700" y2="260" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="700" y1="200" x2="1100" y2="260" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Run 1 -->
+<rect x="80" y="260" width="380" height="200" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="270" y="280" fill="#3fb950" font-size="12" font-weight="bold" text-anchor="middle">Run 1</text>
+<text x="90" y="298" fill="#8b949e" font-size="9">run.machine.json (7态):</text>
+<text x="90" y="312" fill="#f0f6fc" font-size="8">CREATED→PLANNING→RUNNING→PAUSED→COMPLETED</text>
+<rect x="90" y="325" width="360" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="270" y="343" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">Session</text>
+<text x="100" y="358" fill="#8b949e" font-size="8">事件日志 = 权威 (source of truth)</text>
+<text x="100" y="370" fill="#8b949e" font-size="8">Snapshot = 加速 (可重建)</text>
+<text x="100" y="382" fill="#8b949e" font-size="8">11 entry 类型 · SQLite · 崩溃从日志重建</text>
+<rect x="90" y="390" width="360" height="55" fill="#1a0808" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="270" y="408" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">progress.json (Phase 1 桥接)</text>
+<text x="100" y="423" fill="#8b949e" font-size="8">每 turn 写: run_id, current_step, goal,</text>
+<text x="100" y="435" fill="#8b949e" font-size="8">completed_steps, open_tasks, last_error</text>
+
+<!-- Run 2 -->
+<rect x="510" y="260" width="380" height="200" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="700" y="280" fill="#3fb950" font-size="12" font-weight="bold" text-anchor="middle">Run 2</text>
+<text x="520" y="298" fill="#8b949e" font-size="9">run.machine.json (7态)</text>
+<rect x="520" y="325" width="360" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="700" y="343" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">Session</text>
+<text x="530" y="358" fill="#8b949e" font-size="8">读 progress.json + 重建 context</text>
+<text x="530" y="370" fill="#8b949e" font-size="8">effect-state-aware resume</text>
+<text x="530" y="382" fill="#8b949e" font-size="8">(runtime-core.md)</text>
+<rect x="520" y="390" width="360" height="55" fill="#1a0808" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="700" y="408" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">progress.json (续写)</text>
+<text x="530" y="423" fill="#8b949e" font-size="8">append 新 turn 状态</text>
+<text x="530" y="435" fill="#8b949e" font-size="8">checkpoint_refs 指向 VFS /scratch/*</text>
+
+<!-- Run N (Phase 4+) -->
+<rect x="940" y="260" width="380" height="200" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
+<text x="1130" y="280" fill="#bc8cff" font-size="12" font-weight="bold" text-anchor="middle">Run N (Phase 4+)</text>
+<text x="950" y="298" fill="#8b949e" font-size="9">run.machine.json (7态)</text>
+<rect x="950" y="325" width="360" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="1130" y="343" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">Session</text>
+<text x="960" y="358" fill="#8b949e" font-size="8">读 full Memory (6 类型 + Provenance)</text>
+<text x="960" y="370" fill="#8b949e" font-size="8">episodic / semantic / procedural</text>
+<text x="960" y="382" fill="#8b949e" font-size="8">preference / relationship / goal</text>
+<rect x="950" y="390" width="360" height="55" fill="#1a0808" stroke="#bc8cff" stroke-width="2" rx="4"/>
+<text x="1130" y="408" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">full Memory (替代 progress.json)</text>
+<text x="960" y="423" fill="#8b949e" font-size="8">progress.json → 降级为 episodic 源</text>
+<text x="960" y="435" fill="#8b949e" font-size="8">冷启动安全: N&lt;10纯规则, 10≤N&lt;50线性</text>
+
+<!-- Transition -->
+<line x1="460" y1="420" x2="510" y2="380" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+<line x1="890" y1="420" x2="940" y2="380" stroke="#bc8cff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+<!-- Phase 1 → Phase 4 migration -->
+<rect x="40" y="490" width="1320" height="140" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="510" fill="#fbbf24" font-size="12" font-weight="bold" text-anchor="middle">Phase 1 → Phase 4 迁移路径 (无技术债)</text>
+<rect x="60" y="525" width="400" height="90" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="260" y="543" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">Phase 1: progress.json</text>
+<text x="70" y="560" fill="#8b949e" font-size="9">结构: run_id, current_step, goal,</text>
+<text x="70" y="573" fill="#8b949e" font-size="9">completed_steps, open_tasks,</text>
+<text x="70" y="586" fill="#8b949e" font-size="9">last_error, checkpoint_refs</text>
+<text x="70" y="605" fill="#8b949e" font-size="9">位置: .harness/progress.json (runtime data)</text>
+<rect x="500" y="525" width="400" height="90" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="700" y="543" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">迁移: 结构子集化</text>
+<text x="510" y="560" fill="#8b949e" font-size="9">progress.json 结构 ⊂ episodic memory</text>
+<text x="510" y="573" fill="#8b949e" font-size="9">步骤: 读 progress.json</text>
+<text x="510" y="586" fill="#8b949e" font-size="9">→ 写入 episodic memory</text>
+<text x="510" y="599" fill="#8b949e" font-size="9">→ progress.json 停写</text>
+<text x="510" y="612" fill="#f85149" font-size="9" font-weight="bold">不丢状态, 不两套并存</text>
+<rect x="940" y="525" width="400" height="90" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="1140" y="543" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">Phase 4: full Memory</text>
+<text x="950" y="560" fill="#8b949e" font-size="9">6 类型 + Provenance + TTL + 权重</text>
+<text x="950" y="573" fill="#8b949e" font-size="9">冲突解决 + 删除</text>
+<text x="950" y="586" fill="#8b949e" font-size="9">冷启动安全 (N&lt;10纯规则)</text>
+<text x="950" y="605" fill="#f85149" font-size="9" font-weight="bold">模型不可直接写高信任事实</text>
+
+<!-- context_reset handoff -->
+<rect x="40" y="650" width="1320" height="150" fill="#161b22" stroke="#f85149" stroke-width="1" rx="6"/>
+<text x="700" y="670" fill="#f85149" font-size="12" font-weight="bold" text-anchor="middle">context_reset handoff (runtime-core.md)</text>
+<text x="60" y="690" fill="#f0f6fc" font-size="9">触发: 2 consecutive tool oscillations OR goal regress after compaction</text>
+<text x="60" y="705" fill="#f0f6fc" font-size="9">→ 写 handoff artifact: current goal, completed steps, open tasks, checkpoint refs, next step</text>
+<text x="60" y="720" fill="#f0f6fc" font-size="9">→ 开新 session, 从 handoff 恢复</text>
+<text x="60" y="735" fill="#8b949e" font-size="9">区别于 compaction: compaction 原地摘要; context_reset 清空窗口, 通过 artifact 交接</text>
+<text x="60" y="755" fill="#fbbf24" font-size="9">Smart Zone &lt;40% · Caution 40-70% (compaction) · Dumb &gt;70% (context_reset)</text>
+<text x="60" y="775" fill="#8b949e" font-size="9">progress.json 每 turn 写 + context_reset 写 handoff = 双保险跨 session 状态保持</text>
+<text x="60" y="795" fill="#8b949e" font-size="9">Phase 2: session spawn-from-handoff 完整实现 (Phase 1 仅 emit 事件)</text>
+</svg>

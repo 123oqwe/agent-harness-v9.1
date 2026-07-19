@@ -11,6 +11,7 @@ components:
   - phase_timeline
   - decision_gates
   - deliverable_tracker
+  - workflow_graph_view  # G-PI3 DAG visualization
 
 data_dependencies:
   - GET /missions

@@ -1,21 +1,18 @@
 phase: 3
-name: "Adaptive Routing & Multi-Agent"
+name: Adaptive Routing & Multi-Agent
 status: BLOCKED
-objective: "Adaptive Routing & Multi-Agent"
-
+objective: Adaptive Routing & Multi-Agent
 dependencies:
-  - phase-0
-  - phase-1
-  - phase-2
-
+- phase-0
+- phase-1
+- phase-2
 enabled_domains:
-  - all
-
+- all
 disabled_capabilities:
-  - external_write
-  - dynamic_tool_generation
-
+- external_write
+- dynamic_tool_generation
 requirements:
+  - AH-AGENT-AUTHORING-001
   - AH-MULTIAGENT-DAG-001
   - AH-MULTIAGENT-MERGE-001
   - AH-ROUTER-BUDGET-DYNAMIC-001
@@ -26,54 +23,45 @@ requirements:
   - AH-ROUTER-FALLBACK-11-001
   - AH-ROUTER-SKILL-CHAIN-001
   - AH-SUBAGENT-001
-
 fixtures:
-  - fixtures/phase-3/valid/
-  - fixtures/phase-3/invalid/
-
-unit_tests: "tests/phase-3/unit/"
-integration_tests: "tests/phase-3/integration/"
-e2e_tests: "tests/phase-3/e2e/"
-security_tests: "tests/phase-3/security/"
-
+- fixtures/phase-3/valid/
+- fixtures/phase-3/invalid/
+unit_tests: tests/phase-3/unit/
+integration_tests: tests/phase-3/integration/
+e2e_tests: tests/phase-3/e2e/
+security_tests: tests/phase-3/security/
 domain_evals:
-  all: "evals/all/phase-3.yaml"
-
+  all: evals/all/phase-3.yaml
 real_data_tests:
-  synthetic: "data-tests/synthetic/phase-3/"
-  public_benchmarks: "data-tests/public-benchmarks/phase-3/"
-  consented_staging: "data-tests/consented-staging/phase-3/"
-
+  synthetic: data-tests/synthetic/phase-3/
+  public_benchmarks: data-tests/public-benchmarks/phase-3/
+  consented_staging: data-tests/consented-staging/phase-3/
 deployment_target:
-  phase_0: "N/A - specification only"
-  phase_1: "local"
-  phase_2: "local"
-  phase_3: "local"
-  phase_4: "local + staging"
-  phase_5: "staging"
-  phase_6: "staging"
-  phase_7: "canary"
-  phase_8: "production"
-
-gate_command: "python3 factory/phase-gates/gate_runner.py phase3"
-rollback: "auto-rollback if gate fails"
-evidence: "artifacts/phase-3/"
-
+  phase_0: N/A - specification only
+  phase_1: local
+  phase_2: local
+  phase_3: local
+  phase_4: local + staging
+  phase_5: staging
+  phase_6: staging
+  phase_7: canary
+  phase_8: production
+gate_command: python3 factory/phase-gates/gate_runner.py phase3
+rollback: auto-rollback if gate fails
+evidence: artifacts/phase-3/
 entry_criteria:
-  - "Previous phase gate passed"
-  - "All dependencies verified"
-  - "No open P0 blockers"
-
+- Previous phase gate passed
+- All dependencies verified
+- No open P0 blockers
 exit_criteria:
-  - hard_constraint_violation: 0
-  - routing_regret: "<= 15%"
-  - unnecessary_multi_agent_rate: "<= 20%"
-  - context_isolation: PASS
-  - capability_attenuation: PASS
-  - merge_conflict_no_hardcoded_rules: PASS
-
+- hard_constraint_violation: 0
+- routing_regret: <= 15%
+- unnecessary_multi_agent_rate: <= 20%
+- context_isolation: PASS
+- capability_attenuation: PASS
+- merge_conflict_no_hardcoded_rules: PASS
 blocked_conditions:
-  - "Previous phase gate not passed"
-  - "Open P0 blockers"
-  - "Missing dependencies"
-  - "Test environment unavailable"
+- Previous phase gate not passed
+- Open P0 blockers
+- Missing dependencies
+- Test environment unavailable

@@ -1,5 +1,6 @@
 # Harness Boundary
 
+![18-hook-architecture.svg](diagrams/18-hook-architecture.svg)
 
 ![01-harness-14-modules.svg](diagrams/01-harness-14-modules.svg)
 
@@ -52,6 +53,7 @@ harness/
 ├── context/          # Context Compiler, Compaction, Context Window Layout
 ├── memory/           # Memory Store, Consolidation, Provenance
 ├── rag/              # Ingestion, Indexing, Retrieval, Reranking
+├── vfs/              # Virtual Filesystem (FG4): single file-access authority, backend routing, OverlayBackend transactions
 ├── sandbox/          # Process isolation, resource limits
 ├── hooks/            # Hook system
 ├── steering/         # 3-queue steering
@@ -64,6 +66,7 @@ harness/
 ├── ui/               # Frontend (Next.js, shared with apps/)
 ├── ingestion/        # Document ingestion (PDF, DOCX, etc.)
 ├── multimodal/       # Image gen, vision, audio
+├── mobile/           # Push notifications, channels, remote steer (Phase 6)
 └── tests/            # Test files
 ```
 
@@ -76,6 +79,6 @@ Modules communicate via:
 ### Module Independence
 Each module has its own package.json exports. Dependencies flow downward:
 - runtime depends on: security, context
-- router depends on: runtime (for Re-router), security
+- router depends on: runtime (for re-route = new RunPlan revision), security
 - tools depend on: security (for PEP), sandbox
 - No circular dependencies. Agent should verify with `madge --circular` during build.

@@ -1,88 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Complete Execution Flow — User Input → RunConfiguration → Execution → Outcome -->
-<svg width="1400" height="880" viewBox="0 0 1400 880" xmlns="http://www.w3.org/2000/svg">
+<!-- Request to Outcome (v9) — 20-step sequential pipeline -->
+<svg width="1400" height="1000" viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
-<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
 <marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
 </defs>
-<rect x="0" y="0" width="1400" height="880" fill="#0d1117" rx="8"/><text x="20" y="28" fill="#f0f0f5" font-size="15" font-weight="bold">Complete Execution Flow — User Input → RunConfiguration → Execution → Outcome (v8)</text>
-<text x="20" y="46" fill="#8b949e" font-size="11">Harness 永久存在 · 每次输入 → Router 生成 RunConfiguration → Runtime Core 执行 · 不是创建新 Harness</text>
-<rect x="450" y="65" width="500" height="35" fill="#161b22" stroke="#f0f0f5" stroke-width="2" rx="6"/>
-<text x="460" y="83" fill="#f0f0f5" font-size="11" font-weight="bold">1. User Input</text>
-<text x="460" y="99" fill="#8b949e" font-size="9">文本/文件/图片/URL/语音</text>
-<line x1="700" y1="100" x2="700" y2="120" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<rect x="450" y="110" width="500" height="35" fill="#161b22" stroke="#6b7280" stroke-width="2" rx="6"/>
-<text x="460" y="128" fill="#6b7280" font-size="11" font-weight="bold">2. Input Normalizer</text>
-<text x="460" y="144" fill="#8b949e" font-size="9">解析多模态输入</text>
-<line x1="700" y1="145" x2="700" y2="165" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<rect x="450" y="155" width="500" height="35" fill="#161b22" stroke="#6b7280" stroke-width="2" rx="6"/>
-<text x="460" y="173" fill="#6b7280" font-size="11" font-weight="bold">3. Fast Preflight (0 LLM)</text>
-<text x="460" y="189" fill="#8b949e" font-size="9">权限/模态/风险/Provider可用性/预算</text>
-<line x1="700" y1="190" x2="700" y2="210" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<rect x="450" y="200" width="500" height="35" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
-<text x="460" y="218" fill="#58a6ff" font-size="11" font-weight="bold">4. Task Profiler (1 LLM)</text>
-<text x="460" y="234" fill="#8b949e" font-size="9">Intent+Domain+Modality+Complexity+Ambiguity</text>
-<text x="100" y="250" fill="#fbcfe8" font-size="12" font-weight="bold">5. Parallel Candidate Resolution (0 LLM, 确定性)</text>
-<rect x="50" y="260" width="200" height="40" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="60" y="278" fill="#3fb950" font-size="10" font-weight="bold">Strategy Router</text>
-<rect x="270" y="260" width="200" height="40" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
-<text x="280" y="278" fill="#58a6ff" font-size="10" font-weight="bold">Agent Topology</text>
-<rect x="490" y="260" width="200" height="40" fill="#161b22" stroke="#bc8cff" stroke-width="2" rx="6"/>
-<text x="500" y="278" fill="#bc8cff" font-size="10" font-weight="bold">Context Topology v8</text>
-<rect x="710" y="260" width="200" height="40" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
-<text x="720" y="278" fill="#fbbf24" font-size="10" font-weight="bold">Model/API v8</text>
-<rect x="930" y="260" width="200" height="40" fill="#161b22" stroke="#e3b341" stroke-width="2" rx="6"/>
-<text x="940" y="278" fill="#e3b341" font-size="10" font-weight="bold">Tool Router</text>
-<rect x="1150" y="260" width="200" height="40" fill="#161b22" stroke="#f778ba" stroke-width="2" rx="6"/>
-<text x="1160" y="278" fill="#f778ba" font-size="10" font-weight="bold">Skill Router</text>
-<rect x="270" y="310" width="630" height="40" fill="#161b22" stroke="#39c5cf" stroke-width="2" rx="6"/>
-<text x="280" y="328" fill="#39c5cf" font-size="10" font-weight="bold">Execution Env Router + Verification Router</text>
-<rect x="350" y="365" width="700" height="45" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
-<text x="360" y="383" fill="#f85149" font-size="11" font-weight="bold">6. Global Route Optimizer</text>
-<text x="360" y="399" fill="#8b949e" font-size="9">RouteScore = success+quality-cost-latency-risk-pressure-coordination</text>
-<rect x="350" y="420" width="700" height="35" fill="#161b22" stroke="#d29922" stroke-width="2" rx="6"/>
-<text x="360" y="438" fill="#d29922" font-size="11" font-weight="bold">7. Policy Validator</text>
-<text x="360" y="454" fill="#8b949e" font-size="9">删除越权或不安全候选</text>
-<rect x="250" y="470" width="900" height="60" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
-<text x="260" y="488" fill="#fbcfe8" font-size="12" font-weight="bold">8. RunConfiguration</text>
-<text x="260" y="504" fill="#8b949e" font-size="10">strategy + workflow_patterns + agent_topology + context_topology + primary_model + fallback_models</text>
-<text x="260" y="518" fill="#8b949e" font-size="9">selected_tools + selected_skills + execution_environment + policies + limits + routing_evidence</text>
-<rect x="300" y="545" width="800" height="50" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="310" y="563" fill="#3fb950" font-size="11" font-weight="bold">9. Agent Runtime Core</text>
-<text x="310" y="579" fill="#8b949e" font-size="9">Loop · Scheduler · State · Streaming · Single/Multi/Swarm lifecycle</text>
-<text x="310" y="593" fill="#8b949e" font-size="8">Pause / Retry / Resume / Re-route</text>
-<rect x="200" y="610" width="1000" height="55" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
-<text x="210" y="628" fill="#f85149" font-size="11" font-weight="bold">10. PEP Execution</text>
-<text x="210" y="644" fill="#8b949e" font-size="9">verify token + manifest_hash + resource_versions + preconditions + replay</text>
-<text x="210" y="658" fill="#8b949e" font-size="8">execute tool · Secrets Broker inject credential · BudgetGuard扣减 · trace span</text>
-<rect x="200" y="680" width="1000" height="45" fill="#1a1208" stroke="#fbbf24" stroke-width="2" rx="6"/>
-<text x="210" y="698" fill="#fbbf24" font-size="11" font-weight="bold">11. Runtime Monitor + Re-router</text>
-<text x="210" y="714" fill="#8b949e" font-size="9">re-route? (strategy/model/topology/context) · fallback? · budget?</text>
-<text x="210" y="728" fill="#8b949e" font-size="8">不重新造Harness, 只重新路由</text>
-<rect x="300" y="740" width="800" height="45" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="310" y="758" fill="#3fb950" font-size="11" font-weight="bold">12. Verification & Recovery</text>
-<text x="310" y="774" fill="#8b949e" font-size="9">确定性检查 → fail → re-route → reconcile/compensate/revert</text>
-<rect x="300" y="800" width="800" height="50" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
-<text x="310" y="818" fill="#fbcfe8" font-size="11" font-weight="bold">13. Task Complete</text>
-<text x="310" y="834" fill="#8b949e" font-size="9">TaskExecutionRecord → Evolution Engine (Observe+Extract) → SelfModel update</text>
-<text x="310" y="848" fill="#8b949e" font-size="8">输出结果 + trace</text>
-<line x1="700" y1="100" x2="700" y2="110" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="145" x2="700" y2="155" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="190" x2="700" y2="200" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="235" x2="700" y2="250" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="305" x2="700" y2="365" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="410" x2="700" y2="420" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="455" x2="700" y2="470" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="530" x2="700" y2="545" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="595" x2="700" y2="610" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="665" x2="700" y2="680" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="725" x2="700" y2="740" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<line x1="700" y1="785" x2="700" y2="800" stroke="#8b949e" stroke-width="1" marker-end="url(#ab)"/>
-<path d="M 1100 740 Q 1200 500 1100 365" fill="none" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ab)"/>
-<text x="1150" y="550" fill="#58a6ff" font-size="10">L9 fail → re-route</text>
-<path d="M 300 800 Q 100 600 300 545" fill="none" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ag)"/>
-<text x="150" y="680" fill="#3fb950" font-size="9">Evolution → optimize</text>
-<rect x="50" y="835" width="1300" height="35" fill="#1a0808" stroke="#fbcfe8" stroke-width="2" rx="6"/>
-<text x="60" y="853" fill="#fbcfe8" font-size="11" font-weight="bold">关键: 第11步不是重新搭建Harness · 只是局部重新路由 · Harness永久存在 · RunConfiguration是本次运行配置</text>
+<rect x="0" y="0" width="1400" height="1000" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Request-to-Outcome Pipeline (v9) — 20 步顺序流水线</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">request-to-outcome.md · v9: Policy 在 S3(路由前) · PEP 每个动作 · 顺序非并行 · Memory Write 带 PII 检查</text>
+<rect x="10" y="70" width="680" height="840" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="350" y="92" fill="#58a6ff" font-size="12" font-weight="bold" text-anchor="middle">输入 + 路由 (步骤 1-13)</text>
+<rect x="30" y="110" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="128" fill="#8b949e" font-size="9" font-weight="bold">01</text><text x="75" y="128" fill="#f0f6fc" font-size="10">Input Normalization</text>
+<line x1="350" y1="138" x2="350" y2="146" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="146" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="164" fill="#8b949e" font-size="9" font-weight="bold">02</text><text x="75" y="164" fill="#f0f6fc" font-size="10">Identity Resolution</text>
+<line x1="350" y1="174" x2="350" y2="182" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="182" width="640" height="34" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/><text x="45" y="200" fill="#f85149" font-size="9" font-weight="bold">03</text><text x="75" y="200" fill="#f0f6fc" font-size="10">Immutable Policy Constraints</text><text x="430" y="200" fill="#f85149" font-size="8" font-weight="bold">★ v9: 安全在此进入, 路由之前</text>
+<line x1="350" y1="216" x2="350" y2="224" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="224" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="242" fill="#8b949e" font-size="9" font-weight="bold">04</text><text x="75" y="242" fill="#f0f6fc" font-size="10">Task Profiling (1 LLM max)</text>
+<line x1="350" y1="252" x2="350" y2="260" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="260" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="278" fill="#8b949e" font-size="9" font-weight="bold">05</text><text x="75" y="278" fill="#f0f6fc" font-size="10">Context / Capability Probe</text>
+<line x1="350" y1="288" x2="350" y2="296" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="296" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="314" fill="#8b949e" font-size="9" font-weight="bold">06</text><text x="75" y="314" fill="#f0f6fc" font-size="10">Workflow Candidate Generation</text>
+<line x1="350" y1="324" x2="350" y2="332" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="332" width="640" height="28" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/><text x="45" y="350" fill="#8b949e" font-size="9" font-weight="bold">07</text><text x="75" y="350" fill="#f0f6fc" font-size="10">Resource Binding (model/tool/skill/env)</text>
+<line x1="350" y1="360" x2="350" y2="368" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="368" width="640" height="28" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/><text x="45" y="386" fill="#bc8cff" font-size="9" font-weight="bold">08</text><text x="75" y="386" fill="#f0f6fc" font-size="10">AgentGraph Planning</text><text x="350" y="386" fill="#fbbf24" font-size="8">F7: static_dag|routing_slip|workflow_script</text>
+<line x1="350" y1="396" x2="350" y2="404" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="404" width="640" height="28" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/><text x="45" y="422" fill="#bc8cff" font-size="9" font-weight="bold">09</text><text x="75" y="422" fill="#f0f6fc" font-size="10">ContextGraph Planning</text><text x="350" y="422" fill="#8b949e" font-size="8">7 拓扑 · F8 cross-process</text>
+<line x1="350" y1="432" x2="350" y2="440" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="440" width="640" height="28" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/><text x="45" y="458" fill="#e3b341" font-size="9" font-weight="bold">10</text><text x="75" y="458" fill="#f0f6fc" font-size="10">VerificationGraph Planning</text>
+<line x1="350" y1="468" x2="350" y2="476" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="476" width="640" height="28" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/><text x="45" y="494" fill="#fbbf24" font-size="9" font-weight="bold">11</text><text x="75" y="494" fill="#f0f6fc" font-size="10">Joint Constraint Solver</text><text x="350" y="494" fill="#8b949e" font-size="8">贪心 → CSP (regret&gt;15%)</text>
+<line x1="350" y1="504" x2="350" y2="512" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="512" width="640" height="28" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/><text x="45" y="530" fill="#f85149" font-size="9" font-weight="bold">12</text><text x="75" y="530" fill="#f0f6fc" font-size="10">Policy Validation</text>
+<line x1="350" y1="540" x2="350" y2="548" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="30" y="548" width="640" height="38" fill="#1a0808" stroke="#fbcfe8" stroke-width="3" rx="4"/><text x="45" y="566" fill="#fbcfe8" font-size="10" font-weight="bold">13</text><text x="75" y="566" fill="#fbcfe8" font-size="11" font-weight="bold">RunPlan Freeze</text><text x="75" y="580" fill="#8b949e" font-size="8">22 必填字段 · run_plan_hash · 唯一执行契约</text>
+<rect x="710" y="70" width="680" height="840" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="1050" y="92" fill="#3fb950" font-size="12" font-weight="bold" text-anchor="middle">执行 + 验证 + 产出 (步骤 14-20)</text>
+<line x1="670" y1="567" x2="710" y2="120" stroke="#3fb950" stroke-width="2" marker-end="url(#ag)"/>
+<rect x="730" y="110" width="640" height="38" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/><text x="745" y="128" fill="#3fb950" font-size="9" font-weight="bold">14</text><text x="775" y="128" fill="#f0f6fc" font-size="10">Runtime Execution</text><text x="775" y="142" fill="#8b949e" font-size="8">F2: setup(network) → agent(offline, 凭证剥离)</text>
+<line x1="1050" y1="148" x2="1050" y2="156" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="156" width="640" height="38" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/><text x="745" y="174" fill="#f85149" font-size="9" font-weight="bold">15</text><text x="775" y="174" fill="#f0f6fc" font-size="10">Per-Action Authorization (PEP)</text><text x="775" y="188" fill="#f85149" font-size="8">★ 每个动作 · CTRL-REVALIDATE-001 · CTRL-CAPABILITY-SINGLE-USE-001</text>
+<line x1="1050" y1="194" x2="1050" y2="202" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="202" width="640" height="38" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/><text x="745" y="220" fill="#e3b341" font-size="9" font-weight="bold">16</text><text x="775" y="220" fill="#f0f6fc" font-size="10">Tool / Model Execution</text><text x="775" y="234" fill="#8b949e" font-size="8">VFS dispatch (F4) · Sandbox · CTRL-EGRESS-002 · CTRL-SCREEN-ISOLATION-001</text>
+<line x1="1050" y1="240" x2="1050" y2="248" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="248" width="640" height="38" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/><text x="745" y="266" fill="#e3b341" font-size="9" font-weight="bold">17</text><text x="775" y="266" fill="#f0f6fc" font-size="10">Verification</text><text x="775" y="280" fill="#8b949e" font-size="8">独立验证器 · 不同模型族 · 只读 · E0-E7 evidence</text>
+<line x1="1050" y1="286" x2="1050" y2="294" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="294" width="640" height="38" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/><text x="745" y="312" fill="#fbbf24" font-size="9" font-weight="bold">18</text><text x="775" y="312" fill="#f0f6fc" font-size="10">Reconciliation</text><text x="775" y="326" fill="#8b949e" font-size="8">EFFECT_UNKNOWN → 对账 (diagram 12)</text>
+<line x1="1050" y1="332" x2="1050" y2="340" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="340" width="640" height="38" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/><text x="745" y="358" fill="#3fb950" font-size="9" font-weight="bold">19</text><text x="775" y="358" fill="#f0f6fc" font-size="10">Outcome Package</text><text x="775" y="372" fill="#8b949e" font-size="8">交付物(可用物件, 非文字总结)</text>
+<line x1="1050" y1="378" x2="1050" y2="386" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="730" y="386" width="640" height="38" fill="#1a0808" stroke="#bc8cff" stroke-width="2" rx="4"/><text x="745" y="404" fill="#bc8cff" font-size="9" font-weight="bold">20</text><text x="775" y="404" fill="#f0f6fc" font-size="10">Memory Write Proposal</text><text x="775" y="418" fill="#f85149" font-size="8">★ PII 检查 (AR-008): 敏感→本地, 脱敏→云</text>
+<rect x="730" y="440" width="640" height="110" fill="#0d1117" stroke="#bc8cff" stroke-width="1" stroke-dasharray="6,3" rx="4"/>
+<text x="1050" y="458" fill="#bc8cff" font-size="11" font-weight="bold" text-anchor="middle">Scheduled / Routine Task Pipeline</text>
+<text x="740" y="478" fill="#8b949e" font-size="9">Trigger → Re-evaluate policy → Rebuild context</text>
+<text x="740" y="495" fill="#f85149" font-size="9" font-weight="bold">→ Confirm credentials (must be fresh, not days-old)</text>
+<text x="740" y="512" fill="#8b949e" font-size="9">→ Run (always enters agent phase)</text>
+<text x="740" y="530" fill="#8b949e" font-size="8">不可复用旧 Capability</text>
+<rect x="730" y="570" width="640" height="180" fill="#161b22" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1050" y="590" fill="#f85149" font-size="11" font-weight="bold" text-anchor="middle">v9 核心修正 (vs v8)</text>
+<text x="740" y="610" fill="#f85149" font-size="9">1. Policy 在步骤 3(v8 在步骤 7 之后)</text>
+<text x="740" y="628" fill="#f85149" font-size="9">2. PEP 每个动作(v8 仅 plan validation)</text>
+<text x="740" y="646" fill="#f85149" font-size="9">3. Child Capability 由 Auth Service 签</text>
+<text x="740" y="664" fill="#f85149" font-size="9">4. EffectRisk 替代静态 risk tier</text>
+<text x="740" y="682" fill="#f85149" font-size="9">5. Re-route = 新 RunPlan revision + 撤旧 Capability</text>
+<text x="740" y="700" fill="#f85149" font-size="9">6. 顺序 20 步(v8 并行候选 + Promise.all)</text>
+<text x="740" y="718" fill="#f85149" font-size="9">7. Memory Write 带 PII 检查(AR-008)</text>
+<rect x="30" y="640" width="640" height="180" fill="#161b22" stroke="#30363d" rx="4"/>
+<text x="350" y="660" fill="#8b949e" font-size="11" font-weight="bold" text-anchor="middle">指令优先级 (高→低)</text>
+<text x="40" y="680" fill="#f0f6fc" font-size="9">1. Platform policy</text>
+<text x="40" y="697" fill="#f0f6fc" font-size="9">2. Organization policy</text>
+<text x="40" y="714" fill="#f0f6fc" font-size="9">3. Project policy</text>
+<text x="40" y="731" fill="#f0f6fc" font-size="9">4. User instruction</text>
+<text x="40" y="748" fill="#f0f6fc" font-size="9">5. Task instruction</text>
+<text x="40" y="765" fill="#fbbf24" font-size="9">6. Retrieved content (RAG, web) — untrusted</text>
+<text x="40" y="782" fill="#fbbf24" font-size="9">7. Tool output — untrusted</text>
+<text x="40" y="805" fill="#f85149" font-size="9" font-weight="bold">低信任不可覆盖高信任</text>
+<rect x="30" y="840" width="1340" height="80" fill="#161b22" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="700" y="860" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">产出反馈: Outcome → Memory Write → User-visible → Evolution Observe → SelfModel</text>
+<text x="700" y="880" fill="#8b949e" font-size="9" text-anchor="middle">无独立 Re-router · 需调整时回到步骤 13 生成新 RunPlan revision · Evolution Phase 4+ shadow mode</text>
+<text x="700" y="900" fill="#8b949e" font-size="9" text-anchor="middle">5 横切平面: Control(Router+Policy) · Data(Runtime+ToolHost) · Observability(Audit+Trace) · Identity(AuthService) · Budget(BudgetGuard+PEP)</text>
 </svg>

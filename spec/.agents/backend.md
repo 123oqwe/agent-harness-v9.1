@@ -6,7 +6,7 @@
 - workflow engine
 
 ## Allowed Paths
-- src/backend/, api/
+- harness/backend/, api/
 
 ## Forbidden Paths
 - contracts/

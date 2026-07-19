@@ -35,6 +35,9 @@ requirements:
   - AH-OBS-EVENTS-001
   - AH-OBS-OTEL-001
   - AH-OBS-TRACE-001
+  - AH-EVOL-DEDUP-001
+  - AH-EVOL-TECHDEBT-001
+  - AH-EVOL-EVALDRIFT-001
 
 fixtures:
   - fixtures/phase-4/valid/

@@ -1,0 +1,61 @@
+# Screen: tui (Terminal User Interface)
+screen_id: tui
+canonical_route: tui  # not a web route; launched via `harness cli`
+allowed_roles: ['user', 'admin']
+experience_profile: developer
+purpose: "Terminal-based agent interaction (G-PI2)"
+
+rendering:
+  type: diff_render
+  color: true
+  unicode: true
+
+layout:
+  panes:
+    - id: conversation
+      position: left
+      min_width: 60
+      content: message_list + input_bar
+    - id: tool_status
+      position: right_top
+      min_width: 30
+      content: tool_call_start/tool_result stream
+    - id: file_diff
+      position: right_bottom
+      min_width: 30
+      content: file_change events (read-only diff)
+  split: vertical
+
+data_dependencies:
+  - POST /runs
+  - GET /runs/{runId}/events
+  - POST /runs/{runId}/steer
+
+stream_events:
+  - run_event_stream
+
+keyboard_navigation:
+  - tab: next_pane
+  - shift+tab: previous_pane
+  - enter: send_message
+  - ctrl+c: cancel_run
+  - esc: blur_input
+  - ":": command_mode (vim-style: :approve, :reject, :steer)
+  - q: quit
+
+states:
+  loading: "spinner + last event"
+  running: "live stream"
+  awaiting_approval: "highlight approval prompt; 'a' approve, 'r' reject"
+  error: "red error panel"
+  paused: "yellow pause indicator"
+
+accessibility:
+  screen_reader_fallback: "--tui-log outputs plain text"
+  high_contrast: true
+  reduced_motion: true
+
+permissions:
+  - runs:read
+  - runs:write
+  - runs:steer

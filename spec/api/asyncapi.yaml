@@ -41,7 +41,7 @@ channels:
               type: string
             type:
               type: string
-              enum: [run_started, step_started, tool_called, tool_result, model_response, verification_result, state_changed, budget_update, error, run_completed, run_failed, re_route, pause, resume, cancel]
+              enum: [run_started, step_started, tool_called, tool_result, model_response, verification_result, state_changed, budget_update, error, run_completed, run_failed, re_route, pause, resume, cancel, workflow_graph]
             timestamp:
               type: string
               format: date-time

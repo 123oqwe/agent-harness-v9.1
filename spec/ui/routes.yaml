@@ -1,4 +1,6 @@
 # UI Routes
+# Note: tui is a separate delivery surface launched via `harness cli`, not a web route.
+# See ui/screens/tui.yaml for TUI spec (G-PI2).
 routes:
   - path: /
     screen: chat

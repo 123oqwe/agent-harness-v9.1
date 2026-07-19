@@ -1,24 +1,20 @@
 phase: 5
-name: "Certified External Actions"
+name: Certified External Actions
 status: BLOCKED
-objective: "Certified External Actions"
-
+objective: Certified External Actions
 dependencies:
-  - phase-0
-  - phase-1
-  - phase-2
-  - phase-3
-  - phase-4
-
+- phase-0
+- phase-1
+- phase-2
+- phase-3
+- phase-4
 enabled_domains:
-  - external_actions
-  - personal_assistant
-
+- external_actions
+- personal_assistant
 disabled_capabilities:
-  - payment
-  - deploy
-  - db_migrate
-
+- payment
+- deploy
+- db_migrate
 requirements:
   - AH-EXT-CALENDAR-001
   - AH-EXT-CERT-FRAMEWORK-001
@@ -31,55 +27,47 @@ requirements:
   - AH-EXT-RECONCILE-001
   - AH-EXT-SAGA-001
   - AH-EXT-SLACK-001
-
+  - AH-VERIFIER-AUTOREVIEW-001
 fixtures:
-  - fixtures/phase-5/valid/
-  - fixtures/phase-5/invalid/
-
-unit_tests: "tests/phase-5/unit/"
-integration_tests: "tests/phase-5/integration/"
-e2e_tests: "tests/phase-5/e2e/"
-security_tests: "tests/phase-5/security/"
-
+- fixtures/phase-5/valid/
+- fixtures/phase-5/invalid/
+unit_tests: tests/phase-5/unit/
+integration_tests: tests/phase-5/integration/
+e2e_tests: tests/phase-5/e2e/
+security_tests: tests/phase-5/security/
 domain_evals:
-  external_actions: "evals/external_actions/phase-5.yaml"
-  personal_assistant: "evals/personal_assistant/phase-5.yaml"
-
+  external_actions: evals/external_actions/phase-5.yaml
+  personal_assistant: evals/personal_assistant/phase-5.yaml
 real_data_tests:
-  synthetic: "data-tests/synthetic/phase-5/"
-  public_benchmarks: "data-tests/public-benchmarks/phase-5/"
-  consented_staging: "data-tests/consented-staging/phase-5/"
-
+  synthetic: data-tests/synthetic/phase-5/
+  public_benchmarks: data-tests/public-benchmarks/phase-5/
+  consented_staging: data-tests/consented-staging/phase-5/
 deployment_target:
-  phase_0: "N/A - specification only"
-  phase_1: "local"
-  phase_2: "local"
-  phase_3: "local"
-  phase_4: "local + staging"
-  phase_5: "staging"
-  phase_6: "staging"
-  phase_7: "canary"
-  phase_8: "production"
-
-gate_command: "python3 factory/phase-gates/gate_runner.py phase5"
-rollback: "auto-rollback if gate fails"
-evidence: "artifacts/phase-5/"
-
+  phase_0: N/A - specification only
+  phase_1: local
+  phase_2: local
+  phase_3: local
+  phase_4: local + staging
+  phase_5: staging
+  phase_6: staging
+  phase_7: canary
+  phase_8: production
+gate_command: python3 factory/phase-gates/gate_runner.py phase5
+rollback: auto-rollback if gate fails
+evidence: artifacts/phase-5/
 entry_criteria:
-  - "Previous phase gate passed"
-  - "All dependencies verified"
-  - "No open P0 blockers"
-
+- Previous phase gate passed
+- All dependencies verified
+- No open P0 blockers
 exit_criteria:
-  - unauthorized_effect_rate: 0
-  - duplicate_effect_rate: 0
-  - email_compensation: unavailable (NOT retractable)
-  - payment_deploy_db_migrate: NOT CERTIFIED (blocked)
-  - crash_after_dispatch: PASS
-  - network_partition: PASS
-
+- unauthorized_effect_rate: 0
+- duplicate_effect_rate: 0
+- email_compensation: unavailable (NOT retractable)
+- payment_deploy_db_migrate: NOT CERTIFIED (blocked)
+- crash_after_dispatch: PASS
+- network_partition: PASS
 blocked_conditions:
-  - "Previous phase gate not passed"
-  - "Open P0 blockers"
-  - "Missing dependencies"
-  - "Test environment unavailable"
+- Previous phase gate not passed
+- Open P0 blockers
+- Missing dependencies
+- Test environment unavailable

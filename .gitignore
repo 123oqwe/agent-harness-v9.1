@@ -5,3 +5,11 @@ __pycache__/
 *.log
 evidence/rerun/
 worktrees/
+.harness/
+*.bak
+*.lock
+*.tmp
+*.swp
+*~
+factory/state-store/state.json
+factory/state-store/state.json.lock

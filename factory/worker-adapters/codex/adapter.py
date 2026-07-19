@@ -49,6 +49,12 @@ Security Invariants:
 
 Test commands: {context_packet.get('test_commands', [])}
 
+Architecture docs (content included below — do NOT re-read these files):
+{chr(10).join(f'--- spec/{d} ---\n{context_packet.get('relevant_docs_content', {}).get(d, '(file not found)')}' for d in context_packet.get('relevant_docs', []))}
+
+Relevant schemas:
+{chr(10).join(f'- spec/{s["path"]}: {s.get("title","")}' for s in context_packet.get('relevant_schemas', []))}
+
 Definition of Done: {context_packet.get('definition_of_done', 'All criteria met + tests pass')}
 
 Write tests first, then implement. Run actual tests. Do NOT modify files in forbidden paths.
@@ -58,7 +64,7 @@ Write tests first, then implement. Run actual tests. Do NOT modify files in forb
     session["status"] = "ready_to_dispatch"
     return session
 
-def dispatch(session, timeout=600):
+def dispatch(session, timeout=1800):
     """[REAL] Dispatch the worker — actually Popen codex exec.
     
     Executes: codex exec --json <prompt>

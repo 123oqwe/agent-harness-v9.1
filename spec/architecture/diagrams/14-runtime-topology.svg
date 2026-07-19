@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Runtime Topology (v9) — Phase 1 single-process → Phase 3 cross-process → Phase 5 cross-host -->
+<svg width="1400" height="920" viewBox="0 0 1400 920" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="920" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Runtime Topology — 三阶段演进 (v9)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">Phase 1 单进程 → Phase 3 跨进程(F8 obo+jws) → Phase 5 跨主机+外部 · runtime-topology.md · harness-boundary.md 通信演进</text>
+
+<!-- Phase 1 -->
+<rect x="20" y="70" width="440" height="380" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="240" y="90" fill="#3fb950" font-size="13" font-weight="bold" text-anchor="middle">Phase 1: 单进程 (Local)</text>
+<text x="240" y="105" fill="#8b949e" font-size="9" text-anchor="middle">typed function calls · TCB 6 组件同进程</text>
+<rect x="40" y="120" width="120" height="35" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="100" y="140" fill="#58a6ff" font-size="9" text-anchor="middle">Router</text>
+<rect x="180" y="120" width="120" height="35" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="240" y="140" fill="#3fb950" font-size="9" text-anchor="middle">Runtime</text>
+<rect x="320" y="120" width="120" height="35" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="380" y="140" fill="#e3b341" font-size="9" text-anchor="middle">Tools</text>
+<line x1="160" y1="137" x2="180" y2="137" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="300" y1="137" x2="320" y2="137" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="40" y="170" width="120" height="35" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="100" y="190" fill="#f85149" font-size="9" text-anchor="middle">Security/PEP</text>
+<rect x="180" y="170" width="120" height="35" fill="#39c5cf" stroke="#39c5cf" stroke-width="1" rx="4" fill-opacity="0.2"/>
+<text x="240" y="190" fill="#39c5cf" font-size="9" text-anchor="middle">VFS</text>
+<rect x="320" y="170" width="120" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="380" y="190" fill="#8b949e" font-size="9" text-anchor="middle">LocalBackend (FS)</text>
+<line x1="100" y1="155" x2="100" y2="170" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="240" y1="155" x2="240" y2="170" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="240" y1="187" x2="320" y2="187" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="40" y="220" width="120" height="35" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="100" y="240" fill="#bc8cff" font-size="9" text-anchor="middle">Audit (WORM)</text>
+<line x1="100" y1="205" x2="100" y2="220" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<text x="40" y="280" fill="#3fb950" font-size="9" font-weight="bold">✓ 无需 TLS (无网络)</text>
+<text x="40" y="295" fill="#3fb950" font-size="9">✓ Capability: in-memory 签名</text>
+<text x="40" y="310" fill="#3fb950" font-size="9">✓ VFS: 全 backend in-process</text>
+<text x="40" y="325" fill="#3fb950" font-size="9">✓ tRPC: 仅 UI API 暴露</text>
+<text x="40" y="345" fill="#8b949e" font-size="9">event bus: 不需要</text>
+<text x="40" y="360" fill="#8b949e" font-size="9">F8 消息安全: 不需要</text>
+<text x="40" y="380" fill="#fbbf24" font-size="9">Phase 1 实现 scope: 仅此拓扑</text>
+<text x="40" y="395" fill="#8b949e" font-size="9">无需 Redis/Temporal (Phase 4+)</text>
+
+<!-- Phase 3 -->
+<rect x="480" y="70" width="440" height="380" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="90" fill="#fbbf24" font-size="13" font-weight="bold" text-anchor="middle">Phase 3: 跨进程 Multi-Agent</text>
+<text x="700" y="105" fill="#8b949e" font-size="9" text-anchor="middle">7 context topologies · F8: obo_token + jws_signature · CTRL-MSG-INTEGRITY-001</text>
+<rect x="540" y="120" width="160" height="50" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="620" y="138" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">Runtime (supervisor)</text>
+<text x="620" y="153" fill="#8b949e" font-size="8" text-anchor="middle">in-process, central</text>
+<line x1="620" y1="170" x2="540" y2="200" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<line x1="620" y1="170" x2="700" y2="200" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<text x="555" y="188" fill="#58a6ff" font-size="7">TLS+obo+jws</text>
+<text x="660" y="188" fill="#58a6ff" font-size="7">TLS+obo+jws</text>
+<rect x="500" y="200" width="110" height="90" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="555" y="218" fill="#e3b341" font-size="9" font-weight="bold" text-anchor="middle">Worker A</text>
+<text x="510" y="234" fill="#8b949e" font-size="7">Tools (in worker)</text>
+<text x="510" y="247" fill="#8b949e" font-size="7">VFS /scratch/* local</text>
+<text x="510" y="260" fill="#8b949e" font-size="7">PEP (per-worker)</text>
+<text x="510" y="273" fill="#8b949e" font-size="7">Audit→central</text>
+<text x="510" y="286" fill="#f85149" font-size="7">独立 OverlayBackend</text>
+<rect x="630" y="200" width="110" height="90" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="685" y="218" fill="#e3b341" font-size="9" font-weight="bold" text-anchor="middle">Worker B</text>
+<text x="640" y="234" fill="#8b949e" font-size="7">同上结构</text>
+<text x="640" y="250" fill="#8b949e" font-size="7">独立进程</text>
+<text x="640" y="266" fill="#8b949e" font-size="7">独立 VFS overlay</text>
+<text x="500" y="315" fill="#fbbf24" font-size="9" font-weight="bold">F8 边界:</text>
+<text x="500" y="330" fill="#8b949e" font-size="9">TLS 只保护通道</text>
+<text x="500" y="345" fill="#8b949e" font-size="9">消息落盘后需自带签名</text>
+<text x="500" y="360" fill="#f85149" font-size="9" font-weight="bold">obo_token: 链不超原用户权限</text>
+<text x="500" y="375" fill="#f85149" font-size="9" font-weight="bold">jws: 完整性+真实性</text>
+<text x="500" y="390" fill="#8b949e" font-size="9">jwe (可选): 共享 broker 保密</text>
+<text x="640" y="330" fill="#fbbf24" font-size="9" font-weight="bold">Phase 3 前置:</text>
+<text x="640" y="345" fill="#8b949e" font-size="9">1. F8 消息安全</text>
+<text x="640" y="360" fill="#8b949e" font-size="9">2. CTRL-CONTEXT-ISOLATION</text>
+<text x="640" y="375" fill="#8b949e" font-size="9">3. CTRL-TOOL-MASK-001</text>
+<text x="640" y="390" fill="#8b949e" font-size="9">  (否则 DAG 经济不可行)</text>
+
+<!-- Phase 5 -->
+<rect x="940" y="70" width="440" height="380" fill="#161b22" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="1160" y="90" fill="#f85149" font-size="13" font-weight="bold" text-anchor="middle">Phase 5+: 跨主机 + 外部</text>
+<text x="1160" y="105" fill="#8b949e" font-size="9" text-anchor="middle">external-effect.machine.json (14态) · obo_token 外部委托 · Phase 7 企业 VPC</text>
+<rect x="1000" y="120" width="160" height="40" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="4"/>
+<text x="1080" y="143" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">Cloud Control Plane</text>
+<line x1="1080" y1="160" x2="1000" y2="200" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="1080" y1="160" x2="1160" y2="200" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="1080" y1="160" x2="1240" y2="200" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<text x="990" y="180" fill="#8b949e" font-size="7">TLS</text>
+<text x="1110" y="180" fill="#8b949e" font-size="7">TLS</text>
+<text x="1190" y="180" fill="#8b949e" font-size="7">TLS</text>
+<rect x="960" y="200" width="120" height="80" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="1020" y="218" fill="#e3b341" font-size="9" font-weight="bold" text-anchor="middle">Worker Host A</text>
+<text x="970" y="234" fill="#8b949e" font-size="7">VFS /workspace/*</text>
+<text x="970" y="247" fill="#8b949e" font-size="7">(真实 FS on host)</text>
+<text x="970" y="265" fill="#3fb950" font-size="7">→ obo_token →</text>
+<rect x="1090" y="200" width="120" height="80" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="1150" y="218" fill="#e3b341" font-size="9" font-weight="bold" text-anchor="middle">Worker Host B</text>
+<text x="1100" y="234" fill="#8b949e" font-size="7">同上结构</text>
+<text x="1100" y="250" fill="#3fb950" font-size="7">→ obo_token →</text>
+<rect x="1220" y="200" width="140" height="80" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1290" y="218" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">Enterprise VPC</text>
+<text x="1230" y="234" fill="#8b949e" font-size="7">Local Vault (无egress)</text>
+<text x="1230" y="247" fill="#8b949e" font-size="7">Audit (enterprise WORM)</text>
+<text x="1230" y="260" fill="#8b949e" font-size="7">RBAC + 多租户隔离</text>
+<rect x="960" y="295" width="100" height="30" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="1010" y="313" fill="#3fb950" font-size="8" text-anchor="middle">Gmail API</text>
+<rect x="1090" y="295" width="100" height="30" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="1140" y="313" fill="#3fb950" font-size="8" text-anchor="middle">Calendar API</text>
+<line x1="1020" y1="280" x2="1010" y2="295" stroke="#3fb950" stroke-width="1" marker-end="url(#ag)"/>
+<line x1="1150" y1="280" x2="1140" y2="295" stroke="#3fb950" stroke-width="1" marker-end="url(#ag)"/>
+<text x="960" y="345" fill="#f85149" font-size="9" font-weight="bold">外部动作:</text>
+<text x="960" y="360" fill="#8b949e" font-size="9">每个 adapter 有独立</text>
+<text x="960" y="375" fill="#8b949e" font-size="9">external-effect.machine.json</text>
+<text x="960" y="390" fill="#8b949e" font-size="9">PREPARING→COMMITTING→</text>
+<text x="960" y="405" fill="#8b949e" font-size="9">IN_FLIGHT→EFFECT_*</text>
+<text x="1140" y="345" fill="#fbbf24" font-size="9" font-weight="bold">Phase 5 前置:</text>
+<text x="1140" y="360" fill="#8b949e" font-size="9">1. external-effect 14态</text>
+<text x="1140" y="375" fill="#8b949e" font-size="9">2. obo_token 外部委托</text>
+<text x="1140" y="390" fill="#8b949e" font-size="9">3. provider read-back</text>
+<text x="1140" y="405" fill="#8b949e" font-size="9">  (failure-recovery.md)</text>
+
+<!-- TCB distribution table -->
+<rect x="20" y="470" width="1360" height="220" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="700" y="490" fill="#fbcfe8" font-size="12" font-weight="bold" text-anchor="middle">TCB 6 组件分布演进</text>
+<text x="40" y="515" fill="#8b949e" font-size="9" font-weight="bold">组件</text>
+<text x="240" y="515" fill="#3fb950" font-size="9" font-weight="bold">Phase 1</text>
+<text x="540" y="515" fill="#fbbf24" font-size="9" font-weight="bold">Phase 3</text>
+<text x="940" y="515" fill="#f85149" font-size="9" font-weight="bold">Phase 5+</text>
+<line x1="30" y1="522" x2="1370" y2="522" stroke="#30363d" stroke-width="1"/>
+<text x="40" y="540" fill="#f0f6fc" font-size="9">Workflow Control Plane</text>
+<text x="240" y="540" fill="#8b949e" font-size="9">in-process</text>
+<text x="540" y="540" fill="#8b949e" font-size="9">in-process (supervisor)</text>
+<text x="940" y="540" fill="#8b949e" font-size="9">cloud control plane</text>
+<text x="40" y="560" fill="#f0f6fc" font-size="9">Policy Decision Point</text>
+<text x="240" y="560" fill="#8b949e" font-size="9">in-process</text>
+<text x="540" y="560" fill="#8b949e" font-size="9">in-process (central)</text>
+<text x="940" y="560" fill="#8b949e" font-size="9">in-process or enterprise-managed</text>
+<text x="40" y="580" fill="#f0f6fc" font-size="9">Authorization Service</text>
+<text x="240" y="580" fill="#8b949e" font-size="9">in-process</text>
+<text x="540" y="580" fill="#8b949e" font-size="9">in-process (central)</text>
+<text x="940" y="580" fill="#8b949e" font-size="9">in-process (central)</text>
+<text x="40" y="600" fill="#f0f6fc" font-size="9">Secrets Broker</text>
+<text x="240" y="600" fill="#8b949e" font-size="9">in-process</text>
+<text x="540" y="600" fill="#8b949e" font-size="9">in-process (central)</text>
+<text x="940" y="600" fill="#8b949e" font-size="9">in-process + enterprise KMS</text>
+<text x="40" y="620" fill="#f0f6fc" font-size="9">Execution Supervisor / PEP</text>
+<text x="240" y="620" fill="#8b949e" font-size="9">in-process</text>
+<text x="540" y="620" fill="#8b949e" font-size="9">per-worker process</text>
+<text x="940" y="620" fill="#8b949e" font-size="9">per-worker host</text>
+<text x="40" y="640" fill="#f0f6fc" font-size="9">Independent Audit Sink</text>
+<text x="240" y="640" fill="#8b949e" font-size="9">in-process WORM</text>
+<text x="540" y="640" fill="#8b949e" font-size="9">central WORM (network)</text>
+<text x="940" y="640" fill="#8b949e" font-size="9">enterprise-owned WORM</text>
+<text x="40" y="670" fill="#fbbf24" font-size="9">通信演进: P1-3 函数调用 → P2+ tRPC(UI) → P4+ event bus(异步跨进程)</text>
+<text x="40" y="685" fill="#f85149" font-size="9">F8 强制点: Phase 4+ event bus 时, obo_token + jws_signature 成为强制项</text>
+
+<!-- Module independence -->
+<rect x="20" y="710" width="1360" height="190" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="700" y="730" fill="#fbcfe8" font-size="12" font-weight="bold" text-anchor="middle">模块依赖方向 (harness-boundary.md, 无循环)</text>
+<text x="40" y="755" fill="#3fb950" font-size="9">runtime depends on: security, context</text>
+<text x="300" y="755" fill="#58a6ff" font-size="9">router depends on: runtime (re-route=new RunPlan), security</text>
+<text x="700" y="755" fill="#e3b341" font-size="9">tools depend on: security (PEP), sandbox</text>
+<text x="1000" y="755" fill="#39c5cf" font-size="9">vfs: 独立, 被 tools/RAG/memory 共用</text>
+<text x="40" y="780" fill="#8b949e" font-size="9">验证: madge --circular (构建时)</text>
+<text x="40" y="800" fill="#fbbf24" font-size="9">5 横切平面:</text>
+<text x="40" y="815" fill="#8b949e" font-size="9">Control (Router+Policy) · Data (Runtime+ToolHost) · Observability (Audit+Trace) · Identity (AuthService) · Budget (BudgetGuard+PEP)</text>
+<text x="40" y="840" fill="#f85149" font-size="9">安全边界: Process (P1) → Process+Message (P3) → Host+External (P5)</text>
+<text x="40" y="855" fill="#8b949e" font-size="9">每个边界对应的 CTRL 在 security-control-mapping.md 定义</text>
+<text x="40" y="880" fill="#3fb950" font-size="9">Phase 1 实现注意: 不需要 event bus / tRPC 内部 / Redis / Temporal — 这些是 Phase 4+</text>
+</svg>

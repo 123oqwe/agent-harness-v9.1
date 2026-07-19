@@ -5,7 +5,7 @@
 - screen contracts
 
 ## Allowed Paths
-- src/frontend/, ui/screens/
+- harness/frontend/, ui/screens/
 
 ## Forbidden Paths
 - contracts/

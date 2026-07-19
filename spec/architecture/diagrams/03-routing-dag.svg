@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Routing System (v9) — Dependency-Aware DAG, replaces v8 8-parallel-routers -->
+<svg width="1400" height="1080" viewBox="0 0 1400 1080" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="ared" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f85149"/></marker>
+<marker id="ay" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#fbbf24"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="1080" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Routing System — Dependency-Aware DAG (v9, replaces v8 8-parallel-routers + Re-router)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">routing-system.md · 13 阶段顺序依赖 DAG · 3 层实现(0 LLM → 1 LLM → 0 LLM) · Router 输出 risk assessment(非 policy) · 无独立 Re-router(re-route = 新 RunPlan revision)</text>
+
+<!-- Left lane: 3-layer implementation -->
+<rect x="10" y="70" width="180" height="780" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="100" y="92" fill="#58a6ff" font-size="11" font-weight="bold" text-anchor="middle">3 层实现</text>
+<rect x="25" y="110" width="150" height="70" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="100" y="128" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">Layer 1</text>
+<text x="100" y="143" fill="#8b949e" font-size="9" text-anchor="middle">确定性 preflight</text>
+<text x="100" y="156" fill="#8b949e" font-size="8" text-anchor="middle">0 LLM · 纯代码</text>
+<text x="100" y="170" fill="#6e7681" font-size="7" text-anchor="middle">文件类型/模态/权限/工具存在/Provider健康</text>
+<rect x="25" y="200" width="150" height="70" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="100" y="218" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">Layer 2</text>
+<text x="100" y="233" fill="#8b949e" font-size="9" text-anchor="middle">Task Profiler</text>
+<text x="100" y="246" fill="#8b949e" font-size="8" text-anchor="middle">1 LLM max</text>
+<text x="100" y="259" fill="#6e7681" font-size="7" text-anchor="middle">cheap fast model</text>
+<text x="100" y="272" fill="#6e7681" font-size="7" text-anchor="middle">intents/domains/complexity/ambiguity</text>
+<rect x="25" y="290" width="150" height="70" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="100" y="308" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">Layer 3</text>
+<text x="100" y="323" fill="#8b949e" font-size="9" text-anchor="middle">Candidate Optimizer</text>
+<text x="100" y="336" fill="#8b949e" font-size="8" text-anchor="middle">0 LLM · 确定性</text>
+<text x="100" y="349" fill="#6e7681" font-size="7" text-anchor="middle">registry + scoring + 约束求解</text>
+<text x="100" y="375" fill="#fbcfe8" font-size="9" font-weight="bold" text-anchor="middle">v9 核心修正:</text>
+<text x="100" y="390" fill="#8b949e" font-size="8" text-anchor="middle">v8 用 Promise.all</text>
+<text x="100" y="403" fill="#8b949e" font-size="8" text-anchor="middle">跑 8 个独立 router</text>
+<text x="100" y="416" fill="#f85149" font-size="8" text-anchor="middle">v9 改为顺序依赖 DAG</text>
+<text x="100" y="429" fill="#8b949e" font-size="8" text-anchor="middle">每阶段有依赖前置</text>
+<text x="100" y="450" fill="#fbcfe8" font-size="9" font-weight="bold" text-anchor="middle">v9 删除:</text>
+<text x="100" y="465" fill="#8b949e" font-size="8" text-anchor="middle">独立 Re-router 组件</text>
+<text x="100" y="478" fill="#8b949e" font-size="8" text-anchor="middle">re-route = 新 RunPlan</text>
+<text x="100" y="491" fill="#8b949e" font-size="8" text-anchor="middle">revision + 撤旧 Capability</text>
+<text x="100" y="512" fill="#fbcfe8" font-size="9" font-weight="bold" text-anchor="middle">Router 输出:</text>
+<text x="100" y="527" fill="#3fb950" font-size="8" text-anchor="middle">✓ derived_risk_assessment</text>
+<text x="100" y="540" fill="#3fb950" font-size="8" text-anchor="middle">✓ proposed route</text>
+<text x="100" y="553" fill="#3fb950" font-size="8" text-anchor="middle">✓ resource bindings</text>
+<text x="100" y="574" fill="#fbcfe8" font-size="9" font-weight="bold" text-anchor="middle">Router 不输出:</text>
+<text x="100" y="589" fill="#f85149" font-size="8" text-anchor="middle">✗ risk_policy</text>
+<text x="100" y="602" fill="#f85149" font-size="8" text-anchor="middle">✗ consent_policy</text>
+<text x="100" y="615" fill="#8b949e" font-size="7" text-anchor="middle">Policy authority 供 immutable 约束</text>
+
+<!-- Center: 13-stage DAG pipeline -->
+<rect x="210" y="70" width="820" height="780" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="620" y="92" fill="#fbcfe8" font-size="12" font-weight="bold" text-anchor="middle">13 阶段顺序依赖 DAG (S0-S12 → frozen RunPlan)</text>
+
+<rect x="230" y="110" width="780" height="40" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="245" y="128" fill="#58a6ff" font-size="10" font-weight="bold">S0</text>
+<text x="275" y="128" fill="#f0f6fc" font-size="10">Identity & Immutable Policy Constraints</text>
+<text x="700" y="128" fill="#8b949e" font-size="8">安全在此进入(v9 修正,在 routing 之前)</text>
+<text x="700" y="140" fill="#f85149" font-size="8">policy authority 供 immutable 约束</text>
+<line x1="620" y1="150" x2="620" y2="160" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="160" width="780" height="40" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="245" y="178" fill="#f85149" font-size="10" font-weight="bold">S1</text>
+<text x="275" y="178" fill="#f0f6fc" font-size="10">Task Profiling (1 LLM max)</text>
+<text x="700" y="178" fill="#8b949e" font-size="8">intents/domains/complexity/ambiguity(0-1)</text>
+<text x="700" y="190" fill="#8b949e" font-size="8">trust: untrusted_model_output</text>
+<line x1="620" y1="200" x2="620" y2="210" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="210" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="228" fill="#8b949e" font-size="10" font-weight="bold">S2</text>
+<text x="275" y="228" fill="#f0f6fc" font-size="10">Experience / Domain resolution</text>
+<line x1="620" y1="245" x2="620" y2="255" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="255" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="273" fill="#8b949e" font-size="10" font-weight="bold">S3</text>
+<text x="275" y="273" fill="#f0f6fc" font-size="10">Context / Capability probe</text>
+<line x1="620" y1="290" x2="620" y2="300" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="300" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="318" fill="#8b949e" font-size="10" font-weight="bold">S4</text>
+<text x="275" y="318" fill="#f0f6fc" font-size="10">Workflow candidates</text>
+<text x="600" y="318" fill="#6e7681" font-size="8">Research-then-Act / Clarify-then-Act / Map-Reduce / Planner-Worker-Verifier</text>
+<line x1="620" y1="335" x2="620" y2="345" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="345" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="363" fill="#8b949e" font-size="10" font-weight="bold">S5</text>
+<text x="275" y="363" fill="#f0f6fc" font-size="10">Reasoning candidates</text>
+<text x="550" y="363" fill="#6e7681" font-size="8">Direct / ReAct / PlanExecute / ReWOO / IterativeRefine</text>
+<line x1="620" y1="380" x2="620" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="390" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="408" fill="#8b949e" font-size="10" font-weight="bold">S6</text>
+<text x="275" y="408" fill="#f0f6fc" font-size="10">Model / Tool / Skill / Environment binding</text>
+<line x1="620" y1="425" x2="620" y2="435" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="435" width="780" height="40" fill="#21262d" stroke="#bc8cff" stroke-width="2" rx="4"/>
+<text x="245" y="453" fill="#bc8cff" font-size="10" font-weight="bold">S7</text>
+<text x="275" y="453" fill="#f0f6fc" font-size="10">AgentGraph</text>
+<text x="700" y="453" fill="#fbbf24" font-size="8">F7: static_dag | routing_slip | workflow_script</text>
+<text x="700" y="465" fill="#8b949e" font-size="8">routing_slip: itinerary 随消息, agent 可插步 (insert_limit=3)</text>
+<line x1="620" y1="475" x2="620" y2="485" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="485" width="780" height="40" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="245" y="503" fill="#bc8cff" font-size="10" font-weight="bold">S8</text>
+<text x="275" y="503" fill="#f0f6fc" font-size="10">ContextGraph</text>
+<text x="550" y="503" fill="#6e7681" font-size="8">7 拓扑: Shared/Selective/Parent-Child/Isolated/Artifact/Blackboard/Blind</text>
+<text x="550" y="515" fill="#6e7681" font-size="8">F8: cross-process → obo_token + jws_signature (CTRL-MSG-INTEGRITY-001)</text>
+<line x1="620" y1="525" x2="620" y2="535" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="535" width="780" height="35" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="245" y="553" fill="#8b949e" font-size="10" font-weight="bold">S9</text>
+<text x="275" y="553" fill="#f0f6fc" font-size="10">Schedule / Trigger planning</text>
+<text x="600" y="553" fill="#6e7681" font-size="8">routine task: 凭证必须新鲜,不可复用旧 Capability</text>
+<line x1="620" y1="570" x2="620" y2="580" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="580" width="780" height="35" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="245" y="598" fill="#e3b341" font-size="10" font-weight="bold">S10</text>
+<text x="275" y="598" fill="#f0f6fc" font-size="10">VerificationGraph</text>
+<text x="550" y="598" fill="#6e7681" font-size="8">Deterministic / Blind / Independent Verifier (不同模型族)</text>
+<line x1="620" y1="615" x2="620" y2="625" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="625" width="780" height="40" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="245" y="643" fill="#fbbf24" font-size="10" font-weight="bold">S11</text>
+<text x="275" y="643" fill="#f0f6fc" font-size="10">Joint Constraint Solver</text>
+<text x="600" y="643" fill="#6e7681" font-size="8">贪心(filter hard constraints → sort by score)</text>
+<text x="600" y="655" fill="#6e7681" font-size="8">routing_regret &gt; 15% → 升级 CSP</text>
+<line x1="620" y1="665" x2="620" y2="675" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="675" width="780" height="35" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="245" y="693" fill="#f85149" font-size="10" font-weight="bold">S12</text>
+<text x="275" y="693" fill="#f0f6fc" font-size="10">Policy validation</text>
+<text x="600" y="693" fill="#f85149" font-size="8">deny-by-default · 不可旁路</text>
+<line x1="620" y1="710" x2="620" y2="720" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="230" y="720" width="780" height="50" fill="#1a0808" stroke="#fbcfe8" stroke-width="3" rx="4"/>
+<text x="245" y="740" fill="#fbcfe8" font-size="11" font-weight="bold">★</text>
+<text x="275" y="740" fill="#fbcfe8" font-size="11" font-weight="bold">frozen RunPlan</text>
+<text x="275" y="755" fill="#8b949e" font-size="9">run-plan.schema.json · 22 必填字段 · run_plan_hash · 唯一执行契约</text>
+<text x="275" y="767" fill="#8b949e" font-size="8">task/workflow_graph/agent_graph/context_graph/verification_graph/model_bindings/tool_grants/...</text>
+
+<!-- Right: scoring + abstain -->
+<rect x="1050" y="70" width="340" height="780" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="1220" y="92" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">评分 + 约束 + 降级</text>
+<rect x="1070" y="110" width="300" height="110" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="1220" y="128" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">RouteScore (S11 用)</text>
+<text x="1080" y="148" fill="#f0f6fc" font-size="9">= success_prob × 1.0</text>
+<text x="1080" y="163" fill="#f0f6fc" font-size="9">+ quality × 0.8</text>
+<text x="1080" y="178" fill="#f85149" font-size="9">− cost × 0.3</text>
+<text x="1080" y="193" fill="#f85149" font-size="9">− latency × 0.2</text>
+<text x="1080" y="208" fill="#f85149" font-size="9">− risk × 0.5</text>
+<text x="1080" y="223" fill="#f85149" font-size="9">− coordination × 0.4</text>
+<rect x="1070" y="235" width="300" height="90" fill="#21262d" stroke="#8b949e" stroke-width="1" rx="4"/>
+<text x="1220" y="253" fill="#8b949e" font-size="10" font-weight="bold" text-anchor="middle">约束求解</text>
+<text x="1080" y="273" fill="#8b949e" font-size="9">1. filter hard constraints</text>
+<text x="1080" y="288" fill="#8b949e" font-size="9">2. sort by RouteScore</text>
+<text x="1080" y="303" fill="#8b949e" font-size="9">默认贪心</text>
+<text x="1080" y="318" fill="#fbbf24" font-size="9">routing_regret &gt; 15%</text>
+<text x="1080" y="333" fill="#8b949e" font-size="8">→ 升级 CSP (constraint propagation)</text>
+<rect x="1070" y="340" width="300" height="100" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1220" y="358" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">Abstain (无候选满足)</text>
+<text x="1080" y="378" fill="#8b949e" font-size="9">→ RoutingAbstainedError</text>
+<text x="1080" y="393" fill="#8b949e" font-size="9">reason: 哪个约束不满足</text>
+<text x="1080" y="408" fill="#3fb950" font-size="9">fallback: single_agent + direct</text>
+<text x="1080" y="423" fill="#8b949e" font-size="9">requires_human_input: bool</text>
+<rect x="1070" y="455" width="300" height="80" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="1220" y="473" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">超时</text>
+<text x="1080" y="493" fill="#8b949e" font-size="9">每阶段: 5000ms (可调)</text>
+<text x="1080" y="508" fill="#8b949e" font-size="9">总计: 30000ms (可调)</text>
+<text x="1080" y="523" fill="#8b949e" font-size="9">agent 应在 evals/routing/ 调权重</text>
+<rect x="1070" y="550" width="300" height="120" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="1220" y="568" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">F7 三种执行模式</text>
+<text x="1080" y="588" fill="#f0f6fc" font-size="9">static_dag: 冻结图(可预测)</text>
+<text x="1080" y="606" fill="#f0f6fc" font-size="9">routing_slip: 行程随消息</text>
+<text x="1080" y="620" fill="#6e7681" font-size="8">  agent 可插步, insert_limit=3</text>
+<text x="1080" y="638" fill="#f0f6fc" font-size="9">workflow_script: 脚本持结果</text>
+<text x="1080" y="652" fill="#6e7681" font-size="8">  大规模 fan-out, 不入主 context</text>
+<rect x="1070" y="685" width="300" height="70" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1220" y="703" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">v9 re-route 语义</text>
+<text x="1080" y="723" fill="#8b949e" font-size="9">≠ 独立 Re-router 组件</text>
+<text x="1080" y="738" fill="#8b949e" font-size="9">= 新 RunPlan revision</text>
+<text x="1080" y="753" fill="#8b949e" font-size="9">+ 撤销旧 Capability</text>
+
+<!-- Bottom: comparison v8 vs v9 -->
+<rect x="10" y="870" width="1380" height="190" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="700" y="890" fill="#fbcfe8" font-size="11" font-weight="bold" text-anchor="middle">v8 → v9 架构修正对照</text>
+<rect x="30" y="905" width="660" height="140" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="360" y="923" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">v8 (已废弃)</text>
+<text x="40" y="943" fill="#8b949e" font-size="9">• 8 个并行独立 Router (Promise.all)</text>
+<text x="40" y="958" fill="#8b949e" font-size="9">• Strategy / Agent Topology / Context / Model / Tool / Skill / ExecEnv / Verification</text>
+<text x="40" y="973" fill="#8b949e" font-size="9">• Global Route Optimizer 汇总</text>
+<text x="40" y="988" fill="#8b949e" font-size="9">• 独立 Re-router 组件(局部重新路由)</text>
+<text x="40" y="1003" fill="#8b949e" font-size="9">• Parallel Candidate Resolution</text>
+<text x="40" y="1018" fill="#8b949e" font-size="9">• RunConfiguration (v8 术语)</text>
+<text x="40" y="1033" fill="#8b949e" font-size="9">• 20+ tools</text>
+<rect x="710" y="905" width="660" height="140" fill="#0d1117" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="1040" y="923" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">v9 (当前)</text>
+<text x="720" y="943" fill="#3fb950" font-size="9">• 13 阶段顺序依赖 DAG (S0-S12)</text>
+<text x="720" y="958" fill="#8b949e" font-size="9">• 每阶段依赖前置, 非并行</text>
+<text x="720" y="973" fill="#8b949e" font-size="9">• 3 层: 0 LLM → 1 LLM → 0 LLM</text>
+<text x="720" y="988" fill="#8b949e" font-size="9">• re-route = 新 RunPlan revision + 撤旧 Capability</text>
+<text x="720" y="1003" fill="#8b949e" font-size="9">• Policy 在 S0 进入(非 S7 之后)</text>
+<text x="720" y="1018" fill="#8b949e" font-size="9">• RunPlan (术语, 22 必填字段)</text>
+<text x="720" y="1033" fill="#8b949e" font-size="9">• 15 tools (9 P1 + 6 P2-3)</text>
+</svg>

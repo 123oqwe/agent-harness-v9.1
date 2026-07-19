@@ -9,6 +9,28 @@
  * Agent topology graph. Defines which agents participate and how they communicate.
  */
 export interface AgentGraph {
+  /**
+   * FG7/FG9. static_dag = frozen AgentGraph (default). routing_slip = itinerary travels with message, agents may insert steps (open missions). workflow_script = orchestration is a script holding intermediate results out-of-context (large fan-out).
+   */
+  execution_mode?: "static_dag" | "routing_slip" | "workflow_script";
+  /**
+   * FG7. Present only when execution_mode=routing_slip. Itinerary + executed log + compensation log + inserted_steps count.
+   */
+  routing_slip?: {
+    itinerary?: unknown[];
+    executed?: unknown[];
+    compensations?: unknown[];
+    inserted_steps?: number;
+    insert_limit?: number;
+  };
+  /**
+   * FG8. Cross-process message integrity. Applied to communication/result_handoff edges when agents run in separate processes.
+   */
+  message_security?: {
+    obo_token_required?: boolean;
+    jws_signature_required?: boolean;
+    jwe_optional?: boolean;
+  };
   nodes: {
     /**
      * Unique agent identifier
@@ -41,6 +63,26 @@ export interface AgentGraph {
      */
     tool_grant_refs?: string[];
     skill_binding_refs?: string[];
+    /**
+     * G-CC1. Execution isolation level. process=separate process; worktree=git worktree + separate process; sandbox=OS sandbox (G-OS1); none=same process (Phase 1 default, not for Phase 3+ workers)
+     */
+    isolation?: "process" | "worktree" | "sandbox" | "none";
+    /**
+     * G-CC1. Reference to HookConfig ID; null = inherit parent hooks.
+     */
+    hooks_ref?: string | null;
+    /**
+     * G-CC1. inherit=share parent memory store; isolated=own store, no cross-read; scoped=own store + explicitly shared items (maps to 7 context topologies)
+     */
+    memory_scope?: "inherit" | "isolated" | "scoped";
+    /**
+     * G-CC1. Reasoning effort for this node. Distinct from model_binding_ref: same model may run at different effort per node.
+     */
+    effort?: "low" | "medium" | "high";
+    /**
+     * G-CC1. Tools explicitly denied to this node even if in tool_grant_refs. deny wins (deny-by-default).
+     */
+    disallowed_tool_refs?: string[];
   }[];
   edges: {
     from_agent: string;

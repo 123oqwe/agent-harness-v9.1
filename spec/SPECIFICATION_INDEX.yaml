@@ -26,18 +26,20 @@ product:
   billing: "product/billing-and-limits.md"
   support: "product/support-and-abuse.md"
   launch: "product/launch-plan.md"
+  design_framework: "product/design-framework.md"
 
 domains:
-  coding: "domains/coding/"
-  documents: "domains/documents/"
-  research: "domains/research/"
-  writing: "domains/writing/"
-  planning: "domains/planning/"
-  personal_assistant: "domains/personal-assistant/"
-  founder_operator: "domains/founder-operator/"
-  multimodal: "domains/multimodal/"
-  external_actions: "domains/external-actions/"
-  enterprise: "domains/enterprise/"
+  # Domain specs are distributed: PRD/personas in product/, evals in evals/<domain>/, scope in phases/phase-N.yaml
+  coding: "evals/coding/"
+  documents: "evals/documents/"
+  research: "evals/research/"
+  writing: "evals/writing/"
+  planning: "evals/planning/"
+  personal_assistant: "evals/personal_assistant/"
+  founder_operator: "evals/founder-operator/"
+  multimodal: "evals/multimodal/"
+  external_actions: "evals/external-actions/"
+  enterprise: "evals/enterprise/"
 
 architecture:
   harness_boundary: "architecture/harness-boundary.md"
@@ -53,6 +55,11 @@ architecture:
   evolution: "architecture/evolution.md"
   deployment_topology: "architecture/deployment-topology.md"
   trust_boundaries: "architecture/trust-boundaries.md"
+  virtual_filesystem: "architecture/virtual-filesystem.md"
+  realtime_execution_visualization: "architecture/realtime-execution-visualization.md"
+  failure_recovery: "architecture/failure-recovery.md"
+  security_control_mapping: "architecture/security-control-mapping.md"
+  runtime_topology: "architecture/runtime-topology.md"
 
 requirements:
   registry: "requirements/requirements.ndjson"
@@ -61,7 +68,7 @@ requirements:
   schema: "requirements/requirement-schema.json"
 
 contracts:
-  count: 18
+  count: 19
   directory: "contracts/"
 
 state_machines:
@@ -71,7 +78,7 @@ state_machines:
   model_check: "state-machines/model-check-report.txt"
 
 phases:
-  count: 9
+  count: 10
   directory: "phases/"
 
 threat_model:
@@ -105,15 +112,16 @@ factory:
   gate_runner: "../factory/phase-gates/gate_runner.py"
   codex_adapter: "../factory/worker-adapters/codex/adapter.py"
   claude_adapter: "../factory/worker-adapters/claude/adapter.py"
-  verifier: "../factory/verifier/verifier.py"
+  verifier: "../factory/verifier/run_verifier.py"
   merge_queue: "../factory/merge-queue/merge_queue.py"
   worktree_manager: "../factory/worktree-manager/worktree_manager.py"
 
 adrs:
-  count: 12
+  count: 13
   directory: "adr/"
 
 appendix:
-  deprecated_v8: "appendix/appendix/deprecated-v8-content/"
+  competitor_research: "appendix/competitor-research/"
+  deprecated_v8: "appendix/deprecated-v8-content/"
   evidence: "appendix/evidence-registry/"
   originals: "appendix/original-documents/"

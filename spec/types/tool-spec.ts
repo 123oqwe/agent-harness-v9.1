@@ -41,12 +41,30 @@ export interface ToolSpec {
   sandbox_policy: {
     [k: string]: unknown;
   };
-  network_policy: {
-    [k: string]: unknown;
-  };
-  credential_requirements: {
-    [k: string]: unknown;
-  }[];
+ network_policy: {
+   [k: string]: unknown;
+ };
+ /**
+  * Reference to EffectRisk.egress_policy binding used by this tool (FG3).
+  */
+ egress_policy_ref?: string;
+ /**
+  * Screen/desktop operation policy (FG1 Computer Use). Required only by tools whose effect_model involves screen_access.
+  */
+ display_policy?: {
+   surface_scope?: "browser_only" | "native_app_approved" | "desktop" | "fullscreen";
+   approved_apps?: string[];
+   screenshot_isolation?: "exclude_self_output" | "full";
+   global_interrupt_consumed?: boolean;
+   single_session_lock?: boolean;
+ };
+ /**
+  * Which RunPlan phases may invoke this tool (FG2 two-phase runtime).
+  */
+ run_phase_binding?: ("setup" | "agent")[];
+ credential_requirements: {
+   [k: string]: unknown;
+ }[];
   data_egress_policy: {
     [k: string]: unknown;
   };

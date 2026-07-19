@@ -1,7 +1,7 @@
 # Routing System (v9: Dependency-Aware DAG)
 
 
-![03-routing-8-routers.svg](diagrams/03-routing-8-routers.svg)
+![03-routing-dag.svg](diagrams/03-routing-dag.svg)
 
 ## v9 Correction: NOT 8 parallel independent routers
 
@@ -31,6 +31,8 @@ Identity and immutable policy
 1. Deterministic preflight (0 LLM) - file type, modality, permissions, tool existence, Provider health
 2. 1 structured Task Profiler LLM call (cheap fast model)
 3. Deterministic Candidate Optimizer (registry + scoring + constraint solver)
+
+Note: Tool definitions stay stable across DAG nodes; action selection constrained via tool-masking state machine (FG5 CTRL-TOOL-MASK-001, see model-api-gateway.md) to preserve KV-cache across multi-agent runs.
 
 ## Router Outputs (v9 correction)
 
@@ -103,3 +105,27 @@ If no candidate meets hard constraints, Router returns `RoutingAbstainedError` w
 - reason: which constraint couldn't be satisfied
 - fallback_suggestion: "single_agent + direct strategy"
 - requires_human_input: boolean
+
+## Execution Modes (FG7 / FG9)
+
+AgentGraph supports three execution modes, declared in `agent-graph.schema.json` field `execution_mode` (enum: `static_dag` | `routing_slip` | `workflow_script`). The Router selects based on task profile; they are NOT mutually exclusive (a mission may use a static DAG for known sub-tasks and a routing slip for the open-ended trunk).
+
+### Mode A: Static DAG (existing)
+RunPlan Freeze produces a fixed AgentGraph. Used when the task is well-structured and the plan is predictable. Result merge conflict resolution applies (AH-MULTIAGENT-MERGE-001).
+
+### Mode B: Routing-Slip Choreography (FG7)
+AgentGraph.routing_slip carries the itinerary (itinerary, executed, compensations, inserted_steps, insert_limit). For open-ended missions (Founder persona, `AH-CROSSDOMAIN-MISSION-001`, `AH-MISSION-DECOMP-001`) where the next step depends on intermediate results and cannot be frozen up front. The itinerary travels with the message; each agent executes its step, marks complete, and forwards. Agents with `can_edit_itinerary` may insert follow-up steps up to an `insert_limit` (default 3). No central orchestrator; the itinerary is explicit and auditable (visible unlike pure choreography). This is the routing-slip choreography pattern (itinerary travels with the message, no central orchestrator), adopted for AH open-ended missions. Distinct from steering (3 queues): steering is user-injected; itinerary edits are agent-injected within a limit.
+
+### Mode C: Workflow Script (FG9)
+For large-scale fan-out (dozens to hundreds of agents) where intermediate results must NOT enter the main agent context. The orchestration is a script (executable, authored by a planner agent) that holds the loop, branching, and intermediate results in script variables. Sub-agents return only final artifacts to the script. The main session context receives only the final answer. This is required because Mode A/B land every sub-agent result in context (or session event log), which at dozens-of-agents scale overflows the window even with compaction. The script is resumable. Built-in pattern: adversarial cross-check (independent agents review each other before reporting).
+
+### Mode D: Mass Fan-Out (Phase 3+)
+For homogeneous parallel tasks over many items (e.g. multi-source fan-out research, 500-file migration). Declared as `execution_mode: workflow_script` with a fan-out sub-pattern. The originator spawns N clones (default max 6, bounded by AH-SUBAGENT-001; configurable up to 100 with elevated concurrency grant), each in its own context window and its own sandbox. Each clone is a capability-attenuated agent (tool_grants are a subset of the originator, per AH-SUBAGENT-001) receiving a task slice. The originator aggregates and deduplicates results. Clone budget allocated from originator remaining budget; clone exceeding allocation is killed. Clone failure is non-critical (does not block siblings). Distinct from Mode B (sequential open-ended) and Mode A (fixed topology): fan-out is parallel homogeneous. Note: fan-out concurrency is bounded by AH-SUBAGENT-001 max concurrent (default 6); raising the fan-out max above 6 requires an elevated concurrency grant approved by the Authorization Service.
+
+## Cross-Process Messaging Integrity (FG8)
+
+When AgentGraph executes across processes/hosts (Phase 3 multi-agent, 7 context topologies imply cross-process isolation), TLS only protects the channel. Once a message is queued or persisted, the channel trust boundary breaks. AgentGraph edges of `edge_type: communication` and `result_handoff` carry:
+- `obo_token`: On-Behalf-Of delegation token (the agent chain cannot exceed the originating user permissions). Required for Phase 5 external actions (`AH-EXT-CREDENTIAL-001`).
+- `jws_signature`: message integrity + authenticity (JOSE/JWS). Optional `jwe` for confidentiality when the broker is shared.
+
+This is declared in `agent-graph.schema.json` field `message_security` (obo_token_required, jws_signature_required, jwe_optional). It complements Capability Token (A14): Capability is per-call authorization signed by the Authorization Service; the message signature is transport integrity. Both are enforced. Control: CTRL-MSG-INTEGRITY-001.

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- VFS Data Flow (v9) — single file-access authority, 4 entry → 5 backend -->
+<svg width="1400" height="820" viewBox="0 0 1400 820" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ab" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#58a6ff"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="acy" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#39c5cf"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="820" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">VFS Data Flow — 单一文件访问权威 (v9, F4)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">4 入口 → VFS (CompositeBackend) → 5 backend · 关闭 RAG 绕过 read_file deny · OverlayBackend = 事务检查点 · virtual-filesystem.md · CTRL-VFS-001</text>
+
+<!-- 4 entry points -->
+<rect x="40" y="80" width="280" height="320" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="180" y="100" fill="#58a6ff" font-size="12" font-weight="bold" text-anchor="middle">4 入口</text>
+<rect x="60" y="115" width="240" height="55" fill="#21262d" stroke="#e3b341" stroke-width="1" rx="4"/>
+<text x="180" y="133" fill="#e3b341" font-size="10" font-weight="bold" text-anchor="middle">Tool 调用</text>
+<text x="70" y="148" fill="#8b949e" font-size="8">read_file · edit_file · write_file</text>
+<text x="70" y="160" fill="#8b949e" font-size="8">search_files · create_artifact</text>
+<rect x="60" y="180" width="240" height="55" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="180" y="198" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">RAG retrieve</text>
+<text x="70" y="213" fill="#8b949e" font-size="8">ingest → index → retrieve</text>
+<text x="70" y="225" fill="#8b949e" font-size="8">→ rerank → pack</text>
+<text x="70" y="237" fill="#f85149" font-size="8" font-weight="bold">ACL 先过滤 (不先检索后过滤)</text>
+<rect x="60" y="245" width="240" height="55" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="180" y="263" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">Memory store</text>
+<text x="70" y="278" fill="#8b949e" font-size="8">6 类型: episodic/semantic/</text>
+<text x="70" y="290" fill="#8b949e" font-size="8">procedural/preference/</text>
+<text x="70" y="302" fill="#8b949e" font-size="8">relationship/goal</text>
+<rect x="60" y="310" width="240" height="55" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="180" y="328" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">Evidence store</text>
+<text x="70" y="343" fill="#8b949e" font-size="8">WORM, 不可伪造</text>
+<text x="70" y="355" fill="#8b949e" font-size="8">verification 证据</text>
+
+<!-- arrows to VFS -->
+<line x1="320" y1="142" x2="480" y2="200" stroke="#e3b341" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="320" y1="207" x2="480" y2="220" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+<line x1="320" y1="272" x2="480" y2="240" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="320" y1="337" x2="480" y2="260" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ag)"/>
+
+<!-- VFS center -->
+<rect x="480" y="150" width="360" height="200" fill="#1a0808" stroke="#39c5cf" stroke-width="3" rx="8"/>
+<text x="660" y="175" fill="#39c5cf" font-size="14" font-weight="bold" text-anchor="middle">VFS</text>
+<text x="660" y="192" fill="#39c5cf" font-size="11" text-anchor="middle">CompositeBackend</text>
+<text x="660" y="208" fill="#8b949e" font-size="9" text-anchor="middle">最长前缀路由</text>
+<text x="660" y="225" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">每次 access 强制权限规则</text>
+<text x="660" y="240" fill="#f85149" font-size="8" text-anchor="middle">(关 RAG 绕过 read_file deny)</text>
+<text x="660" y="260" fill="#8b949e" font-size="9" text-anchor="middle">ls/glob/grep 跨 backend 聚合</text>
+<text x="660" y="275" fill="#8b949e" font-size="9" text-anchor="middle">保留原始路径前缀</text>
+<text x="660" y="295" fill="#fbbf24" font-size="9" font-weight="bold" text-anchor="middle">CTRL-VFS-001</text>
+<text x="660" y="310" fill="#8b949e" font-size="8" text-anchor="middle">F4: 单一文件访问权威</text>
+<text x="660" y="325" fill="#8b949e" font-size="8" text-anchor="middle">F10: offload 内容也落 VFS</text>
+<text x="660" y="340" fill="#8b949e" font-size="8" text-anchor="middle">RAG retrieve 经 VFS</text>
+
+<!-- 5 backends -->
+<line x1="840" y1="180" x2="980" y2="130" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="840" y1="200" x2="980" y2="210" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="840" y1="220" x2="980" y2="290" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="840" y1="240" x2="980" y2="370" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="840" y1="260" x2="980" y2="450" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<rect x="980" y="110" width="380" height="60" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="1170" y="128" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="middle">OverlayBackend</text>
+<text x="990" y="143" fill="#8b949e" font-size="8">/scratch/* · per-RunPlan 事务</text>
+<text x="990" y="155" fill="#8b949e" font-size="8">staged writes, 原子 commit/rollback</text>
+<text x="990" y="167" fill="#3fb950" font-size="8">验证通过 → commit 到 LocalBackend</text>
+
+<rect x="980" y="190" width="380" height="60" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
+<text x="1170" y="208" fill="#58a6ff" font-size="10" font-weight="bold" text-anchor="middle">StateBackend</text>
+<text x="990" y="223" fill="#8b949e" font-size="8">/thread/* · per-thread</text>
+<text x="990" y="235" fill="#8b949e" font-size="8">会话内 scratch, subagent 共享</text>
+<text x="990" y="247" fill="#8b949e" font-size="8">不跨线程持久</text>
+
+<rect x="980" y="270" width="380" height="60" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="1170" y="288" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">StoreBackend</text>
+<text x="990" y="303" fill="#8b949e" font-size="8">/memories/* · 跨线程</text>
+<text x="990" y="315" fill="#8b949e" font-size="8">长期记忆, 6 类型 + provenance</text>
+<text x="990" y="327" fill="#8b949e" font-size="8">Phase 4: full Memory 替代 progress.json</text>
+
+<rect x="980" y="350" width="380" height="60" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="1170" y="368" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">LocalBackend</text>
+<text x="990" y="383" fill="#8b949e" font-size="8">/workspace/* · 真实项目文件</text>
+<text x="990" y="395" fill="#8b949e" font-size="8">OverlayBackend commit 目标</text>
+<text x="990" y="407" fill="#8b949e" font-size="8">用户真实 FS</text>
+
+<rect x="980" y="430" width="380" height="60" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1170" y="448" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">EvidenceBackend</text>
+<text x="990" y="463" fill="#8b949e" font-size="8">/evidence/* · WORM</text>
+<text x="990" y="475" fill="#8b949e" font-size="8">不可修改, 不可删除</text>
+<text x="990" y="487" fill="#8b949e" font-size="8">verification 证据持久化</text>
+
+<!-- F10 offload path -->
+<rect x="40" y="420" width="420" height="120" fill="#161b22" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6,3" rx="6"/>
+<text x="250" y="440" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">F10 Mechanical Offload 路径</text>
+<text x="50" y="460" fill="#f0f6fc" font-size="9">Tool 结果 &gt; 20000 token (offload_token_threshold)</text>
+<text x="50" y="475" fill="#8b949e" font-size="9">→ 写入 VFS /scratch/*</text>
+<text x="50" y="490" fill="#8b949e" font-size="9">→ 对话层留 file pointer + 10 行预览</text>
+<text x="50" y="505" fill="#3fb950" font-size="9">✓ 可逆 (compaction 不可逆)</text>
+<text x="50" y="520" fill="#3fb950" font-size="9">✓ cache 友好 (不重写 stable prefix)</text>
+<text x="50" y="535" fill="#8b949e" font-size="9">compaction 仅在 offload 不足时触发</text>
+<line x1="460" y1="480" x2="480" y2="280" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+<!-- Memory Write Proposal path -->
+<rect x="40" y="560" width="420" height="120" fill="#161b22" stroke="#bc8cff" stroke-width="2" stroke-dasharray="6,3" rx="6"/>
+<text x="250" y="580" fill="#bc8cff" font-size="11" font-weight="bold" text-anchor="middle">Memory Write Proposal 路径 (pipeline step 20)</text>
+<text x="50" y="600" fill="#f0f6fc" font-size="9">Model 结论 → Memory Write Proposal</text>
+<text x="50" y="615" fill="#f85149" font-size="9" font-weight="bold">PII 检查 (AR-008 fix)</text>
+<text x="50" y="630" fill="#8b949e" font-size="9">├─ 敏感数据 → 本地 StoreBackend</text>
+<text x="50" y="645" fill="#8b949e" font-size="9">└─ 脱敏元数据 → 云模型</text>
+<text x="50" y="660" fill="#8b949e" font-size="9">CTRL-MEMORY-VERIFY-001</text>
+<text x="50" y="675" fill="#8b949e" font-size="9">模型不可直接写高信任事实</text>
+<line x1="460" y1="620" x2="480" y2="300" stroke="#bc8cff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+<!-- Transaction flow -->
+<rect x="480" y="420" width="880" height="180" fill="#161b22" stroke="#3fb950" stroke-width="1" rx="6"/>
+<text x="920" y="440" fill="#3fb950" font-size="12" font-weight="bold" text-anchor="middle">OverlayBackend 事务流程 (edit_file = 真事务, 非 per-tool marker)</text>
+<rect x="500" y="455" width="160" height="50" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="580" y="473" fill="#fbbf24" font-size="9" font-weight="bold" text-anchor="middle">RunPlan 执行中</text>
+<text x="580" y="488" fill="#8b949e" font-size="8" text-anchor="middle">edit 5 files in /scratch/*</text>
+<text x="580" y="500" fill="#8b949e" font-size="8" text-anchor="middle">(staged in overlay)</text>
+<line x1="660" y1="480" x2="700" y2="480" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="700" y="455" width="180" height="50" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="790" y="473" fill="#3fb950" font-size="9" font-weight="bold" text-anchor="middle">Independent Verifier</text>
+<text x="790" y="488" fill="#8b949e" font-size="8" text-anchor="middle">对 staged view 验证</text>
+<text x="790" y="500" fill="#8b949e" font-size="8" text-anchor="middle">(不同模型族, 只读)</text>
+<line x1="880" y1="475" x2="920" y2="475" stroke="#3fb950" stroke-width="1.5" marker-end="url(#ag)"/>
+<line x1="880" y1="490" x2="920" y2="510" stroke="#f85149" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="920" y="455" width="180" height="40" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="1010" y="473" fill="#3fb950" font-size="9" font-weight="bold" text-anchor="middle">验证通过</text>
+<text x="1010" y="487" fill="#8b949e" font-size="8" text-anchor="middle">→ 原子 commit → LocalBackend</text>
+<rect x="920" y="500" width="180" height="40" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="1010" y="518" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">验证失败</text>
+<text x="1010" y="532" fill="#8b949e" font-size="8" text-anchor="middle">→ overlay 丢弃, 5 个编辑不到真实 FS</text>
+<text x="920" y="565" fill="#8b949e" font-size="9">关闭 framework gap: edit_file checkpoint 从 per-tool 升级为 per-RunPlan 事务</text>
+<text x="920" y="585" fill="#8b949e" font-size="9">reconciliation (action-control.md) 只覆盖外部副作用, 不覆盖文件副作用 — VFS 事务覆盖文件副作用</text>
+
+<!-- Bottom: framework gaps closed -->
+<rect x="40" y="700" width="1320" height="100" fill="#0d1117" stroke="#f85149" stroke-width="1" rx="6"/>
+<text x="700" y="720" fill="#f85149" font-size="11" font-weight="bold" text-anchor="middle">VFS 关闭的 3 个 framework gap</text>
+<text x="50" y="740" fill="#f0f6fc" font-size="9">1. 权限绕过: read_file deny on P 可被 RAG retrieve(P) 绕过 (PEP 只守 tool call)</text>
+<text x="50" y="755" fill="#3fb950" font-size="9">   → VFS 统一: deny on P 阻止 read_file(P) 和 retrieve(chunk@P)</text>
+<text x="680" y="740" fill="#f0f6fc" font-size="9">2. 非事务检查点: edit_file per-tool, RunPlan 失败时 5 个编辑不可原子回滚</text>
+<text x="680" y="755" fill="#3fb950" font-size="9">   → OverlayBackend: per-RunPlan 事务, 失败丢弃</text>
+<text x="50" y="775" fill="#f0f6fc" font-size="9">3. 多存储不一致: memory / RAG vector / evidence / real FS 四套权限模型</text>
+<text x="50" y="790" fill="#3fb950" font-size="9">   → VFS 统一权限规则, 每次 access 强制</text>
+</svg>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Failure Recovery & Reconciliation Decision Tree (v9) -->
+<svg width="1400" height="980" viewBox="0 0 1400 980" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="ared" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f85149"/></marker>
+<marker id="ay" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#fbbf24"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="980" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Failure Recovery & Reconciliation — 决策树 (v9)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">operation.machine.json (37态) + external-effect.machine.json (14态) + runtime-core.md effect-state-aware resume · failure-recovery.md</text>
+
+<!-- Entry: failure detected -->
+<rect x="520" y="70" width="360" height="50" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="700" y="95" fill="#f85149" font-size="13" font-weight="bold" text-anchor="middle">PAUSE 或 CRASH during IN_FLIGHT</text>
+<text x="700" y="110" fill="#8b949e" font-size="9" text-anchor="middle">run.machine: RUNNING→PAUSED (guard: pause_requested, effects: save_snapshot, check_effect_state)</text>
+
+<!-- Query effect state -->
+<line x1="700" y1="120" x2="700" y2="150" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="540" y="150" width="320" height="40" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="168" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">查询 effect state (provider ledger / read-back)</text>
+<text x="700" y="182" fill="#8b949e" font-size="9" text-anchor="middle">runtime-core.md: effect-state-aware resume (v9 修正, 替代 v8 generic reExecuteFromStep)</text>
+
+<!-- 5 branches -->
+<line x1="700" y1="190" x2="180" y2="230" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="190" x2="430" y2="230" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="190" x2="700" y2="230" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="190" x2="970" y2="230" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<line x1="700" y1="190" x2="1220" y2="230" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+
+<!-- Branch 1: PRE_DISPATCH -->
+<rect x="60" y="240" width="240" height="90" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="180" y="260" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">PRE_DISPATCH</text>
+<text x="180" y="275" fill="#8b949e" font-size="9" text-anchor="middle">(never left, 未发送)</text>
+<text x="70" y="295" fill="#f0f6fc" font-size="9">→ PRE_DISPATCH_FAILED</text>
+<text x="70" y="308" fill="#8b949e" font-size="9">→ RETRY_SCHEDULED</text>
+<text x="70" y="321" fill="#f85149" font-size="9" font-weight="bold">→ 新 CapabilityToken 必需</text>
+<text x="180" y="334" fill="#fbbf24" font-size="8" text-anchor="middle">CTRL-CAPABILITY-SINGLE-USE-001</text>
+
+<!-- Branch 2: IN_FLIGHT -->
+<rect x="310" y="240" width="240" height="90" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="430" y="260" fill="#f85149" font-size="11" font-weight="bold" text-anchor="middle">IN_FLIGHT</text>
+<text x="430" y="275" fill="#8b949e" font-size="9" text-anchor="middle">(已发送, 无确认)</text>
+<text x="320" y="295" fill="#f85149" font-size="9" font-weight="bold">✗ 不可自动重试</text>
+<text x="320" y="308" fill="#8b949e" font-size="9">(可能重复执行)</text>
+<text x="320" y="321" fill="#fbbf24" font-size="9">→ 进入 RECONCILING</text>
+<text x="320" y="334" fill="#8b949e" font-size="9">→ 查 provider ledger</text>
+
+<!-- Branch 3: EFFECT_UNKNOWN -->
+<rect x="580" y="240" width="240" height="90" fill="#1a0808" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="260" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">EFFECT_UNKNOWN</text>
+<text x="700" y="275" fill="#8b949e" font-size="9" text-anchor="middle">(provider接受, 结果不明)</text>
+<text x="590" y="295" fill="#fbbf24" font-size="9">→ RECONCILING</text>
+<text x="590" y="308" fill="#8b949e" font-size="9">→ read-back: 查外部系统</text>
+<text x="590" y="321" fill="#8b949e" font-size="9">  effect 是否落地</text>
+
+<!-- Branch 4: EFFECT_CONFIRMED -->
+<rect x="850" y="240" width="240" height="90" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="970" y="260" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">EFFECT_CONFIRMED</text>
+<text x="970" y="275" fill="#8b949e" font-size="9" text-anchor="middle">(已确认, effect verified)</text>
+<text x="860" y="295" fill="#3fb950" font-size="9">→ 继续下一步</text>
+<text x="860" y="308" fill="#8b949e" font-size="9">  (无需重试)</text>
+<text x="970" y="325" fill="#3fb950" font-size="9" font-weight="bold" text-anchor="middle">EFFECT_VERIFIED → CONFIRMED</text>
+
+<!-- Branch 5: DEFINITELY_FAILED -->
+<rect x="1100" y="240" width="260" height="90" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="1230" y="260" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">DEFINITELY_FAILED_NO_EFFECT</text>
+<text x="1230" y="275" fill="#8b949e" font-size="9" text-anchor="middle">(provider拒绝, 无副作用)</text>
+<text x="1110" y="295" fill="#3fb950" font-size="9">→ 新 attempt OK</text>
+<text x="1110" y="308" fill="#f85149" font-size="9" font-weight="bold">→ 新 CapabilityToken</text>
+<text x="1230" y="325" fill="#8b949e" font-size="9" text-anchor="middle">(invariant: 只有 PRE_DISPATCH_FAILED 可 auto retry)</text>
+
+<!-- Reconciliation sub-tree -->
+<rect x="350" y="370" width="700" height="200" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="390" fill="#fbbf24" font-size="12" font-weight="bold" text-anchor="middle">RECONCILING 决策子树 (EFFECT_UNKNOWN / IN_FLIGHT)</text>
+<line x1="700" y1="395" x2="700" y2="420" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+<rect x="580" y="420" width="240" height="30" fill="#21262d" stroke="#fbbf24" stroke-width="1" rx="4"/>
+<text x="700" y="438" fill="#fbbf24" font-size="10" text-anchor="middle">read-back: 查询外部系统</text>
+
+<line x1="700" y1="450" x2="450" y2="475" stroke="#3fb950" stroke-width="1" marker-end="url(#ag)"/>
+<line x1="700" y1="450" x2="700" y2="475" stroke="#f85149" stroke-width="1" marker-end="url(#ared)"/>
+<line x1="700" y1="450" x2="950" y2="475" stroke="#8b949e" stroke-width="1" marker-end="url(#ar)"/>
+
+<rect x="370" y="480" width="160" height="60" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="450" y="498" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">read-back 成功</text>
+<text x="450" y="513" fill="#8b949e" font-size="8" text-anchor="middle">EFFECT_VERIFIED</text>
+<text x="450" y="525" fill="#3fb950" font-size="8" text-anchor="middle">→ EFFECT_CONFIRMED</text>
+<text x="450" y="535" fill="#8b949e" font-size="8" text-anchor="middle">→ 继续下一步</text>
+
+<rect x="620" y="480" width="160" height="60" fill="#21262d" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="700" y="498" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">read-back 失败</text>
+<text x="700" y="513" fill="#8b949e" font-size="8" text-anchor="middle">(effect 不存在)</text>
+<text x="700" y="525" fill="#3fb950" font-size="8" text-anchor="middle">→ DEFINITELY_FAILED</text>
+<text x="700" y="535" fill="#8b949e" font-size="8" text-anchor="middle">→ 新 attempt + 新 Capability</text>
+
+<rect x="870" y="480" width="170" height="60" fill="#1a0808" stroke="#8b949e" stroke-width="2" rx="4"/>
+<text x="955" y="498" fill="#8b949e" font-size="10" font-weight="bold" text-anchor="middle">read-back 不确定</text>
+<text x="955" y="513" fill="#8b949e" font-size="8" text-anchor="middle">(无法判定)</text>
+<text x="955" y="525" fill="#fbbf24" font-size="8" text-anchor="middle">→ AWAITING_HUMAN</text>
+<text x="955" y="535" fill="#8b949e" font-size="8" text-anchor="middle">(非终态, 人可解)</text>
+
+<!-- Compensation section -->
+<rect x="40" y="600" width="1320" height="180" fill="#161b22" stroke="#f85149" stroke-width="2" rx="6"/>
+<text x="700" y="620" fill="#f85149" font-size="12" font-weight="bold" text-anchor="middle">补偿决策树 (effect 已应用但需撤销)</text>
+<text x="700" y="635" fill="#8b949e" font-size="9" text-anchor="middle">基于 EffectRisk.reversibility 字段 · action-control.md: "Email compensation = unavailable (NOT retractable)"</text>
+<text x="700" y="650" fill="#39c5cf" font-size="8" text-anchor="middle">external-effect.machine.json (14态): PREPARING→PREPARED→COMMITTING→IN_FLIGHT→PROVIDER_ACCEPTED→EFFECT_OBSERVED→EFFECT_VERIFIED→EFFECT_CONFIRMED / EFFECT_UNKNOWN→RECONCILING→RECONCILIATION_FAILED / EXPIRED / AWAITING_HUMAN / FAILED</text>
+
+<line x1="700" y1="645" x2="220" y2="670" stroke="#3fb950" stroke-width="1" marker-end="url(#ag)"/>
+<line x1="700" y1="645" x2="660" y2="670" stroke="#fbbf24" stroke-width="1" marker-end="url(#ay)"/>
+<line x1="700" y1="645" x2="1100" y2="670" stroke="#f85149" stroke-width="1" marker-end="url(#ared)"/>
+
+<rect x="60" y="675" width="320" height="90" fill="#21262d" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="220" y="693" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">REVERT (reversibility=guaranteed)</text>
+<text x="220" y="708" fill="#8b949e" font-size="9" text-anchor="middle">本地, VFS-tracked</text>
+<text x="70" y="728" fill="#f0f6fc" font-size="9">VFS OverlayBackend 丢弃</text>
+<text x="70" y="741" fill="#8b949e" font-size="9">(per-RunPlan 事务回滚)</text>
+<text x="70" y="754" fill="#8b949e" font-size="9">/scratch/* 文件编辑, 无外部副作用</text>
+<text x="220" y="768" fill="#3fb950" font-size="8" text-anchor="middle">CTRL-VFS-001</text>
+
+<rect x="500" y="675" width="320" height="90" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="4"/>
+<text x="660" y="693" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">COMPENSATE (reversibility=best_effort)</text>
+<text x="660" y="708" fill="#8b949e" font-size="9" text-anchor="middle">外部, 可补偿</text>
+<text x="510" y="728" fill="#f0f6fc" font-size="9">执行补偿动作抵消</text>
+<text x="510" y="741" fill="#8b949e" font-size="9">例: 删 Gmail 草稿, 取消发布</text>
+<text x="510" y="754" fill="#8b949e" font-size="9">COMPENSATION_PENDING → COMPENSATED</text>
+<text x="510" y="767" fill="#f85149" font-size="8">失败 → COMPENSATION_FAILED → AWAITING_HUMAN</text>
+
+<rect x="940" y="675" width="320" height="90" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="1100" y="693" fill="#f85149" font-size="11" font-weight="bold" text-anchor="middle">REMEDIATE (reversibility=none)</text>
+<text x="1100" y="708" fill="#8b949e" font-size="9" text-anchor="middle">不可逆</text>
+<text x="950" y="728" fill="#f0f6fc" font-size="9">REMEDIATION_REQUIRED (终态)</text>
+<text x="950" y="741" fill="#8b949e" font-size="9">需新 Run 或人工流程</text>
+<text x="950" y="754" fill="#f85149" font-size="9">例: 已发邮件, 已付款, 已发推</text>
+<text x="950" y="767" fill="#8b949e" font-size="9">无自动恢复可能</text>
+
+<!-- Error classification -->
+<rect x="40" y="800" width="640" height="160" fill="#161b22" stroke="#30363d" stroke-width="1" rx="6"/>
+<text x="360" y="820" fill="#58a6ff" font-size="11" font-weight="bold" text-anchor="middle">错误分类与恢复 (runtime-core.md)</text>
+<text x="50" y="840" fill="#f0f6fc" font-size="9">Network (transient): retry backoff max 3 → PRE_DISPATCH_FAILED → RETRY_SCHEDULED</text>
+<text x="50" y="858" fill="#f0f6fc" font-size="9">Tool (tool-specific): return error to LLM → LLM 决定下一步</text>
+<text x="50" y="876" fill="#f0f6fc" font-size="9">Model (provider): model fallback (model-api-gateway.md fallback chain)</text>
+<text x="50" y="894" fill="#f0f6fc" font-size="9">Truncation (structural): ✗ 不执行, error to LLM (不重试同输入)</text>
+<text x="50" y="912" fill="#f0f6fc" font-size="9">Malformed JSON (repairable): JSON repair max 2 attempts, 失败→tool error</text>
+<text x="50" y="935" fill="#fbbf24" font-size="9">run.machine: CREATED→PLANNING→RUNNING→PAUSED→COMPLETED/FAILED/CANCELLED (7态)</text>
+<text x="50" y="950" fill="#fbbf24" font-size="9">重试规则: 只有 PRE_DISPATCH_FAILED 可 auto retry</text>
+<text x="50" y="950" fill="#fbbf24" font-size="9">重试生成新 attempt_id + 新 CapabilityToken</text>
+
+<!-- Cancel behavior -->
+<rect x="700" y="800" width="660" height="160" fill="#161b22" stroke="#bc8cff" stroke-width="1" rx="6"/>
+<text x="1030" y="820" fill="#bc8cff" font-size="11" font-weight="bold" text-anchor="middle">IN_FLIGHT Cancel 行为 (runtime-core.md steering)</text>
+<text x="1030" y="838" fill="#bc8cff" font-size="9" text-anchor="middle">"IN_FLIGHT external action: cannot cancel/retry, must reconcile"</text>
+<line x1="1030" y1="848" x2="850" y2="870" stroke="#3fb950" stroke-width="1" marker-end="url(#ag)"/>
+<line x1="1030" y1="848" x2="1200" y2="870" stroke="#f85149" stroke-width="1" marker-end="url(#ared)"/>
+<rect x="720" y="875" width="240" height="65" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="840" y="893" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">PRE_DISPATCH 时 cancel</text>
+<text x="840" y="908" fill="#8b949e" font-size="9" text-anchor="middle">CANCEL_REQUESTED → CANCELLED</text>
+<text x="840" y="922" fill="#3fb950" font-size="9" text-anchor="middle">(clean, 无副作用)</text>
+<text x="840" y="935" fill="#8b949e" font-size="9" text-anchor="middle">run.machine: RUNNING→CANCELLED</text>
+<rect x="1080" y="875" width="260" height="65" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
+<text x="1210" y="893" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">IN_FLIGHT 时 cancel</text>
+<text x="1210" y="908" fill="#fbbf24" font-size="9" text-anchor="middle">CANCEL_REQUESTED → RECONCILING</text>
+<text x="1210" y="922" fill="#8b949e" font-size="9" text-anchor="middle">(不直接 CANCELLED)</text>
+<text x="1210" y="935" fill="#8b949e" font-size="9" text-anchor="middle">必须先确定 effect state</text>
+<text x="1030" y="960" fill="#8b949e" font-size="9" text-anchor="middle">VFS 事务: RunPlan 失败 → OverlayBackend 丢弃, 部分编辑不到真实 FS</text>
+</svg>

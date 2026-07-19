@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Evolution Shadow Mode (v9) — dual-path execution with isolation -->
+<svg width="1400" height="780" viewBox="0 0 1400 780" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#8b949e"/></marker>
+<marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
+<marker id="ared" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f85149"/></marker>
+<marker id="apur" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#bc8cff"/></marker>
+</defs>
+<rect x="0" y="0" width="1400" height="780" fill="#0d1117" rx="8"/>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Evolution Shadow Mode — 双路执行 (v9)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">同 RunPlan 双路并行 · primary 用户可见 · shadow 隔离对比 · evolution.md · in-process dual execution (非多部署)</text>
+
+<!-- Entry -->
+<rect x="520" y="70" width="360" height="50" fill="#21262d" stroke="#fbcfe8" stroke-width="2" rx="6"/>
+<text x="700" y="95" fill="#fbcfe8" font-size="12" font-weight="bold" text-anchor="middle">用户请求 → RunPlan Freeze</text>
+<text x="700" y="110" fill="#8b949e" font-size="9" text-anchor="middle">run-plan.schema.json · 22 必填字段 · run_plan_hash</text>
+
+<!-- Fork -->
+<line x1="700" y1="120" x2="300" y2="160" stroke="#3fb950" stroke-width="2" marker-end="url(#ag)"/>
+<line x1="700" y1="120" x2="1100" y2="160" stroke="#bc8cff" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#apur)"/>
+
+<!-- Primary path -->
+<rect x="80" y="170" width="440" height="280" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
+<text x="300" y="190" fill="#3fb950" font-size="13" font-weight="bold" text-anchor="middle">Primary Path (当前配置)</text>
+<rect x="100" y="205" width="400" height="35" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="300" y="223" fill="#3fb950" font-size="10" text-anchor="middle">用户 model binding (当前最优)</text>
+<rect x="100" y="250" width="400" height="35" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="300" y="268" fill="#3fb950" font-size="10" text-anchor="middle">用户 tool grants (RunPlan.tool_grants)</text>
+<rect x="100" y="295" width="400" height="35" fill="#21262d" stroke="#3fb950" stroke-width="1" rx="4"/>
+<text x="300" y="313" fill="#3fb950" font-size="10" text-anchor="middle">用户预算 (BudgetGuard 扣减)</text>
+<rect x="100" y="340" width="400" height="45" fill="#1a0808" stroke="#3fb950" stroke-width="2" rx="4"/>
+<text x="300" y="358" fill="#3fb950" font-size="11" font-weight="bold" text-anchor="middle">→ 结果用户可见</text>
+<text x="300" y="373" fill="#8b949e" font-size="9" text-anchor="middle">StreamEvent → UI (realtime-execution-visualization.md)</text>
+<text x="300" y="410" fill="#8b949e" font-size="9" text-anchor="middle">执行完成后 → Memory Write Proposal</text>
+<text x="300" y="425" fill="#8b949e" font-size="9" text-anchor="middle">→ Outcome Package → 用户</text>
+
+<!-- Shadow path -->
+<rect x="880" y="170" width="440" height="280" fill="#161b22" stroke="#bc8cff" stroke-width="2" stroke-dasharray="6,3" rx="6"/>
+<text x="1100" y="190" fill="#bc8cff" font-size="13" font-weight="bold" text-anchor="middle">Shadow Path (候选优化)</text>
+<rect x="900" y="205" width="400" height="35" fill="#21262d" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4,2" rx="4"/>
+<text x="1100" y="223" fill="#bc8cff" font-size="10" text-anchor="middle">独立 model binding (候选配置)</text>
+<rect x="900" y="250" width="400" height="35" fill="#21262d" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4,2" rx="4"/>
+<text x="1100" y="268" fill="#bc8cff" font-size="10" text-anchor="middle">独立 tool grants (不复用 primary Capability)</text>
+<rect x="900" y="295" width="400" height="35" fill="#1a0808" stroke="#f85149" stroke-width="1" stroke-dasharray="4,2" rx="4"/>
+<text x="1100" y="313" fill="#f85149" font-size="10" font-weight="bold" text-anchor="middle">evolution 预算 (非用户预算)</text>
+<rect x="900" y="340" width="400" height="45" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="4"/>
+<text x="1100" y="358" fill="#f85149" font-size="11" font-weight="bold" text-anchor="middle">✗ 结果不进用户 context</text>
+<text x="1100" y="373" fill="#8b949e" font-size="9" text-anchor="middle">(never user-visible)</text>
+<text x="1100" y="410" fill="#8b949e" font-size="9" text-anchor="middle">→ 结果送 Independent Verifier 离线对比</text>
+<text x="1100" y="425" fill="#8b949e" font-size="9" text-anchor="middle">→ 不送 UI, 不送 Memory</text>
+
+<!-- Isolation boundary -->
+<rect x="870" y="160" width="460" height="300" fill="none" stroke="#f85149" stroke-width="1" stroke-dasharray="8,4" rx="8"/>
+<text x="1100" y="155" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">⚠ 隔离 sandbox 边界</text>
+
+<!-- Comparison -->
+<line x1="300" y1="460" x2="700" y2="490" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="1100" y1="460" x2="700" y2="490" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="540" y="490" width="320" height="60" fill="#21262d" stroke="#fbbf24" stroke-width="2" rx="6"/>
+<text x="700" y="510" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">Independent Verifier 离线对比</text>
+<text x="700" y="525" fill="#8b949e" font-size="9" text-anchor="middle">不同模型族 · 只读 · clean checkout 重跑</text>
+<text x="700" y="540" fill="#8b949e" font-size="9" text-anchor="middle">签发 VerificationRecord</text>
+
+<!-- Pipeline -->
+<line x1="700" y1="550" x2="700" y2="580" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="200" y="580" width="1000" height="40" fill="#161b22" stroke="#30363d" rx="4"/>
+<text x="700" y="603" fill="#f0f6fc" font-size="10" text-anchor="middle">Candidate → Offline Eval → Sandbox Replay → Shadow → Canary → Human Approval → Limited Activation → Continuous Monitoring</text>
+
+<!-- 4 evolution agents -->
+<rect x="40" y="640" width="1320" height="120" fill="#161b22" stroke="#30363d" rx="6"/>
+<text x="700" y="660" fill="#fbcfe8" font-size="11" font-weight="bold" text-anchor="middle">4 个 Evolution Agent (Phase 4+, 全部 shadow-only, 受 Evolution CANNOT 约束)</text>
+<rect x="60" y="675" width="300" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="210" y="693" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">dedup_scanner</text>
+<text x="70" y="710" fill="#8b949e" font-size="8">扫描重复实现, 提交合并提案</text>
+<text x="70" y="723" fill="#8b949e" font-size="8">触发: 定期 + PR merge</text>
+<text x="70" y="736" fill="#8b949e" font-size="8">输出: 重复集群 + 合并提案</text>
+<rect x="380" y="675" width="300" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="530" y="693" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">techdebt_scanner</text>
+<text x="390" y="710" fill="#8b949e" font-size="8">扫描死代码/未用导入/循环依赖</text>
+<text x="390" y="723" fill="#8b949e" font-size="8">触发: 定期</text>
+<text x="390" y="736" fill="#8b949e" font-size="8">输出: 严重度排序清理提案</text>
+<rect x="700" y="675" width="300" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="850" y="693" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">eval_drift_detector</text>
+<text x="710" y="710" fill="#8b949e" font-size="8">对比 eval 期望 vs 实际输出</text>
+<text x="710" y="723" fill="#8b949e" font-size="8">触发: 每次 domain eval 后</text>
+<text x="710" y="736" fill="#8b949e" font-size="8">输出: 过期 eval 标记 + 建议更新</text>
+<rect x="1020" y="675" width="320" height="70" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
+<text x="1180" y="693" fill="#bc8cff" font-size="10" font-weight="bold" text-anchor="middle">doc_cleanup_agent</text>
+<text x="1030" y="710" fill="#8b949e" font-size="8">扫描断链/过期引用/过时指令</text>
+<text x="1030" y="723" fill="#8b949e" font-size="8">触发: 定期 (后台)</text>
+<text x="1030" y="736" fill="#8b949e" font-size="8">输出: 文档清理 PR 提案</text>
+
+<!-- CANNOT constraints -->
+<text x="700" y="745" fill="#f85149" font-size="9" font-weight="bold" text-anchor="middle">Evolution CANNOT: 改 Policy · 扩 Tool grant · 提 Risk ceiling · 取 Secret · 开外部写 · 绕 Release Gate · 自动升级 generated tool</text>
+</svg>

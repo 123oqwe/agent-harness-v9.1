@@ -15,12 +15,20 @@ export interface EvidencePackage {
   test_results: {
     [k: string]: unknown;
   };
-  coverage: {
-    [k: string]: unknown;
-  };
-  security_checks: {
-    [k: string]: unknown;
-  };
+ coverage: {
+   [k: string]: unknown;
+ };
+ /**
+  * Raw stdout from running the test suite. Used by verifier Check 9/10.
+  */
+ test_output?: string | null;
+ /**
+  * SHA-256 hash of test_output (first 16 chars).
+  */
+ test_output_hash?: string | null;
+ security_checks: {
+   [k: string]: unknown;
+ };
   verifier_result: "pass" | "fail";
   verifier_model?: string;
 }
