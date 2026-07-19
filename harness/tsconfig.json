@@ -8,16 +8,17 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "..",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
     "paths": {
       "@harness/*": ["./*"],
-      "@contracts/*": ["../spec/contracts/*"]
+      "@contracts/*": ["../spec/contracts/*"],
+      "@spec-types/*": ["../spec/types/*"]
     }
   },
-  "include": ["./**/*.ts"],
+  "include": ["./**/*.ts", "../spec/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

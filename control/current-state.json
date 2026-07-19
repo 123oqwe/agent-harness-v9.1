@@ -80,12 +80,12 @@
     "no_circular_verification": "Registry status cannot be the source of Gate evidence. Gates must run real commands."
   },
   "repository_structure": {
-    "spec/": "Harness \u7684\u4e0d\u53ef\u53d8\u4ea7\u54c1\u4e0e\u5de5\u7a0b\u89c4\u8303",
-    "factory/": "\u4f7f\u7528 Codex / Claude Code \u5f00\u53d1 Harness \u7684\u81ea\u4e3b\u5de5\u7a0b\u5de5\u5382",
-    "harness/": "\u771f\u6b63\u7684 Agent Harness \u4ea7\u54c1\u4ee3\u7801",
-    "infra/": "Harness \u4e0e Factory \u7684 CI/CD\u3001\u4e91\u8d44\u6e90\u548c\u90e8\u7f72",
-    "evidence/": "Requirement\u3001\u6d4b\u8bd5\u3001\u5b89\u5168\u3001\u90e8\u7f72\u4ea7\u751f\u7684\u4e0d\u53ef\u4f2a\u9020\u8bc1\u636e",
-    "control/": "\u552f\u4e00\u6743\u5a01\u72b6\u6001\u6765\u6e90 (current-state.json)"
+    "spec/": "Harness 的不可变产品与工程规范",
+    "factory/": "使用 Codex / Claude Code 开发 Harness 的自主工程工厂",
+    "harness/": "真正的 Agent Harness 产品代码",
+    "infra/": "Harness 与 Factory 的 CI/CD、云资源和部署",
+    "evidence/": "Requirement、测试、安全、部署产生的不可伪造证据",
+    "control/": "唯一权威状态来源 (current-state.json)"
   },
   "next_actions": [
     "Begin Phase 1: Single-Agent Multi-Domain Foundation (Phase 0 verified, Phase 1 ready)",
@@ -113,14 +113,14 @@
     "factory_tests": "PASS (state store, controller, blocker, budget, secret, worktree, merge queue)",
     "adrs_resolved": "12/12 ACCEPTED (0 NEEDS_VERIFICATION, 0 CONDITIONAL)",
     "capability_coverage": "100% (108/108 mapped)",
-    "requirements": 213
+    "requirements": 221
   },
   "cleanup_notes": {
     "scripts_moved": "archive/non-normative/old-scripts/",
     "agents_moved": "spec/.agents/",
     "artifacts_audit_moved": "archive/non-normative/v9.1-audit/",
-    "phase_0R_fixed": "5 NOT DONE \u2192 DONE",
-    "bootstrap_fixed": "REPAIR_IN_PROGRESS \u2192 VERIFIED"
+    "phase_0R_fixed": "5 NOT DONE → DONE",
+    "bootstrap_fixed": "REPAIR_IN_PROGRESS → VERIFIED"
   },
   "factory_repairs": {
     "fix_1_requirement_selection": "FIXED - reads implementation_maturity from requirements.ndjson",
@@ -149,12 +149,12 @@
   },
   "factory_manual": "factory/FACTORY_MANUAL.md",
   "control_files": {
-    "AGENTS.md": "\u6839\u76ee\u5f55 (Codex \u5165\u53e3)",
-    "CLAUDE.md": "\u6839\u76ee\u5f55 (Claude Code \u5165\u53e3)",
-    "CODEOWNERS": "\u6839\u76ee\u5f55 (GitHub \u4fdd\u62a4)",
-    "spec/AI_EXECUTION_PROTOCOL.md": "\u6267\u884c\u534f\u8bae",
-    "spec/NORMATIVE_PRECEDENCE.md": "\u89c4\u8303\u4f18\u5148\u7ea7",
-    "spec/SPECIFICATION_INDEX.yaml": "\u4e3b\u7d22\u5f15",
-    "control/current-state.json": "\u552f\u4e00\u6743\u5a01\u72b6\u6001"
+    "AGENTS.md": "根目录 (Codex 入口)",
+    "CLAUDE.md": "根目录 (Claude Code 入口)",
+    "CODEOWNERS": "根目录 (GitHub 保护)",
+    "spec/AI_EXECUTION_PROTOCOL.md": "执行协议",
+    "spec/NORMATIVE_PRECEDENCE.md": "规范优先级",
+    "spec/SPECIFICATION_INDEX.yaml": "主索引",
+    "control/current-state.json": "唯一权威状态"
   }
 }
