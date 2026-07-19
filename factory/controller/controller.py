@@ -196,12 +196,20 @@ def release_lock(req_id):
         fd = open(lock_file, 'w')
         fcntl.flock(fd, fcntl.LOCK_EX)
         
-        state = load_state()
+        # Read state directly (NOT load_state — that would re-acquire flock and deadlock)
+        state_path = os.path.join(str(Path(__file__).parent.parent / "state-store"), "state.json")
+        with open(state_path) as sf:
+            state = json.load(sf)
         active = state.get("active_worktrees", {})
         if req_id in active:
             del active[req_id]
             state["active_worktrees"] = active
-            save_state(state)
+            # Write directly (NOT save_state — already holding flock)
+            state["updated_at"] = datetime.datetime.now().isoformat()
+            tmp = state_path + ".tmp"
+            with open(tmp, 'w') as tf:
+                json.dump(state, tf, indent=2)
+            os.rename(tmp, state_path)
             log(f"Lock released for {req_id}")
             return True
         return False
