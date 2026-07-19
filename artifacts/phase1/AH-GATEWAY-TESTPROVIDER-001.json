@@ -1,0 +1,57 @@
+{
+  "requirement_id": "AH-GATEWAY-TESTPROVIDER-001",
+  "title": "Implement ScriptedTestProvider for offline LLM-free testing",
+  "commit_sha": "(pending)",
+  "source_files": [
+    "harness/gateway/scripted-provider.ts"
+  ],
+  "tests_added": [
+    "harness/tests/gateway/scripted-provider.test.ts (extended: +20 behavior tests)"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": "e3b0c44298fc1c14"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "dac10792aaac8f96"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0
+  ],
+  "test_results": {
+    "total": 119,
+    "passed": 119,
+    "failed": 0,
+    "scripted_provider_tests": 26,
+    "note": "26 tests in scripted-provider.test.ts (6 schema + 20 behavior)"
+  },
+  "coverage": {
+    "note": "Phase 1 threshold mutation>=0.7; v8 coverage via vitest available on demand"
+  },
+  "security_checks": {
+    "zero_network": "PASS (fetch overridden to throw; all paths completed)",
+    "no_credentials": "PASS (no env reads in source)",
+    "no_active_stubs": "PASS (all 8 interface methods implemented)"
+  },
+  "known_limitations": [],
+  "verifier_result": "pending-cross-model",
+  "verifier_model": "structural-only (cross-model verifier key not yet provided)",
+  "acceptance_criteria_met": [
+    "Implements full ProviderAdapter interface (8 methods)",
+    "Accepts response queue (ordered, one per call)",
+    "Accepts response map (keyed by SHA-256 of input messages)",
+    "Records all call metadata (messages, tools, usage, timestamps)",
+    "Throws ScriptedResponseExhaustedError when queue empty",
+    "Injectable via ModelGateway.resolve()",
+    "Health check always healthy without network",
+    "Zero network calls in any code path",
+    "Test suite: queue order, map match, exhausted throws, metadata accurate"
+  ],
+  "generated_at": "2026-07-20T04:42:39.227912"
+}
