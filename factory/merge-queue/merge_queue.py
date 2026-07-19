@@ -93,12 +93,49 @@ def process_next():
         return item
     
     # 3. [REAL] git merge --no-ff in main repo
+    # Stash uncommitted changes (update_registry modifies requirements.ndjson in main repo)
+    stash = subprocess.run(
+        ["git", "stash"],
+        capture_output=True, text=True, cwd=str(BASE_DIR)
+    )
+    stashed = stash.returncode == 0 and "No local changes" not in (stash.stdout or "")
+
     merge = subprocess.run(
         ["git", "merge", "--no-ff", branch, "-m", f"Merge {req_id}"],
         capture_output=True, text=True,
         cwd=str(BASE_DIR)
     )
-    
+
+    # Pop stash to restore uncommitted changes (requirements.ndjson etc.)
+    if stashed:
+        pop = subprocess.run(
+            ["git", "stash", "pop"],
+            capture_output=True, text=True, cwd=str(BASE_DIR)
+        )
+        if pop.returncode != 0:
+            # Conflict — discard stash, merged version is authoritative
+            subprocess.run(["git", "checkout", "--", "."], capture_output=True, cwd=str(BASE_DIR))
+            subprocess.run(["git", "stash", "drop"], capture_output=True, cwd=str(BASE_DIR))
+            # Re-apply verified status in requirements.ndjson
+            try:
+                req_path = BASE_DIR / "spec" / "requirements" / "requirements.ndjson"
+                lines = open(req_path).readlines()
+                for i, line in enumerate(lines):
+                    if not line.strip():
+                        continue
+                    r = json.loads(line)
+                    if r["id"] == req_id and r.get("implementation_maturity") != "verified":
+                        r["implementation_maturity"] = "verified"
+                        lines[i] = json.dumps(r, ensure_ascii=False) + "\n"
+                        break
+                else:
+                    lines = None
+                if lines:
+                    with open(req_path, 'w') as f:
+                        f.writelines(lines)
+            except Exception:
+                pass
+
     if merge.returncode != 0:
         create_blocker(req_id, "merge_conflict", [merge.stderr[:500]], "Resolve merge conflict")
         item["status"] = "merge_failed"
