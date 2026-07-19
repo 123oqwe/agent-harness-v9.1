@@ -6,7 +6,8 @@
     "**/*.ts",
     "!**/*.test.ts",
     "!node_modules/**",
-    "!tests/**"
+    "!tests/**",
+    "!../spec/types/**"
   ],
   "thresholds": {
     "high": 80,
