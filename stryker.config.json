@@ -2,10 +2,12 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
   "mutate": [
-    "gateway/**/*.ts"
+    "gateway/**/*.ts",
+    "security/**/*.ts"
   ],
   "testFiles": [
-    "tests/gateway/*.test.ts"
+    "tests/gateway/*.test.ts",
+    "tests/policy/*.test.ts"
   ],
   "vitest": {
     "configFile": "vitest.config.ts",

@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '**/.stryker-tmp/**'],
     coverage: {
       provider: 'v8',
-      include: ['gateway/**/*.ts'],
+      include: ['gateway/**/*.ts', 'security/**/*.ts'],
       exclude: ['**/*.d.ts'],
       reporter: ['text', 'json', 'json-summary', 'html'],
       thresholds: {
