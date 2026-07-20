@@ -4,6 +4,8 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,12 +15,30 @@
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "paths": {
-      "@harness/*": ["./*"],
-      "@contracts/*": ["../spec/contracts/*"],
-      "@spec-types/*": ["../spec/types/*"]
+      "@harness/*": [
+        "./*"
+      ],
+      "@contracts/*": [
+        "../spec/contracts/*"
+      ],
+      "@spec-types/*": [
+        "../spec/types/*"
+      ]
     }
   },
-  "include": ["./**/*.ts", "../spec/types/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "./**/*.ts",
+    "../spec/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".stryker-tmp"
+  ]
 }

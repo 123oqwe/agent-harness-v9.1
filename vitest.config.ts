@@ -4,9 +4,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    exclude: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '**/.stryker-tmp/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      include: ['gateway/**/*.ts'],
+      exclude: ['**/*.d.ts'],
+      reporter: ['text', 'json', 'json-summary', 'html'],
       thresholds: {
         lines: 80,
         branches: 75,

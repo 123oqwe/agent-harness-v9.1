@@ -3,30 +3,50 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "./dist/harness/index.js",
+  "types": "./dist/harness/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/harness/index.d.ts",
+      "import": "./dist/harness/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "overrides": {
+    "qs": "6.15.3"
+  },
   "scripts": {
-    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint gateway index.ts tests",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:contract": "vitest run tests/contracts tests/api",
+    "test:unit": "vitest run tests/gateway tests/state-machines tests/spikes tests/packaging",
+    "test:integration": "vitest run tests/gateway",
+    "test:security": "vitest run tests/threat-model",
+    "test:e2e": "vitest run tests/contracts tests/gateway",
     "test:coverage": "vitest run --coverage",
-    "test:mutation": "stryker run",
-    "lint": "test -d src && eslint src/ tests/ || echo 'lint: no src/ yet (Phase 0), tests covered by tsc'",
-    "format": "prettier --write tests/"
+    "test:mutation": "node scripts/run-stryker.mjs",
+    "format": "prettier --write gateway index.ts tests *.config.* *.json scripts"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.0.0",
-    "@stryker-mutator/core": "^8.0.0",
-    "@stryker-mutator/vitest-runner": "^8.0.0",
-    "@types/node": "^22.0.0",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
-  },
-  "dependencies": {
-    "fastify": "^5.0.0",
-    "@trpc/server": "^11.0.0",
-    "zod": "^3.23.0"
+    "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "eslint": "^10.7.0",
+    "prettier": "^3.9.5",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
   }
 }
