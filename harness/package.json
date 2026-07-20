@@ -27,13 +27,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contracts tests/api",
-    "test:unit": "vitest run tests/gateway tests/policy tests/state-machines tests/spikes tests/packaging",
-    "test:integration": "vitest run tests/gateway",
-    "test:security": "vitest run tests/threat-model tests/gateway tests/policy",
+    "test:unit": "vitest run tests/gateway tests/policy tests/security tests/state-machines tests/spikes tests/packaging",
+    "test:integration": "vitest run tests/gateway tests/security/capability-replay.test.ts",
+    "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security",
     "test:e2e": "vitest run tests/contracts tests/gateway",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "node scripts/run-stryker.mjs",
-    "format": "prettier --write gateway index.ts tests *.config.* *.json scripts"
+    "format": "prettier --write gateway security index.ts tests *.config.* *.json scripts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -70,7 +70,11 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(mutationText).toMatch(/gateway/u);
     expect(mutationText).toMatch(/security/u);
     expect(mutationText).not.toMatch(/tests|\.config|spec\/types/u);
-    expect(config.testFiles).toEqual(['tests/gateway/*.test.ts', 'tests/policy/*.test.ts']);
+    expect(config.testFiles).toEqual([
+      'tests/gateway/*.test.ts',
+      'tests/policy/*.test.ts',
+      'tests/security/*.test.ts',
+    ]);
     expect(config.cleanTempDir).toBe('always');
     expect(config.concurrency).toBeGreaterThan(0);
     expect(config.concurrency).toBeLessThanOrEqual(4);
@@ -93,6 +97,9 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(built).toHaveProperty('ModelGateway');
     expect(built).toHaveProperty('PolicyEngine');
     expect(built).toHaveProperty('PolicyEnforcementPoint');
+    expect(built).toHaveProperty('AuthorizationService');
+    expect(built).toHaveProperty('InMemoryCapabilityStateStore');
+    expect(built).toHaveProperty('FileCapabilityStateStore');
     expect(fs.readFileSync(path.join(harnessRoot, 'gateway/model-gateway.ts'), 'utf8')).not.toContain(
       'process.env',
     );

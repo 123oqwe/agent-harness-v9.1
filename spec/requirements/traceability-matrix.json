@@ -23,7 +23,8 @@
     "test": [
       "harness/tests/security/capability-issue.test.ts",
       "harness/tests/security/capability-replay.test.ts",
-      "harness/tests/security/capability-child.test.ts"
+      "harness/tests/security/capability-child.test.ts",
+      "harness/tests/packaging/package.test.ts"
     ],
     "eval": null,
     "phase_gate": "phases/phase-1.yaml",
