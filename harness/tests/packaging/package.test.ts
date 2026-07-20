@@ -47,6 +47,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(pkg.scripts.typecheck).toContain('tsc --noEmit');
     expect(pkg.scripts.build).not.toContain('--noEmit');
     expect(pkg.scripts.lint).not.toMatch(/echo|test -d|\|\|/u);
+    expect(pkg.scripts['test:security']).toContain('tests/gateway');
     for (const name of required.filter((entry) => entry.startsWith('test:'))) {
       expect(pkg.scripts[name]).not.toMatch(/passWithNoTests|echo|\|\|\s*true/u);
     }
@@ -67,7 +68,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(config.mutate.length).toBeGreaterThan(0);
     expect(mutationText).toMatch(/gateway/u);
     expect(mutationText).not.toMatch(/tests|\.config|spec\/types/u);
-    expect(config.testFiles).toEqual(['tests/gateway/scripted-provider.test.ts']);
+    expect(config.testFiles).toEqual(['tests/gateway/*.test.ts']);
     expect(config.cleanTempDir).toBe('always');
     expect(config.concurrency).toBeGreaterThan(0);
     expect(config.concurrency).toBeLessThanOrEqual(4);
@@ -85,6 +86,10 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(fs.existsSync(typeEntry)).toBe(true);
     const built = (await import(`${jsEntry}?test=${Date.now()}`)) as Record<string, unknown>;
     expect(built).toHaveProperty('ScriptedTestProvider');
+    expect(built).toHaveProperty('ModelGateway');
+    expect(fs.readFileSync(path.join(harnessRoot, 'gateway/model-gateway.ts'), 'utf8')).not.toContain(
+      'process.env',
+    );
   });
 
   it('packs only the manifest and necessary dist artifacts', () => {

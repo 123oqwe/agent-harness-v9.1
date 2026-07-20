@@ -78,7 +78,7 @@
     "capabilities": {"total": 124, "mapped": 124, "unmapped": 0},
     "phases": {
       "0": {"total": 31, "maturity": {"not_started": 7, "verified": 24}},
-      "1": {"total": 40, "maturity": {"in_progress": 12, "not_started": 27, "verified": 1}},
+      "1": {"total": 40, "maturity": {"in_progress": 12, "not_started": 26, "verified": 2}},
       "2": {"total": 64, "maturity": {"not_started": 64}},
       "3": {"total": 16, "maturity": {"not_started": 16}},
       "4": {"total": 23, "maturity": {"not_started": 23}},
