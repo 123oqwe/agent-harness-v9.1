@@ -5,7 +5,7 @@
     "gateway/**/*.ts"
   ],
   "testFiles": [
-    "tests/gateway/scripted-provider.test.ts"
+    "tests/gateway/*.test.ts"
   ],
   "vitest": {
     "configFile": "vitest.config.ts",

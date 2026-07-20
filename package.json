@@ -29,7 +29,7 @@
     "test:contract": "vitest run tests/contracts tests/api",
     "test:unit": "vitest run tests/gateway tests/state-machines tests/spikes tests/packaging",
     "test:integration": "vitest run tests/gateway",
-    "test:security": "vitest run tests/threat-model",
+    "test:security": "vitest run tests/threat-model tests/gateway",
     "test:e2e": "vitest run tests/contracts tests/gateway",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "node scripts/run-stryker.mjs",
