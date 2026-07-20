@@ -1170,7 +1170,8 @@
     "api": [],
     "source_package": "gateway",
     "test": [
-      "harness/tests/gateway/scripted-provider.test.ts"
+      "harness/tests/gateway/scripted-provider.test.ts",
+      "harness/tests/packaging/package.test.ts"
     ],
     "eval": null,
     "phase_gate": "phases/phase-1.yaml",

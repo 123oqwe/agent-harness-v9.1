@@ -1,35 +1,22 @@
-/**
- * AH-GATEWAY-TESTPROVIDER-001: ScriptedTestProvider
- *
- * Deterministic, network-free test provider implementing the full
- * ProviderAdapter interface. Enables all Phase 1-4 tests to run without any
- * LLM API key. Zero network calls in any code path.
- *
- * Modes:
- *  - queue: responses returned in order, one per call; exhausted queue throws
- *  - map:   responses keyed by SHA-256 of the input messages (deterministic)
- */
 import { createHash } from 'node:crypto';
 
+import type { ProviderAdapter as ProviderAdapterContract } from '../../spec/types/provider-adapter.js';
+import type { ToolSpec as ContractToolSpec } from '../../spec/types/tool-spec.js';
+
+type JsonPrimitive = boolean | null | number | string;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
 export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
+  readonly id: string;
+  readonly name: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
 }
 
 export interface Message {
-  role: 'system' | 'user' | 'assistant' | 'tool';
+  readonly role: 'assistant' | 'system' | 'tool' | 'user';
   content: string;
-  tool_call_id?: string;
-  tool_calls?: ToolCall[];
-}
-
-export interface ParsedResponse {
-  content: string;
-  tool_calls?: ToolCall[];
-  stop_reason?: 'stop' | 'length' | 'tool_use' | 'content_filter';
-  usage?: Usage;
-  model?: string;
+  readonly tool_call_id?: string;
+  readonly tool_calls?: readonly ToolCall[];
 }
 
 export interface Usage {
@@ -37,247 +24,508 @@ export interface Usage {
   output_tokens: number;
 }
 
-export interface ToolSpec {
-  name: string;
-  description?: string;
-  input_schema?: Record<string, unknown>;
+export interface ParsedResponse {
+  readonly content: string;
+  readonly tool_calls?: readonly ToolCall[];
+  readonly stop_reason?: 'content_filter' | 'length' | 'stop' | 'tool_use';
+  readonly usage?: Usage;
+  readonly model?: string;
 }
 
+export type ProviderTool = Pick<ContractToolSpec, 'name'> &
+  Partial<Omit<ContractToolSpec, 'name'>>;
+
 export interface ProviderRequest {
-  messages: Message[];
-  tools?: ToolSpec[];
-  model?: string;
-  temperature?: number;
-  max_tokens?: number;
+  readonly messages: readonly Message[];
+  readonly tools?: readonly ProviderTool[];
+  readonly model?: string;
+  readonly temperature?: number;
+  readonly max_tokens?: number;
 }
 
 export type HealthStatus = 'healthy' | 'degraded' | 'down';
 
 export interface DataPolicyResult {
-  allowed: boolean;
-  reason?: string;
+  readonly allowed: boolean;
+  readonly reason?: string;
 }
 
-export type ProviderError =
-  | { kind: 'rate_limited'; retryable: boolean; detail: string }
-  | { kind: 'auth'; retryable: boolean; detail: string }
-  | { kind: 'invalid_request'; retryable: boolean; detail: string }
-  | { kind: 'server'; retryable: boolean; detail: string }
-  | { kind: 'timeout'; retryable: boolean; detail: string }
-  | { kind: 'unknown'; retryable: boolean; detail: string };
+export interface ProviderError {
+  readonly kind:
+    | 'auth'
+    | 'invalid_request'
+    | 'rate_limited'
+    | 'server'
+    | 'timeout'
+    | 'unknown';
+  readonly retryable: boolean;
+  readonly detail: string;
+  readonly status?: number;
+}
 
 export type StreamEvent =
-  | { type: 'text_delta'; text: string }
-  | { type: 'tool_call'; tool_call: ToolCall }
-  | { type: 'message_stop'; stop_reason: ParsedResponse['stop_reason']; usage?: Usage };
+  | { readonly type: 'text_delta'; readonly text: string }
+  | { readonly type: 'tool_call'; readonly tool_call: ToolCall }
+  | {
+      readonly type: 'message_stop';
+      readonly stop_reason: ParsedResponse['stop_reason'];
+      readonly usage?: Usage;
+    };
 
 export interface CallMetadata {
-  index: number;
-  timestamp: string;
-  messages: Message[];
-  tools_requested: string[];
-  response: ParsedResponse;
-  usage: Usage;
-  lookup_mode: 'queue' | 'map';
+  readonly index: number;
+  readonly timestamp: string;
+  readonly messages: readonly Message[];
+  readonly tools_requested: readonly string[];
+  readonly response: ParsedResponse;
+  readonly usage: Usage;
+  readonly lookup_mode: 'map' | 'queue';
 }
 
-export interface ProviderAdapter {
-  readonly provider_type: 'openai' | 'anthropic' | 'google' | 'local' | 'scripted_test';
-  normalizeRequest(req: ProviderRequest): unknown;
-  parseResponse(raw: unknown): ParsedResponse;
-  normalizeToolCall(raw: unknown): ToolCall;
-  streamEvents(req: ProviderRequest): AsyncIterable<StreamEvent>;
-  mapError(raw: unknown): ProviderError;
-  meterUsage(res: ParsedResponse): Usage;
-  checkHealth(): HealthStatus;
-  validateDataPolicy(req: ProviderRequest): DataPolicyResult;
-}
-
-/** Thrown when the scripted response queue runs out. Prevents silent passes. */
-export class ScriptedResponseExhaustedError extends Error {
-  constructor(message = 'Scripted response queue exhausted: no more responses queued.') {
+export class ProviderValidationError extends TypeError {
+  constructor(message: string) {
     super(message);
-    this.name = 'ScriptedResponseExhaustedError';
-    Object.setPrototypeOf(this, ScriptedResponseExhaustedError.prototype);
+    this.name = 'ProviderValidationError';
   }
 }
 
-/** Thrown when a map lookup misses (no scripted response for that input hash). */
+export class ProviderHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message = `Provider returned HTTP ${status}`) {
+    if (!Number.isInteger(status) || status < 100 || status > 599) {
+      throw new RangeError('Provider HTTP status must be an integer from 100 through 599');
+    }
+    super(message);
+    this.name = 'ProviderHttpError';
+    this.status = status;
+  }
+}
+
+export class ProviderTimeoutError extends Error {
+  constructor(message = 'Provider request timed out') {
+    super(message);
+    this.name = 'ProviderTimeoutError';
+  }
+}
+
+export class ScriptedResponseExhaustedError extends Error {
+  constructor(message = 'Scripted response queue exhausted: no response remains') {
+    super(message);
+    this.name = 'ScriptedResponseExhaustedError';
+  }
+}
+
 export class ScriptedResponseMissingError extends Error {
   readonly key: string;
+
   constructor(key: string) {
     super(`Scripted response missing for input hash ${key}`);
     this.name = 'ScriptedResponseMissingError';
     this.key = key;
-    Object.setPrototypeOf(this, ScriptedResponseMissingError.prototype);
   }
 }
 
-function hashMessages(messages: Message[]): string {
-  // Deterministic canonical JSON: stable key order, no whitespace.
-  const canonical = JSON.stringify(messages, Object.keys(messages[0] ?? {}).sort());
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  return prototype === Object.prototype || prototype === null;
+}
+
+function cloneJson(value: unknown, location = '$'): JsonValue {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new ProviderValidationError(`${location} must contain only finite JSON numbers`);
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => cloneJson(entry, `${location}[${index}]`));
+  }
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneJson(entry, `${location}.${key}`)]),
+    );
+  }
+  throw new ProviderValidationError(`${location} must be valid JSON data`);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;
+  for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  return Object.freeze(value);
+}
+
+function cloneAndFreeze<T>(value: T, location = '$'): T {
+  return deepFreeze(cloneJson(value, location) as T);
+}
+
+function assertKnownKeys(value: Record<string, unknown>, keys: readonly string[], location: string) {
+  const unknown = Object.keys(value).filter((key) => !keys.includes(key));
+  if (unknown.length > 0) {
+    throw new ProviderValidationError(`${location} contains unknown field: ${unknown[0]}`);
+  }
+}
+
+function nonEmptyString(value: unknown, location: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new ProviderValidationError(`${location} must be a non-empty string`);
+  }
+  return value;
+}
+
+function normalizeUsage(raw: unknown, location = 'usage'): Usage {
+  if (!isPlainRecord(raw)) throw new ProviderValidationError(`${location} must be an object`);
+  assertKnownKeys(raw, ['input_tokens', 'output_tokens'], location);
+  const inputTokens = raw.input_tokens;
+  const outputTokens = raw.output_tokens;
+  for (const [field, value] of [
+    ['input_tokens', inputTokens],
+    ['output_tokens', outputTokens],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || (value as number) < 0) {
+      throw new ProviderValidationError(`${location}.${field} must be a non-negative integer`);
+    }
+  }
+  return deepFreeze({ input_tokens: inputTokens as number, output_tokens: outputTokens as number });
+}
+
+function normalizeToolCallValue(raw: unknown, location = 'tool_call'): ToolCall {
+  if (!isPlainRecord(raw)) throw new ProviderValidationError(`${location} must be an object`);
+  assertKnownKeys(raw, ['arguments', 'id', 'name'], location);
+  const id = nonEmptyString(raw.id, `${location}.id`);
+  const name = nonEmptyString(raw.name, `${location}.name`);
+  if (!isPlainRecord(raw.arguments)) {
+    throw new ProviderValidationError(`${location}.arguments must be an object`);
+  }
+  return deepFreeze({
+    id,
+    name,
+    arguments: cloneAndFreeze(raw.arguments, `${location}.arguments`) as Readonly<
+      Record<string, unknown>
+    >,
+  });
+}
+
+function normalizeMessage(raw: unknown, index: number): Message {
+  const location = `messages[${index}]`;
+  if (!isPlainRecord(raw)) throw new ProviderValidationError(`${location} must be an object`);
+  assertKnownKeys(raw, ['content', 'role', 'tool_call_id', 'tool_calls'], location);
+  if (
+    typeof raw.role !== 'string' ||
+    !['assistant', 'system', 'tool', 'user'].includes(raw.role)
+  ) {
+    throw new ProviderValidationError(`${location}.role is unsupported`);
+  }
+  if (typeof raw.content !== 'string') {
+    throw new ProviderValidationError(`${location}.content must be a string`);
+  }
+  const normalized: {
+    role: Message['role'];
+    content: string;
+    tool_call_id?: string;
+    tool_calls?: ToolCall[];
+  } = { role: raw.role as Message['role'], content: raw.content };
+  if (raw.tool_call_id !== undefined) {
+    normalized.tool_call_id = nonEmptyString(raw.tool_call_id, `${location}.tool_call_id`);
+  }
+  if (raw.tool_calls !== undefined) {
+    if (!Array.isArray(raw.tool_calls)) {
+      throw new ProviderValidationError(`${location}.tool_calls must be an array`);
+    }
+    normalized.tool_calls = raw.tool_calls.map((entry, toolIndex) =>
+      normalizeToolCallValue(entry, `${location}.tool_calls[${toolIndex}]`),
+    );
+  }
+  return deepFreeze(normalized);
+}
+
+function normalizeMessages(raw: unknown): readonly Message[] {
+  if (!Array.isArray(raw)) throw new ProviderValidationError('messages must be an array');
+  return deepFreeze(raw.map((entry, index) => normalizeMessage(entry, index)));
+}
+
+function canonicalJson(value: JsonValue): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key]!)}`)
+    .join(',')}}`;
+}
+
+export function hashMessages(messages: readonly Message[]): string {
+  const normalized = normalizeMessages(messages);
+  const canonical = canonicalJson(cloneJson(normalized, 'messages'));
   return createHash('sha256').update(canonical).digest('hex');
 }
 
-function defaultUsage(res: ParsedResponse): Usage {
-  const out = res.usage ?? { input_tokens: 0, output_tokens: 0 };
-  // If output tokens unset, estimate from content length so metering is non-zero.
-  if (out.output_tokens === 0 && res.content) {
-    return { input_tokens: out.input_tokens, output_tokens: Math.ceil(res.content.length / 4) };
-  }
-  return out;
-}
+export const scriptedProviderContract = deepFreeze({
+  provider_type: 'scripted_test',
+  normalize_request: true,
+  parse_response: true,
+  normalize_tool_call: true,
+  stream_events: true,
+  map_error: true,
+  meter_usage: true,
+  check_health: true,
+  validate_data_policy: true,
+} satisfies ProviderAdapterContract);
 
 export interface ScriptedTestProviderOptions {
-  queue?: ParsedResponse[];
-  map?: Record<string, ParsedResponse>;
-  health?: HealthStatus;
-  dataPolicy?: DataPolicyResult;
-  model?: string;
+  readonly queue?: readonly ParsedResponse[];
+  readonly map?: Readonly<Record<string, ParsedResponse>>;
+  readonly dataPolicy?: DataPolicyResult;
+  readonly model?: string;
+  readonly now?: () => Date;
 }
 
-/**
- * Deterministic, network-free ProviderAdapter for testing.
- *
- * Lookup order per call:
- *   1. If a response map is provided AND the input hash is present -> use it.
- *   2. Else if a queue is provided -> shift the next response.
- *   3. Else throw ScriptedResponseExhaustedError / ScriptedResponseMissingError.
- */
-export class ScriptedTestProvider implements ProviderAdapter {
+export class ScriptedTestProvider {
   readonly provider_type = 'scripted_test' as const;
 
   private readonly queue: ParsedResponse[];
-  private readonly map: Record<string, ParsedResponse>;
-  private readonly health: HealthStatus;
+  private readonly responsesByHash: ReadonlyMap<string, ParsedResponse>;
   private readonly dataPolicy: DataPolicyResult;
   private readonly model: string;
+  private readonly now: () => Date;
   private readonly calls: CallMetadata[] = [];
   private callIndex = 0;
 
-  constructor(opts: ScriptedTestProviderOptions = {}) {
-    this.queue = opts.queue ? [...opts.queue] : [];
-    this.map = opts.map ? { ...opts.map } : {};
-    this.health = opts.health ?? 'healthy';
-    this.dataPolicy = opts.dataPolicy ?? { allowed: true };
-    this.model = opts.model ?? 'scripted-test';
+  constructor(options: ScriptedTestProviderOptions = {}) {
+    this.model = nonEmptyString(options.model ?? 'scripted-test', 'model');
+    this.now = options.now ?? (() => new Date());
+    this.dataPolicy = this.normalizeDataPolicy(
+      options.dataPolicy === undefined ? { allowed: true } : options.dataPolicy,
+    );
+    this.queue = (options.queue ?? []).map((entry) => this.parseResponse(entry));
+
+    const mapEntries = Object.entries(options.map ?? {}).map(([key, entry]) => {
+      if (!/^[0-9a-f]{64}$/u.test(key)) {
+        throw new ProviderValidationError('response map keys must be lowercase SHA-256 hashes');
+      }
+      return [key, this.parseResponse(entry)] as const;
+    });
+    this.responsesByHash = new Map(mapEntries);
   }
 
-  /** Resolve the scripted response for a request (the core dispatch). */
-  resolve(req: ProviderRequest): ParsedResponse {
-    const key = hashMessages(req.messages);
+  resolve(request: ProviderRequest): ParsedResponse {
+    const normalizedRequest = this.normalizeRequest(request) as Readonly<{
+      messages: readonly Message[];
+      tools: readonly ProviderTool[];
+    }>;
+    const key = hashMessages(normalizedRequest.messages);
     let response: ParsedResponse | undefined;
-    let mode: 'queue' | 'map';
+    let lookupMode: 'map' | 'queue';
 
-    if (Object.keys(this.map).length > 0 && key in this.map) {
-      response = this.map[key];
-      mode = 'map';
+    if (this.responsesByHash.has(key)) {
+      response = this.responsesByHash.get(key);
+      lookupMode = 'map';
     } else if (this.queue.length > 0) {
       response = this.queue.shift();
-      mode = 'queue';
-    } else if (Object.keys(this.map).length > 0) {
+      lookupMode = 'queue';
+    } else if (this.responsesByHash.size > 0) {
       throw new ScriptedResponseMissingError(key);
     } else {
       throw new ScriptedResponseExhaustedError();
     }
+    if (!response) throw new ScriptedResponseExhaustedError();
 
-    const usage = defaultUsage(response!);
-    const meta: CallMetadata = {
-      index: this.callIndex++,
-      timestamp: new Date().toISOString(),
-      messages: req.messages,
-      tools_requested: (req.tools ?? []).map((t) => t.name),
-      response: response!,
+    const timestamp = this.now();
+    if (!(timestamp instanceof Date) || !Number.isFinite(timestamp.getTime())) {
+      throw new ProviderValidationError('clock must return a valid Date');
+    }
+    const usage = this.meterUsage(response);
+    const metadata = deepFreeze({
+      index: this.callIndex,
+      timestamp: timestamp.toISOString(),
+      messages: normalizedRequest.messages,
+      tools_requested: deepFreeze(normalizedRequest.tools.map((tool) => tool.name)),
+      response,
       usage,
-      lookup_mode: mode,
-    };
-    this.calls.push(meta);
-    return response!;
+      lookup_mode: lookupMode,
+    } satisfies CallMetadata);
+    this.callIndex += 1;
+    this.calls.push(metadata);
+    return response;
   }
 
-  normalizeRequest(req: ProviderRequest): unknown {
-    return {
-      model: req.model ?? this.model,
-      messages: req.messages,
-      tools: req.tools ?? [],
-      temperature: req.temperature ?? 0,
-      max_tokens: req.max_tokens ?? null,
-    };
+  normalizeRequest(request: ProviderRequest): unknown {
+    if (!isPlainRecord(request)) throw new ProviderValidationError('request must be an object');
+    assertKnownKeys(
+      request,
+      ['max_tokens', 'messages', 'model', 'temperature', 'tools'],
+      'request',
+    );
+    const messages = normalizeMessages(request.messages);
+    if (request.tools !== undefined && !Array.isArray(request.tools)) {
+      throw new ProviderValidationError('request.tools must be an array');
+    }
+    const tools = (request.tools ?? []).map((tool, index) => {
+      if (!isPlainRecord(tool)) {
+        throw new ProviderValidationError(`request.tools[${index}] must be an object`);
+      }
+      nonEmptyString(tool.name, `request.tools[${index}].name`);
+      return cloneAndFreeze(tool, `request.tools[${index}]`) as ProviderTool;
+    });
+    const model = nonEmptyString(request.model ?? this.model, 'request.model');
+    const temperature = request.temperature ?? 0;
+    if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
+      throw new ProviderValidationError('request.temperature must be between 0 and 2');
+    }
+    if (
+      request.max_tokens !== undefined &&
+      (!Number.isSafeInteger(request.max_tokens) || request.max_tokens <= 0)
+    ) {
+      throw new ProviderValidationError('request.max_tokens must be a positive integer');
+    }
+
+    return deepFreeze({
+      model,
+      messages,
+      tools: deepFreeze(tools),
+      temperature,
+      max_tokens: request.max_tokens ?? null,
+    });
   }
 
   parseResponse(raw: unknown): ParsedResponse {
-    if (typeof raw !== 'object' || raw === null) {
-      throw new TypeError('parseResponse expects an object');
+    if (!isPlainRecord(raw)) throw new ProviderValidationError('response must be an object');
+    assertKnownKeys(raw, ['content', 'model', 'stop_reason', 'tool_calls', 'usage'], 'response');
+    if (typeof raw.content !== 'string') {
+      throw new ProviderValidationError('response.content must be a string');
     }
-    const r = raw as Partial<ParsedResponse>;
-    if (typeof r.content !== 'string') {
-      throw new TypeError('parseResponse: content must be a string');
+    const stopReason = raw.stop_reason ?? 'stop';
+    if (
+      typeof stopReason !== 'string' ||
+      !['content_filter', 'length', 'stop', 'tool_use'].includes(stopReason)
+    ) {
+      throw new ProviderValidationError('response.stop_reason is unsupported');
     }
-    return {
-      content: r.content,
-      tool_calls: r.tool_calls,
-      stop_reason: r.stop_reason ?? 'stop',
-      usage: r.usage,
-      model: r.model ?? this.model,
+    if (raw.tool_calls !== undefined && !Array.isArray(raw.tool_calls)) {
+      throw new ProviderValidationError('response.tool_calls must be an array');
+    }
+
+    const normalized: {
+      content: string;
+      tool_calls?: ToolCall[];
+      stop_reason: NonNullable<ParsedResponse['stop_reason']>;
+      usage?: Usage;
+      model: string;
+    } = {
+      content: raw.content,
+      stop_reason: stopReason as NonNullable<ParsedResponse['stop_reason']>,
+      model: nonEmptyString(raw.model ?? this.model, 'response.model'),
     };
+    if (raw.tool_calls !== undefined) {
+      normalized.tool_calls = raw.tool_calls.map((entry, index) =>
+        normalizeToolCallValue(entry, `response.tool_calls[${index}]`),
+      );
+    }
+    if (raw.usage !== undefined) normalized.usage = normalizeUsage(raw.usage);
+    return deepFreeze(normalized);
   }
 
   normalizeToolCall(raw: unknown): ToolCall {
-    if (typeof raw !== 'object' || raw === null) {
-      throw new TypeError('normalizeToolCall expects an object');
-    }
-    const r = raw as Partial<ToolCall>;
-    if (typeof r.name !== 'string' || typeof r.id !== 'string') {
-      throw new TypeError('normalizeToolCall: id and name required');
-    }
-    return { id: r.id, name: r.name, arguments: r.arguments ?? {} };
+    return normalizeToolCallValue(raw);
   }
 
-  async *streamEvents(req: ProviderRequest): AsyncIterable<StreamEvent> {
-    const res = this.resolve(req);
-    if (res.content) {
-      yield { type: 'text_delta', text: res.content };
+  async *streamEvents(request: ProviderRequest): AsyncIterable<StreamEvent> {
+    const response = this.resolve(request);
+    if (response.content.length > 0) yield { type: 'text_delta', text: response.content };
+    for (const toolCall of response.tool_calls ?? []) {
+      yield { type: 'tool_call', tool_call: toolCall };
     }
-    for (const tc of res.tool_calls ?? []) {
-      yield { type: 'tool_call', tool_call: tc };
-    }
-    yield { type: 'message_stop', stop_reason: res.stop_reason ?? 'stop', usage: defaultUsage(res) };
+    yield {
+      type: 'message_stop',
+      stop_reason: response.stop_reason ?? 'stop',
+      usage: this.meterUsage(response),
+    };
   }
 
   mapError(raw: unknown): ProviderError {
-    const msg = raw instanceof Error ? raw.message : String(raw);
-    if (raw instanceof ScriptedResponseExhaustedError || raw instanceof ScriptedResponseMissingError) {
-      return { kind: 'invalid_request', retryable: false, detail: msg };
+    if (
+      raw instanceof ProviderValidationError ||
+      raw instanceof ScriptedResponseExhaustedError ||
+      raw instanceof ScriptedResponseMissingError
+    ) {
+      return deepFreeze({ kind: 'invalid_request', retryable: false, detail: raw.message });
     }
-    const lower = msg.toLowerCase();
-    if (lower.includes('rate')) return { kind: 'rate_limited', retryable: true, detail: msg };
-    if (lower.includes('auth') || lower.includes('401') || lower.includes('key')) {
-      return { kind: 'auth', retryable: false, detail: msg };
+    if (raw instanceof ProviderTimeoutError) {
+      return deepFreeze({ kind: 'timeout', retryable: true, detail: 'Provider request timed out' });
     }
-    if (lower.includes('timeout')) return { kind: 'timeout', retryable: true, detail: msg };
-    if (lower.includes('500') || lower.includes('server')) return { kind: 'server', retryable: true, detail: msg };
-    if (lower.includes('400') || lower.includes('invalid')) {
-      return { kind: 'invalid_request', retryable: false, detail: msg };
+    if (raw instanceof ProviderHttpError) {
+      const status = raw.status;
+      if (status === 401 || status === 403) {
+        return deepFreeze({
+          kind: 'auth',
+          retryable: false,
+          detail: 'Provider authentication failed',
+          status,
+        });
+      }
+      if (status === 408) {
+        return deepFreeze({
+          kind: 'timeout',
+          retryable: true,
+          detail: 'Provider request timed out',
+          status,
+        });
+      }
+      if (status === 429) {
+        return deepFreeze({
+          kind: 'rate_limited',
+          retryable: true,
+          detail: 'Provider rate limit exceeded',
+          status,
+        });
+      }
+      if (status >= 500) {
+        return deepFreeze({
+          kind: 'server',
+          retryable: true,
+          detail: `Provider server error (${status})`,
+          status,
+        });
+      }
+      if (status >= 400) {
+        return deepFreeze({
+          kind: 'invalid_request',
+          retryable: false,
+          detail: `Provider rejected request (${status})`,
+          status,
+        });
+      }
+      return deepFreeze({
+        kind: 'unknown',
+        retryable: false,
+        detail: `Unexpected provider HTTP status (${status})`,
+        status,
+      });
     }
-    return { kind: 'unknown', retryable: false, detail: msg };
+    return deepFreeze({
+      kind: 'unknown',
+      retryable: false,
+      detail: 'Unknown provider failure',
+    });
   }
 
-  meterUsage(res: ParsedResponse): Usage {
-    return defaultUsage(res);
+  meterUsage(response: ParsedResponse): Usage {
+    return response.usage === undefined
+      ? deepFreeze({ input_tokens: 0, output_tokens: 0 })
+      : normalizeUsage(response.usage);
   }
 
   checkHealth(): HealthStatus {
-    // Always healthy without network -- by design.
-    return this.health;
+    return 'healthy';
   }
 
-  validateDataPolicy(_req: ProviderRequest): DataPolicyResult {
-    // Scripted provider never transmits data; policy trivially satisfied.
+  validateDataPolicy(_request: ProviderRequest): DataPolicyResult {
     return this.dataPolicy;
   }
 
   get callLog(): readonly CallMetadata[] {
-    return [...this.calls];
+    return deepFreeze([...this.calls]);
   }
 
   get callCount(): number {
@@ -287,40 +535,18 @@ export class ScriptedTestProvider implements ProviderAdapter {
   get remainingQueueLength(): number {
     return this.queue.length;
   }
-}
 
-/**
- * Registry-based gateway. ScriptedTestProvider is injectable here exactly like
- * a real provider, so tests construct the gateway once and resolve by type.
- */
-export class ModelGateway {
-  private readonly adapters = new Map<ProviderAdapter['provider_type'], ProviderAdapter>();
-
-  constructor(initial: ProviderAdapter[] = []) {
-    for (const a of initial) this.register(a);
-  }
-
-  register(adapter: ProviderAdapter): void {
-    this.adapters.set(adapter.provider_type, adapter);
-  }
-
-  resolve(type: ProviderAdapter['provider_type']): ProviderAdapter {
-    const a = this.adapters.get(type);
-    if (!a) throw new Error(`No provider registered for type: ${type}`);
-    return a;
-  }
-
-  complete(type: ProviderAdapter['provider_type'], req: ProviderRequest): ParsedResponse {
-    const adapter = this.resolve(type);
-    if (adapter instanceof ScriptedTestProvider) {
-      return adapter.resolve(req);
+  private normalizeDataPolicy(raw: unknown): DataPolicyResult {
+    if (!isPlainRecord(raw)) throw new ProviderValidationError('dataPolicy must be an object');
+    assertKnownKeys(raw, ['allowed', 'reason'], 'dataPolicy');
+    if (typeof raw.allowed !== 'boolean') {
+      throw new ProviderValidationError('dataPolicy.allowed must be a boolean');
     }
-    throw new Error('ModelGateway.complete only supports scripted_test providers in Phase 1');
-  }
-
-  list(): ProviderAdapter['provider_type'][] {
-    return [...this.adapters.keys()];
+    if (raw.reason !== undefined && typeof raw.reason !== 'string') {
+      throw new ProviderValidationError('dataPolicy.reason must be a string');
+    }
+    return deepFreeze(
+      raw.reason === undefined ? { allowed: raw.allowed } : { allowed: raw.allowed, reason: raw.reason },
+    );
   }
 }
-
-export const __hashMessages = hashMessages;
