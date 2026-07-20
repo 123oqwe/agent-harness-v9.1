@@ -10,6 +10,7 @@
     "run_plan_hash",
     "task",
     "experience_profile",
+    "reasoning_strategy",
     "workflow_graph",
     "agent_graph",
     "context_graph",
@@ -55,6 +56,15 @@
     },
     "experience_profile": {
       "type": "string"
+    },
+    "reasoning_strategy": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "react",
+        "plan_execute"
+      ],
+      "description": "Frozen Phase 1 reasoning strategy. Changing strategy requires a new RunPlan revision."
     },
     "workflow_graph": {
       "$ref": "workflow-graph.schema.json"
@@ -154,7 +164,11 @@
           "type": "integer"
         },
         "summarize_at_window_ratio": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0.4,
+          "maximum": 0.85,
+          "default": 0.7,
+          "description": "Lossy compaction boundary after VFS offload; 0.40 is the offload boundary and 0.85 is the hard context_reset boundary."
         },
         "tool_masking": {
           "type": "boolean"

@@ -3,6 +3,11 @@ name: "Enterprise Hardening & Production Candidate"
 status: BLOCKED
 objective: "Enterprise Hardening & Production Candidate"
 
+delivers:
+  - "Organizations, tenants, members, OIDC/SAML/SCIM, RBAC/ABAC, workload identity, KMS integration, and data residency/retention"
+  - "Managed model/tool/connector/budget policies, signed plugins with SBOM, tenant export/delete, support and incident controls"
+  - "MicroVM isolation, enterprise audit, admin console, billing, alerts, kill switch, and canary candidate"
+
 dependencies:
   - phase-0
   - phase-1
@@ -76,6 +81,7 @@ deployment_target:
   phase_8: "production"
 
 gate_command: "python3 factory/phase-gates/gate_runner.py phase7"
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates tenant isolation, enterprise policy precedence, identity lifecycle, workload isolation, auditability, deletion, and canary readiness."
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-7/"
 
@@ -88,6 +94,7 @@ exit_criteria:
   - all_phase_requirements_verified: true
   - regression_tests_pass: true
   - active_stub_count: 0
+  - independent_glm_5_2_xhigh: PASS
 
 blocked_conditions:
   - "Previous phase gate not passed"

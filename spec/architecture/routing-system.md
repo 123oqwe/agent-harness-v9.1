@@ -3,9 +3,29 @@
 
 ![03-routing-dag.svg](diagrams/03-routing-dag.svg)
 
-## v9 Correction: NOT 8 parallel independent routers
+## v9 Correction: one Router, not parallel independent routers
 
 v8 used Promise.all for 8 independent routers. v9 replaces with sequential dependency-aware DAG.
+
+The product exposes one Router authority. Model selection, tool discovery, skill discovery, RAG retrieval, environment selection, AgentGraph planning, and verification planning are typed resolvers inside that Router pipeline. Security is not a router: immutable Policy constrains inputs and PEP can veto every action. This avoids contradictory decisions and gives each RunPlan one auditable routing record.
+
+### Phase composition
+
+- Phase 1 implements `StaticRouter`: typed intent profiling, deterministic hard-constraint filtering, and selection of direct, ReAct, or plan_execute for one agent. It binds a frozen provider/tool/skill/environment/eval registry snapshot.
+- Phase 2 adds Context/RAG resolvers and progressive disclosure, but remains single-agent.
+- Phase 3 replaces fixed scoring with the complete dependency-aware DAG, joint optimizer, AgentGraph planning, adaptive fallback, and router eval. It extends the Phase 1 interface rather than creating another router.
+
+## Phase 1 StaticRouter
+
+Phase 1 has one deterministic `StaticRouter` and one Agent. Immutable Policy is applied before task profiling and remains a veto after routing. Given the same normalized TaskContract and frozen provider, tool, skill, environment, and eval registry snapshots, routing produces the same RunPlan. The optional structured Task Profiler is invoked at most once.
+
+The strategy rules are evaluated with planning conditions taking precedence:
+
+- `plan_execute`: select when the task has two or more dependent steps; includes writes, tests, checkpoints, or transactions; or the user explicitly requests a plan.
+- `react`: select when a tool is required and the next action depends on an observation, so the complete step sequence cannot be frozen in advance.
+- `direct`: select when no tool or multi-step plan is needed, one model call can meet the success criteria, and no hard constraint remains unresolved.
+
+Missing required information returns `ask_user`. Missing tools, permissions, or satisfiable routing candidates returns `RoutingAbstainedError`; the Router never relaxes Policy to manufacture a route. `RunPlan.reasoning_strategy` uses the lowercase Contract values `direct`, `react`, and `plan_execute`. Strategy changes require a new RunPlan revision. Phase 1 does not implement the Phase 3 optimizer, multi-agent execution, or an AgentGraph routing DAG.
 
 ## Router DAG Pipeline
 
@@ -108,7 +128,7 @@ If no candidate meets hard constraints, Router returns `RoutingAbstainedError` w
 
 ## Execution Modes (FG7 / FG9)
 
-AgentGraph supports three execution modes, declared in `agent-graph.schema.json` field `execution_mode` (enum: `static_dag` | `routing_slip` | `workflow_script`). The Router selects based on task profile; they are NOT mutually exclusive (a mission may use a static DAG for known sub-tasks and a routing slip for the open-ended trunk).
+AgentGraph supports three declared execution modes (`static_dag` | `routing_slip` | `workflow_script`); bounded mass fan-out is a `workflow_script` pattern, not a fourth schema value. The Router selects based on task profile; a mission may compose modes across explicit graph boundaries.
 
 ### Mode A: Static DAG (existing)
 RunPlan Freeze produces a fixed AgentGraph. Used when the task is well-structured and the plan is predictable. Result merge conflict resolution applies (AH-MULTIAGENT-MERGE-001).

@@ -3,6 +3,7 @@
   "run_id": "00000000-0000-0000-0000-000000000001",
   "revision": 1,
   "run_plan_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reasoning_strategy": "plan_execute",
   "task": {
     "goal": "Fix the off-by-one bug in calculate.ts",
     "success_criteria": [

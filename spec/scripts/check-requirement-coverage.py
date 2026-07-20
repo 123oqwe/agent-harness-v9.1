@@ -1,26 +1,80 @@
 #!/usr/bin/env python3
-"""Test script for AH-SPEC-VALIDATOR-001: check-requirement-coverage.py
-Verifies the check script exists and produces output.
-"""
-import os, sys, subprocess
+"""Validate or deterministically refresh requirement-derived repository views."""
+import argparse
+import json
+import os
+import tempfile
+from collections import Counter
+from pathlib import Path
 
-def test_script_exists():
-    """Script file must exist and be non-empty."""
-    assert os.path.exists(__file__), f"Script not found: {__file__}"
-    assert os.path.getsize(__file__) > 0, "Script is empty"
+BASE = Path(__file__).resolve().parents[2]
+REQ_DIR = BASE / "spec" / "requirements"
 
-def test_script_is_executable():
-    """Script must be runnable."""
-    result = subprocess.run(
-        [sys.executable, __file__],
-        capture_output=True, text=True, timeout=30,
-        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    )
-    # Script should either PASS or FAIL, not crash
-    assert "PASS" in result.stdout or "FAIL" in result.stdout, \
-        f"Script produced no PASS/FAIL output. stdout={result.stdout[:200]}, stderr={result.stderr[:200]}"
+
+def load_requirements():
+    return [json.loads(line) for line in (REQ_DIR / "requirements.ndjson").read_text().splitlines() if line.strip()]
+
+
+def build_views(requirements):
+    phase_coverage = dict(sorted(Counter(str(row["delivery_phase"]) for row in requirements).items(), key=lambda item: int(item[0])))
+    domain_coverage = dict(sorted(Counter(row["domain"] for row in requirements).items()))
+    dependency_graph = {row["id"]: row.get("dependencies", []) for row in requirements}
+    traceability = {}
+    for row in requirements:
+        contracts = [path.removeprefix("spec/") for path in row.get("source_files", []) if path.startswith("spec/contracts/")]
+        traceability[row["id"]] = {
+            "requirement_id": row["id"],
+            "product_journey": row.get("experience_profile", "all"),
+            "architecture_module": row["owner_module"],
+            "contract": contracts,
+            "api": row.get("API_operations", []),
+            "source_package": row["owner_module"],
+            "test": row.get("test_files", []),
+            "eval": row.get("eval_files") or None,
+            "phase_gate": f"phases/phase-{row['delivery_phase']}.yaml",
+            "evidence": row["evidence_path"],
+        }
+    return {
+        "phase-coverage.json": phase_coverage,
+        "domain-coverage.json": domain_coverage,
+        "dependency-graph.json": dependency_graph,
+        "traceability-matrix.json": traceability,
+    }
+
+
+def atomic_write(path, payload):
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--write", action="store_true", help="atomically refresh the four derived JSON views")
+    args = parser.parse_args()
+    expected = build_views(load_requirements())
+    if args.write:
+        for name, payload in expected.items():
+            atomic_write(REQ_DIR / name, payload)
+    mismatches = []
+    for name, payload in expected.items():
+        path = REQ_DIR / name
+        actual = json.loads(path.read_text()) if path.exists() else None
+        if actual != payload:
+            mismatches.append(name)
+    if mismatches:
+        print(f"FAIL: stale requirement-derived views: {', '.join(mismatches)}")
+        raise SystemExit(1)
+    print(f"PASS: {len(expected)} requirement-derived views match {len(load_requirements())} registry rows")
+
 
 if __name__ == "__main__":
-    test_script_exists()
-    test_script_is_executable()
-    print("PASS: script exists and produces output")
+    main()

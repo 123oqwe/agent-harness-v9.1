@@ -59,6 +59,37 @@ def run_command(cmd, cwd=None, timeout=300):
             "ran_at": datetime.datetime.now().isoformat()
         }
 
+def run_phase_architecture_check():
+    """Validate exact Phase ownership, dependency order, maturity paths and authority state."""
+    result = run_command("python3 factory/phase-gates/check-phase-coverage.py")
+    detail = (result["stdout"] or result["stderr"]).strip()
+    return {
+        "name": "phase_architecture_consistent",
+        "passed": result["exit_code"] == 0,
+        "detail": detail,
+        "stdout_hash": result.get("stdout_hash"),
+    }
+
+def run_requirement_views_check():
+    """Reject stale traceability, dependency, Phase and domain views."""
+    result = run_command("python3 spec/scripts/check-requirement-coverage.py")
+    return {
+        "name": "requirement_views_current",
+        "passed": result["exit_code"] == 0,
+        "detail": (result["stdout"] or result["stderr"]).strip(),
+        "stdout_hash": result.get("stdout_hash"),
+    }
+
+def run_capability_coverage_check():
+    """Require every product capability and every actionable requirement to map both ways."""
+    result = run_command("python3 spec/scripts/check-capability-coverage.py")
+    return {
+        "name": "capability_coverage_bidirectional",
+        "passed": result["exit_code"] == 0,
+        "detail": (result["stdout"] or result["stderr"]).strip(),
+        "stdout_hash": result.get("stdout_hash"),
+    }
+
 def run_spec_gate():
     """Specification validation gate.
     
@@ -104,6 +135,11 @@ def run_spec_gate():
     else:
         check2["detail"] = "File not found"
     checks.append(check2)
+
+    # Check 2a: Phase manifests, dependency order, maturity paths and current-state agree
+    checks.append(run_phase_architecture_check())
+    checks.append(run_requirement_views_check())
+    checks.append(run_capability_coverage_check())
     
     # Check 3: Model check report is VERIFIED
     mc_path = spec_dir / "state-machines" / "model-check-report.txt"
@@ -257,6 +293,11 @@ def run_phase_gate(phase_num):
         else:
             check1["detail"] = f"All {len(phase_reqs)} requirements have criteria"
     checks.append(check1)
+
+    # Check 1a: Phase architecture remains exact before any implementation evidence is trusted
+    checks.append(run_phase_architecture_check())
+    checks.append(run_requirement_views_check())
+    checks.append(run_capability_coverage_check())
     
     # Check 2: All phase requirements have test files ON DISK
     check2 = {"name": "requirements_have_tests", "passed": True, "detail": ""}

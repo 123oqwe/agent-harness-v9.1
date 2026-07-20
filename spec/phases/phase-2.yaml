@@ -2,6 +2,11 @@ phase: 2
 name: Context, RAG, Multimodal & Product UX
 status: BLOCKED
 objective: Context, RAG, Multimodal & Product UX
+delivers:
+- Nine-layer Context Compiler with active-plan injection, VFS offload, aligned compaction, context reset, and progressive disclosure
+- ACL-before-retrieval hybrid RAG with provenance, citations, deletion propagation, migration, and injection isolation
+- Session tree, steering, pause/resume, full budget ledger, and model fallback
+- MCP stdio allowlist, multimodal/document tool expansion, web/desktop/TUI product surfaces, and optional rootless OCI sandbox
 dependencies:
 - phase-0
 - phase-1
@@ -41,6 +46,7 @@ requirements:
   - AH-MM-IMAGE-IN-001
   - AH-MM-VISION-VERIFY-001
   - AH-PAUSE-RESUME-001
+  - AH-SANDBOX-OCI-001
   - AH-RAG-CHUNK-001
   - AH-RAG-CITE-001
   - AH-RAG-DELETE-001
@@ -58,10 +64,17 @@ requirements:
   - AH-RUNTIME-SESSIONTREE-001
   - AH-RUNTIME-STEERING-001
   - AH-TOOL-BEHAVIOR-VERIFY-001
+  - AH-TOOL-IMAGE-GEN-001
+  - AH-TOOL-SPEECH-GEN-001
+  - AH-TOOL-TRANSCRIBE-001
+  - AH-TOOL-SPREADSHEET-001
+  - AH-TOOL-PRESENTATION-001
+  - AH-TOOL-DOCUMENT-001
+  - AH-TOOL-OCR-001
+  - AH-TOOL-ESCALATE-001
   - AH-TOOL-WEB-FETCH-001
   - AH-TOOL-WEB-SEARCH-001
   - AH-UI-DOC-001
-  - AH-UI-MEMORY-001
   - AH-UI-MM-001
   - AH-UI-NOTIFY-001
   - AH-UI-PLANNING-001
@@ -104,6 +117,7 @@ deployment_target:
   phase_7: canary
   phase_8: production
 gate_command: python3 factory/phase-gates/gate_runner.py phase2
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates long-context, RAG, multimodal, UX, privacy, and failure-recovery scenarios."
 rollback: auto-rollback if gate fails
 evidence: artifacts/phase-2/
 entry_criteria:
@@ -114,6 +128,7 @@ exit_criteria:
 - all_phase_requirements_verified: true
 - regression_tests_pass: true
 - active_stub_count: 0
+- independent_glm_5_2_xhigh: PASS
 blocked_conditions:
 - Previous phase gate not passed
 - Open P0 blockers

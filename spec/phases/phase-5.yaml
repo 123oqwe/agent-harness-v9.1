@@ -2,6 +2,10 @@ phase: 5
 name: Certified External Actions
 status: BLOCKED
 objective: Certified External Actions
+delivers:
+- Credential-custodied external action adapters with exact preview, consent, idempotency, receipts, authoritative read-back, reconciliation, and compensation/Saga semantics
+- Certification framework and pre-approval auto-review for high-risk actions
+- Certified Gmail, Calendar, Slack, and GitHub PR adapters; payment, deployment, and database migration remain blocked
 dependencies:
 - phase-0
 - phase-1
@@ -53,6 +57,7 @@ deployment_target:
   phase_7: canary
   phase_8: production
 gate_command: python3 factory/phase-gates/gate_runner.py phase5
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates unauthorized effects, duplicates, partitions, crash-after-dispatch, read-back, reconciliation, and compensation truthfulness."
 rollback: auto-rollback if gate fails
 evidence: artifacts/phase-5/
 entry_criteria:
@@ -66,6 +71,7 @@ exit_criteria:
 - payment_deploy_db_migrate: NOT CERTIFIED (blocked)
 - crash_after_dispatch: PASS
 - network_partition: PASS
+- independent_glm_5_2_xhigh: PASS
 blocked_conditions:
 - Previous phase gate not passed
 - Open P0 blockers

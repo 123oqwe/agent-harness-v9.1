@@ -1,11 +1,11 @@
 {
   "version": "9.2.1",
-  "generated_at": "2026-07-16T04:27:35.172648",
-  "generated_by": "manual-audit-correction",
+  "generated_at": "2026-07-20T19:14:43Z",
+  "generated_by": "phase-architecture-normalization",
   "specification": "VERIFIED",
   "phase": 1,
   "factory_status": "IMPLEMENTED",
-  "product_status": "NOT_STARTED",
+  "product_status": "IN_PROGRESS",
   "production_status": "BLOCKED",
   "phases": {
     "0R": {
@@ -19,7 +19,7 @@
       "blockers": []
     },
     "1": {
-      "status": "READY",
+      "status": "IN_PROGRESS",
       "name": "Single-Agent Multi-Domain Foundation",
       "blockers": []
     },
@@ -39,7 +39,7 @@
     },
     "4": {
       "status": "BLOCKED",
-      "name": "Memory, Assurance & Evolution Shadow",
+      "name": "Memory, Assurance, Observability & Evolution Shadow",
       "blockers": [
         "Phase 3 not passed"
       ]
@@ -73,6 +73,21 @@
       ]
     }
   },
+  "registry_summary": {
+    "total": 254,
+    "capabilities": {"total": 124, "mapped": 124, "unmapped": 0},
+    "phases": {
+      "0": {"total": 31, "maturity": {"not_started": 7, "verified": 24}},
+      "1": {"total": 40, "maturity": {"in_progress": 12, "not_started": 27, "verified": 1}},
+      "2": {"total": 64, "maturity": {"not_started": 64}},
+      "3": {"total": 16, "maturity": {"not_started": 16}},
+      "4": {"total": 23, "maturity": {"not_started": 23}},
+      "5": {"total": 12, "maturity": {"not_started": 12}},
+      "6": {"total": 25, "maturity": {"not_started": 25}},
+      "7": {"total": 27, "maturity": {"not_started": 27}},
+      "8": {"total": 16, "maturity": {"not_started": 16}}
+    }
+  },
   "known_contradictions": [],
   "rules": {
     "status_source": "This file is the ONLY authoritative status source. All README, HTML, dashboards and reports must be generated from this file.",
@@ -88,10 +103,10 @@
     "control/": "唯一权威状态来源 (current-state.json)"
   },
   "next_actions": [
-    "Begin Phase 1: Single-Agent Multi-Domain Foundation (Phase 0 verified, Phase 1 ready)",
-    "Implement AH-GATEWAY-TESTPROVIDER-001 first (all verticals depend on it)",
-    "Switch verifier to RERUN mode when harness/ has code",
-    "Create test files for Phase 1-8 requirements as they are implemented"
+    "Continue Phase 1 only; Phase 2-8 remain blocked by the previous Phase gate",
+    "Complete provider/tool/skill registries, VFS, static Router and permission boundaries before vertical expansion",
+    "Integrate the isolated AH-RUNTIME-LOOP-001 work only through its requirement gate; do not duplicate it on main",
+    "Run GLM-5.2 xhigh independent read-only acceptance only after the complete Phase 1 local gate passes"
   ],
   "factory_test_results": {
     "state_store": "PASS",
@@ -105,15 +120,15 @@
     "merge_queue": "PASS",
     "dashboard": "PASS"
   },
-  "last_updated": "2026-07-16T07:19:05.262793",
+  "last_updated": "2026-07-20T19:30:30Z",
   "verification_evidence": {
     "model_check": "VERIFIED (TLC v2.19, 251 states, 0 errors)",
-    "spec_gate": "PASS (10/10 checks, actual file checks)",
+    "spec_gate": "PASS (13/13 checks, including Phase ownership, derived views, and bidirectional capability consistency)",
     "failure_injection": "PASS (10/10 failures detected)",
     "factory_tests": "PASS (state store, controller, blocker, budget, secret, worktree, merge queue)",
-    "adrs_resolved": "12/12 ACCEPTED (0 NEEDS_VERIFICATION, 0 CONDITIONAL)",
-    "capability_coverage": "100% (108/108 mapped)",
-    "requirements": 221
+    "adrs_resolved": "14/14 ACCEPTED (0 NEEDS_VERIFICATION, 0 CONDITIONAL)",
+    "capability_coverage": "100% (124/124 capabilities; 223/223 actionable requirements mapped)",
+    "requirements": 254
   },
   "cleanup_notes": {
     "scripts_moved": "archive/non-normative/old-scripts/",
@@ -140,7 +155,7 @@
   },
   "factory_verification": {
     "all_modules_import": "PASS",
-    "spec_gate": "PASS (10/10)",
+    "spec_gate": "PASS (13/13)",
     "check_scripts": "PASS (5/5)",
     "codex_popen_test": "PASS (pid=89115, exit_code=0, 24823 chars stdout)",
     "worktree_test": "PASS (create/list/remove all real)",

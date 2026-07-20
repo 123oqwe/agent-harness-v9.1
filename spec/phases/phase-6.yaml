@@ -3,6 +3,12 @@ name: "Mission Layer, Routines & Proactive Assistant"
 status: BLOCKED
 objective: "Mission Layer, Routines & Proactive Assistant"
 
+delivers:
+  - "Mission decomposition, state, budget, cancellation, cross-domain execution, open-loop tracking, watches, and founder/operator templates"
+  - "Durable cron/routines with timezone and DST rules, leases, idempotent occurrences, overlap/concurrency limits, missed-run policy, and fresh authorization/context"
+  - "Sandbox sleep/wake, proactive suggestions, relationship follow-up, daily brief and mission UI"
+  - "schedule_task, real-time voice, voice cloning with biometric consent, and remote/mobile channel behavior"
+
 dependencies:
   - phase-0
   - phase-1
@@ -38,6 +44,12 @@ requirements:
   - AH-UI-MISSION-001
   - AH-WATCH-COND-001
   - AH-EVOL-DOCCLEAN-001
+  - AH-TOOL-CHANNEL-001
+  - AH-TOOL-PUSH-001
+  - AH-TOOL-REMOTE-STEER-001
+  - AH-TOOL-VOICE-CONVERSE-001
+  - AH-TOOL-CLONE-VOICE-001
+  - AH-TOOL-SCHEDULE-001
 
 fixtures:
   - fixtures/phase-6/valid/
@@ -69,6 +81,7 @@ deployment_target:
   phase_8: "production"
 
 gate_command: "python3 factory/phase-gates/gate_runner.py phase6"
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates long-running missions, cron correctness, duplicate prevention, stale-credential rejection, sleep/wake integrity, proactive consent, and voice privacy."
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-6/"
 
@@ -81,6 +94,7 @@ exit_criteria:
   - all_phase_requirements_verified: true
   - regression_tests_pass: true
   - active_stub_count: 0
+  - independent_glm_5_2_xhigh: PASS
 
 blocked_conditions:
   - "Previous phase gate not passed"

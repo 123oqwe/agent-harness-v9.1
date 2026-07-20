@@ -2,6 +2,11 @@ phase: 3
 name: Adaptive Routing & Multi-Agent
 status: BLOCKED
 objective: Adaptive Routing & Multi-Agent
+delivers:
+- Full dependency-aware Router DAG and joint constraint solver over model, tool, skill, RAG, environment, agent, context, and verification bindings
+- Static DAG, routing-slip, workflow-script, and bounded fan-out execution modes
+- Capability-attenuated AgentGraph workers with isolated context/VFS/PEP, signed messaging, deterministic merge, and failure propagation
+- Router evaluation, eleven typed fallbacks, agent authoring, skill chaining, MCP discovery, tool masking, and media/computer-use expansion
 dependencies:
 - phase-0
 - phase-1
@@ -23,6 +28,11 @@ requirements:
   - AH-ROUTER-FALLBACK-11-001
   - AH-ROUTER-SKILL-CHAIN-001
   - AH-SUBAGENT-001
+  - AH-TOOL-BROWSER-001
+  - AH-TOOL-COMPUTER-001
+  - AH-TOOL-VIDEO-GEN-001
+  - AH-TOOL-MUSIC-GEN-001
+  - AH-TOOL-VIDEO-EDIT-001
 fixtures:
 - fixtures/phase-3/valid/
 - fixtures/phase-3/invalid/
@@ -47,6 +57,7 @@ deployment_target:
   phase_7: canary
   phase_8: production
 gate_command: python3 factory/phase-gates/gate_runner.py phase3
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates routing regret, unnecessary multi-agent use, isolation, attenuation, merge, fallback, and adversarial routing."
 rollback: auto-rollback if gate fails
 evidence: artifacts/phase-3/
 entry_criteria:
@@ -60,6 +71,7 @@ exit_criteria:
 - context_isolation: PASS
 - capability_attenuation: PASS
 - merge_conflict_no_hardcoded_rules: PASS
+- independent_glm_5_2_xhigh: PASS
 blocked_conditions:
 - Previous phase gate not passed
 - Open P0 blockers

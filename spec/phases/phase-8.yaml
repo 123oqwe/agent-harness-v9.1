@@ -3,6 +3,11 @@ name: "Production Launch & Post-Launch Operations"
 status: BLOCKED
 objective: "Production Launch & Post-Launch Operations"
 
+delivers:
+  - "Certification of already implemented subsystems; Phase 8 adds no new runtime authority"
+  - "Human-signed release, generated-tool manual certification, canary, SLO, incident/on-call, status, privacy, abuse and billing validation"
+  - "Backup/restore, migration, rollback, kill-switch, deletion and disaster-recovery drills plus consented beta and 30/60/90 review"
+
 dependencies:
   - phase-0
   - phase-1
@@ -66,6 +71,7 @@ deployment_target:
   phase_8: "production"
 
 gate_command: "python3 factory/phase-gates/gate_runner.py phase8"
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run audits release evidence and production drills; human WebAuthn release approval remains mandatory and cannot be replaced by model approval."
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-8/"
 
@@ -86,6 +92,7 @@ exit_criteria:
   - privacy_review: PASS
   - data_deletion_test: PASS
   - billing_test: PASS
+  - independent_glm_5_2_xhigh: PASS
 
 blocked_conditions:
   - "Previous phase gate not passed"

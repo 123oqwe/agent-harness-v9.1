@@ -5,6 +5,29 @@
 - Error classification: network (transient), tool (tool-specific), model (provider), truncation (structural - do NOT execute)
 - No private CoT storage: only plan, decision summary, tool calls, evidence, error classification
 
+### Eight loop families and their Phase owner
+
+These are explicit state machines coordinated through events; they are not eight recursive model loops and they do not create competing sources of truth.
+
+| Loop | First complete Phase | Authority and termination |
+|------|----------------------|---------------------------|
+| Request reasoning | 1 | Static Router selects direct, ReAct, or plan_execute; TaskContract success, budget, deadline, cancel, or typed failure terminates it |
+| Tool execution | 1 | Runtime proposes; the 12-step Action Control pipeline authorizes and dispatches each call; receipt or typed error returns control |
+| Verification and recovery | 1, advanced in 4 | Deterministic local eval and Evidence Package first; Independent Verifier may request bounded recovery but cannot edit implementation or expected results |
+| Steering and context maintenance | 2 | Three queues, active-plan rewrite, offload, compaction, and context_reset are event-log transitions, never hidden prompt mutation |
+| Adaptive routing and multi-agent | 3 | One Router revises RunPlan; AgentGraph children are bounded by DAG completion, attenuated budgets/capabilities, and merge policy |
+| Memory and personalization | 4 | Outcome creates proposals; provenance/trust/consent/TTL/conflict checks decide persistence; session event log remains runtime authority |
+| Capability evolution | 4 | Offline replay and shadow comparison produce proposals only; rollback/quarantine/human certification bound promotion |
+| Mission and schedule | 6 | Durable mission/occurrence state, leases, idempotency, fresh context/authorization, sleep/wake, cancel, and budget terminate each activation |
+
+## Phase 1 Reasoning Strategies
+
+Runtime executes the frozen `RunPlan.reasoning_strategy`; it never silently switches strategy.
+
+- `direct` performs exactly one model call, no Tool execution, no action/observation loop, and no multi-step WorkflowGraph. A returned ToolCall is a typed strategy violation or causes the Router to issue a new RunPlan revision; Runtime does not execute it.
+- `react` alternates a persisted decision summary, one proposed ToolCall, Policy, Capability, PEP, Tool execution, Observation, and the next model turn. It stores summaries, calls, observations, receipts, and Evidence but no private chain-of-thought. Maximum iterations, budget, deadline, cancellation, and repeated Tool-plus-arguments oscillation bound the loop. A ToolCall truncated with `stop_reason=length` is never executed.
+- `plan_execute` requires a frozen acyclic WorkflowGraph before any Tool execution. Steps execute in topological order and are verified individually; a failed verification blocks dependent steps. Writes remain in a VFS Overlay until every verification passes, then commit atomically; failure discards the Overlay. Replanning increments `revision` and binds the correct `previous_revision_hash`. Crash restore resumes at the first incomplete step without repeating completed real side effects.
+
 ## Session Model
 - Event log = authority (source of truth)
 - Snapshot = acceleration (rebuildable)
@@ -129,11 +152,10 @@ type TerminationReason =
 Event sourcing: append-only event log is source of truth. Snapshot is acceleration (can rebuild from log).
 Agent should use SQLite for event log (consistent with ADR-004/ADR-006).
 
-### Compaction Trigger
-`shouldCompact(tokens, window, settings)`: when tokens > window * 0.4 (Smart Zone boundary, agent-tunable threshold).
+### Context pressure thresholds
+`shouldOffload(tokens, window)`: at 40%, mechanically offload large reversible payloads to VFS.
+`shouldCompact(tokens, window)`: at 70% after offload, run cache-aligned summarization.
+`shouldReset(tokens, window)`: at 85% when offload + compaction cannot recover, or earlier on measured goal regression/oscillation, write handoff and start a fresh context.
 
-Context zones (industry consensus: performance degrades past ~40% of window):
-- Smart Zone: tokens < 40% of window — full model capability
-- Caution Zone: 40%-70% — compaction triggered here to stay out of Dumb Zone
-- Dumb Zone: > 70% — forced context_reset (see Stop Conditions); do NOT rely on compaction alone at this point
+These are one policy, not three competing defaults: 40% is the soft offload boundary, 70% is the lossy-compaction boundary, and 85% is the hard reset boundary. RunPlan may lower thresholds for a domain but cannot raise the hard reset above the model's safe input budget.
  Must preserve: goals, constraints, decisions, approvals, side effects, open tasks, security state.
