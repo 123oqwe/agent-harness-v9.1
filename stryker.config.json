@@ -7,7 +7,8 @@
   ],
   "testFiles": [
     "tests/gateway/*.test.ts",
-    "tests/policy/*.test.ts"
+    "tests/policy/*.test.ts",
+    "tests/security/*.test.ts"
   ],
   "vitest": {
     "configFile": "vitest.config.ts",
