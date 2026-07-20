@@ -1625,7 +1625,8 @@
     "test": [
       "harness/tests/policy/deny-by-default.test.ts",
       "harness/tests/policy/pep.test.ts",
-      "harness/tests/policy/risk-derivation.test.ts"
+      "harness/tests/policy/risk-derivation.test.ts",
+      "harness/tests/packaging/package.test.ts"
     ],
     "eval": null,
     "phase_gate": "phases/phase-1.yaml",

@@ -48,6 +48,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(pkg.scripts.build).not.toContain('--noEmit');
     expect(pkg.scripts.lint).not.toMatch(/echo|test -d|\|\|/u);
     expect(pkg.scripts['test:security']).toContain('tests/gateway');
+    expect(pkg.scripts['test:security']).toContain('tests/policy');
     for (const name of required.filter((entry) => entry.startsWith('test:'))) {
       expect(pkg.scripts[name]).not.toMatch(/passWithNoTests|echo|\|\|\s*true/u);
     }
@@ -67,13 +68,16 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
 
     expect(config.mutate.length).toBeGreaterThan(0);
     expect(mutationText).toMatch(/gateway/u);
+    expect(mutationText).toMatch(/security/u);
     expect(mutationText).not.toMatch(/tests|\.config|spec\/types/u);
-    expect(config.testFiles).toEqual(['tests/gateway/*.test.ts']);
+    expect(config.testFiles).toEqual(['tests/gateway/*.test.ts', 'tests/policy/*.test.ts']);
     expect(config.cleanTempDir).toBe('always');
     expect(config.concurrency).toBeGreaterThan(0);
     expect(config.concurrency).toBeLessThanOrEqual(4);
     expect(config.vitest).toEqual({ configFile: 'vitest.config.ts', related: true });
     expect(fs.existsSync(path.join(harnessRoot, 'scripts/run-stryker.mjs'))).toBe(true);
+    const coverageConfig = fs.readFileSync(path.join(harnessRoot, 'vitest.config.ts'), 'utf8');
+    expect(coverageConfig).toContain("'security/**/*.ts'");
   });
 
   it('builds importable JavaScript and declarations from the public entrypoint', async () => {
@@ -87,6 +91,8 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     const built = (await import(`${jsEntry}?test=${Date.now()}`)) as Record<string, unknown>;
     expect(built).toHaveProperty('ScriptedTestProvider');
     expect(built).toHaveProperty('ModelGateway');
+    expect(built).toHaveProperty('PolicyEngine');
+    expect(built).toHaveProperty('PolicyEnforcementPoint');
     expect(fs.readFileSync(path.join(harnessRoot, 'gateway/model-gateway.ts'), 'utf8')).not.toContain(
       'process.env',
     );
