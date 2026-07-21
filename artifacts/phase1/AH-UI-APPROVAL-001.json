@@ -1,0 +1,63 @@
+{
+  "requirement_id": "AH-UI-APPROVAL-001",
+  "commit_sha": "3d93cd00fbcbdecc3b5cb26604d307ea021cf5d3",
+  "source_files": [
+    "harness/ui/ah_ui_approval_001.ts"
+  ],
+  "tests_added": [
+    "harness/tests/ui/ah-ui-approval-001.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "4960e5e7e9fe93ee"
+    },
+    {
+      "command": "npx vitest run <tool tests>",
+      "exit_code": 0,
+      "stdout_hash": "2aa5bfda95b12336"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "626",
+    "suite_passed": "626",
+    "requirement_tests": 4,
+    "requirement_passed": 4,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "2aa5bfda95b12336",
+    "acceptance_criteria_met": [
+      "Submit returns approval state",
+      "List empty state",
+      "Decide approved/denied",
+      "Not found error"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-tool tests pass; coverage at gate time"
+  },
+  "security_checks": {
+    "real_policy_dep": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": "4960e5e7e9fe93ee"
+}

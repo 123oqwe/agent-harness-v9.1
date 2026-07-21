@@ -1,0 +1,61 @@
+{
+  "requirement_id": "AH-UI-EVIDENCE-001",
+  "commit_sha": "3d93cd00fbcbdecc3b5cb26604d307ea021cf5d3",
+  "source_files": [
+    "harness/ui/ah_ui_evidence_001.ts"
+  ],
+  "tests_added": [
+    "harness/tests/ui/ah-ui-evidence-001.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "4960e5e7e9fe93ee"
+    },
+    {
+      "command": "npx vitest run <tool tests>",
+      "exit_code": 0,
+      "stdout_hash": "e2ce86330f9e96ce"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "626",
+    "suite_passed": "626",
+    "requirement_tests": 2,
+    "requirement_passed": 2,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "e2ce86330f9e96ce",
+    "acceptance_criteria_met": [
+      "Empty state when no evidence",
+      "Success state lists summaries"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-tool tests pass; coverage at gate time"
+  },
+  "security_checks": {
+    "real_api_dep": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": "4960e5e7e9fe93ee"
+}
