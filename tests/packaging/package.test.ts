@@ -49,6 +49,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(pkg.scripts.lint).not.toMatch(/echo|test -d|\|\|/u);
     expect(pkg.scripts['test:security']).toContain('tests/gateway');
     expect(pkg.scripts['test:security']).toContain('tests/policy');
+    expect(pkg.scripts['test:security']).toContain('tests/capability');
     for (const name of required.filter((entry) => entry.startsWith('test:'))) {
       expect(pkg.scripts[name]).not.toMatch(/passWithNoTests|echo|\|\|\s*true/u);
     }
@@ -74,6 +75,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
       'tests/gateway/*.test.ts',
       'tests/policy/*.test.ts',
       'tests/security/*.test.ts',
+      'tests/capability/*.test.ts',
     ]);
     expect(config.cleanTempDir).toBe('always');
     expect(config.concurrency).toBeGreaterThan(0);
@@ -100,6 +102,9 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(built).toHaveProperty('AuthorizationService');
     expect(built).toHaveProperty('InMemoryCapabilityStateStore');
     expect(built).toHaveProperty('FileCapabilityStateStore');
+    expect(built).toHaveProperty('AuthService');
+    expect(built).toHaveProperty('AuthApi');
+    expect(built).toHaveProperty('InMemoryAuthStore');
     expect(fs.readFileSync(path.join(harnessRoot, 'gateway/model-gateway.ts'), 'utf8')).not.toContain(
       'process.env',
     );

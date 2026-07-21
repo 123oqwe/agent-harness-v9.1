@@ -27,18 +27,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contracts tests/api",
-    "test:unit": "vitest run tests/gateway tests/policy tests/security tests/state-machines tests/spikes tests/packaging",
-    "test:integration": "vitest run tests/gateway tests/security/capability-replay.test.ts",
-    "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security",
+    "test:unit": "vitest run tests/gateway tests/policy tests/security tests/capability tests/state-machines tests/spikes tests/packaging",
+    "test:integration": "vitest run tests/gateway tests/security/capability-replay.test.ts tests/capability",
+    "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security tests/capability",
     "test:e2e": "vitest run tests/contracts tests/gateway",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "node scripts/run-stryker.mjs",
     "format": "prettier --write gateway security index.ts tests *.config.* *.json scripts"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@types/bcrypt": "6.0.0",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "ajv": "^8.20.0",
@@ -48,5 +50,9 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "13.3.2",
+    "bcrypt": "6.0.0"
   }
 }
