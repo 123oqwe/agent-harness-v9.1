@@ -422,45 +422,74 @@ paths:
                   type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /vault/secrets/{name}:
     put:
       tags: [vault]
       operationId: storeSecret
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, value]
-              properties:
-                name:
-                  type: string
-                value:
-                  type: string
-                  format: password
-      responses:
-        '201':
-          description: Secret stored
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /vault/secrets/{name}:
-    get:
-      tags: [vault]
-      operationId: getSecret
       parameters:
         - name: name
           in: path
           required: true
           schema:
             type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [value]
+              properties:
+                value:
+                  type: string
+                  format: password
+                  minLength: 1
+                  maxLength: 1048576
       responses:
-        '200':
-          description: Secret value (short-lived, requires capability token)
+        '201':
+          description: Secret encrypted and stored; the value is never returned
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [stored]
+                properties:
+                  stored:
+                    type: boolean
+                    const: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags: [vault]
+      operationId: getSecret
+      security:
+        - capabilityAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+      responses:
+        '200':
+          description: Secret value (short-lived, requires capability token)
+          headers:
+            Cache-Control:
+              description: Secret responses are never cached
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [value, expires_at]
                 properties:
                   value:
                     type: string
@@ -481,6 +510,7 @@ paths:
           required: true
           schema:
             type: string
+            pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
       responses:
         '204':
           description: Secret deleted
@@ -1245,6 +1275,10 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    capabilityAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Ed25519 CapabilityToken
 
   parameters:
     Page:

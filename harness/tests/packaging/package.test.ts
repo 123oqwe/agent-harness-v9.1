@@ -105,6 +105,8 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(built).toHaveProperty('AuthService');
     expect(built).toHaveProperty('AuthApi');
     expect(built).toHaveProperty('InMemoryAuthStore');
+    expect(built).toHaveProperty('SecretsBroker');
+    expect(built).toHaveProperty('SecretsBrokerApi');
     expect(fs.readFileSync(path.join(harnessRoot, 'gateway/model-gateway.ts'), 'utf8')).not.toContain(
       'process.env',
     );
@@ -124,8 +126,12 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(paths.every((entry) => entry === 'package.json' || entry.startsWith('dist/'))).toBe(
       true,
     );
-    expect(paths.some((entry) => /node_modules|coverage|stryker|tests|secret/iu.test(entry))).toBe(
-      false,
-    );
+    expect(
+      paths.some((entry) =>
+        /(?:^|\/)(?:node_modules|coverage|\.stryker-tmp|tests)(?:\/|$)|(?:^|\/)\.env(?:\.|$)|credentials?|api[-_]?keys?/iu.test(
+          entry,
+        ),
+      ),
+    ).toBe(false);
   });
 });

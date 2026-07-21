@@ -5,3 +5,4 @@ export * from './security/pep.js';
 export * from './security/capability.js';
 export * from './security/authorization-service.js';
 export * from './security/auth.js';
+export * from './security/secrets-broker.js';
