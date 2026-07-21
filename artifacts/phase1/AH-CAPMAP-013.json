@@ -1,0 +1,69 @@
+{
+  "requirement_id": "AH-CAPMAP-013",
+  "commit_sha": "3d279cc0083d143a3fd2a154f2f34751072d7d61",
+  "source_files": [
+    "harness/runtime/retry.ts"
+  ],
+  "tests_added": [
+    "harness/tests/capability/ah-capmap-013.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "d6c8de165541d175"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "7a9af36a513ef7f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "517",
+    "suite_passed": "517",
+    "requirement_tests": 11,
+    "requirement_passed": 11,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "7a9af36a513ef7f5",
+    "acceptance_criteria_met": [
+      "maxAttempts=3",
+      "Backoff baseDelay*2^(N-1)+jitter",
+      "Defaults",
+      "Non-retryable 400 no retry",
+      "Retryable network/429/500/502/503/504",
+      "Circuit breaker opens 5 failures blocks 60s",
+      "Half-open 1 probe after cooldown",
+      "All attempts logged",
+      "RetryExhausted last error + attempt count",
+      "No replay non-idempotent without key"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "no_replay_non_idempotent": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "d6c8de165541d175"
+}
