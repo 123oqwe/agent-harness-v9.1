@@ -1,0 +1,63 @@
+{
+  "requirement_id": "AH-PA-VERTICAL-001",
+  "commit_sha": "d0529f2290eaab75283d22f1ee0c1573a7ca8db2",
+  "source_files": [
+    "harness/personal_assistant/ah_pa_vertical_001.ts"
+  ],
+  "tests_added": [
+    "harness/tests/domain/pa-vertical.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "6eda6f15ff69650e"
+    },
+    {
+      "command": "npx vitest run <tool tests>",
+      "exit_code": 0,
+      "stdout_hash": "9adc4fd1e47fdc83"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "598",
+    "suite_passed": "598",
+    "requirement_tests": 1,
+    "requirement_passed": 1,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "9adc4fd1e47fdc83",
+    "acceptance_criteria_met": [
+      "Takes real task list",
+      "Generates daily plan",
+      "Plan respects constraints",
+      "No external actions taken"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-tool tests pass; coverage at gate time"
+  },
+  "security_checks": {
+    "no_external_actions": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": "6eda6f15ff69650e"
+}
