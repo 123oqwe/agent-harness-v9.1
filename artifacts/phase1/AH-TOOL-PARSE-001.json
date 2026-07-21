@@ -1,0 +1,64 @@
+{
+  "requirement_id": "AH-TOOL-PARSE-001",
+  "commit_sha": "c707b0c96ae38d5e00cd47dfe21f44754211b594",
+  "source_files": [
+    "harness/ingestion/parse-document.ts"
+  ],
+  "tests_added": [
+    "harness/tests/tools/parse-document.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a04eee1a0c1672d"
+    },
+    {
+      "command": "npx vitest run <tool tests>",
+      "exit_code": 0,
+      "stdout_hash": "b84ae63b4f150613"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "581",
+    "suite_passed": "581",
+    "requirement_tests": 3,
+    "requirement_passed": 3,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "b84ae63b4f150613",
+    "acceptance_criteria_met": [
+      "Parses plain text with page boundaries",
+      "Respects max_pages",
+      "Parses markdown"
+    ],
+    "known_limitations": [
+      "Phase 1: plain text + markdown only; PDF parsing deferred to Phase 2"
+    ]
+  },
+  "coverage": {
+    "note": "Per-tool tests pass; coverage at gate time"
+  },
+  "security_checks": {
+    "via_vfs": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": "8a04eee1a0c1672d"
+}

@@ -1,0 +1,60 @@
+{
+  "requirement_id": "AH-TOOL-WRITE-001",
+  "commit_sha": "c707b0c96ae38d5e00cd47dfe21f44754211b594",
+  "source_files": [
+    "harness/tools/write-file.ts"
+  ],
+  "tests_added": [
+    "harness/tests/tools/write-file.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a04eee1a0c1672d"
+    },
+    {
+      "command": "npx vitest run <tool tests>",
+      "exit_code": 0,
+      "stdout_hash": "c92d3f25d44ddb2c"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "581",
+    "suite_passed": "581",
+    "requirement_tests": 1,
+    "requirement_passed": 1,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "c92d3f25d44ddb2c",
+    "acceptance_criteria_met": [
+      "Writes file through VFS with checkpoint"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-tool tests pass; coverage at gate time"
+  },
+  "security_checks": {
+    "via_vfs": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": "8a04eee1a0c1672d"
+}
