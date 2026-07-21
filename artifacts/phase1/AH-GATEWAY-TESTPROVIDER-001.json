@@ -1,57 +1,79 @@
 {
   "requirement_id": "AH-GATEWAY-TESTPROVIDER-001",
-  "title": "Implement ScriptedTestProvider for offline LLM-free testing",
-  "commit_sha": "(pending)",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
   "source_files": [
-    "harness/gateway/scripted-provider.ts"
+    "harness/gateway/scripted-provider.ts",
+    "harness/index.ts",
+    "harness/package.json",
+    "harness/package-lock.json",
+    "harness/eslint.config.js",
+    "harness/stryker.config.json",
+    "harness/scripts/run-stryker.mjs",
+    "harness/tsconfig.json",
+    "harness/tsconfig.build.json",
+    "harness/vitest.config.ts"
   ],
   "tests_added": [
-    "harness/tests/gateway/scripted-provider.test.ts (extended: +20 behavior tests)"
+    "harness/tests/gateway/scripted-provider.test.ts",
+    "harness/tests/packaging/package.test.ts"
   ],
   "commands_run": [
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": "e3b0c44298fc1c14"
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
     },
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "dac10792aaac8f96"
+      "stdout_hash": "8a300ed6166513f5"
     }
   ],
   "exit_codes": [
     0,
+    0,
+    0,
     0
   ],
   "test_results": {
-    "total": 119,
-    "passed": 119,
-    "failed": 0,
-    "scripted_provider_tests": 26,
-    "note": "26 tests in scripted-provider.test.ts (6 schema + 20 behavior)"
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 75,
+    "requirement_passed": 75,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "c3548bf882460241",
+    "acceptance_criteria_met": [
+      "Implements full ProviderAdapter interface importing contract types",
+      "Response queue + map with canonical JSON hashing",
+      "Distinct nested ToolCall args produce distinct hashes",
+      "Metadata deeply immutable",
+      "Malformed data rejected; negative usage rejected",
+      "Typed errors map to normalized taxonomy",
+      "Queue exhaustion throws non-retryable",
+      "Runtime shape consumable by ModelGateway",
+      "Zero network calls in all paths",
+      "typecheck/build/mutation/pack scripts real",
+      "Stryker mutates product source only"
+    ],
+    "known_limitations": [],
+    "generated_at": "2026-07-21T06:23:26.579Z"
   },
   "coverage": {
-    "note": "Phase 1 threshold mutation>=0.7; v8 coverage via vitest available on demand"
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
   },
   "security_checks": {
-    "zero_network": "PASS (fetch overridden to throw; all paths completed)",
-    "no_credentials": "PASS (no env reads in source)",
-    "no_active_stubs": "PASS (all 8 interface methods implemented)"
+    "zero_network": "PASS fetch/http/https/net/dns/child_process boundaries tested",
+    "no_credentials": "PASS no env reads in source",
+    "malformed_fails_closed": "PASS parseResponse/normalizeToolCall reject malformed"
   },
-  "known_limitations": [],
-  "verifier_result": "pending-cross-model",
-  "verifier_model": "structural-only (cross-model verifier key not yet provided)",
-  "acceptance_criteria_met": [
-    "Implements full ProviderAdapter interface (8 methods)",
-    "Accepts response queue (ordered, one per call)",
-    "Accepts response map (keyed by SHA-256 of input messages)",
-    "Records all call metadata (messages, tools, usage, timestamps)",
-    "Throws ScriptedResponseExhaustedError when queue empty",
-    "Injectable via ModelGateway.resolve()",
-    "Health check always healthy without network",
-    "Zero network calls in any code path",
-    "Test suite: queue order, map match, exhausted throws, metadata accurate"
-  ],
-  "generated_at": "2026-07-20T04:42:39.227912"
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
 }

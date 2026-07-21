@@ -1,0 +1,66 @@
+{
+  "requirement_id": "AH-GATEWAY-PROVIDER-001",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "source_files": [
+    "harness/gateway/model-gateway.ts",
+    "harness/index.ts",
+    "harness/stryker.config.json",
+    "harness/package.json"
+  ],
+  "tests_added": [
+    "harness/tests/gateway/model-gateway.test.ts",
+    "harness/tests/packaging/package.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a300ed6166513f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 78,
+    "requirement_passed": 78,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "8589fa6a39f52208",
+    "acceptance_criteria_met": [
+      "Typed ProviderAdapter contract",
+      "Provider registry with metadata rejects duplicates fail-closed",
+      "ModelGateway.resolve deterministic from frozen snapshot",
+      "Provider switch revalidates context/tools/output/policy",
+      "No adapter bypasses metering/error-normalization/egress"
+    ],
+    "known_limitations": [],
+    "generated_at": "2026-07-21T06:23:30.506Z"
+  },
+  "coverage": {
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+  },
+  "security_checks": {
+    "provider_credentials_via_secrets_broker": "PASS at dispatch only",
+    "selection_cannot_weaken_policy": "PASS frozen snapshot + revalidation"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
+}

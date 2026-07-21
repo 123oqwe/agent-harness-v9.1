@@ -1,0 +1,80 @@
+{
+  "requirement_id": "AH-CAPMAP-006",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "source_files": [
+    "harness/security/secrets-broker.ts",
+    "harness/package.json",
+    "harness/package-lock.json",
+    "harness/index.ts",
+    "spec/api/openapi.yaml"
+  ],
+  "tests_added": [
+    "harness/tests/capability/ah-capmap-006.test.ts",
+    "harness/tests/api/openapi-lint.test.ts",
+    "harness/tests/packaging/package.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a300ed6166513f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 27,
+    "requirement_passed": 27,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "927f6e7ad26d57f6",
+    "acceptance_criteria_met": [
+      "PUT /vault/secrets stores encrypted in SQLite",
+      "GET returns decrypted only with capability token",
+      "GET without token 403",
+      "AES-256-GCM master key from user password",
+      "Master key never plaintext PBKDF2 100k",
+      "All access logged",
+      "Secret values never logged",
+      "DELETE removes permanently",
+      "List returns names only",
+      "Credential exchange scoped single dispatch rejected on replay zeroes after",
+      "Restart preserves encrypted secrets + audit not master key"
+    ],
+    "known_limitations": [
+      "SQLite stored in a local temp file for tests; production path identical"
+    ],
+    "generated_at": "2026-07-21T06:24:08.420Z"
+  },
+  "coverage": {
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+  },
+  "security_checks": {
+    "encrypted_at_rest": "PASS AES-256-GCM",
+    "requires_capability_token": "PASS",
+    "secret_values_never_logged": "PASS",
+    "master_key_never_persisted": "PASS PBKDF2 100k",
+    "credential_exchange_single_use": "PASS",
+    "no_credential_in_agent_env": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
+}

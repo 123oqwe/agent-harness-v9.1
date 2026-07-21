@@ -1,0 +1,73 @@
+{
+  "requirement_id": "AH-CAPABILITY-001",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "source_files": [
+    "harness/security/capability.ts",
+    "harness/security/authorization-service.ts",
+    "harness/package.json",
+    "harness/index.ts",
+    "harness/stryker.config.json"
+  ],
+  "tests_added": [
+    "harness/tests/security/capability-issue.test.ts",
+    "harness/tests/security/capability-replay.test.ts",
+    "harness/tests/security/capability-child.test.ts",
+    "harness/tests/packaging/package.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a300ed6166513f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 30,
+    "requirement_passed": 30,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "eb027049103eb777",
+    "acceptance_criteria_met": [
+      "Token issued with all required fields",
+      "Token verified before execution",
+      "Replay blocked single-use",
+      "Expired token rejected",
+      "Used token rejected",
+      "Revocation works",
+      "Child capability signed by AuthorizationService not parent",
+      "Credential single-exchange at dispatch, never in process env across iterations"
+    ],
+    "known_limitations": [],
+    "generated_at": "2026-07-21T06:23:39.415Z"
+  },
+  "coverage": {
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+  },
+  "security_checks": {
+    "use_limit_1_atomic": "PASS",
+    "parent_cannot_sign_child": "PASS AuthorizationService signs",
+    "confirmation_key_verified": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
+}

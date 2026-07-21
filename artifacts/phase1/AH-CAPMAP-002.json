@@ -1,0 +1,81 @@
+{
+  "requirement_id": "AH-CAPMAP-002",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "source_files": [
+    "harness/security/auth.ts",
+    "harness/package.json",
+    "harness/package-lock.json",
+    "harness/index.ts",
+    "harness/stryker.config.json",
+    "spec/api/openapi.yaml",
+    "spec/adr/ADR-009-secrets-and-identity.md"
+  ],
+  "tests_added": [
+    "harness/tests/capability/ah-capmap-002.test.ts",
+    "harness/tests/packaging/package.test.ts",
+    "harness/tests/api/openapi-lint.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a300ed6166513f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 37,
+    "requirement_passed": 37,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "dd4108a6abc89cbd",
+    "acceptance_criteria_met": [
+      "POST /auth/login password returns 200 session token",
+      "Invalid password 401 after 5 attempts rate-limited 15min",
+      "WebAuthn register/authenticate challenge flows",
+      "WebAuthn verify validates origin/RP/presence/UV/cred/counter",
+      "Session 24h HttpOnly+Secure",
+      "GET /auth/me valid/401",
+      "POST /auth/logout invalidates",
+      "bcrypt cost 12 never plaintext",
+      "Password never in logs",
+      "OpenAPI surface passes real parser"
+    ],
+    "known_limitations": [
+      "WebAuthn uses deterministic test-mode crypto helpers for offline verification; no real hardware authenticator"
+    ],
+    "generated_at": "2026-07-21T06:24:03.940Z"
+  },
+  "coverage": {
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+  },
+  "security_checks": {
+    "password_never_logged": "PASS",
+    "session_httponly_secure": "PASS",
+    "failed_login_rate_limited": "PASS",
+    "bcrypt_cost_12": "PASS",
+    "webauthn_challenges_short_lived_single_use": "PASS",
+    "signature_counter_atomic": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
+}

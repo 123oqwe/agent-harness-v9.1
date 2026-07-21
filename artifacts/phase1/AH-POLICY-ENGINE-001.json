@@ -1,0 +1,73 @@
+{
+  "requirement_id": "AH-POLICY-ENGINE-001",
+  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "source_files": [
+    "harness/security/policy-engine.ts",
+    "harness/security/pep.ts",
+    "harness/package.json",
+    "harness/index.ts",
+    "harness/stryker.config.json",
+    "harness/vitest.config.ts"
+  ],
+  "tests_added": [
+    "harness/tests/policy/deny-by-default.test.ts",
+    "harness/tests/policy/pep.test.ts",
+    "harness/tests/policy/risk-derivation.test.ts",
+    "harness/tests/packaging/package.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "8a300ed6166513f5"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_files": "34",
+    "suite_total_tests": "419",
+    "suite_passed": "419",
+    "requirement_tests": 106,
+    "requirement_passed": 106,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "c6e56f24e7ff632b",
+    "acceptance_criteria_met": [
+      "Deny-by-default enforced",
+      "PEP at every action",
+      "Risk tier derived from EffectRisk+Policy+Context",
+      "Unauthorized tool call blocked",
+      "Expired capability rejected",
+      "Used capability rejected",
+      "PEP logs every decision",
+      "PEP enforces egress_policy (authoritative)"
+    ],
+    "known_limitations": [],
+    "generated_at": "2026-07-21T06:23:34.543Z"
+  },
+  "coverage": {
+    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+  },
+  "security_checks": {
+    "pep_cannot_be_bypassed": "PASS single chokepoint validate()",
+    "policy_immutable": "PASS not a Router output"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "8a300ed6166513f5"
+}
