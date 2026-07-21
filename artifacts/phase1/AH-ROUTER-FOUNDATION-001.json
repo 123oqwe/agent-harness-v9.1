@@ -1,0 +1,72 @@
+{
+  "requirement_id": "AH-ROUTER-FOUNDATION-001",
+  "commit_sha": "34e2dc2bae9a7e4e255793bd25c0b4e7c19414ac",
+  "source_files": [
+    "harness/router/static-router.ts"
+  ],
+  "tests_added": [
+    "harness/tests/router/static-router.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "c7ca22c66ac81ac8"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "26386e3ba95dfc1e"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "495",
+    "suite_passed": "495",
+    "requirement_tests": 19,
+    "requirement_passed": 19,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "26386e3ba95dfc1e",
+    "acceptance_criteria_met": [
+      "Normalizes request into typed intents domains ambiguity constraints success criteria",
+      "Selects exactly one strategy direct/react/plan_execute",
+      "Single-agent RunPlan from frozen model/tool/skill/environment/verification snapshots",
+      "Deterministic rules at most one profiler model call no Phase 3 optimizer",
+      "Abstains or asks user when hard constraints unsatisfiable",
+      "Policy constraints before profiling binding veto after routing",
+      "reasoning_strategy lowercase contract values direct/react/plan_execute",
+      "direct only tool-free single-call; react only observation-dependent; plan_execute for dependent multi-step write/test/checkpoint/transaction/explicit-plan"
+    ],
+    "known_limitations": [
+      "Phase 1 profiler is deterministic rules only (0 LLM); structured profiler model call deferred to Phase 2"
+    ]
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "router_cannot_issue_capabilities": "PASS",
+    "router_cannot_grant_permissions": "PASS",
+    "router_cannot_define_consent": "PASS",
+    "untrusted_profiler_validated": "PASS schema-validated TaskContract"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "c7ca22c66ac81ac8"
+}
