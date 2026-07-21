@@ -1,0 +1,66 @@
+{
+  "requirement_id": "AH-RUNTIME-SESSION-001",
+  "commit_sha": "9279ef6ffaae817d46cf81154b3a8f164885d8fc",
+  "source_files": [
+    "harness/session/durable-session.ts"
+  ],
+  "tests_added": [
+    "harness/tests/session/durable.test.ts",
+    "harness/tests/session/crash-restore.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "d83e5a90fce9e8b6"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "16234e176d39b3dd"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "544",
+    "suite_passed": "544",
+    "requirement_tests": 13,
+    "requirement_passed": 13,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "16234e176d39b3dd",
+    "acceptance_criteria_met": [
+      "Event log is source of truth",
+      "Snapshot is acceleration rebuildable",
+      "Crash mid-task resume without duplicate writes",
+      "Session export/import works",
+      "11 entry types supported"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "concurrent_writer_lock": "PASS",
+    "snapshot_version_verified_on_load": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "d83e5a90fce9e8b6"
+}

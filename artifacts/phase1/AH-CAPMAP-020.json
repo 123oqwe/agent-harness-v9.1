@@ -1,0 +1,69 @@
+{
+  "requirement_id": "AH-CAPMAP-020",
+  "commit_sha": "9279ef6ffaae817d46cf81154b3a8f164885d8fc",
+  "source_files": [
+    "harness/runtime/notifications.ts"
+  ],
+  "tests_added": [
+    "harness/tests/capability/ah-capmap-020.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "84dfbb73a140a103"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "ab1487f6a1d84b6a"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "544",
+    "suite_passed": "544",
+    "requirement_tests": 11,
+    "requirement_passed": 11,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "ab1487f6a1d84b6a",
+    "acceptance_criteria_met": [
+      "POST creates notification with id user_id type title body created_at read=false",
+      "GET returns unread sorted by created_at desc",
+      "GET include_read=true returns all",
+      "PATCH marks as read",
+      "DELETE dismisses",
+      "5 notification types",
+      "30-day expiry configurable",
+      "No external delivery no email/push/SMS",
+      "Body max 500 chars"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "user_isolation": "PASS",
+    "authenticated_session_required": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "84dfbb73a140a103"
+}
