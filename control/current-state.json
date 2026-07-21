@@ -91,9 +91,9 @@
       "1": {
         "total": 40,
         "maturity": {
-          "verified": 6,
+          "verified": 7,
           "in_progress": 11,
-          "not_started": 23
+          "not_started": 22
         }
       },
       "2": {

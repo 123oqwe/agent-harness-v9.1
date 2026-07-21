@@ -1,0 +1,65 @@
+{
+  "requirement_id": "AH-VFS-001",
+  "commit_sha": "2817fa459f59b5180c714647d4594392daff6500",
+  "source_files": [
+    "harness/vfs/virtual-filesystem.ts"
+  ],
+  "tests_added": [
+    "harness/tests/vfs/virtual-filesystem.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "85e45192fffc20ba"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "b456088a63d54884"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "440",
+    "suite_passed": "440",
+    "requirement_tests": 21,
+    "requirement_passed": 21,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "b456088a63d54884",
+    "acceptance_criteria_met": [
+      "Routes /workspace /scratch /memories /evidence through typed Local Overlay Store Evidence backends",
+      "Path-prefix permission checks on every access from tools/RAG/memory/evidence",
+      "Stages RunPlan writes in OverlayBackend atomically commits after verification",
+      "Rejects traversal symlink-escape cross-backend aliasing denied-path disclosure",
+      "Bounded read list search write edit commit discard with receipts"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "no_module_bypasses_vfs": "PASS single VirtualFilesystem authority",
+    "rag_cannot_read_denied_path": "PASS permission checked for every access"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "85e45192fffc20ba"
+}
