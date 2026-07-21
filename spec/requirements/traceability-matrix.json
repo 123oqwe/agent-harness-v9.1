@@ -38,13 +38,16 @@
     "api": [
       "POST /auth/login",
       "POST /auth/webauthn/register",
+      "POST /auth/webauthn/authenticate",
       "POST /auth/webauthn/verify",
       "GET /auth/me",
       "POST /auth/logout"
     ],
     "source_package": "security",
     "test": [
-      "harness/tests/capability/ah-capmap-002.test.ts"
+      "harness/tests/capability/ah-capmap-002.test.ts",
+      "harness/tests/packaging/package.test.ts",
+      "harness/tests/api/openapi-lint.test.ts"
     ],
     "eval": null,
     "phase_gate": "phases/phase-1.yaml",

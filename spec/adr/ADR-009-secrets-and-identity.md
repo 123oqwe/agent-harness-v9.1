@@ -8,5 +8,6 @@ WebAuthn for user auth is SOTA (phishing-resistant). SPIFFE for workload identit
 ## Decision
 - Personal: Local Vault stores refresh tokens, Local Broker exchanges
 - Enterprise: HashiCorp Vault / AWS KMS
-- Identity: WebAuthn for user, SPIFFE for workload
+- Identity: WebAuthn registration and authentication assertions for user auth, SPIFFE for workload
+- WebAuthn authentication uses a short-lived, single-use server challenge and issues the same 24-hour session as password authentication only after origin, RP ID, user presence, user verification, credential, and signature-counter checks succeed
 - Capability: Ed25519 signing

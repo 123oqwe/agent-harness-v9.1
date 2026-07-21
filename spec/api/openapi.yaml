@@ -68,7 +68,7 @@ paths:
                 password:
                   type: string
                 webauthn_assertion:
-                  type: string
+                  type: object
                 oidc_code:
                   type: string
                 saml_response:
@@ -76,17 +76,20 @@ paths:
       responses:
         '200':
           description: Login successful
+          headers:
+            Set-Cookie:
+              description: HttpOnly, Secure, 24-hour authenticated session cookie
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
+                required: [authenticated]
                 properties:
-                  access_token:
-                    type: string
-                  refresh_token:
-                    type: string
-                  expires_in:
-                    type: integer
+                  authenticated:
+                    type: boolean
+                    const: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -118,8 +121,24 @@ paths:
       tags: [auth]
       operationId: logout
       responses:
-        '204':
+        '200':
           description: Logged out
+          headers:
+            Set-Cookie:
+              description: Expired authenticated session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+                    const: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /auth/me:
     get:
@@ -132,14 +151,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [user_id]
                 properties:
                   user_id:
                     type: string
-                  session_token:
-                    type: string
-                  expires_at:
-                    type: string
-                    format: date-time
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -150,22 +165,64 @@ paths:
       responses:
         '200':
           description: WebAuthn registration challenge
+          headers:
+            Set-Cookie:
+              description: HttpOnly, Secure, five-minute single-use ceremony cookie
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
+                required: [challenge, rp, user, pubKeyCredParams]
                 properties:
                   challenge:
                     type: string
-                  rp_id:
-                    type: string
+                  rp:
+                    type: object
+                  user:
+                    type: object
+                  pubKeyCredParams:
+                    type: array
+                    items:
+                      type: object
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /auth/webauthn/authenticate:
+    post:
+      tags: [auth]
+      operationId: webauthnAuthenticate
+      security: []
+      responses:
+        '200':
+          description: Short-lived WebAuthn authentication challenge
+          headers:
+            Set-Cookie:
+              description: HttpOnly, Secure, five-minute single-use ceremony cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [challenge, rpId, timeout, userVerification]
+                properties:
+                  challenge:
+                    type: string
+                  rpId:
+                    type: string
+                  timeout:
+                    type: integer
+                  userVerification:
+                    type: string
+                    const: required
 
   /auth/webauthn/verify:
     post:
       tags: [auth]
       operationId: webauthnVerify
+      security: []
       requestBody:
         required: true
         content:
@@ -178,7 +235,23 @@ paths:
                   type: object
       responses:
         '200':
-          description: WebAuthn verification successful
+          description: WebAuthn registration or authentication verification successful
+          headers:
+            Set-Cookie:
+              description: HttpOnly, Secure, 24-hour authenticated session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+                    const: true
+        '400':
+          description: WebAuthn registration response was invalid
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1236,6 +1309,12 @@ components:
   responses:
     Unauthorized:
       description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden
       content:
         application/json:
           schema:
