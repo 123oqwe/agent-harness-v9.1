@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { generateEvidence, writeEvidence, validateEvidence, runCommand, EvidenceError } from '../../verification/evidence.js';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 

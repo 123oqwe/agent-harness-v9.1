@@ -186,3 +186,68 @@ describe('AH-VFS-001 Virtual Filesystem', () => {
     });
   });
 });
+
+describe('VFS backend direct coverage', () => {
+  it('StoreBackend list/read/delete/exists', () => {
+    const sb = new StoreBackend('/memories');
+    sb.write('/memories/a', Buffer.from('x'));
+    sb.write('/memories/b', Buffer.from('y'));
+    expect(sb.list('/memories').length).toBe(2);
+    expect(sb.read('/memories/a').toString()).toBe('x');
+    expect(sb.exists('/memories/a')).toBe(true);
+    sb.delete('/memories/a');
+    expect(sb.exists('/memories/a')).toBe(false);
+    expect(() => sb.read('/memories/missing')).toThrow();
+    // root path list
+    expect(sb.list('/').length).toBe(1);
+  });
+
+  it('EvidenceBackend list/read/exists + WORM delete throws', () => {
+    const eb = new EvidenceBackend('/evidence');
+    eb.write('/evidence/1', Buffer.from('a'));
+    expect(eb.list('/evidence').length).toBe(1);
+    expect(eb.read('/evidence/1').toString()).toBe('a');
+    expect(eb.exists('/evidence/1')).toBe(true);
+    expect(() => eb.delete('/evidence/1')).toThrow();
+    expect(() => eb.read('/evidence/missing')).toThrow();
+  });
+
+  it('OverlayBackend list/read/delete/exists/tombstones', () => {
+    const ov = new OverlayBackend('/scratch');
+    ov.write('/scratch/a', Buffer.from('1'));
+    ov.write('/scratch/b', Buffer.from('2'));
+    expect(ov.list('/scratch').length).toBe(2);
+    expect(ov.read('/scratch/a').toString()).toBe('1');
+    ov.delete('/scratch/a');
+    expect(ov.exists('/scratch/a')).toBe(false);
+    expect(() => ov.read('/scratch/a')).toThrow();
+    expect(ov.stagedTombstones()).toContain('/scratch/a');
+    expect(ov.stagedEntries().length).toBe(1);
+    ov.markDiscarded();
+    expect(ov.isDiscarded()).toBe(true);
+    expect(() => ov.write('/scratch/c', Buffer.from('3'))).toThrow();
+  });
+
+  it('OverlayBackend markCommitted blocks further writes', () => {
+    const ov = new OverlayBackend('/scratch');
+    ov.write('/scratch/a', Buffer.from('1'));
+    ov.markCommitted();
+    expect(ov.isCommitted()).toBe(true);
+    expect(() => ov.write('/scratch/b', Buffer.from('2'))).toThrow();
+  });
+
+  it('VFS exists returns false for denied path', () => {
+    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }, { prefix: '/workspace/secret', read: false, write: false }]);
+    vfs.mount(new LocalBackend('/workspace', mkdtempSync(join(tmpdir(), 'vfsex-'))));
+    expect(vfs.exists('/workspace/secret/x')).toBe(false);
+  });
+
+  it('VFS delete removes a file', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'vfsdel-'));
+    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
+    vfs.mount(new LocalBackend('/workspace', tmp));
+    writeFileSync(join(tmp, 'del.txt'), 'x');
+    vfs.delete('/workspace/del.txt');
+    expect(vfs.exists('/workspace/del.txt')).toBe(false);
+  });
+});

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, symlinkSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSandboxed, detectMechanism, assertWithinWorkspace, SandboxError, type SandboxProfile } from '../../runtime/sandbox.js';
+import { execSandboxed, detectMechanism, type SandboxProfile } from '../../runtime/sandbox.js';
 
 const mechanism = detectMechanism();
 const hasSandbox = mechanism !== 'none';
