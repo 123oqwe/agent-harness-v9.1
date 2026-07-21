@@ -1,7 +1,7 @@
 /** AH-TOOL-PARSE-001: Phase 1 parse_document tool. Extracts text from plain text/markdown. */
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 
-export interface ParseDocumentInput { path: string; max_pages?: number }
+export interface ParseDocumentInput { path: string; max_pages?: number | undefined }
 export interface ParseDocumentPage { page: number; text: string }
 export interface ParseDocumentOutput { path: string; pages: ParseDocumentPage[]; total_chars: number }
 
