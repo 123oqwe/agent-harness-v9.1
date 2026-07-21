@@ -1,0 +1,72 @@
+{
+  "requirement_id": "AH-CAPMAP-017",
+  "commit_sha": "d633cecc5b5e80d26b6a1e404d010aaa6d97a14f",
+  "source_files": [
+    "harness/tools/skill-registry.ts"
+  ],
+  "tests_added": [
+    "harness/tests/capability/ah-capmap-017.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "92f63e9b91985a32"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "07b17b64f731a076"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "476",
+    "suite_passed": "476",
+    "requirement_tests": 11,
+    "requirement_passed": 11,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "07b17b64f731a076",
+    "acceptance_criteria_met": [
+      "loadSkills reads .yaml/.json from directory",
+      "Each skill validated against skill-spec.schema.json",
+      "Invalid skill throws SkillValidationError with file path",
+      "getSkill/listSkills/reloadSkills",
+      "Skills declarative only no executable code",
+      "No network calls during loading",
+      "skill_search searches compact metadata without full instructions",
+      "Full SkillSpec loaded only after selection",
+      "One authoritative registry snapshot shared by Router/Runtime",
+      "8 declarative base skills shipped",
+      "Duplicate/ambiguous names fail closed"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "skills_cannot_self_elevate": "PASS",
+    "declarative_only": "PASS",
+    "search_never_grants": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "92f63e9b91985a32"
+}
