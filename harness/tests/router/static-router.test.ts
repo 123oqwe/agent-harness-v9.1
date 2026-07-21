@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { StaticRouter, profileIntent, selectStrategy, type ReasoningStrategy } from '../../router/static-router.js';
+import { StaticRouter, profileIntent, selectStrategy } from '../../router/static-router.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';

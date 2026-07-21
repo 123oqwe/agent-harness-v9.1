@@ -9,7 +9,25 @@
     {
       "name": "requirements_valid",
       "passed": true,
-      "detail": "214 requirements, 0 duplicates"
+      "detail": "254 requirements, 0 duplicates"
+    },
+    {
+      "name": "phase_architecture_consistent",
+      "passed": true,
+      "detail": "PASS: 254 requirements have one Phase owner, valid dependency order, truthful implemented/verified paths, and consistent authoritative state",
+      "stdout_hash": "7682545fa79d279b"
+    },
+    {
+      "name": "requirement_views_current",
+      "passed": true,
+      "detail": "PASS: 4 requirement-derived views match 254 registry rows",
+      "stdout_hash": "ccc54be87bb35c56"
+    },
+    {
+      "name": "capability_coverage_bidirectional",
+      "passed": true,
+      "detail": "PASS: 124 capabilities and 223 actionable requirements are mapped bidirectionally",
+      "stdout_hash": "ef57ab50df2a615d"
     },
     {
       "name": "model_check_verified",
@@ -34,12 +52,12 @@
     {
       "name": "factory_controller_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/worktrees/phase1/factory/controller/controller.py"
     },
     {
       "name": "codeowners_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../CODEOWNERS"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/worktrees/phase1/CODEOWNERS"
     },
     {
       "name": "ui_screens_differentiated",
@@ -53,6 +71,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-18T19:05:07.062644",
+  "timestamp": "2026-07-22T04:34:12.412826",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

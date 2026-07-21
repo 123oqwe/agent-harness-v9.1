@@ -4,18 +4,36 @@
     {
       "name": "requirements_have_criteria",
       "passed": true,
-      "detail": "All 31 requirements have criteria"
+      "detail": "All 40 requirements have criteria"
+    },
+    {
+      "name": "phase_architecture_consistent",
+      "passed": true,
+      "detail": "PASS: 254 requirements have one Phase owner, valid dependency order, truthful implemented/verified paths, and consistent authoritative state",
+      "stdout_hash": "7682545fa79d279b"
+    },
+    {
+      "name": "requirement_views_current",
+      "passed": true,
+      "detail": "PASS: 4 requirement-derived views match 254 registry rows",
+      "stdout_hash": "ccc54be87bb35c56"
+    },
+    {
+      "name": "capability_coverage_bidirectional",
+      "passed": true,
+      "detail": "PASS: 124 capabilities and 223 actionable requirements are mapped bidirectionally",
+      "stdout_hash": "ef57ab50df2a615d"
     },
     {
       "name": "requirements_have_tests",
-      "passed": false,
-      "detail": "Missing on disk: ['AH-RUNTIME-LOOP-001:harness/tests/runtime/loop.test.ts', 'AH-RUNTIME-SESSION-001:harness/tests/session/durable.test.ts', 'AH-SANDBOX-001:harness/tests/sandbox/path-traversal.test.ts', 'AH-POLICY-ENGINE-001:harness/tests/policy/deny-by-default.test.ts', 'AH-CAPABILITY-001:harness/tests/security/capability-issue.test.ts']"
+      "passed": true,
+      "detail": "All 40 requirements have test files on disk"
     },
     {
       "name": "build",
       "passed": true,
       "detail": "exit_code=0",
-      "stdout_hash": "152e34a5956f2c6b"
+      "stdout_hash": "16a19b99f21433e5"
     },
     {
       "name": "type_check",
@@ -25,15 +43,15 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=4dadf3a8250c1cae"
+      "detail": "exit_code=0, stdout_hash=11d838a02309ab85"
     },
     {
       "name": "all_requirements_verified",
-      "passed": false,
-      "detail": "31 requirements not verified: ['AH-RUNTIME-LOOP-001', 'AH-RUNTIME-SESSION-001', 'AH-SANDBOX-001', 'AH-POLICY-ENGINE-001', 'AH-CAPABILITY-001']"
+      "passed": true,
+      "detail": "All 40 requirements verified"
     }
   ],
-  "result": "FAIL",
-  "timestamp": "2026-07-18T19:04:26.965772",
+  "result": "PASS",
+  "timestamp": "2026-07-22T04:34:59.432285",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

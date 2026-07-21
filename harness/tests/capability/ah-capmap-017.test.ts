@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillRegistry, SkillValidationError, baseSkills } from '../../tools/skill-registry.js';
+import { SkillRegistry, SkillValidationError } from '../../tools/skill-registry.js';
 import type { SkillSpec } from '../../../spec/types/skill-spec.js';
 
 function validSkill(name: string): SkillSpec {

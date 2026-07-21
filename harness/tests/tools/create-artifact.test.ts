@@ -1,7 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { VirtualFilesystem, StoreBackend } from '../../vfs/virtual-filesystem.js';
 import { createArtifact } from '../../tools/create-artifact.js';
 
