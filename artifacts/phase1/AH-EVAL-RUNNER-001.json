@@ -1,0 +1,66 @@
+{
+  "requirement_id": "AH-EVAL-RUNNER-001",
+  "commit_sha": "f8ae874bcb4b3a260eab8b4b69f97612980890b2",
+  "source_files": [
+    "harness/verification/eval-runner.ts"
+  ],
+  "tests_added": [
+    "harness/tests/verification/eval-runner.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "05b59d173fd6323d"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "1f946dbcfedabec0"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "559",
+    "suite_passed": "559",
+    "requirement_tests": 8,
+    "requirement_passed": 8,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "1f946dbcfedabec0",
+    "acceptance_criteria_met": [
+      "Executes unit integration adversarial 6 vertical eval suites from one manifest",
+      "Uses ScriptedTestProvider and local fixtures only",
+      "Evaluates TaskContract success criteria emits pass/fail reasons",
+      "Captures command exit code stdout/stderr hashes fixture version code revision",
+      "Failing/missing eval cannot be pass",
+      "Runs e2e fixtures direct/react/plan_execute fails on disagreement"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "impl_agent_cannot_edit_expected_results": "PASS",
+    "registry_maturity_never_evidence": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "05b59d173fd6323d"
+}

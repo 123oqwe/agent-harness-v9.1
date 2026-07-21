@@ -1,0 +1,62 @@
+{
+  "requirement_id": "AH-EVIDENCE-001",
+  "commit_sha": "f8ae874bcb4b3a260eab8b4b69f97612980890b2",
+  "source_files": [
+    "harness/verification/evidence.ts"
+  ],
+  "tests_added": [
+    "harness/tests/evidence/generation.test.ts"
+  ],
+  "commands_run": [
+    {
+      "command": "npx tsc --noEmit",
+      "exit_code": 0,
+      "stdout_hash": null
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "stdout_hash": "16a19b99f21433e5"
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "stdout_hash": "11424db473f14367"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "87bcc146c5a9422d"
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "suite_total_tests": "559",
+    "suite_passed": "559",
+    "requirement_tests": 7,
+    "requirement_passed": 7,
+    "requirement_failed": 0,
+    "requirement_test_stdout_hash": "87bcc146c5a9422d",
+    "acceptance_criteria_met": [
+      "Evidence generated from actual command output",
+      "Includes commit_sha source_files tests_added commands_run exit_codes test_results coverage security_checks",
+      "Self-reported PASS without evidence forbidden"
+    ],
+    "known_limitations": []
+  },
+  "coverage": {
+    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+  },
+  "security_checks": {
+    "evidence_immutable_once_generated": "PASS"
+  },
+  "verifier_result": "pass",
+  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "test_output": null,
+  "test_output_hash": "11424db473f14367"
+}
