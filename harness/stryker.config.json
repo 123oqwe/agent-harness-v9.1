@@ -16,7 +16,7 @@
     "related": true
   },
   "cleanTempDir": "always",
-  "concurrency": 1,
+  "concurrency": 2,
   "reporters": [
     "clear-text",
     "progress",
