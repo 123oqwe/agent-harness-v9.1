@@ -40,4 +40,41 @@ describe('AH-SPEC-API-001: OpenAPI contract', () => {
     expect(paths['/auth/logout']?.post?.security).toBeUndefined();
     expect(JSON.stringify(paths['/auth/me']?.get?.responses?.['200'])).not.toContain('session_token');
   });
+
+  it('defines the Phase 1 secret vault surface without exposing values from list or write responses', async () => {
+    const document = await SwaggerParser.validate(apiPath);
+    const paths = document.paths ?? {};
+    const collection = paths['/vault/secrets'];
+    const item = paths['/vault/secrets/{name}'];
+
+    expect(collection?.get?.operationId).toBe('listSecrets');
+    expect(collection?.put).toBeUndefined();
+    expect(item?.put?.operationId).toBe('storeSecret');
+    expect(item?.get?.operationId).toBe('getSecret');
+    expect(item?.get?.security).toEqual([{ capabilityAuth: [] }]);
+    const components = (document as {
+      components?: { securitySchemes?: Record<string, unknown> };
+    }).components;
+    expect(components?.securitySchemes?.capabilityAuth).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'Ed25519 CapabilityToken',
+    });
+    expect(item?.delete?.operationId).toBe('deleteSecret');
+    expect(item?.put?.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'name', in: 'path', required: true })]),
+    );
+    expect(item?.get?.responses?.['403']).toBeDefined();
+    const listResponse = collection?.get?.responses?.['200'] as
+      | { content?: Record<string, { schema?: unknown }> }
+      | undefined;
+    const storeResponse = item?.put?.responses?.['201'] as
+      | { content?: Record<string, { schema?: unknown }> }
+      | undefined;
+    const listSchema = listResponse?.content?.['application/json']?.schema;
+    const storeSchema = storeResponse?.content?.['application/json']?.schema;
+    expect(listSchema).toMatchObject({ type: 'array', items: { type: 'string' } });
+    expect(JSON.stringify(listSchema)).not.toContain('value');
+    expect(JSON.stringify(storeSchema)).not.toContain('value');
+  });
 });
