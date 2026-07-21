@@ -75,17 +75,69 @@
   },
   "registry_summary": {
     "total": 254,
-    "capabilities": {"total": 124, "mapped": 124, "unmapped": 0},
+    "capabilities": {
+      "total": 124,
+      "mapped": 124,
+      "unmapped": 0
+    },
     "phases": {
-      "0": {"total": 31, "maturity": {"not_started": 7, "verified": 24}},
-      "1": {"total": 40, "maturity": {"in_progress": 11, "not_started": 23, "verified": 6}},
-      "2": {"total": 64, "maturity": {"not_started": 64}},
-      "3": {"total": 16, "maturity": {"not_started": 16}},
-      "4": {"total": 23, "maturity": {"not_started": 23}},
-      "5": {"total": 12, "maturity": {"not_started": 12}},
-      "6": {"total": 25, "maturity": {"not_started": 25}},
-      "7": {"total": 27, "maturity": {"not_started": 27}},
-      "8": {"total": 16, "maturity": {"not_started": 16}}
+      "0": {
+        "total": 31,
+        "maturity": {
+          "not_started": 7,
+          "verified": 24
+        }
+      },
+      "1": {
+        "total": 40,
+        "maturity": {
+          "implemented": 6,
+          "in_progress": 11,
+          "not_started": 23
+        }
+      },
+      "2": {
+        "total": 64,
+        "maturity": {
+          "not_started": 64
+        }
+      },
+      "3": {
+        "total": 16,
+        "maturity": {
+          "not_started": 16
+        }
+      },
+      "4": {
+        "total": 23,
+        "maturity": {
+          "not_started": 23
+        }
+      },
+      "5": {
+        "total": 12,
+        "maturity": {
+          "not_started": 12
+        }
+      },
+      "6": {
+        "total": 25,
+        "maturity": {
+          "not_started": 25
+        }
+      },
+      "7": {
+        "total": 27,
+        "maturity": {
+          "not_started": 27
+        }
+      },
+      "8": {
+        "total": 16,
+        "maturity": {
+          "not_started": 16
+        }
+      }
     }
   },
   "known_contradictions": [],
