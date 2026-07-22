@@ -119,7 +119,7 @@ describe('AH-TOOL-REGISTRY-001 Tool Registry', () => {
     });
 
     it('loads the schema from spec/contracts/tool-spec.schema.json at construction', () => {
-      const contractPath = join(__dirname, '../../../spec/contracts/tool-spec.schema.json');
+      const contractPath = join(process.env.HARNESS_SPEC_ROOT ?? join(__dirname, '../../../spec'), 'contracts', 'tool-spec.schema.json');
       const contractSchema = JSON.parse(readFileSync(contractPath, 'utf8'));
       expect(contractSchema.title).toBe('ToolSpec');
       // The registry validates using the authoritative contract schema
