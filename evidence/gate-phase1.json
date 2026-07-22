@@ -43,7 +43,7 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=ad6afebf5ec6fbc4"
+      "detail": "exit_code=0, stdout_hash=fdfba110cc2acb59"
     },
     {
       "name": "all_requirements_verified",
@@ -52,6 +52,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-22T13:39:39.787537",
+  "timestamp": "2026-07-22T13:45:43.952037",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

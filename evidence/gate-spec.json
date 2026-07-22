@@ -71,6 +71,6 @@
     }
   ],
   "result": "PASS",
-  "timestamp": "2026-07-22T13:38:56.186177",
+  "timestamp": "2026-07-22T13:44:53.793034",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }
