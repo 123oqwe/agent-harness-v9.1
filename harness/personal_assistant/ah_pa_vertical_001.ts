@@ -27,6 +27,19 @@ export function paTaskContract(input: PAVerticalInput): TaskContract {
 
 export async function runPAVertical(harness: Harness, input: PAVerticalInput): Promise<PAVerticalOutput> {
   const outcome = await harness.run(paTaskContract(input), `pa-${Date.now()}`);
+
+  // Extract plan from model output — parse task IDs from the response
+  const modelOutput = outcome.loop_result.turns.at(-1)?.model.content ?? '';
+  const plan: { task_id: string; title: string; slot: number }[] = [];
+  const unallocated: string[] = [];
+  for (const task of input.tasks) {
+    if (modelOutput.includes(task.id)) {
+      plan.push({ task_id: task.id, title: task.title, slot: task.duration_min });
+    } else {
+      unallocated.push(task.id);
+    }
+  }
+
   // no_external_actions proven by: no external-write tools in the frozen snapshot,
   // no external-write tool_calls in the session event log, Policy denies external_write.
   const events = outcome.session.getEvents();
@@ -35,9 +48,10 @@ export async function runPAVertical(harness: Harness, input: PAVerticalInput): P
     const tool = (e.data as { tool: string }).tool;
     return tool.includes('email') || tool.includes('calendar') || tool.includes('push') || tool.includes('sms');
   });
+
   return {
-    plan: [],
-    unallocated: [],
+    plan,
+    unallocated,
     no_external_actions: !hasExternalAction,
     outcome,
   };

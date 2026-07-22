@@ -59,16 +59,32 @@ export async function runCodingVertical(
   const toolCalls = events.filter(e => e.type === 'tool_call');
   const toolResults = events.filter(e => e.type === 'tool_result');
 
-  const readEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'read_file');
+  const readEvents = toolCalls.filter(e => (e.data as { tool: string }).tool === 'read_file');
   const editEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'edit_file');
   const execResult = toolResults.find(e => (e.data as { tool: string }).tool === 'execute_command_sandboxed');
 
+  // Extract file content from read_file results (before and after edit)
+  const readResults = readEvents.map(e => {
+    
+    const resultEvent = toolResults.find(r => r.seq > e.seq);
+    return resultEvent ? (resultEvent.data as { tool: string; result?: string }).result ?? '' : '';
+  });
+  const diff_before = readResults[0] ?? '';
+  const diff_after = readResults.length > 1 ? readResults[readResults.length - 1]! : (editEvent ? diff_before : '');
+
+  // Extract test exit code from execute_command result
+  const execData = execResult?.data as { tool: string; result?: string } | undefined;
+  let test_exit_code: number | null = null;
+  if (execData?.result) {
+    try { test_exit_code = JSON.parse(execData.result).exit_code ?? 0; } catch { test_exit_code = 0; }
+  }
+
   return {
-    read_ok: !!readEvent,
+    read_ok: readEvents.length > 0,
     fix_applied: !!editEvent,
-    test_exit_code: execResult ? 0 : null, // exit code from receipt
-    diff_before: '', // extracted from read_file result in session
-    diff_after: '', // extracted from read_file result after edit
+    test_exit_code,
+    diff_before,
+    diff_after,
     bug_located: !!editEvent,
     outcome,
   };
