@@ -99,7 +99,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     });
     it('single-agent RunPlan (agent_count=1)', () => {
       const r = router.route(task('fix the bug'));
-      expect((r.run_plan!.agent_graph as { agent_count: number }).agent_count).toBe(1);
+      expect((r.run_plan!.agent_graph as { nodes: unknown[] }).nodes.length).toBe(1);
     });
   });
 
@@ -117,7 +117,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     it('abstains when a required tool is not in the frozen snapshot', () => {
       const tr = new ToolRegistry(); // empty registry
       const sr = new SkillRegistry();
-      const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
+      const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
       const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p' });
       const result = r.route(task('fix the bug then run the tests'));
       expect(result.outcome).toBe('abstain');

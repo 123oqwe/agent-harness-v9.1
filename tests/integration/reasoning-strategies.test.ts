@@ -128,8 +128,9 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
       { content: 'done', decision_summary: 'done' },
     ]) });
     const r = await h.run(task('write a file'));
-    // write_file was called by the model but policy denied it → error in session
-    expect(r.session.getEvents().some(e => e.type === 'error' && JSON.stringify(e.data).includes('policy denied'))).toBe(true);
+    // Router prefilter denies write_file (not in policy allowed_tools) → routing abstains
+    expect(r.routing.outcome).toBe('abstain');
+    expect(r.routing.abstain_reason).toContain('policy');
   });
 
   it('all model calls go through HarnessProvider (no direct fetch)', async () => {

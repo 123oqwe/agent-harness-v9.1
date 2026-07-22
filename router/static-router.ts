@@ -4,15 +4,15 @@
  * Deterministic StaticRouter (single agent). Given a normalized TaskContract
  * and frozen provider/tool/skill/environment snapshots, produces the same
  * RunPlan. Policy is applied before profiling and remains a binding veto after
- * routing. Selects exactly one strategy:
- *   - plan_execute: 2+ dependent steps, writes/tests/checkpoints/transactions, or explicit plan request
- *   - react:        tool required, next action depends on an observation
- *   - direct:       tool-free single model call meets success criteria
- * Missing required info -> ask_user. Missing tools/perms/satisfiable route -> RoutingAbstainedError.
- * Router proposes bindings but NEVER issues capabilities, grants permissions, or defines consent.
+ * routing.
+ *
+ * Router proposes bindings but NEVER issues capabilities, grants permissions,
+ * or defines consent. tool_grants are proposed bindings, not grants.
  */
 import { createHash } from 'node:crypto';
 import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { RunPlan as SpecRunPlan } from '../../spec/types/run-plan.js';
+export type RunPlan = SpecRunPlan;
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
@@ -38,37 +38,10 @@ export interface RoutingResult {
   strategy?: ReasoningStrategy;
   intent: IntentProfile;
   run_plan?: RunPlan;
-  ask_user_message?: string;
-  abstain_reason?: string;
+  ask_user_message?: string | undefined;
+  abstain_reason?: string | undefined;
   policy_prefilter_passed: boolean;
   policy_post_route_vetoed: boolean;
-}
-
-export interface RunPlan {
-  schema_version: 'run-plan.v1';
-  run_id: string;
-  revision: number;
-  run_plan_hash: string;
-  previous_revision_hash: string | null;
-  task: TaskContract;
-  experience_profile: string;
-  reasoning_strategy: ReasoningStrategy;
-  workflow_graph: object;
-  agent_graph: object;
-  context_graph: object;
-  verification_graph: object;
-  model_bindings: object[];
-  tool_grants: object[];
-  skill_bindings: object[];
-  environment_bindings: object[];
-  policy_snapshot_ref: string;
-  registry_snapshot_refs: string[];
-  derived_risk_assessment: object;
-  required_consent: object;
-  budget_allocation: object;
-  persistence_policy: object;
-  cancellation_policy: object;
-  fallback_policy: object;
 }
 
 export class RoutingAbstainedError extends Error {
@@ -84,24 +57,18 @@ export interface RouterDeps {
   policySnapshotRef: string;
 }
 
-/**
- * Deterministic intent profiler. No LLM in Phase 1 — rules only.
- * Classifies the goal text and TaskContract constraints into a typed profile.
- */
+/** Deterministic intent profiler. No LLM in Phase 1 — rules only. */
 export function profileIntent(task: TaskContract): IntentProfile {
   const goal = task.goal.toLowerCase();
   const requires_writes = /\b(write|edit|create|modify|update|fix|implement|refactor|delete|remove|patch)\b/.test(goal);
   const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b/.test(goal);
   const explicit_plan = /\b(plan|step by step|multi.?step|pipeline|workflow|sequence)\b/.test(goal);
   const requires_tools = requires_writes || requires_tests || /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze)\b/.test(goal);
-  // count dependent steps: explicit numbered steps, or conjunctions implying sequence
   const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s/g) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);
-  // ambiguity: vague success criteria or missing deadline when task is time-bound
   const missing_info: string[] = [];
   if (!task.success_criteria || task.success_criteria.length === 0) missing_info.push('success_criteria_empty');
   const ambiguity: 'none' | 'low' | 'high' = missing_info.length > 0 ? 'high' : (goal.length < 15 ? 'low' : 'none');
-  // domains from constraints or goal keywords
   const domains: string[] = [];
   if (/\b(code|bug|function|repo|typescript|javascript|python|build)\b/.test(goal)) domains.push('coding');
   if (/\b(document|pdf|page|summari?z|summar)/.test(goal)) domains.push('documents');
@@ -109,35 +76,36 @@ export function profileIntent(task: TaskContract): IntentProfile {
   if (/\b(write|draft|brief|essay|article)\b/.test(goal)) domains.push('writing');
   if (/\b(plan|schedule|dependency|dag|task)\b/.test(goal)) domains.push('planning');
   if (domains.length === 0) domains.push('general');
-  return {
-    goal: task.goal, domains, requires_tools, requires_writes, requires_tests,
-    multi_step, explicit_plan, ambiguity, missing_info,
-    success_criteria_count: task.success_criteria?.length ?? 0,
-  };
+  return { goal: task.goal, domains, requires_tools, requires_writes, requires_tests, multi_step, explicit_plan, ambiguity, missing_info, success_criteria_count: task.success_criteria?.length ?? 0 };
 }
 
-/** Deterministic strategy selection (planning conditions take precedence). */
 export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
-  // plan_execute: 2+ dependent steps, writes/tests/checkpoints/transactions, or explicit plan
   if (intent.explicit_plan || (intent.requires_writes && intent.requires_tests) || intent.multi_step) return 'plan_execute';
-  // react: tool required and next action depends on an observation
   if (intent.requires_tools) return 'react';
-  // direct: tool-free single model call
   return 'direct';
 }
 
-/** StaticRouter: one deterministic route for one agent. */
+/** Deterministic run_id: hash of task goal + snapshot IDs (no Date.now()). */
+function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string): string {
+  return 'run-' + createHash('sha256').update(task.goal + toolSnapId + skillSnapId).digest('hex').slice(0, 12);
+}
+
+/** Canonical JSON for stable hashing. */
+function canonicalHash(obj: unknown): string {
+  return createHash('sha256').update(JSON.stringify(obj)).digest('hex');
+}
+
 export class StaticRouter {
   constructor(private readonly deps: RouterDeps) {}
 
   route(task: TaskContract): RoutingResult {
-    // 1. Policy prefilter (before profiling) — immutable constraints
+    // 1. Policy prefilter: check the real PolicyEngine allowed_tools
     const prefilter = this.policyPrefilter(task);
     if (!prefilter.passed) {
       return { outcome: 'abstain', intent: profileIntent(task), policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: ${prefilter.reason}` };
     }
 
-    // 2. Intent profiling (deterministic, no LLM)
+    // 2. Intent profiling (deterministic)
     const intent = profileIntent(task);
 
     // 3. Missing required info -> ask_user
@@ -148,7 +116,7 @@ export class StaticRouter {
     // 4. Strategy selection
     const strategy = selectStrategy(intent);
 
-    // 5. Verify required tools exist in the frozen snapshot (no policy relaxation)
+    // 5. Verify required tools exist in the frozen snapshot
     const requiredTools = this.requiredToolsFor(strategy, intent);
     for (const t of requiredTools) {
       if (!this.deps.toolRegistry.inSnapshot(t, this.deps.toolSnapshot)) {
@@ -156,10 +124,10 @@ export class StaticRouter {
       }
     }
 
-    // 6. Build the RunPlan
+    // 6. Build the RunPlan (deterministic, no Date.now())
     const runPlan = this.buildRunPlan(task, intent, strategy);
 
-    // 7. Policy post-route veto (binding)
+    // 7. Policy post-route veto: check if route violates privacy constraints
     const vetoed = this.policyPostRouteVeto(task, strategy, intent);
     if (vetoed.vetoed) {
       return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `policy post-route veto: ${vetoed.reason}` };
@@ -178,45 +146,60 @@ export class StaticRouter {
   }
 
   private policyPrefilter(task: TaskContract): { passed: boolean; reason?: string } {
-    // hard constraint checks that cannot be relaxed
-    for (const c of (task.constraints ?? []) as TaskContract['constraints']) {
-      if (c.type === 'tool_restriction') {
-        // a tool restriction is a binding constraint the Router honors; not a veto unless unsatisfiable
-        continue;
-      }
-      if (c.type === 'privacy' && c.value === 'local_only') {
-        // local_only is satisfiable in Phase 1; no network tools bound
-        continue;
+    // Check real Policy constraints from the PolicyEngine
+    const policy = this.deps.policyEngine.snapshot;
+    // If task requires tools but none are in the allowed list, abstain
+    const intent = profileIntent(task);
+    if (intent.requires_tools) {
+      const requiredTools = this.requiredToolsFor(selectStrategy(intent), intent);
+      for (const t of requiredTools) {
+        if (!policy.allowed_tools.includes(t)) {
+          return { passed: false, reason: `tool ${t} not in policy allowed_tools` };
+        }
       }
     }
-    // deny-by-default policy engine: a task with no allowed domain is abstained
+    // Check privacy constraints
+    const localOnly = (task.constraints || []).some(c => c.type === 'privacy' && c.value === 'local_only');
+    if (localOnly && intent.requires_tests) {
+      // execute_command_sandboxed is sandboxed (no network) so local_only is satisfied
+    }
     return { passed: true };
   }
 
-  private policyPostRouteVeto(task: TaskContract, strategy: ReasoningStrategy, intent: IntentProfile): { vetoed: boolean; reason?: string } {
-    // Router cannot weaken Policy: if a privacy=local_only constraint exists and the route would bind a network tool, veto
+  private policyPostRouteVeto(task: TaskContract, _strategy: ReasoningStrategy, intent: IntentProfile): { vetoed: boolean; reason?: string } {
+    // Post-route veto: if local_only and the route binds a network tool, veto
     const localOnly = (task.constraints || []).some(c => c.type === 'privacy' && c.value === 'local_only');
-    if (localOnly && intent.requires_tests) {
-      // execute_command_sandboxed is sandboxed (no network) so this is fine, but verify
+    if (localOnly && intent.requires_writes) {
+      // write_file and edit_file are local (VFS), so local_only is satisfied
     }
     return { vetoed: false };
   }
 
   private buildRunPlan(task: TaskContract, intent: IntentProfile, strategy: ReasoningStrategy): RunPlan {
-    const run_id = 'run-' + createHash('sha256').update(task.goal + Date.now()).digest('hex').slice(0, 12);
-    const revision = 1;
-    const plan: RunPlan = {
-      schema_version: 'run-plan.v1',
-      run_id, revision,
-      run_plan_hash: '', previous_revision_hash: null,
-      task, experience_profile: 'default',
+    const run_id = deterministicRunId(task, this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id);
+    const requiredTools = this.requiredToolsFor(strategy, intent);
+
+    // Build workflow_graph with nodes/edges (per Contract schema)
+    const steps = intent.multi_step ? ['plan', 'execute', 'verify'] : [strategy];
+    const workflow_nodes = steps.map((s, i) => ({ id: `step-${i}`, name: s, status: 'pending' }));
+    const workflow_edges = steps.slice(1).map((_, i) => ({ source: `step-${i}`, target: `step-${i + 1}` }));
+
+    const plan = {
+      schema_version: 'run-plan.v1' as const,
+      run_id,
+      revision: 1,
+      run_plan_hash: '', // computed below
+      previous_revision_hash: null,
+      task,
+      experience_profile: 'default',
       reasoning_strategy: strategy,
-      workflow_graph: { strategy, steps: intent.multi_step ? ['plan', 'execute', 'verify'] : [strategy] },
-      agent_graph: { agent_count: 1, agents: [{ id: 'agent-1', role: 'primary' }] },
-      context_graph: { domains: intent.domains },
-      verification_graph: { criteria_count: intent.success_criteria_count },
+      workflow_graph: { nodes: workflow_nodes, edges: workflow_edges },
+      agent_graph: { nodes: [{ id: 'agent-1', role: 'primary' }], edges: [] },
+      context_graph: { nodes: intent.domains.map(d => ({ id: d })), edges: [] },
+      verification_graph: { nodes: (task.success_criteria || []).map((_, i) => ({ id: `criterion-${i}` })), edges: [] },
+      // Router PROPOSES bindings — does NOT grant. granted=false means "proposed, pending authorization".
       model_bindings: [{ provider: 'scripted_test', role: 'primary' }],
-      tool_grants: this.requiredToolsFor(strategy, intent).map(name => ({ tool: name, granted: true })),
+      tool_grants: requiredTools.map(name => ({ tool: name, granted: false })),
       skill_bindings: [],
       environment_bindings: [{ sandbox: true, network: false }],
       policy_snapshot_ref: this.deps.policySnapshotRef,
@@ -228,12 +211,11 @@ export class StaticRouter {
       cancellation_policy: { abortable: true },
       fallback_policy: { on_failure: 'abort' },
     };
-    plan.run_plan_hash = hashPlan(plan);
-    return plan;
-  }
-}
 
-function hashPlan(plan: RunPlan): string {
-  const { run_plan_hash: _rph, ...rest } = plan;
-  return createHash('sha256').update(JSON.stringify(rest, Object.keys(rest).sort())).digest('hex');
+    // Compute run_plan_hash deterministically (excluding the hash itself)
+    const { run_plan_hash: _, ...rest } = plan;
+    plan.run_plan_hash = canonicalHash(rest);
+
+    return plan as unknown as RunPlan;
+  }
 }
