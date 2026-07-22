@@ -76,6 +76,13 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
       'tests/policy/*.test.ts',
       'tests/security/*.test.ts',
       'tests/capability/*.test.ts',
+      'tests/runtime/*.test.ts',
+      'tests/router/*.test.ts',
+      'tests/vfs/*.test.ts',
+      'tests/session/*.test.ts',
+      'tests/tools/*.test.ts',
+      'tests/evidence/*.test.ts',
+      'tests/verification/*.test.ts',
     ]);
     expect(config.cleanTempDir).toBe('always');
     expect(config.concurrency).toBeGreaterThan(0);

@@ -12,6 +12,7 @@ import type { SandboxProfile } from '../runtime/sandbox.js';
 import type { ToolRegistry, RegistrySnapshot } from './tool-registry.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
 import type { DurableSession } from '../session/durable-session.js';
+import { createHash } from 'node:crypto';
 
 export interface ToolReceipt {
   tool_name: string;
@@ -37,7 +38,7 @@ export class ToolExecutorError extends Error {
 }
 
 function hash(s: unknown): string {
-  const { createHash } = require('node:crypto') as { createHash: (a: string) => { update: (b: string) => { digest: (c: string) => string } } };
+  
   return createHash('sha256').update(JSON.stringify(s)).digest('hex').slice(0, 16);
 }
 
@@ -64,12 +65,10 @@ export class ToolExecutor {
 
     // 4. PEP: execute through the pipeline (Phase 1: direct call, Phase 2: full PEP)
     let result: T;
-    let success = true;
     let error: string | undefined;
     try {
       result = await fn(this.deps);
     } catch (e) {
-      success = false;
       error = (e as Error).message;
       this.deps.session.append('error', { tool: toolName, error });
       throw e;
@@ -79,11 +78,11 @@ export class ToolExecutor {
     const receipt: ToolReceipt = {
       tool_name: toolName,
       timestamp: new Date().toISOString(),
-      success,
+      success: error === undefined,
       error,
       duration_ms: Date.now() - start,
       input_hash: hash(input),
-      output_hash: success ? hash(result) : undefined,
+      output_hash: error === undefined ? hash(result) : undefined,
     };
 
     // 6. Evidence: record in session

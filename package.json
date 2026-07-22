@@ -23,7 +23,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "lint": "eslint gateway security index.ts tests",
+    "lint": "eslint gateway security runtime router session tools ui verification vfs domains ingestion research writing planning personal_assistant index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contracts tests/api",

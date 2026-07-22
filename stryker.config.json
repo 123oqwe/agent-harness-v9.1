@@ -3,13 +3,26 @@
   "testRunner": "vitest",
   "mutate": [
     "gateway/**/*.ts",
-    "security/**/*.ts"
+    "security/**/*.ts",
+    "runtime/**/*.ts",
+    "router/**/*.ts",
+    "vfs/**/*.ts",
+    "session/**/*.ts",
+    "tools/**/*.ts",
+    "verification/**/*.ts"
   ],
   "testFiles": [
     "tests/gateway/*.test.ts",
     "tests/policy/*.test.ts",
     "tests/security/*.test.ts",
-    "tests/capability/*.test.ts"
+    "tests/capability/*.test.ts",
+    "tests/runtime/*.test.ts",
+    "tests/router/*.test.ts",
+    "tests/vfs/*.test.ts",
+    "tests/session/*.test.ts",
+    "tests/tools/*.test.ts",
+    "tests/evidence/*.test.ts",
+    "tests/verification/*.test.ts"
   ],
   "vitest": {
     "configFile": "vitest.config.ts",

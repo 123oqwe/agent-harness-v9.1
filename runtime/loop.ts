@@ -13,8 +13,7 @@
  * RunPhase: agent phase network disabled, credentials stripped before agent phase.
  * No private CoT stored — only plan, decision summary, tool calls, evidence.
  */
-import { createHash } from 'node:crypto';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DurableSession } from '../session/durable-session.js';
 

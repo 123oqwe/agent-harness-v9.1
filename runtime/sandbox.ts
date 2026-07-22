@@ -12,8 +12,8 @@
  * via AbortSignal. Shell injection blocked by argv (no shell) for the wrapped
  * command. Path traversal/symlink escape blocked by VFS before reaching here.
  */
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { spawn, execSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, isAbsolute, relative } from 'node:path';
 
@@ -74,7 +74,7 @@ const isLinux = process.platform === 'linux';
 export function detectMechanism(): SandboxMechanism {
   if (isDarwin) return 'seatbelt';
   if (isLinux) {
-    try { require('node:child_process').execSync('command -v bwrap', { stdio: 'ignore' }); return 'bubblewrap'; } catch { /* fall through */ }
+    try { execSync('command -v bwrap', { stdio: 'ignore' }); return 'bubblewrap'; } catch { /* fall through */ }
   }
   if (process.platform === 'win32') return 'appcontainer';
   return 'none';
