@@ -124,8 +124,8 @@ export class SkillRegistry {
     }
   }
 
-  /** Load the 8 Phase 1 base skills. */
-  loadBaseSkills(): void { for (const s of baseSkills()) this.register(s, { summary: '', domain: '', tags: [] }); }
+  /** Load the 8 Phase 1 base skills from declarative JSON files in skills/. */
+  loadBaseSkills(): void { this.loadSkills('skills/'); }
 
   getSkill(name: string): SkillSpec | undefined { return this.skills.get(name); }
   listSkills(): string[] { return [...this.skills.keys()].sort(); }

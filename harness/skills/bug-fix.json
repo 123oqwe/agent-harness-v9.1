@@ -1,0 +1,27 @@
+{
+  "name": "bug-fix",
+  "version": "1.0.0",
+  "supported_experience_profiles": [
+    "default"
+  ],
+  "input_schema_ref": "schemas/skills/bug-fix-input.json",
+  "output_schema_ref": "schemas/skills/bug-fix-output.json",
+  "required_context": [],
+  "required_tools": [
+    "read_file",
+    "edit_file",
+    "execute_command_sandboxed"
+  ],
+  "allowed_effect_classes": [
+    "read",
+    "write"
+  ],
+  "workflow_template_ref": "workflows/bug-fix.yaml",
+  "verification_template_ref": "verifications/bug-fix.yaml",
+  "failure_policy": {
+    "on_failure": "abort",
+    "max_retries": 0
+  },
+  "risk_ceiling": "medium",
+  "eval_suite_ref": "evals/skills/bug-fix.yaml"
+}
