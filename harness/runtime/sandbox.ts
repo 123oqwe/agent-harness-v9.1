@@ -76,7 +76,8 @@ export function detectMechanism(): SandboxMechanism {
   if (isLinux) {
     try { execSync('command -v bwrap', { stdio: 'ignore' }); return 'bubblewrap'; } catch { /* fall through */ }
   }
-  if (process.platform === 'win32') return 'appcontainer';
+  // Windows: real AppContainer is not implemented; fail closed rather than
+  // pretending a PowerShell JobObject wrapper is AppContainer.
   return 'none';
 }
 
@@ -107,8 +108,7 @@ function seatbeltProfile(p: SandboxProfile, tmpDir: string): string {
   lines.push(`(allow file-write* (subpath "${tmpDir.replace(/"/g, '\\"'  )}"))`);
   lines.push('(allow file-write* (literal "/dev/null"))');
   lines.push('(allow file-write* (literal "/dev/dtracehelper"))');
-  lines.push('(allow file-read* (subpath "/var/folders"))');
-  lines.push('(allow file-write* (subpath "/var/folders"))');
+  lines.push(`(allow file-read* (subpath "${tmpDir.replace(/"/g, '\\"')}"))`);
   lines.push('(allow file-write* (literal "/dev/dtracehelper"))');
   for (const r of p.allowRead) lines.push(`(allow file-read* (subpath "${r.replace(/"/g, '\\"')}"))`);
   if (p.allowNetwork) {
@@ -136,7 +136,7 @@ function seatbeltProfile(p: SandboxProfile, tmpDir: string): string {
 /** Windows: build a PowerShell wrapper that applies JobObject process/memory limits.
  *  Weaker than AppContainer but provides real OS-level process containment.
  *  Network denied by default; egress policy enforced separately by caller. */
-function windowsJobWrapper(opts: SandboxExecOptions, limits: SandboxLimits): { argv: string[]; profileFile: string } {
+function _windowsJobWrapper(opts: SandboxExecOptions, limits: SandboxLimits): { argv: string[]; profileFile: string } {
   const memBytes = limits.memoryMb * 1024 * 1024;
   const exe = (opts.argv[0] ?? 'cmd.exe').replace(/'/g, "''");
   const args = opts.argv.slice(1).map(a => a.replace(/'/g, "''")).join(' ');
@@ -170,16 +170,21 @@ function buildWrappedArgv(opts: SandboxExecOptions, mech: SandboxMechanism, prof
     return ['sandbox-exec', '-f', profileFile, '--', ...opts.argv];
   }
   if (mech === 'bubblewrap') {
-    const args = ['bwrap', '--ro-bind', '/', '/', '--bind', opts.profile.workspaceRoot, opts.profile.workspaceRoot,
+    const memMb = limits?.memoryMb ?? 256;
+    const args = [
+      'bwrap', '--ro-bind', '/', '/',
+      '--bind', opts.profile.workspaceRoot, opts.profile.workspaceRoot,
       '--unshare-net', '--die-with-parent',
-      `--setenv`, `AH_RLIMIT_AS_MB`, `${limits?.memoryMb ?? 256}`,
-      '--'];
-    return [...args, ...opts.argv];
+      '--unshare-uts', '--hostname', 'sandbox',
+      '--',
+      '/bin/sh', '-c',
+      'ulimit -v ' + String(memMb * 1024) + ' && exec "$@"',
+      '--',
+      ...opts.argv,
+    ];
+    return args;
   }
-  if (mech === 'appcontainer' && limits) {
-    const wrapped = windowsJobWrapper(opts, limits);
-    return wrapped.argv;
-  }
+  // appcontainer mechanism removed: Windows must use fail-closed (mechanism='none')
   return opts.argv;
 }
 
@@ -206,10 +211,7 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
         profileFile = join(tmpDir, 'profile.sb');
         writeFileSync(profileFile, seatbeltProfile(opts.profile, tmpDir));
       }
-      if (mech === 'appcontainer') {
-        const wrapped = windowsJobWrapper(opts, limits);
-        profileFile = wrapped.profileFile;
-      }
+      // appcontainer mechanism removed: Windows fails closed
     } catch (e) {
       cleanup();
       rejectP(new SandboxError(`failed to build sandbox profile: ${(e as Error).message}`));
