@@ -46,7 +46,7 @@ EVIDENCE=evidence/
 - Do not enable production credentials
 - Do not mark complete without command evidence
 - Do not bypass Policy/PEP/sandbox
-- Do not implement deprecated v8 content (see `spec/appendix/deprecated-v8-content/`)
+- Do not implement deprecated v8 content (see `archive/appendix/deprecated-v8-content/`)
 - Do not modify frozen contracts without ADR + human approval
 - Do not modify `spec/`, `control/`, or `evidence/` without CTO approval
 
@@ -62,11 +62,10 @@ EVIDENCE=evidence/
 
 These directories are NOT product specs. Reading them proactively wastes context and may mislead with outdated content:
 
-- `spec/appendix/archive/non-normative/` — old audit artifacts superseded by `control/current-state.json`. Read only if investigating a specific past audit finding.
-- `spec/appendix/deprecated-v8-content/` — 14 files documenting v8→v9 changes. Read ONLY if a requirement references a v8 concept and you need to understand what v9 corrected.
-- `spec/appendix/competitor-research/` — framework comparison and gap analysis. Background only. Read if working on `product/design-framework.md` or ADR-013.
-- `spec/appendix/evidence-registry/` and `spec/appendix/original-documents/` — placeholder READMEs, no substantive content.
-- `HARNESS_NOTES.md` — audit notes from spec review. Non-normative.
+- `archive/appendix/archive/non-normative/` — old audit artifacts superseded by `control/current-state.json`. Read only if investigating a specific past audit finding.
+- `archive/appendix/deprecated-v8-content/` — 14 files documenting v8→v9 changes. Read ONLY if a requirement references a v8 concept and you need to understand what v9 corrected.
+- `archive/appendix/competitor-research/` — framework comparison and gap analysis. Background only. Read if working on `product/design-framework.md` or ADR-013.
+- `archive/appendix/evidence-registry/` and `archive/appendix/original-documents/` — placeholder READMEs, no substantive content.
 
 ### Factory — what it is and when to read it
 
