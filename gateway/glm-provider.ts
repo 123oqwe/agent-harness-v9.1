@@ -69,7 +69,8 @@ export class GlmProvider {
 
   async *streamEvents(_req: ProviderRequest): AsyncIterable<StreamEvent> {
     // Phase 1: no streaming; single response. Yield message_stop at the end.
-    const res = await this.resolve(_req);
+    const raw = await this.resolve(_req);
+    const res = this.parseResponse(raw);
     if (res.content) yield { type: 'text_delta', text: res.content };
     for (const tc of res.tool_calls ?? []) yield { type: 'tool_call', tool_call: tc };
     const stopEv: { type: "message_stop"; stop_reason: NonNullable<typeof res.stop_reason> } & { usage?: Usage } = { type: "message_stop", stop_reason: res.stop_reason ?? "stop" };
@@ -106,8 +107,9 @@ export class GlmProvider {
     return { allowed: allowRemote, reason: allowRemote ? 'remote egress permitted by config' : 'remote egress denied by default' };
   }
 
-  /** The main resolve: makes a real HTTP call to the GLM API. */
-  async resolve(request: ProviderRequest): Promise<ParsedResponse> {
+  /** The main resolve: makes a real HTTP call to the GLM API, returns raw JSON.
+   *  dispatch() will call parseResponse() on the result. */
+  async resolve(request: ProviderRequest): Promise<unknown> {
     const body = this.normalizeRequest(request) as Record<string, unknown>;
     const res = await fetch(this.endpoint, {
       method: 'POST',
@@ -118,8 +120,7 @@ export class GlmProvider {
       const errText = await res.text();
       throw new GlmProviderError(`GLM API error ${res.status}: ${errText.slice(0, 300)}`);
     }
-    const data = await res.json();
-    return this.parseResponse(data);
+    return res.json();
   }
 }
 
@@ -134,7 +135,7 @@ export function glmProviderRuntime(): {
   meterUsage: GlmProvider['meterUsage'];
   checkHealth: GlmProvider['checkHealth'];
   validateDataPolicy: GlmProvider['validateDataPolicy'];
-  resolve: (req: ProviderRequest) => Promise<ParsedResponse>;
+  resolve: (req: ProviderRequest) => Promise<unknown>;
 } {
   const p = new GlmProvider();
   return {
