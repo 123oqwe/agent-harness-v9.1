@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import type { TaskContract } from '../../spec/types/task-contract.js';
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
-import type { PolicyEngine, PolicyDecision } from '../security/policy-engine.js';
+import type { PolicyEngine } from '../security/policy-engine.js';
 
 export type ReasoningStrategy = 'direct' | 'react' | 'plan_execute';
 export type RoutingOutcome = 'route' | 'ask_user' | 'abstain';
@@ -234,6 +234,6 @@ export class StaticRouter {
 }
 
 function hashPlan(plan: RunPlan): string {
-  const { run_plan_hash, ...rest } = plan;
+  const { run_plan_hash: _rph, ...rest } = plan;
   return createHash('sha256').update(JSON.stringify(rest, Object.keys(rest).sort())).digest('hex');
 }

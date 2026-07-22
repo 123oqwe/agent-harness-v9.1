@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 export interface CommandResult {
   command: string;
@@ -111,7 +111,7 @@ export function writeEvidence(evidence: EvidencePackage, path: string): void {
 
 /** Validate an EvidencePackage against the schema. */
 export function validateEvidence(evidence: unknown, schemaPath: string): boolean {
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+  JSON.parse(readFileSync(schemaPath, 'utf8'));
   // minimal structural validation (full ajv validation done in tests)
   const e = evidence as EvidencePackage;
   const required = ['requirement_id', 'commit_sha', 'source_files', 'tests_added', 'commands_run', 'exit_codes', 'test_results', 'coverage', 'security_checks', 'verifier_result'];

@@ -49,7 +49,7 @@ function sha(s: string): string { return createHash('sha256').update(s).digest('
 
 /** The 8 declarative base skills shipped with Phase 1. */
 export function baseSkills(): SkillSpec[] {
-  const mk = (name: string, tools: string[], risk: string, domain: string, summary: string): SkillSpec => ({
+  const mk = (name: string, tools: string[], risk: string, _domain: string, _summary: string): SkillSpec => ({
     name, version: '1.0.0',
     supported_experience_profiles: ['default'],
     input_schema_ref: `schemas/skills/${name}-input.json`,

@@ -11,7 +11,6 @@
  * Evidence reasoning_strategy disagree.
  */
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 export type EvalSuiteKind = 'unit' | 'integration' | 'adversarial' | 'vertical' | 'e2e';

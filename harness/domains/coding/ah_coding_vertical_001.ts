@@ -8,7 +8,6 @@
 import type { VirtualFilesystem } from '../../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
 import { readFile } from '../../tools/read-file.js';
-import { editFile } from '../../tools/edit-file.js';
 import { executeCommand } from '../../tools/execute-command.js';
 
 export interface CodingVerticalInput {

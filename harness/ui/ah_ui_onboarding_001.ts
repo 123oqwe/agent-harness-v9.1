@@ -1,6 +1,5 @@
 /** AH-UI-ONBOARDING-001: Onboarding flow with real steps (auth + policy acceptance). */
 import type { UiResult } from './ui-state.js';
-import type { Policy } from '../security/policy-engine.js';
 
 export interface OnboardingStep { id: string; title: string; completed: boolean }
 export interface OnboardingState { steps: OnboardingStep[]; current_step: number; auth_token?: string }

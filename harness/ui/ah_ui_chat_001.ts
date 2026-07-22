@@ -5,7 +5,7 @@ export interface ChatMessage { role: 'user' | 'assistant'; content: string; time
 export class ChatController {
   private messages: ChatMessage[] = [];
   private loading = false;
-  send(content: string, responder: (msg: string) => Promise<string>): UiResult<ChatMessage> {
+  send(content: string, _responder: (msg: string) => Promise<string>): UiResult<ChatMessage> {
     if (!content.trim()) return { state: 'error', error: 'empty message' };
     this.messages.push({ role: 'user', content, timestamp: new Date().toISOString() });
     this.loading = true;
