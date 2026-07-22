@@ -87,28 +87,42 @@ export function assertWithinWorkspace(path: string, root: string): void {
   if (rel.startsWith('..') || isAbsolute(rel)) throw new SandboxError(`cwd outside workspace root: ${path}`);
 }
 
-function seatbeltProfile(p: SandboxProfile): string {
+function seatbeltProfile(p: SandboxProfile, tmpDir: string): string {
   const ws = p.workspaceRoot.replace(/"/g, '\\"');
   const lines: string[] = ['(version 1)', '(deny default)'];
   // allow self process control
   lines.push('(allow process-info* (target self))');
   lines.push('(allow signal (target self))');
   lines.push('(allow sysctl-read)');
-  // allow read everywhere needed to run a command (bin, libs)
+  // allow reads from system paths needed to run commands
+  // Deny sensitive paths explicitly (defense in depth)
   lines.push('(allow file-read*)');
+  lines.push('(deny file-read* (subpath "/etc/ssh"))');
+  lines.push('(deny file-read* (subpath "/etc/ssl/private"))');
+  lines.push('(deny file-read* (subpath "/Users"))');
+  lines.push(`(allow file-read* (subpath "${ws}"))`);
   // workspace write only
   lines.push(`(allow file-write* (subpath "${ws}"))`);
-  // temp dirs the sandbox itself needs
-  for (const t of ['/private/tmp', '/tmp', '/var/tmp']) lines.push(`(allow file-write* (subpath "${t}"))`);
+  // temp dirs: only the sandbox's own temp dir
+  lines.push(`(allow file-write* (subpath "${tmpDir.replace(/"/g, '\\"'  )}"))`);
   lines.push('(allow file-write* (literal "/dev/null"))');
+  lines.push('(allow file-write* (literal "/dev/dtracehelper"))');
+  lines.push('(allow file-read* (subpath "/var/folders"))');
+  lines.push('(allow file-write* (subpath "/var/folders"))');
   lines.push('(allow file-write* (literal "/dev/dtracehelper"))');
   for (const r of p.allowRead) lines.push(`(allow file-read* (subpath "${r.replace(/"/g, '\\"')}"))`);
   if (p.allowNetwork) {
-    if (p.allowUnixSockets) {
-      lines.push('(allow network*)');
+    if (p.egressAllowlist && p.egressAllowlist.length > 0) {
+      // Allow only specific hosts from the egress allowlist
+      for (const rule of p.egressAllowlist) {
+        lines.push(`(allow network-outbound (remote tcp "${rule.host}:443"))`);
+        lines.push(`(allow network-outbound (remote tcp "${rule.host}:80"))`);
+      }
+      if (p.allowUnixSockets) lines.push('(allow network-local)');
+      else lines.push('(deny network-local)');
     } else {
-      lines.push('(allow network*)');
-      lines.push('(deny network-local)');
+      // No allowlist = no network, even if allowNetwork is true
+      lines.push('(deny network*)');
     }
   } else {
     lines.push('(deny network*)');
@@ -190,7 +204,7 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
     try {
       if (mech === 'seatbelt') {
         profileFile = join(tmpDir, 'profile.sb');
-        writeFileSync(profileFile, seatbeltProfile(opts.profile));
+        writeFileSync(profileFile, seatbeltProfile(opts.profile, tmpDir));
       }
       if (mech === 'appcontainer') {
         const wrapped = windowsJobWrapper(opts, limits);
@@ -223,21 +237,27 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      try { child.kill('SIGKILL'); } catch { /* */ }
+      try { process.kill(-child.pid!, 'SIGKILL'); } catch {
+        try { child.kill('SIGKILL'); } catch { /* */ }
+      }
     }, limits.timeoutMs);
 
     const onAbort = () => {
       if (settled) return;
       canceled = true;
-      try { child.kill('SIGKILL'); } catch { /* */ }
+      try { process.kill(-child.pid!, 'SIGKILL'); } catch {
+        try { child.kill('SIGKILL'); } catch { /* */ }
+      }
     };
     if (opts.signal) {
       if (opts.signal.aborted) onAbort();
       else opts.signal.addEventListener('abort', onAbort, { once: true });
     }
 
+    let totalOutput = 0;
     const acc = (buf: Buffer, chunk: Buffer, kind: 'stdout' | 'stderr'): Buffer => {
-      if (buf.length + chunk.length > limits.outputBytes) {
+      totalOutput += chunk.length;
+      if (totalOutput > limits.outputBytes) {
         const room = Math.max(0, limits.outputBytes - buf.length);
         buf = Buffer.concat([buf, chunk.subarray(0, room)]);
         truncated = true;
