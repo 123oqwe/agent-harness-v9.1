@@ -40,7 +40,17 @@ export interface RegistrySnapshot {
   tool_names: readonly string[];
 }
 
-const TOOL_SPEC_SCHEMA_PATH = join(resolve(__dirname, '..', '..', 'spec', 'contracts'), 'tool-spec.schema.json');
+function findSchemaPath(filename: string): string {
+  // Try relative to __dirname first, then process.cwd() (for Stryker temp dirs)
+  const candidates = [
+    join(resolve(__dirname, '..', '..', 'spec', 'contracts'), filename),
+    join(resolve(process.cwd(), '..', 'spec', 'contracts'), filename),
+    join(resolve(process.cwd(), 'spec', 'contracts'), filename),
+  ];
+  for (const p of candidates) { try { if (existsSync(p)) return p; } catch { /* */ } }
+  return candidates[0]!;
+}
+const TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(TOOL_SPEC_SCHEMA_PATH, 'utf8'));
