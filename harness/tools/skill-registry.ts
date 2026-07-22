@@ -10,7 +10,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
 import type { SkillSpec } from '../../spec/types/skill-spec.js';
 
@@ -38,9 +38,11 @@ export interface SkillRegistrySnapshot {
   skill_names: readonly string[];
 }
 
-const SKILL_SPEC_SCHEMA = {"$schema": "https://json-schema.org/draft/2020-12/schema", "title": "SkillSpec", "required": ["name", "version", "supported_experience_profiles", "input_schema_ref", "output_schema_ref", "required_context", "required_tools", "allowed_effect_classes", "workflow_template_ref", "verification_template_ref", "failure_policy", "risk_ceiling", "eval_suite_ref"], "properties": {"name": {"type": "string"}, "version": {"type": "string"}, "supported_experience_profiles": {"type": "array"}, "input_schema_ref": {"type": "string"}, "output_schema_ref": {"type": "string"}, "required_context": {"type": "array"}, "required_tools": {"type": "array"}, "allowed_effect_classes": {"type": "array"}, "workflow_template_ref": {"type": "string"}, "verification_template_ref": {"type": "string"}, "failure_policy": {"type": "object"}, "risk_ceiling": {"type": "string"}, "eval_suite_ref": {"type": "string"}}, "type": "object", "additionalProperties": false} as object;
+const SKILL_SPEC_SCHEMA_PATH = join(resolve(__dirname, '..', '..', 'spec', 'contracts'), 'skill-spec.schema.json');
 
-function loadSchema(): object { return SKILL_SPEC_SCHEMA; }
+function loadSchema(): object {
+  return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
+}
 
 function sha(s: string): string { return createHash('sha256').update(s).digest('hex'); }
 

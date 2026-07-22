@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { SkillRegistry, SkillValidationError } from '../../tools/skill-registry.js';
 import type { SkillSpec } from '../../../spec/types/skill-spec.js';
 
@@ -96,4 +98,12 @@ describe('AH-CAPMAP-017 Skill Registry', () => {
     expect((results[0] as unknown as { grant?: unknown }).grant).toBeUndefined();
     expect((results[0] as unknown as { capability?: unknown }).capability).toBeUndefined();
   });
+
+
+  it('does not embed a copied JSON Schema in source code', () => {
+    const source = readFileSync(join(__dirname, '../../tools/skill-registry.ts'), 'utf8');
+    expect(source).not.toMatch(/SKILL_SPEC_SCHEMA\s*=\s*\{/);
+    expect(source).not.toMatch(/as object/);
+  });
+
 });
