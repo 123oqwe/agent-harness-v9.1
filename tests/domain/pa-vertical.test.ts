@@ -1,18 +1,31 @@
 import { describe, it, expect } from 'vitest';
+import { Harness, type HarnessProvider } from '../../harness.js';
+import { ToolRegistry } from '../../tools/tool-registry.js';
+import { SkillRegistry } from '../../tools/skill-registry.js';
+import { VirtualFilesystem, StoreBackend } from '../../vfs/virtual-filesystem.js';
+import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
+import type { SandboxProfile } from '../../runtime/sandbox.js';
+import type { ToolSpec } from '../../../spec/types/tool-spec.js';
 import { runPAVertical } from '../../personal_assistant/ah_pa_vertical_001.js';
 
-describe('AH-PA-VERTICAL-001 personal assistant vertical', () => {
-  it('takes task list, generates daily plan, respects constraints, no external actions', async () => {
-    const r = await runPAVertical({
-      tasks: [
-        { id: 't1', title: 'urgent meeting', priority: 'high', duration_min: 30 },
-        { id: 't2', title: 'write report', priority: 'normal', duration_min: 60 },
-        { id: 't3', title: 'optional reading', priority: 'low', duration_min: 45 },
-      ],
-      available_minutes: 90,
-    });
-    expect(r.plan).toHaveLength(2); // t1 (30) + t2 (60) = 90
-    expect(r.unallocated).toContain('t3');
+function toolSpec(name: string): ToolSpec {
+  return { name, version: '1.0.0', domains: ['planning'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
+}
+function makeHarness(): Harness {
+  const tr = new ToolRegistry(); ['read_file', 'search_files'].forEach(n => tr.register(toolSpec(n)));
+  const sr = new SkillRegistry(); sr.loadBaseSkills();
+  const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new StoreBackend('/workspace'));
+  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+  const sandbox: SandboxProfile = { workspaceRoot: '/tmp', allowNetwork: false, allowUnixSockets: false, allowRead: [] };
+  const provider: HarnessProvider = { async resolve() { return { content: 'Daily plan: T1, T3, T2, T5, T4', decision_summary: 'I scheduled tasks' }; } };
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
+}
+
+describe('AH-PA-VERTICAL-001 personal assistant vertical (thin adapter)', () => {
+  it('delegates to Harness, no external actions proven by session audit', async () => {
+    const h = makeHarness();
+    const r = await runPAVertical(h, { tasks: [{ id: 'T1', title: 'meeting', priority: 'high', duration_min: 30 }], available_minutes: 60 });
     expect(r.no_external_actions).toBe(true);
+    expect(r.outcome.session.eventCount()).toBeGreaterThan(0);
   });
 });

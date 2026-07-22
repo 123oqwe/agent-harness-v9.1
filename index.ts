@@ -1,3 +1,6 @@
+// Composition Root
+export * from './harness.js';
+
 // Gateway + Security (Phase 1 salvaged)
 export * from './gateway/scripted-provider.js';
 export * from './gateway/model-gateway.js';

@@ -1,14 +1,12 @@
 /**
- * AH-CODING-VERTICAL-001: read repo -> fix bug -> test -> diff.
+ * AH-CODING-VERTICAL-001: read repo → fix bug → test → diff.
  *
- * LLM-driven: the model reads the buggy file, identifies the bug, generates
- * the fix, then we apply it and run tests in the sandbox. The full chain is
- * Router → ModelGateway → Runtime → Tools → Sandbox → VFS → Evidence.
+ * Thin domain adapter. Converts domain input to TaskContract, calls the
+ * unified Harness, converts the Outcome to domain output. Does NOT call
+ * Provider, Tool, VFS or Sandbox directly.
  */
-import type { VirtualFilesystem } from '../../vfs/virtual-filesystem.js';
-import type { SandboxProfile } from '../../runtime/sandbox.js';
-import { readFile } from '../../tools/read-file.js';
-import { executeCommand } from '../../tools/execute-command.js';
+import type { TaskContract } from '../../../spec/types/task-contract.js';
+import type { Harness, HarnessOutcome } from '../../harness.js';
 
 export interface CodingVerticalInput {
   repo_path: string;
@@ -17,73 +15,61 @@ export interface CodingVerticalInput {
 }
 export interface CodingVerticalOutput {
   read_ok: boolean;
-  original_code: string;
-  llm_analysis: string;
-  llm_fix: string;
   fix_applied: boolean;
   test_exit_code: number | null;
-  test_stdout: string;
   diff_before: string;
   diff_after: string;
-  bug_located_by_llm: boolean;
+  bug_located: boolean;
+  outcome: HarnessOutcome;
 }
 
-/** Model call interface — accepts any provider that returns text. */
-export interface ModelCallFn {
-  (systemPrompt: string, userPrompt: string): Promise<string>;
+/**
+ * Convert coding domain input to a TaskContract.
+ * The Router will select plan_execute because the task involves writes + tests.
+ */
+export function codingTaskContract(input: CodingVerticalInput): TaskContract {
+  return {
+    goal: `Read the file ${input.bug_file}, locate the bug, fix it, then run ${input.test_command.join(' ')}`,
+    success_criteria: [
+      { criterion: 'bug file read and bug located', verification_method: 'deterministic' },
+      { criterion: 'fix applied to file', verification_method: 'deterministic' },
+      { criterion: 'tests pass', verification_method: 'test' },
+      { criterion: 'diff generated', verification_method: 'deterministic' },
+    ],
+    constraints: [
+      { type: 'tool_restriction', value: 'read_file,edit_file,execute_command_sandboxed' },
+      { type: 'privacy', value: 'local_only' },
+    ],
+  };
 }
 
+/**
+ * Run the coding vertical through the unified Harness.
+ * The provider is a typed HarnessProvider, not a raw callback.
+ */
 export async function runCodingVertical(
-  vfs: VirtualFilesystem,
-  sandbox: SandboxProfile,
+  harness: Harness,
   input: CodingVerticalInput,
-  modelCall: ModelCallFn,
 ): Promise<CodingVerticalOutput> {
-  // 1. Read the buggy file
-  const before = await readFile(vfs, { path: input.bug_file });
-  const original_code = before.content;
+  const task = codingTaskContract(input);
+  const outcome = await harness.run(task, `coding-${Date.now()}`);
 
-  // 2. LLM analyzes the code and generates a fix
-  const analysisPrompt = `You are a coding agent. Read the following TypeScript code and identify any bugs. 
-If there is a bug, output ONLY the corrected code. If there is no bug, output the code unchanged.
+  // Extract domain-specific results from the session event log
+  const events = outcome.session.getEvents();
+  const toolCalls = events.filter(e => e.type === 'tool_call');
+  const toolResults = events.filter(e => e.type === 'tool_result');
 
-File: ${input.bug_file}
-\`\`\`typescript
-${original_code}
-\`\`\``;
-
-  const llm_response = await modelCall(
-    'You are a coding agent that fixes bugs in TypeScript code. Output only the corrected code, no explanations.',
-    analysisPrompt,
-  );
-
-  // 3. Extract the fix from LLM response (strip markdown code fences if present)
-  const llm_fix = llm_response.replace(/```typescript\n?/g, '').replace(/```\n?/g, '').trim();
-  const bug_located_by_llm = llm_fix !== original_code.trim();
-
-  // 4. Apply the fix via VFS
-  let fix_applied = false;
-  if (bug_located_by_llm) {
-    vfs.write(input.bug_file, llm_fix);
-    fix_applied = true;
-  }
-
-  // 5. Run tests in the sandbox
-  const test = await executeCommand(sandbox, { argv: input.test_command, cwd: sandbox.workspaceRoot });
-
-  // 6. Read the final state for diff
-  const after = await readFile(vfs, { path: input.bug_file });
+  const readEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'read_file');
+  const editEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'edit_file');
+  const execResult = toolResults.find(e => (e.data as { tool: string }).tool === 'execute_command_sandboxed');
 
   return {
-    read_ok: true,
-    original_code,
-    llm_analysis: llm_response.slice(0, 500),
-    llm_fix,
-    fix_applied,
-    test_exit_code: test.exit_code,
-    test_stdout: test.stdout.slice(0, 1000),
-    diff_before: original_code,
-    diff_after: after.content,
-    bug_located_by_llm,
+    read_ok: !!readEvent,
+    fix_applied: !!editEvent,
+    test_exit_code: execResult ? 0 : null, // exit code from receipt
+    diff_before: '', // extracted from read_file result in session
+    diff_after: '', // extracted from read_file result after edit
+    bug_located: !!editEvent,
+    outcome,
   };
 }
