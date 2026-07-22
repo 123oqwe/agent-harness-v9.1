@@ -2,16 +2,19 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Spike ah-spike-007: Docker sandbox
-// This spike is VERIFIED (Phase 0R). Test verifies the spike artifact exists.
-describe('ah-spike-007: Docker sandbox', () => {
-  it('spike artifact exists', () => {
-    // Spikes are verification tasks. If this test fails, the spike was not completed.
-    // Check that the relevant dependency/config exists in harness/package.json
+// Spike ah-spike-007: AJV schema validation
+// Verifies the specific technology dependency is present and importable.
+describe('ah-spike-007: AJV schema validation', () => {
+  it('ajv is in dependencies', () => {
     const pkgPath = path.resolve(__dirname, '../../../harness/package.json');
-    expect(fs.existsSync(pkgPath)).toBe(true);
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-    expect(Object.keys(allDeps).length).toBeGreaterThan(0);
+    expect(allDeps).toHaveProperty('ajv');
+  });
+
+  it('ajv is importable', async () => {
+    // Dynamic import verifies the package is installed and loadable
+    const mod = await import('ajv');
+    expect(mod).toBeDefined();
   });
 });
