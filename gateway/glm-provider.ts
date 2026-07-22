@@ -6,7 +6,6 @@
  * env ONLY (GLM_API_KEY, GLM_MODEL, GLM_REASONING_EFFORT) — never from args,
  * never printed, never stored.
  */
-import { createHash } from 'node:crypto';
 import type {
   ProviderRequest, ParsedResponse, ToolCall, Usage,
   HealthStatus, DataPolicyResult, ProviderError, StreamEvent,
@@ -33,6 +32,7 @@ export class GlmProvider {
   normalizeRequest(req: ProviderRequest): unknown {
     return {
       model: this.model,
+      reasoning_effort: this.reasoningEffort,
       messages: req.messages.map(m => ({ role: m.role, content: m.content })),
       temperature: req.temperature ?? 0.1,
       max_tokens: req.max_tokens ?? 4096,
@@ -98,10 +98,12 @@ export class GlmProvider {
     return this.apiKey ? 'healthy' : 'down';
   }
 
-  validateDataPolicy(req: ProviderRequest): DataPolicyResult {
+  validateDataPolicy(_req: ProviderRequest): DataPolicyResult {
     // GLM is a remote provider; data leaves the local machine.
-    // Policy must explicitly allow remote execution.
-    return { allowed: true, reason: 'remote provider; data egress to zhipu API' };
+    // Deny by default unless the caller has explicitly allowed remote execution.
+    // The caller (ModelGateway) must check egress policy before dispatching.
+    const allowRemote = process.env.GLM_ALLOW_REMOTE === 'true';
+    return { allowed: allowRemote, reason: allowRemote ? 'remote egress permitted by config' : 'remote egress denied by default' };
   }
 
   /** The main resolve: makes a real HTTP call to the GLM API. */

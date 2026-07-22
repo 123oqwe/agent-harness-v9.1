@@ -6,8 +6,7 @@
  * in temp dirs. GLM cannot modify the source repository.
  */
 import { describe, it, expect } from 'vitest';
-import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { VirtualFilesystem, LocalBackend, OverlayBackend } from '../../vfs/virtual-filesystem.js';
@@ -167,7 +166,6 @@ describe.skipIf(SKIP)('GLM-5.2 xhigh end-to-end acceptance', () => {
   it('security 6: symlink escape blocked', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'sym-'));
     try {
-      const { symlinkSync } = require('node:fs');
       symlinkSync(tmpdir(), join(tmp, 'escape'));
       const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
       vfs.mount(new LocalBackend('/workspace', tmp));
