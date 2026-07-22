@@ -142,4 +142,16 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
       ),
     ).toBe(false);
   });
+
+  it('run-stryker.mjs uses spawnSync with argv array, not shell string concatenation', () => {
+    const script = fs.readFileSync(path.join(harnessRoot, 'scripts/run-stryker.mjs'), 'utf8');
+    // Must NOT use execSync or shell string concatenation
+    expect(script).not.toMatch(/execSync/);
+    expect(script).not.toMatch(/`npx stryker/);
+    expect(script).not.toMatch(/args\.join/);
+    // Must NOT rely on npx temporary download
+    expect(script).not.toMatch(/\bnpx\b/);
+    // Must use spawnSync or execFile with argv array
+    expect(script).toMatch(/spawnSync|execFile/);
+  });
 });
