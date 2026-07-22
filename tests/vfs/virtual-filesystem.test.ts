@@ -300,7 +300,7 @@ describe('VFS backend direct coverage', () => {
       exists: (p: string) => base.exists(p),
     };
 
-    expect(() => vfs.commitOverlay(overlay, partiallyFailingTarget as unknown as Backend)).toThrow();
+    expect(() => vfs.commitOverlay(overlay, partiallyFailingTarget as unknown as InstanceType<typeof LocalBackend>)).toThrow();
     // file-a.txt was overwritten with 'new-a' — rollback must restore 'original-a'
     expect(readFileSync(join(tmp, 'file-a.txt'), 'utf8')).toBe('original-a');
     // file-b.txt should still have its original content
@@ -339,7 +339,7 @@ describe('VFS backend direct coverage', () => {
       exists: (p: string) => base.exists(p),
     };
 
-    expect(() => vfs.commitOverlay(overlay, failingTarget as unknown as Backend)).toThrow();
+    expect(() => vfs.commitOverlay(overlay, failingTarget as unknown as InstanceType<typeof LocalBackend>)).toThrow();
     // keep.txt must still exist with original content
     expect(readFileSync(join(tmp, 'keep.txt'), 'utf8')).toBe('keep-content');
   });
