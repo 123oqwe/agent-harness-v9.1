@@ -368,6 +368,45 @@ def run_phase_gate(phase_num):
             check5 = {"name": "unit_tests", "passed": False, "detail": "FAIL: No tests directory or package.json — Phase 1+ requires unit tests"}
     checks.append(check5)
     
+    # Check 5a: Lint (Phase 1+) — must run on ALL product source, not just gateway/security
+    if phase_num >= 1 and product_dir.exists():
+        result = run_command("npm run lint", cwd=str(product_dir), timeout=120)
+        check_lint = {"name": "lint", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}"}
+        checks.append(check_lint)
+    
+    # Check 5b: Coverage (Phase 1+)
+    if phase_num >= 1 and product_dir.exists():
+        result = run_command("npm run test:coverage", cwd=str(product_dir), timeout=300)
+        # Parse coverage from stdout
+        cov_pass = result["exit_code"] == 0
+        # Check if thresholds met (lines >= 80%)
+        stdout = result.get("stdout", "")
+        lines_match = None
+        for line in stdout.split("\n"):
+            if "Lines" in line and "%" in line:
+                lines_match = line
+                break
+        if lines_match:
+            try:
+                pct = float(lines_match.split(":")[1].strip().split("%")[0].strip())
+                cov_pass = cov_pass and pct >= 80
+            except:
+                pass
+        check_cov = {"name": "coverage", "passed": cov_pass, "detail": f"exit_code={result['exit_code']}, {lines_match or 'no data'}"}
+        checks.append(check_cov)
+    
+    # Check 5c: npm audit (Phase 1+)
+    if phase_num >= 1 and product_dir.exists():
+        result = run_command("npm audit --audit-level=high", cwd=str(product_dir), timeout=60)
+        check_audit = {"name": "npm_audit", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}"}
+        checks.append(check_audit)
+    
+    # Check 5d: npm pack (Phase 1+)
+    if phase_num >= 1 and product_dir.exists():
+        result = run_command("npm pack --dry-run", cwd=str(product_dir), timeout=60)
+        check_pack = {"name": "npm_pack", "passed": result["exit_code"] == 0, "detail": f"exit_code={result['exit_code']}"}
+        checks.append(check_pack)
+    
     # Check 6: Model check (for Phase 0)
     if phase_num == 0:
         mc_path = spec_dir / "state-machines" / "model-check-report.txt"

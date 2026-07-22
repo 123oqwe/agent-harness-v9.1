@@ -84,14 +84,14 @@
       "0": {
         "total": 31,
         "maturity": {
-          "not_started": 7,
-          "verified": 24
+          "verified": 24,
+          "not_started": 7
         }
       },
       "1": {
         "total": 40,
         "maturity": {
-          "verified": 40
+          "implemented": 40
         }
       },
       "2": {

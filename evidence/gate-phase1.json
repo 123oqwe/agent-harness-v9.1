@@ -8,9 +8,9 @@
     },
     {
       "name": "phase_architecture_consistent",
-      "passed": true,
-      "detail": "PASS: 254 requirements have one Phase owner, valid dependency order, truthful implemented/verified paths, and consistent authoritative state",
-      "stdout_hash": "7682545fa79d279b"
+      "passed": false,
+      "detail": "FAIL: Phase architecture consistency errors:\n  - Phase 1: missing from manifest: ['AH-CAPABILITY-001', 'AH-CAPMAP-002', 'AH-CAPMAP-006', 'AH-CAPMAP-013', 'AH-CAPMAP-017', 'AH-CAPMAP-020', 'AH-CODING-VERTICAL-001', 'AH-DOC-VERTICAL-001', 'AH-EVAL-RUNNER-001', 'AH-EVIDENCE-001', 'AH-GATEWAY-PROVIDER-001', 'AH-GATEWAY-TESTPROVIDER-001', 'AH-PA-VERTICAL-001', 'AH-PLANNING-VERTICAL-001', 'AH-POLICY-ENGINE-001', 'AH-RESEARCH-VERTICAL-001', 'AH-ROUTER-FOUNDATION-001', 'AH-RUNTIME-LOOP-001', 'AH-RUNTIME-SESSION-001', 'AH-SANDBOX-001', 'AH-TOOL-ARTIFACT-001', 'AH-TOOL-ASK-001', 'AH-TOOL-EDIT-001', 'AH-TOOL-EXEC-001', 'AH-TOOL-LIST-001', 'AH-TOOL-PARSE-001', 'AH-TOOL-READ-001', 'AH-TOOL-REGISTRY-001', 'AH-TOOL-SEARCH-001', 'AH-TOOL-WRITE-001', 'AH-UI-APPROVAL-001', 'AH-UI-CHAT-001', 'AH-UI-CODING-001', 'AH-UI-EVIDENCE-001', 'AH-UI-ONBOARDING-001', 'AH-UI-PRIVACY-001', 'AH-UI-SETTINGS-001', 'AH-UI-TASK-001', 'AH-VFS-001', 'AH-WRITING-VERTICAL-001']\n  - Phase 2: missing from manifest: ['AH-CONTEXT-COMPILER-001', 'AH-DOC-INGEST-DOCX-001', 'AH-DOC-INGEST-ENC-001', 'AH-DOC-INGEST-IMG-001', 'AH-DOC-INGEST-MD-001', 'AH-DOC-INGEST-PDF-001', 'AH-DOC-INGEST-PPTX-001', 'AH-DOC-INGEST-UNSUPPORTED-001', 'AH-DOC-INGEST-WEB-001', 'AH-DOC-INGEST-XLSX-001', 'AH-DOC-PARSE-HEAD-001', 'AH-DOC-PARSE-IMGREF-001', 'AH-DOC-PARSE-PROVENANCE-001', 'AH-DOC-PARSE-TABLE-001', 'AH-HOOK-001', 'AH-MCP-STDIO-001', 'AH-MM-ARTIFACT-001', 'AH-MM-DOC-VISION-001', 'AH-MM-IMAGE-EDIT-001', 'AH-MM-IMAGE-GEN-001', 'AH-MM-IMAGE-IN-001', 'AH-MM-VISION-VERIFY-001', 'AH-PAUSE-RESUME-001', 'AH-RAG-CHUNK-001', 'AH-RAG-CITE-001', 'AH-RAG-DELETE-001', 'AH-RAG-EMBED-001', 'AH-RAG-EMBED-MIG-001', 'AH-RAG-FTS-001', 'AH-RAG-GRAPH-001', 'AH-RAG-INJECTION-001', 'AH-RAG-META-001', 'AH-RAG-QUERY-001', 'AH-RAG-RERANK-001', 'AH-RUNTIME-BUDGET-002', 'AH-RUNTIME-COMPACTION-001', 'AH-RUNTIME-MODELFALLBACK-001', 'AH-RUNTIME-SESSIONTREE-001', 'AH-RUNTIME-STEERING-001', 'AH-SANDBOX-OCI-001', 'AH-TOOL-BEHAVIOR-VERIFY-001', 'AH-TOOL-DOCUMENT-001', 'AH-TOOL-ESCALATE-001', 'AH-TOOL-IMAGE-GEN-001', 'AH-TOOL-OCR-001', 'AH-TOOL-PRESENTATION-001', 'AH-TOOL-SPEECH-GEN-001', 'AH-TOOL-SPREADSHEET-001', 'AH-TOOL-TRANSCRIBE-001', 'AH-TOOL-WEB-FETCH-001', 'AH-TOOL-WEB-SEARCH-001', 'AH-UI-DOC-001', 'AH-UI-MM-001', 'AH-UI-NOTIFY-001', 'AH-UI-PLANNING-001', 'AH-UI-RECONCILE-001', 'AH-UI-RESEARCH-001', 'AH-UI-TUI-001', 'AH-UI-WRITING-001', 'AH-UX-API-001', 'AH-UX-CONTRACT-001', 'AH-UX-DESKTOP-001', 'AH-UX-STATES-001', 'AH-UX-WEB-001']\n  - current-state registry_summary.phases does not match requirements.ndjson",
+      "stdout_hash": "3b284b14ff297bf5"
     },
     {
       "name": "requirement_views_current",
@@ -43,15 +43,35 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=f434bc1d4d063bce"
+      "detail": "exit_code=0, stdout_hash=34e003a40ebbc488"
+    },
+    {
+      "name": "lint",
+      "passed": true,
+      "detail": "exit_code=0"
+    },
+    {
+      "name": "coverage",
+      "passed": true,
+      "detail": "exit_code=0, File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s "
+    },
+    {
+      "name": "npm_audit",
+      "passed": true,
+      "detail": "exit_code=0"
+    },
+    {
+      "name": "npm_pack",
+      "passed": true,
+      "detail": "exit_code=0"
     },
     {
       "name": "all_requirements_verified",
-      "passed": true,
-      "detail": "All 40 requirements verified"
+      "passed": false,
+      "detail": "40 requirements not verified: ['AH-CAPABILITY-001', 'AH-CAPMAP-002', 'AH-CAPMAP-006', 'AH-CAPMAP-013', 'AH-CAPMAP-017']"
     }
   ],
-  "result": "PASS",
-  "timestamp": "2026-07-22T19:16:04.275972",
+  "result": "FAIL",
+  "timestamp": "2026-07-22T21:45:15.815091",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }
