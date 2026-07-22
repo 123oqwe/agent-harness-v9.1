@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { validateFixture } from '../helpers/schema-validator.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { StaticRouter, profileIntent, selectStrategy } from '../../router/static-router.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
@@ -94,8 +97,9 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
   describe('RunPlan uses frozen registry snapshots', () => {
     it('run_plan references tool + skill snapshot IDs', () => {
       const r = router.route(task('fix the bug then run the tests'));
-      expect(r.run_plan!.registry_snapshot_refs).toHaveLength(2);
-      expect(r.run_plan!.registry_snapshot_refs[0]).toMatch(/^[0-9a-f]{64}$/);
+      const refs = r.run_plan!.registry_snapshot_refs as Record<string, string>;
+      expect(refs.tool_registry).toMatch(/^[0-9a-f]{64}$/);
+      expect(refs.skill_registry).toMatch(/^[0-9a-f]{64}$/);
     });
     it('single-agent RunPlan (agent_count=1)', () => {
       const r = router.route(task('fix the bug'));
@@ -162,4 +166,112 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect((r.run_plan as unknown as { risk_policy?: unknown }).risk_policy).toBeUndefined();
     });
   });
+
+
+  describe('RunPlan passes full AJV schema validation', () => {
+    function validateRunPlan(data: unknown) { return validateFixture('run-plan.schema.json', data); }
+
+    it('direct strategy RunPlan passes schema', () => {
+      const r = router.route(task('rewrite this text more concisely'));
+      const result = validateRunPlan(r.run_plan);
+      if (!result.valid) console.error('direct errors:', result.errors);
+      expect(result.valid).toBe(true);
+    });
+
+    it('react strategy RunPlan passes schema', () => {
+      const r = router.route(task('list the directory and read the matching file'));
+      const result = validateRunPlan(r.run_plan);
+      if (!result.valid) console.error('react errors:', result.errors);
+      expect(result.valid).toBe(true);
+    });
+
+    it('plan_execute strategy RunPlan passes schema', () => {
+      const r = router.route(task('fix the bug then run the tests then verify'));
+      const result = validateRunPlan(r.run_plan);
+      if (!result.valid) console.error('plan_execute errors:', result.errors);
+      expect(result.valid).toBe(true);
+    });
+
+    it('run_id is UUID format', () => {
+      const r = router.route(task('rewrite this text'));
+      expect(r.run_plan!.run_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    });
+
+    it('registry_snapshot_refs is an object not array', () => {
+      const r = router.route(task('fix the bug'));
+      expect(typeof r.run_plan!.registry_snapshot_refs).toBe('object');
+      expect(Array.isArray(r.run_plan!.registry_snapshot_refs)).toBe(false);
+    });
+
+    it('workflow_graph nodes use step_id/step_type/status', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const wf = r.run_plan!.workflow_graph as { nodes: Record<string, unknown>[] };
+      for (const n of wf.nodes) {
+        expect(n).toHaveProperty('step_id');
+        expect(n).toHaveProperty('step_type');
+        expect(n).toHaveProperty('status');
+        expect(n).not.toHaveProperty('id');
+        expect(n).not.toHaveProperty('name');
+      }
+    });
+
+    it('workflow_graph edges use from_step/to_step', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const wf = r.run_plan!.workflow_graph as { edges: Record<string, unknown>[] };
+      for (const e of wf.edges) {
+        expect(e).toHaveProperty('from_step');
+        expect(e).toHaveProperty('to_step');
+        expect(e).not.toHaveProperty('source');
+        expect(e).not.toHaveProperty('target');
+      }
+    });
+
+    it('agent_graph node has all required fields', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: Record<string, unknown>[] };
+      expect(ag.nodes).toHaveLength(1);
+      const n = ag.nodes[0]!;
+      expect(n).toHaveProperty('agent_id');
+      expect(n).toHaveProperty('role');
+      expect(n).toHaveProperty('model_binding_ref');
+      expect(n).toHaveProperty('budget_ceiling');
+      expect(n).toHaveProperty('status');
+    });
+
+    it('model_bindings have all required fields', () => {
+      const r = router.route(task('rewrite this text'));
+      const mb = r.run_plan!.model_bindings[0]!;
+      expect(mb).toHaveProperty('provider');
+      expect(mb).toHaveProperty('model_id');
+      expect(mb).toHaveProperty('modality_role');
+      expect(mb).toHaveProperty('capability_match_score');
+    });
+
+    it('context_strategy has active_plan_injection', () => {
+      const r = router.route(task('fix the bug'));
+      const cs = (r.run_plan as unknown as { context_strategy?: { active_plan_injection: boolean } }).context_strategy;
+      expect(cs).toBeDefined();
+      expect(cs!.active_plan_injection).toBe(true);
+    });
+
+    it('same input produces same hash and run_id', () => {
+      const t = task('fix the bug then run the tests');
+      const r1 = router.route(t);
+      const r2 = router.route(t);
+      expect(r1.run_plan!.run_plan_hash).toBe(r2.run_plan!.run_plan_hash);
+      expect(r1.run_plan!.run_id).toBe(r2.run_plan!.run_id);
+    });
+
+    it('different constraints produce different hash', () => {
+      const t1 = task('fix the bug', { constraints: [{ type: 'privacy', value: 'local_only' }] });
+      const t2 = task('fix the bug', { constraints: [{ type: 'budget', value: '1000' }] });
+      expect(router.route(t1).run_plan!.run_plan_hash).not.toBe(router.route(t2).run_plan!.run_plan_hash);
+    });
+
+    it('no as unknown as RunPlan in source', () => {
+      const src = readFileSync(join(__dirname, '../../router/static-router.ts'), 'utf8');
+      expect(src).not.toContain('as unknown as RunPlan');
+    });
+  });
+
 });

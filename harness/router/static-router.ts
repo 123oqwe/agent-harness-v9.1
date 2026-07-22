@@ -11,8 +11,8 @@
  */
 import { createHash } from 'node:crypto';
 import type { TaskContract } from '../../spec/types/task-contract.js';
-import type { RunPlan as SpecRunPlan } from '../../spec/types/run-plan.js';
-export type RunPlan = SpecRunPlan;
+import type { RunPlan } from '../../spec/types/run-plan.js';
+export type { RunPlan };
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
@@ -85,14 +85,23 @@ export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
   return 'direct';
 }
 
-/** Deterministic run_id: hash of task goal + snapshot IDs (no Date.now()). */
+/** Deterministic run_id: UUID v5-style (deterministic from task + snapshots, no Date.now()). */
 function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string): string {
-  return 'run-' + createHash('sha256').update(task.goal + toolSnapId + skillSnapId).digest('hex').slice(0, 12);
+  const hash = createHash('sha256').update(JSON.stringify(task) + toolSnapId + skillSnapId).digest('hex');
+  // Format as UUID: 8-4-4-4-12 hex chars from the hash
+  return `${hash.slice(0,8)}-${hash.slice(8,12)}-${hash.slice(12,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
 }
 
-/** Canonical JSON for stable hashing. */
+/** Recursive canonical JSON for stable hashing. */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map(k => [k, canonicalize((value as Record<string, unknown>)[k])]));
+  }
+  return value;
+}
 function canonicalHash(obj: unknown): string {
-  return createHash('sha256').update(JSON.stringify(obj)).digest('hex');
+  return createHash('sha256').update(JSON.stringify(canonicalize(obj))).digest('hex');
 }
 
 export class StaticRouter {
@@ -179,13 +188,50 @@ export class StaticRouter {
     const run_id = deterministicRunId(task, this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id);
     const requiredTools = this.requiredToolsFor(strategy, intent);
 
-    // Build workflow_graph with nodes/edges (per Contract schema)
+    // Build workflow_graph with proper Contract field names
     const steps = intent.multi_step ? ['plan', 'execute', 'verify'] : [strategy];
-    const workflow_nodes = steps.map((s, i) => ({ id: `step-${i}`, name: s, status: 'pending' }));
-    const workflow_edges = steps.slice(1).map((_, i) => ({ source: `step-${i}`, target: `step-${i + 1}` }));
+    const workflow_nodes = steps.map((s, i) => ({
+      step_id: `step-${i}`,
+      step_type: s === 'verify' ? 'verification' as const : s === 'plan' || s === 'execute' ? 'model_call' as const : 'model_call' as const,
+      status: 'pending' as const,
+    }));
+    const workflow_edges = steps.slice(1).map((_, i) => ({
+      from_step: `step-${i}`,
+      to_step: `step-${i + 1}`,
+      condition: null,
+    }));
 
-    const plan = {
-      schema_version: 'run-plan.v1' as const,
+    // AgentGraph: single agent (Phase 1)
+    const agent_nodes = [{
+      agent_id: 'agent-1',
+      role: 'worker' as const,
+      model_binding_ref: 'binding-1',
+      budget_ceiling: { token_limit: '1000000', usd_micros: '5000000' },
+      status: 'pending' as const,
+      delegation_depth: 0,
+      isolation: 'none' as const,
+    }];
+
+    // ContextGraph: single context node
+    const context_nodes = [{
+      node_id: 'ctx-1',
+      agent_id_ref: 'agent-1',
+      context_scope: 'full' as const,
+    }];
+
+    // VerificationGraph: one per success criterion
+    const verification_nodes = (task.success_criteria || []).map((c, i) => ({
+      verification_id: `verify-${i}`,
+      step_id_ref: `step-${steps.length - 1}`,
+      verification_type: c.verification_method === 'test' ? 'test_execution' as const
+        : c.verification_method === 'deterministic' ? 'deterministic' as const
+        : c.verification_method === 'human_review' ? 'human_review' as const
+        : 'schema_validation' as const,
+      strictness: 'standard' as const,
+    }));
+
+    const plan: RunPlan = {
+      schema_version: 'run-plan.v1',
       run_id,
       revision: 1,
       run_plan_hash: '', // computed below
@@ -194,28 +240,36 @@ export class StaticRouter {
       experience_profile: 'default',
       reasoning_strategy: strategy,
       workflow_graph: { nodes: workflow_nodes, edges: workflow_edges },
-      agent_graph: { nodes: [{ id: 'agent-1', role: 'primary' }], edges: [] },
-      context_graph: { nodes: intent.domains.map(d => ({ id: d })), edges: [] },
-      verification_graph: { nodes: (task.success_criteria || []).map((_, i) => ({ id: `criterion-${i}` })), edges: [] },
-      // Router PROPOSES bindings — does NOT grant. granted=false means "proposed, pending authorization".
-      model_bindings: [{ provider: 'scripted_test', role: 'primary' }],
+      agent_graph: { nodes: agent_nodes, edges: [] },
+      context_graph: { nodes: context_nodes, edges: [] },
+      verification_graph: { nodes: verification_nodes, edges: [] },
+      model_bindings: [{
+        provider: 'scripted_test',
+        model_id: 'scripted-test',
+        modality_role: 'reasoning' as const,
+        capability_match_score: 1.0,
+      }],
       tool_grants: requiredTools.map(name => ({ tool: name, granted: false })),
       skill_bindings: [],
       environment_bindings: [{ sandbox: true, network: false }],
       policy_snapshot_ref: this.deps.policySnapshotRef,
-      registry_snapshot_refs: [this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id],
+      registry_snapshot_refs: {
+        tool_registry: this.deps.toolSnapshot.snapshot_id,
+        skill_registry: this.deps.skillSnapshot.snapshot_id,
+      },
       derived_risk_assessment: { risk_tier: intent.requires_writes ? 2 : 1, egress: 'none' },
       required_consent: { required: intent.requires_writes },
       budget_allocation: { max_iterations: strategy === 'direct' ? 1 : 3 },
       persistence_policy: { event_log: true, snapshot: true },
       cancellation_policy: { abortable: true },
       fallback_policy: { on_failure: 'abort' },
+      context_strategy: { active_plan_injection: true },
     };
 
     // Compute run_plan_hash deterministically (excluding the hash itself)
-    const { run_plan_hash: _, ...rest } = plan;
+    const { run_plan_hash: _omit, ...rest } = plan;
     plan.run_plan_hash = canonicalHash(rest);
 
-    return plan as unknown as RunPlan;
+    return plan;
   }
 }
