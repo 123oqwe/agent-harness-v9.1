@@ -189,7 +189,7 @@ export class StaticRouter {
     const requiredTools = this.requiredToolsFor(strategy, intent);
 
     // Build workflow_graph with proper Contract field names
-    const steps = intent.multi_step ? ['plan', 'execute', 'verify'] : [strategy];
+    const steps = intent.multi_step ? ['plan', 'execute', 'execute', 'execute', 'verify'] : [strategy];
     const workflow_nodes = steps.map((s, i) => ({
       step_id: `step-${i}`,
       step_type: s === 'verify' ? 'verification' as const : s === 'plan' || s === 'execute' ? 'model_call' as const : 'model_call' as const,

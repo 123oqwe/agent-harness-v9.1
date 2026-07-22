@@ -16,6 +16,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DurableSession } from '../session/durable-session.js';
+import type { RunPlan } from '../../spec/types/run-plan.js';
 
 export type TerminationReason =
   | 'iteration_limit' | 'budget_exhausted' | 'user_cancel' | 'deadline'
@@ -32,6 +33,7 @@ export interface LoopConfig {
   data_dir?: string | undefined;
   run_id: string;
   goal: string;
+  run_plan?: Readonly<RunPlan> | undefined;
 }
 
 export interface ModelTurn {
@@ -211,13 +213,13 @@ export class LoopEngine {
   /** plan_execute: read WorkflowGraph from RunPlan, execute in topo order,
    *  stage writes in Overlay, commit on success, discard on failure. */
   private async runPlanExecute(messages: unknown[]): Promise<void> {
-    // Read the frozen WorkflowGraph from the RunPlan
-    const runPlan = this.config as unknown as { workflow_graph?: { nodes: Array<{ step_id: string; step_type: string; status: string; tool_name?: string | null }>; edges: Array<{ from_step: string; to_step: string }> } };
-    const wf = runPlan.workflow_graph;
+    // Read the frozen WorkflowGraph from the RunPlan (properly typed, no cast)
+    const wf = this.config.run_plan?.workflow_graph;
 
-    // If no WorkflowGraph, fall back to linear plan->execute->verify
+    // No WorkflowGraph: fail closed — plan_execute requires a frozen DAG
     if (!wf || !wf.nodes || wf.nodes.length === 0) {
-      await this.runPlanExecuteLinear(messages);
+      this.deps.session.append('error', { reason: 'plan_execute requires a frozen WorkflowGraph — none provided' });
+      this.terminate('malformed_response');
       return;
     }
 
@@ -280,6 +282,22 @@ export class LoopEngine {
         this.recordTurn(turn);
         if (turn.stop_reason === 'length') { this.terminate('malformed_response'); return; }
         messages.push({ role: 'assistant', content: turn.decision_summary, tool_calls: turn.tool_calls });
+        // Execute tool calls produced by this model step
+        if (turn.tool_calls && turn.tool_calls.length > 0 && this.deps.toolExecute) {
+          for (const tc of turn.tool_calls) {
+            try {
+              const result = await this.deps.toolExecute(tc.name, tc.arguments);
+              const lastTurn = this.turns[this.turns.length - 1]!;
+              if (!lastTurn.tool_executed) lastTurn.tool_executed = { name: tc.name, arguments: tc.arguments, result };
+              messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+            } catch (e) {
+              this.deps.session.append('error', { step: stepId, tool: tc.name, error: (e as Error).message });
+              this.deps.session.append('system', { step: stepId, action: 'overlay_discard', reason: 'tool failure' });
+              this.terminate('malformed_response');
+              return;
+            }
+          }
+        }
         node.status = 'done';
         completedSteps.add(stepId);
       } else if (node.step_type === 'tool_call' && this.deps.toolExecute) {
@@ -327,36 +345,6 @@ export class LoopEngine {
       this.deps.session.append('system', { action: 'overlay_commit', reason: 'all steps completed' });
       if (this.deps.goalSatisfied?.(this.turns)) this.terminate('goal_satisfied');
       else this.terminate('completed');
-    }
-  }
-
-  /** Fallback: linear plan_execute without WorkflowGraph. */
-  private async runPlanExecuteLinear(messages: unknown[]): Promise<void> {
-    const steps = ['plan', 'execute', 'verify'];
-    let stepIdx = 0;
-    while (this.iterations < this.config.max_iterations && !this.terminated && stepIdx < steps.length) {
-      if (this.deps.signal?.aborted) { this.terminate('user_cancel'); return; }
-      this.iterations++;
-      const turn = await this.deps.modelCall(messages, this.iterations);
-      this.recordTurn(turn);
-      if (turn.stop_reason === 'length') { this.terminate('malformed_response'); return; }
-      if (turn.tool_calls && turn.tool_calls.length > 0 && this.deps.toolExecute) {
-        const tc = turn.tool_calls[0]!;
-        try {
-          const result = await this.deps.toolExecute(tc.name, tc.arguments);
-          this.turns[this.turns.length - 1]!.tool_executed = { name: tc.name, arguments: tc.arguments, result };
-          messages.push({ role: 'assistant', content: turn.decision_summary });
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
-        } catch (e) {
-          this.deps.session.append('error', { step: steps[stepIdx], error: (e as Error).message });
-          this.terminate('malformed_response'); return;
-        }
-      }
-      stepIdx++;
-    }
-    if (!this.terminated) {
-      if (this.deps.goalSatisfied?.(this.turns)) this.terminate('goal_satisfied');
-      else this.terminate(this.iterations >= this.config.max_iterations ? 'iteration_limit' : 'completed');
     }
   }
 

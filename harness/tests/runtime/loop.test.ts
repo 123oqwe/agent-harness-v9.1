@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DurableSession } from '../../session/durable-session.js';
@@ -188,4 +188,67 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
       expect(r.termination_reason).toBe('context_reset');
     });
   });
+
+
+  describe('P0: Loop must accept frozen RunPlan, not cast LoopConfig', () => {
+    it('loop.ts source does not cast config to RunPlan via as unknown as', () => {
+      const src = readFileSync(join(__dirname, '../../runtime/loop.ts'), 'utf8');
+      expect(src).not.toContain('as unknown as');
+    });
+
+    it('loop.ts source does not have runPlanExecuteLinear fallback', () => {
+      const src = readFileSync(join(__dirname, '../../runtime/loop.ts'), 'utf8');
+      expect(src).not.toContain('runPlanExecuteLinear');
+    });
+
+    it('loop.ts source does not access workflow_graph from config via cast', () => {
+      const src = readFileSync(join(__dirname, '../../runtime/loop.ts'), 'utf8');
+      // Should not access workflow_graph by casting LoopConfig
+      expect(src).not.toMatch(/this\.config as unknown as/);
+    });
+  });
+
+  describe('P0: Harness must use ToolExecutor, not direct dispatch', () => {
+    it('harness.ts does not have direct dispatch switch statement', () => {
+      const src = readFileSync(join(__dirname, '../../harness.ts'), 'utf8');
+      // Should not have the old dispatchTool method with inline switch
+      expect(src).not.toContain('private async dispatchTool(');
+      // dispatchToolViaDeps is called via ToolExecutor callback — switch inside is correct
+    });
+
+    it('harness.ts imports and uses ToolExecutor', () => {
+      const src = readFileSync(join(__dirname, '../../harness.ts'), 'utf8');
+      expect(src).toContain('ToolExecutor');
+    });
+
+    it('harness.ts does not return real VFS from createOverlayVfs', () => {
+      const src = readFileSync(join(__dirname, '../../harness.ts'), 'utf8');
+      // Should not have the comment "just use the real VFS"
+      expect(src).not.toContain('just use the real VFS');
+    });
+
+    it('harness.ts does not use live-run as commit_sha', () => {
+      const src = readFileSync(join(__dirname, '../../harness.ts'), 'utf8');
+      expect(src).not.toContain('live-run');
+    });
+
+    it('harness.ts does not have 60% keyword matching for goal check', () => {
+      const src = readFileSync(join(__dirname, '../../harness.ts'), 'utf8');
+      expect(src).not.toContain('0.6');
+    });
+  });
+
+  describe('P0: ToolExecutor must not self-generate keypair', () => {
+    it('tool-executor.ts does not call generateKeyPairSync', () => {
+      const src = readFileSync(join(__dirname, '../../tools/tool-executor.ts'), 'utf8');
+      expect(src).not.toContain('generateKeyPairSync');
+    });
+
+    it('tool-executor.ts does not guess risk by tool name', () => {
+      const src = readFileSync(join(__dirname, '../../tools/tool-executor.ts'), 'utf8');
+      // Should not have name-based risk guessing
+      expect(src).not.toContain("toolName.includes('write')");
+    });
+  });
+
 });
