@@ -45,8 +45,12 @@ export class DurableSession {
   private snapshot: SessionSnapshot | null = null;
   private writerLocked = false;
   private last_hash = '';
+  private logPath: string | null = null;
 
   constructor(session_id: string) { this.session_id = session_id; }
+
+  /** Set the file path for incremental event log persistence. */
+  setLogPath(path: string): void { this.logPath = path; }
 
   /** Acquire exclusive writer lock (concurrent writer lock enforced). */
   acquireWriter(): void {
@@ -55,7 +59,7 @@ export class DurableSession {
   }
   releaseWriter(): void { this.writerLocked = false; }
 
-  /** Append an event to the log (source of truth). */
+  /** Append an event to the log (source of truth). Persists incrementally if logPath is set. */
   append(type: SessionEventType, data: unknown): SessionEvent {
     if (!ALL_TYPES.includes(type)) throw new SessionError(`invalid event type: ${type}`);
     if (!this.writerLocked) throw new SessionError('writer lock required to append');
@@ -66,6 +70,10 @@ export class DurableSession {
     const ev: SessionEvent = { seq, type, timestamp, data, hash, prev_hash };
     this.events.push(ev);
     this.last_hash = hash;
+    // Incremental persistence: flush each event to disk immediately
+    if (this.logPath) {
+      appendEvent(ev, this.logPath);
+    }
     return ev;
   }
 

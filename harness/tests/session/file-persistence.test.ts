@@ -61,4 +61,32 @@ describe('Session file persistence', () => {
     expect(loaded.getSnapshot()).not.toBeNull();
     expect(loaded.getSnapshot()!.last_seq).toBe(1);
   });
+
+
+  it('DurableSession persists each event incrementally to disk on append (not just at end)', () => {
+    const logPath = join(tmpdir(), 'sess-incr-' + Date.now() + '.log');
+    const session = new DurableSession('incr-test');
+    session.acquireWriter();
+    session.append('user', { msg: 'first' });
+    // After append, the event must already be on disk (incremental persistence)
+    expect(existsSync(logPath)).toBe(false); // no logPath set yet — this is the old API
+
+    // New behavior: DurableSession should accept a logPath and persist incrementally
+    const session2 = new DurableSession('incr-test-2');
+    session2.setLogPath(logPath);
+    session2.acquireWriter();
+    session2.append('user', { msg: 'first' });
+    // Event must be on disk immediately after append
+    expect(existsSync(logPath)).toBe(true);
+    const content = readFileSync(logPath, 'utf8');
+    expect(content).toContain('first');
+
+    session2.append('assistant', { msg: 'second' });
+    const content2 = readFileSync(logPath, 'utf8');
+    expect(content2).toContain('first');
+    expect(content2).toContain('second');
+    session2.releaseWriter();
+    rmSync(logPath, { force: true });
+  });
+
 });
