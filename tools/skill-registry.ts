@@ -58,7 +58,7 @@ function findSchemaPath(filename: string): string {
   }
   return join(dirs[0]!, filename);
 }
-const SKILL_SPEC_SCHEMA_PATHconst SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
+const SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
