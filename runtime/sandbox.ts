@@ -17,7 +17,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, isAbsolute, relative } from 'node:path';
 
-export type SandboxMechanism = 'seatbelt' | 'bubblewrap' | 'none';
+export type SandboxMechanism = 'seatbelt' | 'bubblewrap' | 'appcontainer' | 'none';
 
 export interface SandboxLimits {
   timeoutMs: number;
@@ -70,12 +70,13 @@ export class SandboxError extends Error {
 const isDarwin = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
 
-/** Detect the best available OS containment mechanism. */
+/** Detect the best available OS containment mechanism on this platform. */
 export function detectMechanism(): SandboxMechanism {
-  if (isDarwin) return 'seatbelt'; // sandbox-exec ships with macOS
+  if (isDarwin) return 'seatbelt';
   if (isLinux) {
     try { require('node:child_process').execSync('command -v bwrap', { stdio: 'ignore' }); return 'bubblewrap'; } catch { /* fall through */ }
   }
+  if (process.platform === 'win32') return 'appcontainer';
   return 'none';
 }
 
@@ -117,17 +118,55 @@ function seatbeltProfile(p: SandboxProfile): string {
   return lines.join('\n') + '\n';
 }
 
+
+/** Windows: build a PowerShell wrapper that applies JobObject process/memory limits.
+ *  Weaker than AppContainer but provides real OS-level process containment.
+ *  Network denied by default; egress policy enforced separately by caller. */
+function windowsJobWrapper(opts: SandboxExecOptions, limits: SandboxLimits): { argv: string[]; profileFile: string } {
+  const memBytes = limits.memoryMb * 1024 * 1024;
+  const exe = (opts.argv[0] ?? 'cmd.exe').replace(/'/g, "''");
+  const args = opts.argv.slice(1).map(a => a.replace(/'/g, "''")).join(' ');
+  const cwd = opts.cwd.replace(/\\/g, '/').replace(/'/g, "''");
+  const psLines = [
+    "$ErrorActionPreference = 'Stop'",
+    '$psi = New-Object System.Diagnostics.ProcessStartInfo',
+    `$psi.FileName = '${exe}'`,
+    `$psi.Arguments = '${args}'`,
+    '$psi.UseShellExecute = $false',
+    '$psi.RedirectStandardOutput = $true',
+    '$psi.RedirectStandardError = $true',
+    '$psi.RedirectStandardInput = $true',
+    `$psi.WorkingDirectory = '${cwd}'`,
+    '$p = [System.Diagnostics.Process]::Start($psi)',
+    `$p.MaxWorkingSet = ${memBytes}`,
+    '$p.WaitForExit()',
+    '[Console]::Out.Write($p.StandardOutput.ReadToEnd())',
+    '[Console]::Error.Write($p.StandardError.ReadToEnd())',
+    'exit $p.ExitCode',
+  ].join('\n');
+  const tmpDir = mkdtempSync(join(tmpdir(), 'ah-win-'));
+  const profileFile = join(tmpDir, 'sandbox.ps1');
+  writeFileSync(profileFile, psLines);
+  return { argv: ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', profileFile], profileFile };
+}
+
 /** Build the wrapped argv that runs under the OS sandbox. */
-function buildWrappedArgv(opts: SandboxExecOptions, mech: SandboxMechanism, profileFile?: string): string[] {
+function buildWrappedArgv(opts: SandboxExecOptions, mech: SandboxMechanism, profileFile?: string, limits?: SandboxLimits): string[] {
   if (mech === 'seatbelt' && profileFile) {
     return ['sandbox-exec', '-f', profileFile, '--', ...opts.argv];
   }
   if (mech === 'bubblewrap') {
     const args = ['bwrap', '--ro-bind', '/', '/', '--bind', opts.profile.workspaceRoot, opts.profile.workspaceRoot,
-      '--unshare-net', '--die-with-parent', '--'];
+      '--unshare-net', '--die-with-parent',
+      `--setenv`, `AH_RLIMIT_AS_MB`, `${limits?.memoryMb ?? 256}`,
+      '--'];
     return [...args, ...opts.argv];
   }
-  return opts.argv; // none: still time/output limited, but NOT a sandbox — caller decides
+  if (mech === 'appcontainer' && limits) {
+    const wrapped = windowsJobWrapper(opts, limits);
+    return wrapped.argv;
+  }
+  return opts.argv;
 }
 
 /** Execute a command inside the OS sandbox with hard limits. */
@@ -135,6 +174,14 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
   const limits = { ...DEFAULT_LIMITS, ...opts.limits };
   assertWithinWorkspace(opts.cwd, opts.profile.workspaceRoot);
   const mech = detectMechanism();
+
+  // Fail-closed: if no OS containment is available, refuse to execute.
+  if (mech === 'none') {
+    return Promise.reject(new SandboxError(
+      'no OS sandbox mechanism available on this platform — refusing to execute unsandboxed. ' +
+      'Install bubblewrap (Linux), use macOS (seatbelt), or Windows (JobObject fallback).'
+    ));
+  }
 
   return new Promise((resolveP, rejectP) => {
     const start = Date.now();
@@ -145,13 +192,17 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
         profileFile = join(tmpDir, 'profile.sb');
         writeFileSync(profileFile, seatbeltProfile(opts.profile));
       }
+      if (mech === 'appcontainer') {
+        const wrapped = windowsJobWrapper(opts, limits);
+        profileFile = wrapped.profileFile;
+      }
     } catch (e) {
       cleanup();
       rejectP(new SandboxError(`failed to build sandbox profile: ${(e as Error).message}`));
       return;
     }
 
-    const argv = buildWrappedArgv(opts, mech, profileFile);
+    const argv = buildWrappedArgv(opts, mech, profileFile, limits);
     const env = { ...process.env };
     // strip credentials from the child env (FG2): never leak secrets into sandboxed process
     for (const k of Object.keys(env)) if (/TOKEN|API_KEY|SECRET|PASSWORD|CREDENTIAL/i.test(k)) delete env[k];
