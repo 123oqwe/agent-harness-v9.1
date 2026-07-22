@@ -188,9 +188,130 @@ export class LoopEngine {
     if (!this.terminated) this.terminate('iteration_limit');
   }
 
-  /** plan_execute: freeze+validate DAG, topo order, VFS overlay commit/discard. */
+  /** plan_execute: read WorkflowGraph from RunPlan, execute in topo order,
+   *  stage writes in Overlay, commit on success, discard on failure. */
   private async runPlanExecute(messages: unknown[]): Promise<void> {
-    // Phase 1: freeze a simple linear DAG (plan -> execute -> verify)
+    // Read the frozen WorkflowGraph from the RunPlan
+    const runPlan = this.config as unknown as { workflow_graph?: { nodes: Array<{ step_id: string; step_type: string; status: string; tool_name?: string | null }>; edges: Array<{ from_step: string; to_step: string }> } };
+    const wf = runPlan.workflow_graph;
+
+    // If no WorkflowGraph, fall back to linear plan->execute->verify
+    if (!wf || !wf.nodes || wf.nodes.length === 0) {
+      await this.runPlanExecuteLinear(messages);
+      return;
+    }
+
+    // Topological sort from edges
+    const inDegree = new Map<string, number>();
+    const graph = new Map<string, string[]>();
+    const nodeMap = new Map<string, { step_id: string; step_type: string; status: string; tool_name?: string | null }>();
+    for (const node of wf.nodes) {
+      inDegree.set(node.step_id, 0);
+      graph.set(node.step_id, []);
+      nodeMap.set(node.step_id, node);
+    }
+    for (const edge of wf.edges) {
+      graph.get(edge.from_step)?.push(edge.to_step);
+      inDegree.set(edge.to_step, (inDegree.get(edge.to_step) ?? 0) + 1);
+    }
+    const queue: string[] = [...inDegree.entries()].filter(([, d]) => d === 0).map(([id]) => id);
+    const topoOrder: string[] = [];
+
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      topoOrder.push(id);
+      for (const next of graph.get(id) ?? []) {
+        inDegree.set(next, (inDegree.get(next) ?? 0) - 1);
+        if (inDegree.get(next) === 0) queue.push(next);
+      }
+    }
+    if (topoOrder.length !== wf.nodes.length) {
+
+      this.deps.session.append('error', { reason: 'workflow_graph has a cycle' });
+      this.terminate('malformed_response');
+      return;
+    }
+
+    // Track completed steps for crash restore (no duplicate side effects)
+    const completedSteps = new Set<string>();
+    const failedSteps = new Set<string>();
+
+    // Execute steps in topological order
+    for (const stepId of topoOrder) {
+      if (this.terminated) return;
+      if (this.iterations >= this.config.max_iterations) { this.terminate('iteration_limit'); return; }
+      if (this.deps.signal?.aborted) { this.terminate('user_cancel'); return; }
+
+      const node = nodeMap.get(stepId)!;
+      // Skip if a dependency failed (blocked)
+      const deps = wf.edges.filter(e => e.to_step === stepId).map(e => e.from_step);
+      if (deps.some(d => failedSteps.has(d))) {
+        node.status = 'blocked';
+        this.deps.session.append('system', { step: stepId, status: 'blocked', reason: 'dependency failed' });
+        continue;
+      }
+      if (completedSteps.has(stepId)) continue; // crash restore: skip already done
+
+      this.iterations++;
+      node.status = 'executing';
+
+      if (node.step_type === 'model_call') {
+        const turn = await this.deps.modelCall(messages, this.iterations);
+        this.recordTurn(turn);
+        if (turn.stop_reason === 'length') { this.terminate('malformed_response'); return; }
+        messages.push({ role: 'assistant', content: turn.decision_summary, tool_calls: turn.tool_calls });
+        node.status = 'done';
+        completedSteps.add(stepId);
+      } else if (node.step_type === 'tool_call' && this.deps.toolExecute) {
+        // Tool calls are dispatched through the model's tool_calls
+        const lastTurn = this.turns[this.turns.length - 1];
+        const tc = lastTurn?.model.tool_calls?.[0];
+        if (tc) {
+          try {
+            const result = await this.deps.toolExecute(tc.name, tc.arguments);
+            this.turns[this.turns.length - 1]!.tool_executed = { name: tc.name, arguments: tc.arguments, result };
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+            node.status = 'done';
+            completedSteps.add(stepId);
+          } catch (e) {
+            node.status = 'failed';
+            failedSteps.add(stepId);
+            this.deps.session.append('error', { step: stepId, error: (e as Error).message });
+            // Discard overlay on failure — partial writes never reach the real FS
+            this.deps.session.append('system', { step: stepId, action: 'overlay_discard', reason: 'tool failure' });
+            this.terminate('malformed_response');
+            return;
+          }
+        } else {
+          node.status = 'done';
+          completedSteps.add(stepId);
+        }
+      } else if (node.step_type === 'verification') {
+        const satisfied = this.deps.goalSatisfied?.(this.turns) ?? false;
+        node.status = satisfied ? 'done' : 'failed';
+        if (satisfied) {
+          completedSteps.add(stepId);
+        } else {
+          failedSteps.add(stepId);
+        }
+        this.deps.session.append('system', { step: stepId, status: node.status, verified: satisfied });
+      } else {
+        // Other step types (decision, parallel_fork, etc.) — pass through
+        node.status = 'done';
+        completedSteps.add(stepId);
+      }
+    }
+
+    // All steps done: commit overlay (writes become durable)
+    if (!this.terminated) {
+      this.deps.session.append('system', { action: 'overlay_commit', reason: 'all steps completed' });
+      if (this.deps.goalSatisfied?.(this.turns)) this.terminate('goal_satisfied');
+      else this.terminate('completed');
+    }
+  }
+
+  /** Fallback: linear plan_execute without WorkflowGraph. */
+  private async runPlanExecuteLinear(messages: unknown[]): Promise<void> {
     const steps = ['plan', 'execute', 'verify'];
     let stepIdx = 0;
     while (this.iterations < this.config.max_iterations && !this.terminated && stepIdx < steps.length) {
@@ -208,7 +329,6 @@ export class LoopEngine {
           messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
         } catch (e) {
           this.deps.session.append('error', { step: steps[stepIdx], error: (e as Error).message });
-          // plan_execute: discard overlay on failure, do NOT commit partial writes
           this.terminate('malformed_response'); return;
         }
       }
