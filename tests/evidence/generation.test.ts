@@ -90,7 +90,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       commands_run: [{ command: 'x', exit_code: 0, stdout_hash: 'x' }], exit_codes: [0],
       test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass' as const,
     };
-    expect(() => validateEvidence(bad, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    expect(() => validateEvidence(bad, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
   });
 
   it('runCommand captures real exit code and output hash', () => {
@@ -114,7 +114,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       security_checks: { none: true },
       verifier_result: 'pass' as const,
     };
-    expect(() => validateEvidence(valid, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).not.toThrow();
+    expect(() => validateEvidence(valid, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).not.toThrow();
   });
 
   it('validateEvidence rejects evidence missing required fields via AJV', () => {
@@ -122,7 +122,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       requirement_id: 'AH-TEST-007',
       // missing commit_sha, source_files, etc.
     };
-    expect(() => validateEvidence(invalid, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    expect(() => validateEvidence(invalid, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
   });
 
   it('generateEvidence fails when declared source_files do not exist', () => {
