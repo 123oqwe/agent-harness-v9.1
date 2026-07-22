@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-EVIDENCE-001",
-  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+  "commit_sha": "13522c6e768415d6ab7d403fd597bf16df8b1318",
   "source_files": [
     "harness/verification/evidence.ts"
   ],
@@ -21,12 +21,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "ed11a7abfd31592f"
+      "stdout_hash": "fb0ef7a1f9134471"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "2976c8d487e6ed16"
+      "stdout_hash": "bc7a56e647047b57"
     }
   ],
   "exit_codes": [
@@ -36,23 +36,23 @@
     0
   ],
   "test_results": {
-    "suite_total_files": "78",
-    "suite_total_tests": "640",
-    "suite_passed": "640",
+    "suite_total_files": "80",
+    "suite_total_tests": "648",
+    "suite_passed": "648",
     "requirement_tests": 7,
     "requirement_passed": 7,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "2976c8d487e6ed16"
+    "requirement_test_stdout_hash": "bc7a56e647047b57"
   },
   "coverage": {
     "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
-    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
+    "verified_at_sha": "13522c6e768415d6ab7d403fd597bf16df8b1318",
+    "independent_rerun": "independent detached worktree at 13522c6: npm ci + typecheck + npm test -> 648 pass, 23 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
+  "verifier_model": "independent detached worktree rerun at 13522c6; 648/640 tests pass",
   "test_output": null,
-  "test_output_hash": "ed11a7abfd31592f"
+  "test_output_hash": "fb0ef7a1f9134471"
 }
