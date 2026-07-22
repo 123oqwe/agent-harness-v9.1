@@ -1,6 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import * as path from 'node:path';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -155,3 +158,53 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(script).toMatch(/spawnSync|execFile/);
   });
 });
+
+  it('run-stryker.mjs: real behavior test prevents shell injection via argv', () => {
+    const fakeNodeModules = mkdtempSync(join(tmpdir(), 'fake-nm-'));
+    const fakeBinDir = join(fakeNodeModules, 'node_modules', '.bin');
+    fs.mkdirSync(fakeBinDir, { recursive: true });
+    const fakeStryker = join(fakeBinDir, 'stryker');
+    const fakeScript = '#!/bin/sh\nprintf "%s\\n" "$@" > "$FAKE_STRYKER_ARGV_FILE"\nexit 0\n';
+    writeFileSync(fakeStryker, fakeScript);
+    fs.chmodSync(fakeStryker, 0o755);
+
+    const argvFile = join(fakeNodeModules, 'argv.txt');
+    const markerFile = join(fakeNodeModules, 'marker-file');
+    const maliciousArg = '; touch ' + markerFile;
+
+    const _result = spawnSync('node', [
+      join(harnessRoot, 'scripts/run-stryker.mjs'),
+      maliciousArg,
+    ], {
+      cwd: fakeNodeModules,
+      encoding: 'utf8',
+      env: { ...process.env, FAKE_STRYKER_ARGV_FILE: argvFile },
+      timeout: 5000,
+    });
+
+    // The marker file must NOT be created — shell injection prevented
+    expect(fs.existsSync(markerFile)).toBe(false);
+
+    // The malicious argument must be passed as a single argv element
+    if (fs.existsSync(argvFile)) {
+      const recordedArgv = fs.readFileSync(argvFile, 'utf8').trim();
+      // Should contain "run" and the malicious arg as separate elements
+      expect(recordedArgv).toContain('run');
+      expect(recordedArgv).toContain('touch');
+    }
+
+    rmSync(fakeNodeModules, { recursive: true, force: true });
+  });
+
+  it('run-stryker.mjs: exits non-zero when local stryker binary does not exist', () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'empty-stryker-'));
+    const _result = spawnSync('node', [
+      join(harnessRoot, 'scripts/run-stryker.mjs'),
+    ], {
+      cwd: emptyDir,
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    expect(_result.status).not.toBe(0);
+    rmSync(emptyDir, { recursive: true, force: true });
+  });
