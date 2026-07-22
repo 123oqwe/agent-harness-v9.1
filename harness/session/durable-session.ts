@@ -123,3 +123,54 @@ export class DurableSession {
   /** 11 entry types supported. */
   static readonly EVENT_TYPES = ALL_TYPES;
 }
+
+// ---------------------------------------------------------------------------
+// File-based persistence (cross-process durable log)
+// ---------------------------------------------------------------------------
+
+import { writeFileSync, readFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+/**
+ * Persist the session event log to a file (one JSON line per event).
+ * This makes the session durable across process restarts.
+ */
+export function persistSession(session: DurableSession, logPath: string): void {
+  mkdirSync(dirname(logPath), { recursive: true });
+  const data = session.export_();
+  // Write all events as NDJSON (one event per line)
+  writeFileSync(logPath, data.events.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+  // Write snapshot alongside if present
+  if (data.snapshot) {
+    writeFileSync(logPath + '.snapshot.json', JSON.stringify(data.snapshot, null, 2), 'utf8');
+  }
+}
+
+/**
+ * Load a session from a file-based event log.
+ * Replays the hash-chained event log and verifies integrity.
+ */
+export function loadSession(session_id: string, logPath: string): DurableSession {
+  if (!existsSync(logPath)) throw new SessionError(`session log not found: ${logPath}`);
+  const content = readFileSync(logPath, 'utf8');
+  const events: SessionEvent[] = [];
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    events.push(JSON.parse(line));
+  }
+  let snapshot: SessionSnapshot | null = null;
+  const snapshotPath = logPath + '.snapshot.json';
+  if (existsSync(snapshotPath)) {
+    snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
+  }
+  return DurableSession.import_({ session_id, events, snapshot });
+}
+
+/**
+ * Append a single event to the log file (incremental persistence).
+ * Use this for crash-safe writing after each session.append().
+ */
+export function appendEvent(event: SessionEvent, logPath: string): void {
+  mkdirSync(dirname(logPath), { recursive: true });
+  appendFileSync(logPath, JSON.stringify(event) + '\n', 'utf8');
+}

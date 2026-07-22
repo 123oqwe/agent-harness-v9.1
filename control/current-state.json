@@ -24,11 +24,9 @@
       "blockers": []
     },
     "2": {
-      "status": "BLOCKED",
+      "status": "IN_PROGRESS",
       "name": "Context, RAG, Multimodal & UX",
-      "blockers": [
-        "Phase 2 not started"
-      ]
+      "blockers": []
     },
     "3": {
       "status": "BLOCKED",
