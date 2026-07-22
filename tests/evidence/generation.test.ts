@@ -31,7 +31,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
     const ev = generateEvidence({
       requirement_id: 'AH-TEST-002',
       source_files: ['package.json'],
-      tests_added: ['tests/x.test.ts'],
+      tests_added: ['tests/evidence/generation.test.ts'],
       commands: ['echo ok'],
       cwd: process.cwd(),
       test_results: {},
@@ -90,7 +90,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       commands_run: [{ command: 'x', exit_code: 0, stdout_hash: 'x' }], exit_codes: [0],
       test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass' as const,
     };
-    expect(() => validateEvidence(bad, require('node:path').join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    expect(() => validateEvidence(bad, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
   });
 
   it('runCommand captures real exit code and output hash', () => {
@@ -98,4 +98,55 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
     expect(r.exit_code).toBe(0);
     expect(r.stdout_hash).toMatch(/^[0-9a-f]{16}$/);
   });
+
+
+  it('validateEvidence uses AJV against evidence-package.schema.json', () => {
+    // A valid evidence package should pass AJV validation
+    const valid = {
+      requirement_id: 'AH-TEST-006',
+      commit_sha: 'a'.repeat(40),
+      source_files: ['package.json'],
+      tests_added: [],
+      commands_run: [{ command: 'echo ok', exit_code: 0, stdout_hash: 'abc123' }],
+      exit_codes: [0],
+      test_results: { total: 1, passed: 1 },
+      coverage: { lines: 100 },
+      security_checks: { none: true },
+      verifier_result: 'pass' as const,
+    };
+    expect(() => validateEvidence(valid, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).not.toThrow();
+  });
+
+  it('validateEvidence rejects evidence missing required fields via AJV', () => {
+    const invalid = {
+      requirement_id: 'AH-TEST-007',
+      // missing commit_sha, source_files, etc.
+    };
+    expect(() => validateEvidence(invalid, join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+  });
+
+  it('generateEvidence fails when declared source_files do not exist', () => {
+    dir = mkdtempSync(join(tmpdir(), 'ev-'));
+    expect(() => generateEvidence({
+      requirement_id: 'AH-TEST-008',
+      source_files: ['nonexistent-file.ts'],
+      tests_added: [],
+      commands: ['echo ok'],
+      cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    })).toThrow(EvidenceError);
+  });
+
+  it('generateEvidence fails when declared tests_added do not exist', () => {
+    dir = mkdtempSync(join(tmpdir(), 'ev-'));
+    expect(() => generateEvidence({
+      requirement_id: 'AH-TEST-009',
+      source_files: [],
+      tests_added: ['nonexistent-test.test.ts'],
+      commands: ['echo ok'],
+      cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    })).toThrow(EvidenceError);
+  });
+
 });
