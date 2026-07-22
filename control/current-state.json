@@ -91,7 +91,8 @@
       "1": {
         "total": 40,
         "maturity": {
-          "implemented": 40
+          "verified": 1,
+          "implemented": 39
         }
       },
       "2": {
