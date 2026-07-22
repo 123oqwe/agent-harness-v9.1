@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createGlmGateway } from '../../gateway/glm-gateway-bridge.js';
 import type { ProviderSelectionRequest } from '../../gateway/model-gateway.js';
 
@@ -45,3 +47,13 @@ describe.skipIf(SKIP)('GLM via ModelGateway', () => {
     }
   });
 });
+
+
+
+describe('GLM provider: no default model fallback', () => {
+  it('does not default to glm-4-plus when GLM_MODEL is not set', () => {
+    const source = readFileSync(join(__dirname, '../../gateway/glm-provider.ts'), 'utf8');
+    expect(source).not.toContain('glm-4-plus');
+  });
+});
+

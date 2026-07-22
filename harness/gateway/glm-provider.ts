@@ -24,7 +24,7 @@ export class GlmProvider {
 
   constructor() {
     this.apiKey = process.env.GLM_API_KEY ?? '';
-    this.model = process.env.GLM_MODEL ?? 'glm-4-plus';
+    this.model = process.env.GLM_MODEL ?? '';
     this.reasoningEffort = process.env.GLM_REASONING_EFFORT ?? 'xhigh';
     // Key may be empty if constructed during agent phase; checked lazily in resolve()
   }
@@ -112,6 +112,7 @@ export class GlmProvider {
   async resolve(request: ProviderRequest): Promise<unknown> {
     const body = this.normalizeRequest(request) as Record<string, unknown>;
     if (!this.apiKey) throw new GlmProviderError('GLM_API_KEY not set in env');
+    if (!this.model) throw new GlmProviderError('GLM_MODEL not set in env — must be a GLM-5.2 model ID, no default fallback');
     const res = await fetch(this.endpoint, {
       method: 'POST',
       signal: AbortSignal.timeout(30_000),
