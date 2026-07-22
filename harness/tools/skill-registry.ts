@@ -38,12 +38,9 @@ export interface SkillRegistrySnapshot {
   skill_names: readonly string[];
 }
 
-const SCHEMA_PATH = join(process.cwd(), 'spec/contracts/skill-spec.schema.json');
+const SKILL_SPEC_SCHEMA = {"$schema": "https://json-schema.org/draft/2020-12/schema", "title": "SkillSpec", "required": ["name", "version", "supported_experience_profiles", "input_schema_ref", "output_schema_ref", "required_context", "required_tools", "allowed_effect_classes", "workflow_template_ref", "verification_template_ref", "failure_policy", "risk_ceiling", "eval_suite_ref"], "properties": {"name": {"type": "string"}, "version": {"type": "string"}, "supported_experience_profiles": {"type": "array"}, "input_schema_ref": {"type": "string"}, "output_schema_ref": {"type": "string"}, "required_context": {"type": "array"}, "required_tools": {"type": "array"}, "allowed_effect_classes": {"type": "array"}, "workflow_template_ref": {"type": "string"}, "verification_template_ref": {"type": "string"}, "failure_policy": {"type": "object"}, "risk_ceiling": {"type": "string"}, "eval_suite_ref": {"type": "string"}}, "type": "object", "additionalProperties": false} as object;
 
-function loadSchema(): object {
-  const p = existsSync(SCHEMA_PATH) ? SCHEMA_PATH : join(process.cwd(), '..', 'spec/contracts/skill-spec.schema.json');
-  return JSON.parse(readFileSync(p, 'utf8'));
-}
+function loadSchema(): object { return SKILL_SPEC_SCHEMA; }
 
 function sha(s: string): string { return createHash('sha256').update(s).digest('hex'); }
 

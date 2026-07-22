@@ -90,7 +90,7 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       commands_run: [{ command: 'x', exit_code: 0, stdout_hash: 'x' }], exit_codes: [0],
       test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass' as const,
     };
-    expect(() => validateEvidence(bad, '../spec/contracts/evidence-package.schema.json')).toThrow(EvidenceError);
+    expect(() => validateEvidence(bad, require('node:path').join(process.cwd(), '..', 'spec', 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
   });
 
   it('runCommand captures real exit code and output hash', () => {
