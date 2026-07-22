@@ -42,6 +42,7 @@ function findSchemaPath(filename: string): string {
   const candidates = [
     join(resolve(__dirname, '..', '..', 'spec', 'contracts'), filename),
     join(resolve(process.cwd(), '..', 'spec', 'contracts'), filename),
+    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts'), filename),
     join(resolve(process.cwd(), 'spec', 'contracts'), filename),
   ];
   for (const p of candidates) { try { if (existsSync(p)) return p; } catch { /* */ } }
