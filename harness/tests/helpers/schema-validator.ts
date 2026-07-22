@@ -3,7 +3,9 @@
  import * as fs from 'fs';
  import * as path from 'path';
 
- const contractsDir = path.resolve(__dirname, '../../../spec/contracts');
+ const contractsDir = process.env.HARNESS_SPEC_ROOT
+  ? path.resolve(process.env.HARNESS_SPEC_ROOT, 'contracts')
+  : path.resolve(__dirname, '../../../spec/contracts');
 
  // Cache compiled validators
  const validatorCache = new Map<string, Ajv>();
