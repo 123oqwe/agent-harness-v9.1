@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ToolRegistry, ToolRegistryError } from '../../tools/tool-registry.js';
@@ -102,4 +102,35 @@ describe('AH-TOOL-REGISTRY-001 Tool Registry', () => {
     // results are plain data objects with no execute() method
     expect(typeof (results[0] as unknown as { execute?: unknown }).execute).toBe('undefined');
   });
+
+
+  // -----------------------------------------------------------------------
+  // P0: ToolRegistry must load schema from authoritative contract, not copy
+  // -----------------------------------------------------------------------
+  describe('loads schema from authoritative contract file', () => {
+    it('does not embed a copied JSON Schema in source code', () => {
+      const source = readFileSync(
+        join(__dirname, '../../tools/tool-registry.ts'),
+        'utf8',
+      );
+      // The source must NOT contain an inline schema object
+      expect(source).not.toMatch(/TOOL_SPEC_SCHEMA\s*=\s*\{/);
+      expect(source).not.toMatch(/as object/);
+    });
+
+    it('loads the schema from spec/contracts/tool-spec.schema.json at construction', () => {
+      const contractPath = join(__dirname, '../../../spec/contracts/tool-spec.schema.json');
+      const contractSchema = JSON.parse(readFileSync(contractPath, 'utf8'));
+      expect(contractSchema.title).toBe('ToolSpec');
+      // The registry validates using the authoritative contract schema
+      const reg = new ToolRegistry();
+      // A valid spec should register fine
+      reg.register(validSpec('test_tool'));
+      // An invalid spec (missing required field) should be rejected
+      const invalid = validSpec('bad_tool') as unknown as Record<string, unknown>;
+      delete invalid.name;
+      expect(() => reg.register(invalid as unknown as ToolSpec)).toThrow(ToolRegistryError);
+    });
+  });
+
 });
