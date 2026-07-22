@@ -38,7 +38,16 @@ export interface SkillRegistrySnapshot {
   skill_names: readonly string[];
 }
 
-const SKILL_SPEC_SCHEMA_PATH = join(resolve(__dirname, '..', '..', 'spec', 'contracts'), 'skill-spec.schema.json');
+function findSchemaPath(filename: string): string {
+  const candidates = [
+    join(resolve(__dirname, '..', '..', 'spec', 'contracts'), filename),
+    join(resolve(process.cwd(), '..', 'spec', 'contracts'), filename),
+    join(resolve(process.cwd(), 'spec', 'contracts'), filename),
+  ];
+  for (const p of candidates) { try { if (existsSync(p)) return p; } catch { /* */ } }
+  return candidates[0]!;
+}
+const SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
