@@ -1,0 +1,28 @@
+{
+  "name": "feature-implementation",
+  "version": "1.0.0",
+  "supported_experience_profiles": [
+    "default"
+  ],
+  "input_schema_ref": "schemas/skills/feature-implementation-input.json",
+  "output_schema_ref": "schemas/skills/feature-implementation-output.json",
+  "required_context": [],
+  "required_tools": [
+    "read_file",
+    "write_file",
+    "edit_file",
+    "execute_command_sandboxed"
+  ],
+  "allowed_effect_classes": [
+    "read",
+    "write"
+  ],
+  "workflow_template_ref": "workflows/feature-implementation.yaml",
+  "verification_template_ref": "verifications/feature-implementation.yaml",
+  "failure_policy": {
+    "on_failure": "abort",
+    "max_retries": 0
+  },
+  "risk_ceiling": "medium",
+  "eval_suite_ref": "evals/skills/feature-implementation.yaml"
+}

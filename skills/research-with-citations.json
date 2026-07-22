@@ -1,0 +1,27 @@
+{
+  "name": "research-with-citations",
+  "version": "1.0.0",
+  "supported_experience_profiles": [
+    "default"
+  ],
+  "input_schema_ref": "schemas/skills/research-with-citations-input.json",
+  "output_schema_ref": "schemas/skills/research-with-citations-output.json",
+  "required_context": [],
+  "required_tools": [
+    "search_files",
+    "read_file",
+    "parse_document"
+  ],
+  "allowed_effect_classes": [
+    "read",
+    "write"
+  ],
+  "workflow_template_ref": "workflows/research-with-citations.yaml",
+  "verification_template_ref": "verifications/research-with-citations.yaml",
+  "failure_policy": {
+    "on_failure": "abort",
+    "max_retries": 0
+  },
+  "risk_ceiling": "medium",
+  "eval_suite_ref": "evals/skills/research-with-citations.yaml"
+}

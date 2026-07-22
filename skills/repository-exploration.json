@@ -1,0 +1,27 @@
+{
+  "name": "repository-exploration",
+  "version": "1.0.0",
+  "supported_experience_profiles": [
+    "default"
+  ],
+  "input_schema_ref": "schemas/skills/repository-exploration-input.json",
+  "output_schema_ref": "schemas/skills/repository-exploration-output.json",
+  "required_context": [],
+  "required_tools": [
+    "list_directory",
+    "read_file",
+    "search_files"
+  ],
+  "allowed_effect_classes": [
+    "read",
+    "write"
+  ],
+  "workflow_template_ref": "workflows/repository-exploration.yaml",
+  "verification_template_ref": "verifications/repository-exploration.yaml",
+  "failure_policy": {
+    "on_failure": "abort",
+    "max_retries": 0
+  },
+  "risk_ceiling": "medium",
+  "eval_suite_ref": "evals/skills/repository-exploration.yaml"
+}

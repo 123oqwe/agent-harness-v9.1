@@ -1,0 +1,26 @@
+{
+  "name": "dependency-aware-planning",
+  "version": "1.0.0",
+  "supported_experience_profiles": [
+    "default"
+  ],
+  "input_schema_ref": "schemas/skills/dependency-aware-planning-input.json",
+  "output_schema_ref": "schemas/skills/dependency-aware-planning-output.json",
+  "required_context": [],
+  "required_tools": [
+    "read_file",
+    "search_files"
+  ],
+  "allowed_effect_classes": [
+    "read",
+    "write"
+  ],
+  "workflow_template_ref": "workflows/dependency-aware-planning.yaml",
+  "verification_template_ref": "verifications/dependency-aware-planning.yaml",
+  "failure_policy": {
+    "on_failure": "abort",
+    "max_retries": 0
+  },
+  "risk_ceiling": "medium",
+  "eval_suite_ref": "evals/skills/dependency-aware-planning.yaml"
+}
