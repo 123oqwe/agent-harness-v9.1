@@ -35,7 +35,7 @@ export class VfsError extends Error {
 
 export interface VfsEntry { path: string; kind: 'file' | 'dir'; size: number; }
 
-interface Backend {
+export interface Backend {
   readonly kind: VfsBackendKind;
   readonly prefix: string;
   read(path: string): Buffer;

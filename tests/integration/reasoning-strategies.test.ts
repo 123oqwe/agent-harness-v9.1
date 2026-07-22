@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Harness, type HarnessProvider, type HarnessConfig } from '../../harness.js';
+import { Harness, type HarnessProvider } from '../../harness.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
@@ -25,7 +25,7 @@ function toolSpec(name: string): ToolSpec {
 function makeProvider(turns: ModelTurn[]): HarnessProvider {
   let idx = 0;
   return {
-    async resolve(messages: Array<{ role: string; content: string }>): Promise<ModelTurn> {
+    async resolve(_messages: Array<{ role: string; content: string }>): Promise<ModelTurn> {
       const turn = turns[Math.min(idx, turns.length - 1)]!;
       idx++;
       return turn;
@@ -41,7 +41,7 @@ function makeHarness(tmp: string, extraTools: string[] = []): Harness {
   sr.loadBaseSkills();
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
   vfs.mount(new LocalBackend('/workspace', tmp));
-  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([]) });
 }
@@ -121,7 +121,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const sr = new SkillRegistry(); sr.loadBaseSkills();
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
     vfs.mount(new LocalBackend('/workspace', tmp));
-    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([
       { content: '', decision_summary: 'write', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] },
@@ -141,7 +141,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const tr = new ToolRegistry(); tr.register(toolSpec('read_file'));
     const sr = new SkillRegistry(); sr.loadBaseSkills();
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
-    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
     await h.run(task('rewrite text'));

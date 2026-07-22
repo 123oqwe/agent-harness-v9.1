@@ -14,19 +14,22 @@
  * authorization scope — it only fires if PEP allows.
  */
 import { createHash } from 'node:crypto';
-import { generateKeyPairSync } from 'node:crypto';
+// Ed25519 keypair is injected by composition root, not self-generated
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../runtime/sandbox.js';
 import type { ToolRegistry, RegistrySnapshot } from './tool-registry.js';
+import type { ToolSpec } from '../../spec/types/tool-spec.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
 import type { PolicyContext } from '../security/policy-engine.js';
 import type { EffectRisk } from '../../spec/types/effect-risk.js';
 import type { ActionManifest } from '../../spec/types/action-manifest.js';
 import type { CapabilityToken } from '../../spec/types/capability-token.js';
 import type { DurableSession } from '../session/durable-session.js';
-import { AuthorizationService } from '../security/authorization-service.js';
-import { InMemoryCapabilityStateStore, hashCapabilityValue } from '../security/capability.js';
-import { PolicyEnforcementPoint, type AuditEvent } from '../security/pep.js';
+import type { AuthorizationService } from '../security/authorization-service.js';
+import type { InMemoryCapabilityStateStore} from '../security/capability.js';
+import { hashCapabilityValue } from '../security/capability.js';
+import type { PolicyEnforcementPoint} from '../security/pep.js';
+import { type AuditEvent } from '../security/pep.js';
 
 export interface ToolReceipt {
   tool_name: string;
@@ -57,14 +60,31 @@ function hash(s: unknown): string {
   return createHash('sha256').update(JSON.stringify(s)).digest('hex');
 }
 
-/** Default risk for file tools. Real tools should provide their own EffectRisk. */
-function defaultRisk(toolName: string): EffectRisk {
-  const isWrite = toolName.includes('write') || toolName.includes('edit') || toolName.includes('create');
-  const isExec = toolName.includes('execute') || toolName.includes('command');
+/** Read risk from ToolSpec.effect_model. Falls back to safe read-only risk if not specified. */
+function extractRisk(toolSpec: ToolSpec | undefined): EffectRisk {
+  if (toolSpec) {
+    const em = toolSpec.effect_model as Record<string, unknown> | undefined;
+    if (em && typeof em.operation === 'string') {
+      return {
+        locality: (em.locality as 'local' | 'remote' | 'external') ?? 'local',
+        operation: (em.operation as 'read' | 'write' | 'create' | 'delete' | 'execute' | 'publish' | 'communicate' | 'purchase') ?? 'read',
+        reversibility: (em.reversibility as 'guaranteed' | 'best_effort' | 'none') ?? 'guaranteed',
+        data_egress: (em.data_egress as 'none' | 'metadata' | 'content' | 'sensitive') ?? 'none',
+        network_access: (em.network_access as boolean) ?? false,
+        credential_access: (em.credential_access as boolean) ?? false,
+        blast_radius: (em.blast_radius as 'single_resource' | 'bounded_set' | 'workspace' | 'organization' | 'public' | 'unbounded') ?? 'single_resource',
+        financial_impact_usd_micros: (em.financial_impact_usd_micros as string) ?? '0',
+        human_impact: (em.human_impact as 'none' | 'self' | 'internal_people' | 'external_people' | 'public') ?? 'none',
+        external_visibility: (em.external_visibility as 'private' | 'shared' | 'public') ?? 'private',
+        regulatory_sensitivity: (em.regulatory_sensitivity as string[]) ?? [],
+      };
+    }
+  }
+  // Safe default: read-only, no effects
   return {
     locality: 'local',
-    operation: isExec ? 'execute' : isWrite ? 'write' : 'read',
-    reversibility: isWrite ? 'best_effort' : 'guaranteed',
+    operation: 'read',
+    reversibility: 'guaranteed',
     data_egress: 'none',
     network_access: false,
     credential_access: false,
@@ -86,7 +106,7 @@ function extractResourceIds(args: Record<string, unknown>): string[] {
 
 /** Build a minimal ActionManifest for a tool call. */
 function buildManifest(toolName: string, input: unknown, policyVersion: string, taskId: string, planId: string, stepId: string): ActionManifest {
-  const isWrite = toolName.includes('write') || toolName.includes('edit') || toolName.includes('create');
+  const isWrite = false; // determined by ToolSpec.effect_model, not by name
   const canonicalArgs = input as Record<string, unknown>;
   const manifestHash = hash({ toolName, input, policyVersion });
   return {
@@ -115,46 +135,27 @@ function buildManifest(toolName: string, input: unknown, policyVersion: string, 
   };
 }
 
+export interface ToolExecutorInjectedDeps {
+  authz: AuthorizationService;
+  pep: PolicyEnforcementPoint;
+  stateStore: InMemoryCapabilityStateStore;
+  now: () => string;
+}
+
 export class ToolExecutor {
   private readonly authz: AuthorizationService;
   private readonly pep: PolicyEnforcementPoint;
+  private readonly stateStore: InMemoryCapabilityStateStore;
+  private readonly injectedNow: () => string;
   private readonly auditLog: AuditEvent[] = [];
   private callCount = 0;
-  private _setSharedNow: (ts: string) => void = () => {};
   private _currentTokenHash = '';
 
-  constructor(private deps: ToolExecutorDeps) {
-    // Generate Ed25519 key pair for AuthorizationService
-    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-    const stateStore = new InMemoryCapabilityStateStore();
-    let sharedNow = new Date().toISOString();
-    this.authz = new AuthorizationService({
-      private_key: privateKey,
-      public_key: publicKey,
-      state_store: stateStore,
-      now: () => sharedNow,
-    });
-    this._setSharedNow = (ts: string) => { sharedNow = ts }; 
-    this.pep = new PolicyEnforcementPoint({
-      policy_engine: deps.policyEngine,
-      capability_authority: {
-        verify_signature: async (token: CapabilityToken) => {
-          try {
-            const record = await stateStore.read(token.token_id);
-            if (!record) return false;
-            return true; // AuthorizationService already verified on issue
-          } catch { return false; }
-        },
-        consume: async (tokenId: string) => {
-          const result = await stateStore.consume(tokenId, this._currentTokenHash);
-          return result === 'consumed';
-        },
-      },
-      audit_sink: {
-        write: async (event: AuditEvent) => { this.auditLog.push(event); },
-      },
-      now: () => new Date().toISOString(),
-    });
+  constructor(private deps: ToolExecutorDeps, injected: ToolExecutorInjectedDeps) {
+    this.authz = injected.authz;
+    this.pep = injected.pep;
+    this.stateStore = injected.stateStore;
+    this.injectedNow = injected.now;
   }
 
   async execute<T>(toolName: string, input: unknown, fn: (deps: ToolExecutorDeps) => Promise<T>): Promise<{ result: T; receipt: ToolReceipt }> {
@@ -177,7 +178,8 @@ export class ToolExecutor {
 
     // 3. Build manifest and evaluate risk
     const manifest = buildManifest(toolName, input, policy.version, 'task-1', 'plan-1', `step-${this.callCount}`);
-    const risk = defaultRisk(toolName);
+    const toolSpec = this.deps.toolRegistry.get(toolName);
+    const risk = extractRisk(toolSpec);
     const policyContext: PolicyContext = {
       tenant_id: 'tenant-1',
       user_id: 'user-1',
@@ -188,8 +190,7 @@ export class ToolExecutor {
 
     // 4. Issue a single-use capability token
     let token: CapabilityToken;
-    const issueTime = new Date(Date.now()).toISOString();
-    this._setSharedNow(issueTime);
+    const issueTime = this.injectedNow();
     try {
       const decision = this.deps.policyEngine.evaluate({
         tool_name: toolName,

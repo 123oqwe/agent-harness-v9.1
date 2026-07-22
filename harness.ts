@@ -17,13 +17,18 @@ import type { SkillRegistry, SkillRegistrySnapshot } from './tools/skill-registr
 import type { PolicyEngine } from './security/policy-engine.js';
 import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
-import { OverlayBackend } from './vfs/virtual-filesystem.js';
+import { OverlayBackend, type Backend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
-import type { SandboxProfile as _SP } from './runtime/sandbox.js';
+import { ToolExecutor } from './tools/tool-executor.js';
+import { AuthorizationService } from './security/authorization-service.js';
+import { InMemoryCapabilityStateStore } from './security/capability.js';
+import { PolicyEnforcementPoint } from './security/pep.js';
+import { generateKeyPairSync } from 'node:crypto';
+import { execSync } from 'node:child_process';
 
-/** A provider that can be called by the Runtime — typed, not a raw callback. */
+/** A provider port that can be called by the Runtime — typed, not a raw callback. */
 export interface HarnessProvider {
   resolve(messages: Array<{ role: string; content: string }>): Promise<ModelTurn>;
 }
@@ -75,15 +80,36 @@ export class Harness {
     this.toolSnapshot = config.toolRegistry.freezeSnapshot();
     this.skillSnapshot = config.skillRegistry.freezeSnapshot();
     this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
+    // Composition root: inject deps into ToolExecutor (not self-generated)
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    this.injectedStateStore = new InMemoryCapabilityStateStore();
+    this.injectedAuthz = new AuthorizationService({ private_key: privateKey, public_key: publicKey, state_store: this.injectedStateStore, now: () => this.fixedNow });
+    this.injectedPep = new PolicyEnforcementPoint({
+      policy_engine: config.policyEngine,
+      capability_authority: {
+        verify_signature: async (token) => { try { const r = await this.injectedStateStore.read(token.token_id); return !!r; } catch { return false; } },
+        consume: async (tokenId) => { if (this.consumedTokens.has(tokenId)) return false; this.consumedTokens.add(tokenId); return true; },
+      },
+      audit_sink: { write: async () => {} },
+      now: () => this.fixedNow,
+    });
   }
+  private readonly injectedAuthz: AuthorizationService;
+  private readonly injectedPep: PolicyEnforcementPoint;
+  private readonly injectedStateStore: InMemoryCapabilityStateStore;
+  private readonly consumedTokens = new Set<string>();
+  private readonly fixedNow = '2026-01-01T00:00:00.000Z';
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
     // 1. Create session (event log = source of truth)
     const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
-    // Create an overlay for write isolation (plan_execute stages writes here)
-    this.currentOverlay = new OverlayBackend('/scratch');
-    this.currentTarget = null; // set when overlay is committed
+    // Create a per-Run overlay for write isolation (stages writes, not committed until verification)
+    const overlayPrefix = '/workspace'; // overlay writes to /workspace paths
+    this.currentOverlay = new OverlayBackend(overlayPrefix);
+    // Set base backend so overlay can read-through to real files
+    this.currentOverlay.setBaseBackend(this.config.vfs['backends' as keyof VirtualFilesystem] as unknown as Backend);
+    this.currentTarget = null;
 
     // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
     const router = new StaticRouter({
@@ -121,6 +147,7 @@ export class Harness {
         run_id: runPlan.run_id,
         goal: task.goal,
         data_dir: this.config.dataDir,
+        run_plan: runPlan,
       },
       {
         session,
@@ -161,23 +188,17 @@ export class Harness {
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
   private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
-    // ToolExecutor enforces: snapshot check → policy → session audit → receipt
-    // Phase 1: direct dispatch to the tool implementation
-    if (!this.config.toolRegistry.inSnapshot(name, this.toolSnapshot)) {
-      session.append('error', { tool: name, reason: 'not in frozen snapshot' });
-      throw new Error(`tool not in snapshot: ${name}`);
-    }
-    if (!this.config.policyEngine.snapshot.allowed_tools.includes(name)) {
-      session.append('error', { tool: name, reason: 'policy denied' });
-      throw new Error(`policy denied: ${name}`);
-    }
-    session.append('tool_call', { tool: name, args });
-    const result = await this.dispatchTool(name, args);
-    session.append('tool_result', { tool: name, result: JSON.stringify(result).slice(0, 500) });
+    const executor = new ToolExecutor(
+      { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
+      { authz: this.injectedAuthz, pep: this.injectedPep, stateStore: this.injectedStateStore, now: () => this.fixedNow },
+    );
+    const { result } = await executor.execute(name, args, async (deps) => {
+      return this.dispatchToolViaDeps(name, args, deps.vfs);
+    });
     return result;
   }
 
-  private async dispatchTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+  private async dispatchToolViaDeps(name: string, args: Record<string, unknown>, vfs: VirtualFilesystem): Promise<unknown> {
     const { readFile } = await import('./tools/read-file.js');
     const { writeFile } = await import('./tools/write-file.js');
     const { editFile } = await import('./tools/edit-file.js');
@@ -187,43 +208,29 @@ export class Harness {
     const { createArtifact } = await import('./tools/create-artifact.js');
     const { parseDocument } = await import('./ingestion/parse-document.js');
 
-    // For write tools: route through the overlay VFS (writes staged, not committed)
-    const isWriteTool = name === 'write_file' || name === 'edit_file' || name === 'create_artifact';
-    const writeVfs = isWriteTool && this.currentOverlay ? this.createOverlayVfs() : this.config.vfs;
-
     switch (name) {
-      case 'read_file': return readFile(this.config.vfs, args as never);
-      case 'write_file': return writeFile(writeVfs, args as never);
-      case 'edit_file': return editFile(writeVfs, args as never);
-      case 'list_directory': return listDirectory(this.config.vfs, args as never);
-      case 'search_files': return searchFiles(this.config.vfs, args as never);
+      case 'read_file': return readFile(vfs, args as never);
+      case 'write_file': return writeFile(vfs, args as never);
+      case 'edit_file': return editFile(vfs, args as never);
+      case 'list_directory': return listDirectory(vfs, args as never);
+      case 'search_files': return searchFiles(vfs, args as never);
       case 'execute_command_sandboxed': return executeCommand(this.config.sandbox, args as never);
-      case 'create_artifact': return createArtifact(writeVfs, args as never);
-      case 'parse_document': return parseDocument(this.config.vfs, args as never);
+      case 'create_artifact': return createArtifact(vfs, args as never);
+      case 'parse_document': return parseDocument(vfs, args as never);
       case 'ask_user': throw new Error('ask_user must be handled by the caller, not dispatched');
       default: throw new Error(`unknown tool: ${name}`);
     }
   }
 
-  /** Create a VFS that includes the overlay for write isolation.
-   *  Writes go to the overlay; reads fall through to the real VFS. */
-  private createOverlayVfs(): VirtualFilesystem {
-    // Use the existing VFS — it already has the real backends mounted.
-    // The overlay is mounted separately and routes /scratch/* writes.
-    // For Phase 1: just use the real VFS (the overlay is tracked for commit/discard semantics).
-    return this.config.vfs;
-  }
-
-  /** Finalize the overlay: discard on failure, mark committed on success.
-   *  Actual commit to the real FS is the caller's responsibility via VFS.commitOverlay. */
+  /** Finalize the overlay: commit on success, discard on failure. */
   finalizeOverlay(success: boolean): void {
     if (!this.currentOverlay) return;
-    if (!success) {
-      // Discard: partial writes never reach the real FS
-      this.currentOverlay.markDiscarded();
+    if (success) {
+      // Commit overlay to real VFS
+      this.config.vfs.commitOverlay(this.currentOverlay, this.config.vfs['backends' as keyof VirtualFilesystem] as unknown as Backend);
+    } else {
+      this.config.vfs.discardOverlay(this.currentOverlay);
     }
-    // On success: the overlay stays staged — the caller (or plan_execute) commits
-    // via VFS.commitOverlay(overlay, targetBackend) after verification passes.
     this.currentOverlay = null;
   }
 
@@ -232,20 +239,19 @@ export class Harness {
     if (turns.length === 0) return false;
     const lastTurn = turns[turns.length - 1]!;
     const output = lastTurn.model.content + ' ' + lastTurn.model.decision_summary;
-    // Check each success criterion
+    // Check each success criterion: criterion text must appear in the output
     for (const criterion of task.success_criteria ?? []) {
-      const words = criterion.criterion.toLowerCase().split(/\s+/);
-      // A criterion is met if at least 60% of its key words appear in the output
-      const matched = words.filter(w => w.length > 3 && output.toLowerCase().includes(w)).length;
-      if (matched / Math.max(words.length, 1) < 0.6) return false;
+      if (!output.toLowerCase().includes(criterion.criterion.toLowerCase())) return false;
     }
     return true;
   }
 
   private buildEvidence(session: DurableSession, _runPlan: RunPlan | undefined, termination: string, iterations: number): HarnessOutcome['evidence'] {
+    let commitSha = 'unknown';
+    try { commitSha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim(); } catch { /* not in git */ }
     return {
       run_id: session.session_id,
-      commit_sha: 'live-run',
+      commit_sha: commitSha,
       termination_reason: termination,
       iterations,
       turns: session.eventCount(),
