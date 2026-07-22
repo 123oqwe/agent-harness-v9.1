@@ -97,6 +97,11 @@ export class LoopEngine {
 
   async run(): Promise<LoopResult> {
     // Enter agent phase: network disabled by default, credentials stripped
+    // Save credentials so they can be restored after the agent phase ends
+    const savedCreds: Record<string, string | undefined> = {};
+    for (const k of Object.keys(process.env)) {
+      if (/TOKEN|API_KEY|SECRET|PASSWORD|CREDENTIAL/i.test(k)) savedCreds[k] = process.env[k];
+    }
     stripCredentialsFromEnv();
     this.deps.session.acquireWriter();
     try {
@@ -112,6 +117,10 @@ export class LoopEngine {
     } finally {
       this.writeProgress();
       this.deps.session.releaseWriter();
+      // Restore credentials after agent phase ends
+      for (const [k, v] of Object.entries(savedCreds)) {
+        if (v !== undefined) process.env[k] = v;
+      }
     }
     return {
       strategy: this.config.strategy,

@@ -148,12 +148,21 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
     it('loop run strips credentials before agent phase', async () => {
       process.env.LOOP_SECRET_KEY = 'secret';
+      let credsStrippedDuringLoop = false;
       const loop = new LoopEngine(
         { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
-        { session: session(), modelCall: async () => ({ content: 'ok', decision_summary: 'd' }), goalSatisfied: () => true },
+        { session: session(), modelCall: async () => {
+          // During the agent phase, credentials should be stripped
+          credsStrippedDuringLoop = process.env.LOOP_SECRET_KEY === undefined;
+          return { content: 'ok', decision_summary: 'd' };
+        }, goalSatisfied: () => true },
       );
       await loop.run();
-      expect(process.env.LOOP_SECRET_KEY).toBeUndefined();
+      // Credentials were stripped during the agent phase
+      expect(credsStrippedDuringLoop).toBe(true);
+      // After the loop, credentials are restored (for the next setup phase)
+      expect(process.env.LOOP_SECRET_KEY).toBe('secret');
+      delete process.env.LOOP_SECRET_KEY;
     });
   });
 
