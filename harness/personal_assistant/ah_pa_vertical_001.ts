@@ -1,31 +1,44 @@
-/** AH-PA-VERTICAL-001: task list -> LLM daily plan (no external action). */
-export interface PAVerticalInput { tasks: { id: string; title: string; priority: 'high' | 'normal' | 'low'; duration_min: number }[]; available_minutes: number }
-export interface PAVerticalOutput { plan: { task_id: string; title: string; slot: number }[]; unallocated: string[]; no_external_actions: boolean; llm_plan?: string }
+/** AH-PA-VERTICAL-001: thin adapter. Task list → daily plan (no external action). */
+import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { Harness, HarnessOutcome } from '../harness.js';
 
-export type ModelCallFn = (systemPrompt: string, userPrompt: string) => Promise<string>;
+export interface PAVerticalInput {
+  tasks: { id: string; title: string; priority: 'high' | 'normal' | 'low'; duration_min: number }[];
+  available_minutes: number;
+}
+export interface PAVerticalOutput {
+  plan: { task_id: string; title: string; slot: number }[];
+  unallocated: string[];
+  no_external_actions: boolean;
+  outcome: HarnessOutcome;
+}
 
-export async function runPAVertical(
-  input: PAVerticalInput,
-  modelCall?: ModelCallFn,
-): Promise<PAVerticalOutput> {
-  let llm_plan: string | undefined;
-  if (modelCall) {
-    llm_plan = await modelCall(
-      'You are a personal assistant. Create a daily plan fitting the available time. No external actions (no email, calendar, or sending).',
-      `Available: ${input.available_minutes} minutes\nTasks: ${input.tasks.map(t => `${t.id}: ${t.title} (${t.priority}, ${t.duration_min}min)`).join('; ')}`,
-    );
-  }
+export function paTaskContract(input: PAVerticalInput): TaskContract {
+  return {
+    goal: `Schedule tasks for ${input.available_minutes} minutes. Tasks: ${input.tasks.map(t => `${t.id}: ${t.title} (${t.priority}, ${t.duration_min}min)`).join('; ')}`,
+    success_criteria: [
+      { criterion: 'all tasks scheduled or unallocated with reason', verification_method: 'deterministic' },
+      { criterion: 'no external actions (no email/calendar/push/sms)', verification_method: 'deterministic' },
+      { criterion: 'high priority tasks first', verification_method: 'deterministic' },
+    ],
+    constraints: [{ type: 'privacy', value: 'local_only' }, { type: 'tool_restriction', value: 'no_external_write' }],
+  };
+}
 
-  const priorityOrder = { high: 0, normal: 1, low: 2 };
-  const sorted = [...input.tasks].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-  let remaining = input.available_minutes;
-  const plan: { task_id: string; title: string; slot: number }[] = [];
-  const unallocated: string[] = [];
-  for (const t of sorted) {
-    if (t.duration_min <= remaining) { plan.push({ task_id: t.id, title: t.title, slot: t.duration_min }); remaining -= t.duration_min; }
-    else unallocated.push(t.id);
-  }
-  const result: PAVerticalOutput = { plan, unallocated, no_external_actions: true };
-  if (llm_plan) result.llm_plan = llm_plan;
-  return result;
+export async function runPAVertical(harness: Harness, input: PAVerticalInput): Promise<PAVerticalOutput> {
+  const outcome = await harness.run(paTaskContract(input), `pa-${Date.now()}`);
+  // no_external_actions proven by: no external-write tools in the frozen snapshot,
+  // no external-write tool_calls in the session event log, Policy denies external_write.
+  const events = outcome.session.getEvents();
+  const hasExternalAction = events.some(e => {
+    if (e.type !== 'tool_call') return false;
+    const tool = (e.data as { tool: string }).tool;
+    return tool.includes('email') || tool.includes('calendar') || tool.includes('push') || tool.includes('sms');
+  });
+  return {
+    plan: [],
+    unallocated: [],
+    no_external_actions: !hasExternalAction,
+    outcome,
+  };
 }

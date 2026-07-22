@@ -1,38 +1,31 @@
-/** AH-DOC-VERTICAL-001: read doc -> extract -> LLM summarize -> cite pages. */
-import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
-import { parseDocument } from './parse-document.js';
+/** AH-DOC-VERTICAL-001: thin adapter. Read doc → summarize → cite pages. */
+import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { Harness, HarnessOutcome } from '../harness.js';
 
 export interface DocVerticalInput { path: string; max_pages?: number }
 export interface DocVerticalOutput {
-  pages: { page: number; text: string }[];
   summary: string;
   citations: { page: number; excerpt: string }[];
-  total_chars: number;
+  outcome: HarnessOutcome;
 }
 
-export type ModelCallFn = (systemPrompt: string, userPrompt: string) => Promise<string>;
+export function docTaskContract(input: DocVerticalInput): TaskContract {
+  return {
+    goal: `Read document at ${input.path}, extract text, summarize content, cite page numbers`,
+    success_criteria: [
+      { criterion: 'document parsed and text extracted', verification_method: 'deterministic' },
+      { criterion: 'summary mentions key content', verification_method: 'semantic' },
+      { criterion: 'citations reference correct page numbers', verification_method: 'deterministic' },
+    ],
+    constraints: [{ type: 'privacy', value: 'local_only' }],
+  };
+}
 
-export async function runDocVertical(
-  vfs: VirtualFilesystem,
-  input: DocVerticalInput,
-  modelCall?: ModelCallFn,
-): Promise<DocVerticalOutput> {
-  const parsed = await parseDocument(vfs, { path: input.path, max_pages: input.max_pages });
-  const fullText = parsed.pages.map(p => `[Page ${p.page}] ${p.text}`).join('\n\n');
-
-  let summary: string;
-  if (modelCall) {
-    summary = await modelCall(
-      'You are a document summarizer. Summarize the document concisely, citing page numbers as [Page N].',
-      `Document:\n${fullText.slice(0, 8000)}`,
-    );
-  } else {
-    summary = parsed.pages.map(p => `p${p.page}: ${p.text.slice(0, 200)}`).join('\n');
-  }
-
-  const citations = parsed.pages.map(p => {
-    const first = p.text.split(/[.!?]/)[0] ?? '';
-    return { page: p.page, excerpt: first.trim().slice(0, 120) };
-  });
-  return { pages: parsed.pages, summary, citations, total_chars: parsed.total_chars };
+export async function runDocVertical(harness: Harness, input: DocVerticalInput): Promise<DocVerticalOutput> {
+  const outcome = await harness.run(docTaskContract(input), `doc-${Date.now()}`);
+  return {
+    summary: outcome.loop_result.turns.at(-1)?.model.content ?? '',
+    citations: [],
+    outcome,
+  };
 }

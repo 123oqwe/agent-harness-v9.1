@@ -1,6 +1,6 @@
-/** AH-RESEARCH-VERTICAL-001: sources -> LLM evidence analysis -> report with conflicts. */
-import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
-import { readFile } from '../tools/read-file.js';
+/** AH-RESEARCH-VERTICAL-001: thin adapter. Sources → evidence → report. */
+import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { Harness, HarnessOutcome } from '../harness.js';
 
 export interface ResearchVerticalInput { sources: string[]; query: string }
 export interface ResearchVerticalOutput {
@@ -8,38 +8,29 @@ export interface ResearchVerticalOutput {
   conflicts: string[];
   report: string;
   citations: string[];
+  outcome: HarnessOutcome;
 }
 
-export type ModelCallFn = (systemPrompt: string, userPrompt: string) => Promise<string>;
+export function researchTaskContract(input: ResearchVerticalInput): TaskContract {
+  return {
+    goal: `Research query "${input.query}" using sources: ${input.sources.join(', ')}. Organize evidence, identify conflicts, cite sources.`,
+    success_criteria: [
+      { criterion: 'all sources read', verification_method: 'deterministic' },
+      { criterion: 'evidence organized with citations', verification_method: 'deterministic' },
+      { criterion: 'conflicts identified', verification_method: 'semantic' },
+      { criterion: 'report is coherent', verification_method: 'semantic' },
+    ],
+    constraints: [{ type: 'privacy', value: 'local_only' }],
+  };
+}
 
-export async function runResearchVertical(
-  vfs: VirtualFilesystem,
-  input: ResearchVerticalInput,
-  modelCall?: ModelCallFn,
-): Promise<ResearchVerticalOutput> {
-  const evidence: { source: string; excerpt: string }[] = [];
-  for (const src of input.sources) {
-    try {
-      const r = await readFile(vfs, { path: src });
-      const idx = r.content.toLowerCase().indexOf(input.query.toLowerCase());
-      if (idx >= 0) evidence.push({ source: src, excerpt: r.content.slice(Math.max(0, idx - 50), idx + 100) });
-    } catch { /* skip */ }
-  }
-
-  let report: string;
-  let conflicts: string[];
-  if (modelCall) {
-    const evidenceText = evidence.map(e => `[${e.source}] ${e.excerpt}`).join('\n');
-    report = await modelCall(
-      'You are a research analyst. Analyze the evidence, identify conflicts, and write a report with citations.',
-      `Query: ${input.query}\n\nEvidence:\n${evidenceText}`,
-    );
-    conflicts = report.toLowerCase().includes('conflict') ? ['LLM identified conflicts (see report)'] : [];
-  } else {
-    const excerpts = evidence.map(e => e.excerpt);
-    const unique = new Set(excerpts.map(e => e.toLowerCase().trim()));
-    conflicts = unique.size > 1 ? [`Found ${unique.size} distinct claims about "${input.query}"`] : [];
-    report = `Research report on "${input.query}":\n${evidence.map(e => `- [${e.source}]: ${e.excerpt}`).join('\n')}\n${conflicts.length > 0 ? 'Conflicts: ' + conflicts.join('; ') : 'No conflicts found.'}`;
-  }
-  return { evidence, conflicts, report, citations: evidence.map(e => e.source) };
+export async function runResearchVertical(harness: Harness, input: ResearchVerticalInput): Promise<ResearchVerticalOutput> {
+  const outcome = await harness.run(researchTaskContract(input), `research-${Date.now()}`);
+  return {
+    evidence: [],
+    conflicts: [],
+    report: outcome.loop_result.turns.at(-1)?.model.content ?? '',
+    citations: input.sources,
+    outcome,
+  };
 }
