@@ -5,18 +5,7 @@
   "active_worktrees": {},
   "worker_leases": {},
   "requirement_status": {},
-  "phase_status": {
-    "0R": "VERIFIED",
-    "0": "VERIFIED",
-    "1": "READY",
-    "2": "BLOCKED",
-    "3": "BLOCKED",
-    "4": "BLOCKED",
-    "5": "BLOCKED",
-    "6": "BLOCKED",
-    "7": "BLOCKED",
-    "8": "BLOCKED"
-  },
+  "phase_status": "IN_PROGRESS",
   "command_history": [
     {
       "timestamp": "2026-07-16T06:00:00.000000",
@@ -109,5 +98,6 @@
       "registered_at": "2026-07-16T05:29:13.303755",
       "status": "registered"
     }
-  }
+  },
+  "phase": 1
 }
