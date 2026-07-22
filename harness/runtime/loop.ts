@@ -27,9 +27,9 @@ export type LoopStrategy = 'direct' | 'react' | 'plan_execute';
 export interface LoopConfig {
   strategy: LoopStrategy;
   max_iterations: number;
-  budget_tokens?: number;
-  deadline_ms?: number;
-  data_dir?: string;
+  budget_tokens?: number | undefined;
+  deadline_ms?: number | undefined;
+  data_dir?: string | undefined;
   run_id: string;
   goal: string;
 }
