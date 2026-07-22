@@ -61,7 +61,7 @@ function findSchemaPath(filename: string): string {
   }
   return join(dirs[0]!, filename);
 }
-const TOOL_SPEC_SCHEMA_PATHconst TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
+const TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(TOOL_SPEC_SCHEMA_PATH, 'utf8'));
