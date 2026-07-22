@@ -1,8 +1,21 @@
-/** AH-PLANNING-VERTICAL-001: goal+constraints -> plan -> validate DAG (no cycles). */
+/** AH-PLANNING-VERTICAL-001: goal+constraints -> LLM plan -> validate DAG (no cycles). */
 export interface PlanningVerticalInput { goal: string; tasks: { id: string; depends_on: string[] }[] }
-export interface PlanningVerticalOutput { plan: string[]; valid: boolean; cycles: string[][]; feasible: boolean }
+export interface PlanningVerticalOutput { plan: string[]; valid: boolean; cycles: string[][]; feasible: boolean; llm_plan?: string }
 
-export async function runPlanningVertical(input: PlanningVerticalInput): Promise<PlanningVerticalOutput> {
+export type ModelCallFn = (systemPrompt: string, userPrompt: string) => Promise<string>;
+
+export async function runPlanningVertical(
+  input: PlanningVerticalInput,
+  modelCall?: ModelCallFn,
+): Promise<PlanningVerticalOutput> {
+  let llm_plan: string | undefined;
+  if (modelCall) {
+    llm_plan = await modelCall(
+      'You are a planning assistant. Create a step-by-step plan to achieve the goal. Output each step on a new line.',
+      `Goal: ${input.goal}\nTasks: ${input.tasks.map(t => `${t.id} (depends on: ${t.depends_on.join(',') || 'none'})`).join('; ')}`,
+    );
+  }
+
   // topological sort with cycle detection
   const inDegree = new Map<string, number>();
   const graph = new Map<string, string[]>();
@@ -17,10 +30,8 @@ export async function runPlanningVertical(input: PlanningVerticalInput): Promise
     for (const next of graph.get(id) ?? []) { inDegree.set(next, (inDegree.get(next) ?? 0) - 1); if (inDegree.get(next) === 0) queue.push(next); }
   }
   const valid = plan.length === input.tasks.length;
-  if (!valid) {
-    // find cycle nodes
-    const remaining = input.tasks.filter(t => !plan.includes(t.id)).map(t => t.id);
-    cycles.push(remaining);
-  }
-  return { plan, valid, cycles, feasible: valid };
+  if (!valid) cycles.push(input.tasks.filter(t => !plan.includes(t.id)).map(t => t.id));
+  const result: PlanningVerticalOutput = { plan, valid, cycles, feasible: valid };
+  if (llm_plan) result.llm_plan = llm_plan;
+  return result;
 }

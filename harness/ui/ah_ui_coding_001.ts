@@ -4,11 +4,15 @@ import { runCodingVertical, type CodingVerticalInput, type CodingVerticalOutput 
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../runtime/sandbox.js';
 
+export type ModelCallFn = (systemPrompt: string, userPrompt: string) => Promise<string>;
+
 export class CodingWorkspaceController {
-  constructor(private vfs: VirtualFilesystem, private sandbox: SandboxProfile) {}
-  async runFix(input: CodingVerticalInput): Promise<UiResult<CodingVerticalOutput>> {
+  constructor(private vfs: VirtualFilesystem, private sandbox: SandboxProfile, private modelCall?: ModelCallFn) {}
+  async runFix(input: CodingVerticalInput, modelCall?: ModelCallFn): Promise<UiResult<CodingVerticalOutput>> {
     try {
-      const result = await runCodingVertical(this.vfs, this.sandbox, input);
+      const mc = modelCall ?? this.modelCall;
+      if (!mc) return { state: 'error', error: 'no model call function provided' };
+      const result = await runCodingVertical(this.vfs, this.sandbox, input, mc);
       return { state: 'success', data: result };
     } catch (e) { return { state: 'error', error: (e as Error).message }; }
   }
