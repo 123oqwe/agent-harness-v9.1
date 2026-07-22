@@ -13,9 +13,9 @@
     },
     {
       "name": "phase_architecture_consistent",
-      "passed": true,
-      "detail": "PASS: 254 requirements have one Phase owner, valid dependency order, truthful implemented/verified paths, and consistent authoritative state",
-      "stdout_hash": "7682545fa79d279b"
+      "passed": false,
+      "detail": "FAIL: Phase architecture consistency errors:\n  - Phase 2: missing from manifest: ['AH-CONTEXT-COMPILER-001', 'AH-DOC-INGEST-DOCX-001', 'AH-DOC-INGEST-ENC-001', 'AH-DOC-INGEST-IMG-001', 'AH-DOC-INGEST-MD-001', 'AH-DOC-INGEST-PDF-001', 'AH-DOC-INGEST-PPTX-001', 'AH-DOC-INGEST-UNSUPPORTED-001', 'AH-DOC-INGEST-WEB-001', 'AH-DOC-INGEST-XLSX-001', 'AH-DOC-PARSE-HEAD-001', 'AH-DOC-PARSE-IMGREF-001', 'AH-DOC-PARSE-PROVENANCE-001', 'AH-DOC-PARSE-TABLE-001', 'AH-HOOK-001', 'AH-MCP-STDIO-001', 'AH-MM-ARTIFACT-001', 'AH-MM-DOC-VISION-001', 'AH-MM-IMAGE-EDIT-001', 'AH-MM-IMAGE-GEN-001', 'AH-MM-IMAGE-IN-001', 'AH-MM-VISION-VERIFY-001', 'AH-PAUSE-RESUME-001', 'AH-RAG-CHUNK-001', 'AH-RAG-CITE-001', 'AH-RAG-DELETE-001', 'AH-RAG-EMBED-001', 'AH-RAG-EMBED-MIG-001', 'AH-RAG-FTS-001', 'AH-RAG-GRAPH-001', 'AH-RAG-INJECTION-001', 'AH-RAG-META-001', 'AH-RAG-QUERY-001', 'AH-RAG-RERANK-001', 'AH-RUNTIME-BUDGET-002', 'AH-RUNTIME-COMPACTION-001', 'AH-RUNTIME-MODELFALLBACK-001', 'AH-RUNTIME-SESSIONTREE-001', 'AH-RUNTIME-STEERING-001', 'AH-SANDBOX-OCI-001', 'AH-TOOL-BEHAVIOR-VERIFY-001', 'AH-TOOL-DOCUMENT-001', 'AH-TOOL-ESCALATE-001', 'AH-TOOL-IMAGE-GEN-001', 'AH-TOOL-OCR-001', 'AH-TOOL-PRESENTATION-001', 'AH-TOOL-SPEECH-GEN-001', 'AH-TOOL-SPREADSHEET-001', 'AH-TOOL-TRANSCRIBE-001', 'AH-TOOL-WEB-FETCH-001', 'AH-TOOL-WEB-SEARCH-001', 'AH-UI-DOC-001', 'AH-UI-MM-001', 'AH-UI-NOTIFY-001', 'AH-UI-PLANNING-001', 'AH-UI-RECONCILE-001', 'AH-UI-RESEARCH-001', 'AH-UI-TUI-001', 'AH-UI-WRITING-001', 'AH-UX-API-001', 'AH-UX-CONTRACT-001', 'AH-UX-DESKTOP-001', 'AH-UX-STATES-001', 'AH-UX-WEB-001']",
+      "stdout_hash": "6f69a7cab66094c0"
     },
     {
       "name": "requirement_views_current",
@@ -36,8 +36,8 @@
     },
     {
       "name": "all_phases_have_requirements",
-      "passed": true,
-      "detail": "All phases have requirements"
+      "passed": false,
+      "detail": " Phase 2: 0 requirements. "
     },
     {
       "name": "no_status_contradictions",
@@ -70,7 +70,7 @@
       "detail": "All ADRs ACCEPTED"
     }
   ],
-  "result": "PASS",
-  "timestamp": "2026-07-22T13:44:53.793034",
+  "result": "FAIL",
+  "timestamp": "2026-07-22T19:13:01.642334",
   "note": "This gate runs REAL file checks. Registry status is NOT used as evidence."
 }

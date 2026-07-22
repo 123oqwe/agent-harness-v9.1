@@ -93,7 +93,8 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(coverageConfig).toContain("'security/**/*.ts'");
   });
 
-  it('builds importable JavaScript and declarations from the public entrypoint', async () => {
+  it('builds importable JavaScript and declarations from the public entrypoint', { timeout: 30_000 }, async () => {
+    // timeout: build takes longer under full-suite load
     const result = runNpm(['run', 'build']);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
 
@@ -119,7 +120,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     );
   });
 
-  it('packs only the manifest and necessary dist artifacts', () => {
+  it('packs only the manifest and necessary dist artifacts', { timeout: 30_000 }, () => {
     const build = runNpm(['run', 'build']);
     expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
     const packed = runNpm(['pack', '--dry-run', '--json', '--ignore-scripts']);
