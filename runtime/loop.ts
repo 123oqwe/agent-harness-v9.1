@@ -39,6 +39,7 @@ export interface ModelTurn {
   tool_calls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
   stop_reason?: 'stop' | 'length' | 'tool_use' | 'content_filter';
   decision_summary: string; // NOT private CoT
+  usage?: { input_tokens: number; output_tokens: number };
 }
 
 export interface LoopTurn {
@@ -138,8 +139,11 @@ export class LoopEngine {
     this.iterations = 1;
     const turn = await this.deps.modelCall(messages, 1);
     this.recordTurn(turn);
-    // direct strategy: a returned tool_call is a typed violation — do NOT execute
+    // direct strategy: a returned tool_call is a strategy violation
+    // The Router selected direct (tool-free) but the model proposed a tool.
+    // This requires a new RunPlan revision, not just termination.
     if (turn.tool_calls && turn.tool_calls.length > 0) {
+      this.deps.session.append('system', { reason: 'strategy_violation', detail: 'direct strategy received tool_call, requires RunPlan revision' });
       this.terminate('malformed_response');
       return;
     }
@@ -154,26 +158,42 @@ export class LoopEngine {
     while (this.iterations < this.config.max_iterations && !this.terminated) {
       if (this.deps.signal?.aborted) { this.terminate('user_cancel'); return; }
       if (this.config.deadline_ms && Date.now() - this.startTime > this.config.deadline_ms) { this.terminate('deadline'); return; }
+      if (this.config.budget_tokens) {
+        const usedTokens = this.turns.reduce((sum, t) => sum + (t.model.usage?.input_tokens ?? 0) + (t.model.usage?.output_tokens ?? 0), 0);
+        if (usedTokens >= this.config.budget_tokens) { this.terminate('budget_exhausted'); return; }
+      }
       this.iterations++;
       const turn = await this.deps.modelCall(messages, this.iterations);
       this.recordTurn(turn);
 
       if (turn.stop_reason === 'length') { this.terminate('malformed_response'); return; } // truncated tool call NOT executed
+      if (turn.stop_reason === 'content_filter') { this.terminate('model_refusal'); return; }
       if (turn.tool_calls && turn.tool_calls.length > 0) {
-        const tc = turn.tool_calls[0]!;
-        const key = `${tc.name}:${JSON.stringify(tc.arguments)}`;
-        const count = (toolCallCounts.get(key) ?? 0) + 1;
-        toolCallCounts.set(key, count);
-        if (count >= 3) { this.terminate('tool_oscillation'); return; }
-        if (!this.deps.toolExecute) { this.terminate('malformed_response'); return; }
-        try {
-          const result = await this.deps.toolExecute(tc.name, tc.arguments);
-          this.turns[this.turns.length - 1]!.tool_executed = { name: tc.name, arguments: tc.arguments, result };
-          messages.push({ role: 'assistant', content: turn.decision_summary, tool_calls: turn.tool_calls });
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
-        } catch (e) {
-          this.deps.session.append('error', { tool: tc.name, error: (e as Error).message });
-          this.terminate('malformed_response'); return;
+        // Execute ALL tool calls in this turn (was only first)
+        messages.push({ role: 'assistant', content: turn.decision_summary, tool_calls: turn.tool_calls });
+        for (const tc of turn.tool_calls) {
+          // Canonical oscillation detection (stable JSON key)
+          const key = `${tc.name}:${JSON.stringify(tc.arguments, Object.keys(tc.arguments).sort())}`;
+          const count = (toolCallCounts.get(key) ?? 0) + 1;
+          toolCallCounts.set(key, count);
+          if (count >= 3) { this.terminate('tool_oscillation'); return; }
+          if (!this.deps.toolExecute) { this.terminate('malformed_response'); return; }
+          try {
+            const result = await this.deps.toolExecute(tc.name, tc.arguments);
+            const lastTurn = this.turns[this.turns.length - 1]!;
+            if (!lastTurn.tool_executed) lastTurn.tool_executed = { name: tc.name, arguments: tc.arguments, result };
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+          } catch (e) {
+            // Typed error: distinguish tool errors from malformed responses
+            const errMsg = (e as Error).message;
+            this.deps.session.append('error', { tool: tc.name, error: errMsg, error_type: 'tool_execution' });
+            // Tool errors are retryable if budget allows, otherwise terminate
+            if (this.iterations >= this.config.max_iterations) {
+              this.terminate('malformed_response'); return;
+            }
+            // Record error and continue to next iteration for retry
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ error: errMsg }) });
+          }
         }
       } else {
         // no tool call: check goal
