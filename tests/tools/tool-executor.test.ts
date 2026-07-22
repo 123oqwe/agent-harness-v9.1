@@ -24,7 +24,7 @@ describe('ToolExecutor unified pipeline', () => {
     const snap = tr.freezeSnapshot();
     vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
     vfs.mount(new LocalBackend('/workspace', tmp));
-    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-read', priority: 1, effect: 'allow', tools: ['read_file'], resource_prefixes: ['/workspace'] }] } as Policy);
     const session = new DurableSession('s1');
     session.acquireWriter();
     executor = new ToolExecutor({ toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session });
