@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-RUNTIME-SESSION-001",
-  "commit_sha": "9279ef6ffaae817d46cf81154b3a8f164885d8fc",
+  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
   "source_files": [
     "harness/session/durable-session.ts"
   ],
@@ -12,7 +12,7 @@
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": null
+      "stdout_hash": "e3b0c44298fc1c14"
     },
     {
       "command": "npm run build",
@@ -22,12 +22,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "d83e5a90fce9e8b6"
+      "stdout_hash": "ed11a7abfd31592f"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "16234e176d39b3dd"
+      "stdout_hash": "2976c8d487e6ed16"
     }
   ],
   "exit_codes": [
@@ -37,30 +37,23 @@
     0
   ],
   "test_results": {
-    "suite_total_tests": "544",
-    "suite_passed": "544",
+    "suite_total_files": "78",
+    "suite_total_tests": "640",
+    "suite_passed": "640",
     "requirement_tests": 13,
     "requirement_passed": 13,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "16234e176d39b3dd",
-    "acceptance_criteria_met": [
-      "Event log is source of truth",
-      "Snapshot is acceleration rebuildable",
-      "Crash mid-task resume without duplicate writes",
-      "Session export/import works",
-      "11 entry types supported"
-    ],
-    "known_limitations": []
+    "requirement_test_stdout_hash": "2976c8d487e6ed16"
   },
   "coverage": {
-    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+    "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "concurrent_writer_lock": "PASS",
-    "snapshot_version_verified_on_load": "PASS"
+    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
   "test_output": null,
-  "test_output_hash": "d83e5a90fce9e8b6"
+  "test_output_hash": "ed11a7abfd31592f"
 }

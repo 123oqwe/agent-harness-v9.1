@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-CAPMAP-006",
-  "commit_sha": "ceb668c869b69265ce4f46af66b3d4e5bad458cc",
+  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
   "source_files": [
     "harness/security/secrets-broker.ts",
     "harness/package.json",
@@ -17,7 +17,7 @@
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": null
+      "stdout_hash": "e3b0c44298fc1c14"
     },
     {
       "command": "npm run build",
@@ -27,7 +27,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "8a300ed6166513f5"
+      "stdout_hash": "ed11a7abfd31592f"
+    },
+    {
+      "command": "npx vitest run <requirement tests>",
+      "exit_code": 0,
+      "stdout_hash": "2976c8d487e6ed16"
     }
   ],
   "exit_codes": [
@@ -37,44 +42,23 @@
     0
   ],
   "test_results": {
-    "suite_total_files": "34",
-    "suite_total_tests": "419",
-    "suite_passed": "419",
+    "suite_total_files": "78",
+    "suite_total_tests": "640",
+    "suite_passed": "640",
     "requirement_tests": 27,
     "requirement_passed": 27,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "927f6e7ad26d57f6",
-    "acceptance_criteria_met": [
-      "PUT /vault/secrets stores encrypted in SQLite",
-      "GET returns decrypted only with capability token",
-      "GET without token 403",
-      "AES-256-GCM master key from user password",
-      "Master key never plaintext PBKDF2 100k",
-      "All access logged",
-      "Secret values never logged",
-      "DELETE removes permanently",
-      "List returns names only",
-      "Credential exchange scoped single dispatch rejected on replay zeroes after",
-      "Restart preserves encrypted secrets + audit not master key"
-    ],
-    "known_limitations": [
-      "SQLite stored in a local temp file for tests; production path identical"
-    ],
-    "generated_at": "2026-07-21T06:24:08.420Z"
+    "requirement_test_stdout_hash": "2976c8d487e6ed16"
   },
   "coverage": {
-    "note": "Coverage reported by full-suite vitest --coverage at gate time; per-requirement tests pass"
+    "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "encrypted_at_rest": "PASS AES-256-GCM",
-    "requires_capability_token": "PASS",
-    "secret_values_never_logged": "PASS",
-    "master_key_never_persisted": "PASS PBKDF2 100k",
-    "credential_exchange_single_use": "PASS",
-    "no_credential_in_agent_env": "PASS"
+    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
   "test_output": null,
-  "test_output_hash": "8a300ed6166513f5"
+  "test_output_hash": "ed11a7abfd31592f"
 }

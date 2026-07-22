@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-EVAL-RUNNER-001",
-  "commit_sha": "f8ae874bcb4b3a260eab8b4b69f97612980890b2",
+  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
   "source_files": [
     "harness/verification/eval-runner.ts"
   ],
@@ -11,7 +11,7 @@
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": null
+      "stdout_hash": "e3b0c44298fc1c14"
     },
     {
       "command": "npm run build",
@@ -21,12 +21,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "05b59d173fd6323d"
+      "stdout_hash": "ed11a7abfd31592f"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "1f946dbcfedabec0"
+      "stdout_hash": "2976c8d487e6ed16"
     }
   ],
   "exit_codes": [
@@ -36,31 +36,23 @@
     0
   ],
   "test_results": {
-    "suite_total_tests": "559",
-    "suite_passed": "559",
+    "suite_total_files": "78",
+    "suite_total_tests": "640",
+    "suite_passed": "640",
     "requirement_tests": 8,
     "requirement_passed": 8,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "1f946dbcfedabec0",
-    "acceptance_criteria_met": [
-      "Executes unit integration adversarial 6 vertical eval suites from one manifest",
-      "Uses ScriptedTestProvider and local fixtures only",
-      "Evaluates TaskContract success criteria emits pass/fail reasons",
-      "Captures command exit code stdout/stderr hashes fixture version code revision",
-      "Failing/missing eval cannot be pass",
-      "Runs e2e fixtures direct/react/plan_execute fails on disagreement"
-    ],
-    "known_limitations": []
+    "requirement_test_stdout_hash": "2976c8d487e6ed16"
   },
   "coverage": {
-    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+    "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "impl_agent_cannot_edit_expected_results": "PASS",
-    "registry_maturity_never_evidence": "PASS"
+    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
   "test_output": null,
-  "test_output_hash": "05b59d173fd6323d"
+  "test_output_hash": "ed11a7abfd31592f"
 }

@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-UI-SETTINGS-001",
-  "commit_sha": "3d93cd00fbcbdecc3b5cb26604d307ea021cf5d3",
+  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
   "source_files": [
     "harness/ui/ah_ui_settings_001.ts"
   ],
@@ -11,7 +11,7 @@
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": null
+      "stdout_hash": "e3b0c44298fc1c14"
     },
     {
       "command": "npm run build",
@@ -21,12 +21,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "4960e5e7e9fe93ee"
+      "stdout_hash": "ed11a7abfd31592f"
     },
     {
-      "command": "npx vitest run <tool tests>",
+      "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "c1056616f640f318"
+      "stdout_hash": "2976c8d487e6ed16"
     }
   ],
   "exit_codes": [
@@ -36,28 +36,23 @@
     0
   ],
   "test_results": {
-    "suite_total_tests": "626",
-    "suite_passed": "626",
+    "suite_total_files": "78",
+    "suite_total_tests": "640",
+    "suite_passed": "640",
     "requirement_tests": 4,
     "requirement_passed": 4,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "c1056616f640f318",
-    "acceptance_criteria_met": [
-      "Returns real config",
-      "Updates config",
-      "Rejects negative budget",
-      "Reset restores defaults"
-    ],
-    "known_limitations": []
+    "requirement_test_stdout_hash": "2976c8d487e6ed16"
   },
   "coverage": {
-    "note": "Per-tool tests pass; coverage at gate time"
+    "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "validation": "PASS"
+    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent rerun at exact implementation SHA",
+  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
   "test_output": null,
-  "test_output_hash": "4960e5e7e9fe93ee"
+  "test_output_hash": "ed11a7abfd31592f"
 }

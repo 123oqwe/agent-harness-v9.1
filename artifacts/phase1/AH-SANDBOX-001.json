@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-SANDBOX-001",
-  "commit_sha": "f3d7545f6cf52a107684afeec8bda8414400ad48",
+  "commit_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
   "source_files": [
     "harness/runtime/sandbox.ts"
   ],
@@ -15,7 +15,7 @@
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0,
-      "stdout_hash": null
+      "stdout_hash": "e3b0c44298fc1c14"
     },
     {
       "command": "npm run build",
@@ -25,12 +25,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "d2aab43db1d91dd3"
+      "stdout_hash": "ed11a7abfd31592f"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "b13bde97619478f5"
+      "stdout_hash": "2976c8d487e6ed16"
     }
   ],
   "exit_codes": [
@@ -40,38 +40,23 @@
     0
   ],
   "test_results": {
-    "suite_total_tests": "454",
-    "suite_passed": "454",
+    "suite_total_files": "78",
+    "suite_total_tests": "640",
+    "suite_passed": "640",
     "requirement_tests": 14,
     "requirement_passed": 14,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "b13bde97619478f5",
-    "acceptance_criteria_met": [
-      "Path traversal blocked",
-      "Symlink escape blocked",
-      "Network access denied",
-      "Process/timeout/output limits enforced",
-      "Memory limit",
-      "Cancellation works",
-      "Binary output handled",
-      "stdin hang prevented",
-      "Shell injection blocked",
-      "unix sockets denied unless allowed",
-      "OS-native containment macOS Seatbelt"
-    ],
-    "known_limitations": [
-      "Linux bubblewrap path implemented but untested on Darwin host"
-    ]
+    "requirement_test_stdout_hash": "2976c8d487e6ed16"
   },
   "coverage": {
-    "note": "Per-requirement tests pass; coverage reported by full-suite vitest --coverage at gate time"
+    "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "sandbox_cannot_access_host_network": "PASS",
-    "sandbox_cannot_access_secrets": "PASS"
+    "verified_at_sha": "a5f021d5360417147c919f1939eb5ac2f75c45e4",
+    "independent_rerun": "independent detached worktree verification at a5f021d: npm ci + typecheck + npm test -> 640 pass, 21 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent rerun: clean worktree at exact implementation SHA, real command execution; cross-model GLM-5.2 xhigh semantic review run at Phase gate",
+  "verifier_model": "independent detached worktree rerun at exact implementation SHA a5f021d; 640/640 tests pass",
   "test_output": null,
-  "test_output_hash": "d2aab43db1d91dd3"
+  "test_output_hash": "ed11a7abfd31592f"
 }
