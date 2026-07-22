@@ -41,16 +41,27 @@ export interface RegistrySnapshot {
 }
 
 function findSchemaPath(filename: string): string {
-  // Try relative to __dirname first, then process.cwd() (for Stryker temp dirs)
-  const candidates = [
-    join(resolve(__dirname, '..', '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), 'spec', 'contracts'), filename),
+  // Try env var first (set by Stryker run script), then relative paths
+  const specRoot = process.env.HARNESS_SPEC_ROOT;
+  if (specRoot) {
+    const p = join(specRoot, 'contracts', filename);
+    if (existsSync(p)) return p;
+  }
+  const dirs = [
+    join(resolve(__dirname, '..', '..', 'spec', 'contracts')),
+    join(resolve(__dirname, '..', '..', '..', 'spec', 'contracts')),
+    join(resolve(__dirname, '..', '..', '..', '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', '..', '..', 'spec', 'contracts')),
   ];
-  for (const p of candidates) { try { if (existsSync(p)) return p; } catch { /* */ } }
-  return candidates[0]!;
+  for (const dir of dirs) {
+    const p = join(dir, filename);
+    try { if (existsSync(p)) return p; } catch { /* */ }
+  }
+  return join(dirs[0]!, filename);
 }
-const TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
+const TOOL_SPEC_SCHEMA_PATHconst TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(TOOL_SPEC_SCHEMA_PATH, 'utf8'));
