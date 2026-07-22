@@ -7,6 +7,10 @@ const args = process.argv.slice(2);
 // Call the locally installed stryker binary directly.
 const strykerBin = resolve(process.cwd(), 'node_modules', '.bin', 'stryker');
 
+// Set spec root for schema file resolution inside Stryker sandbox
+const specRoot = resolve(process.cwd(), '..', 'spec');
+process.env.HARNESS_SPEC_ROOT = specRoot;
+
 const result = spawnSync(strykerBin, ['run', ...args], {
   stdio: 'inherit',
   cwd: process.cwd(),

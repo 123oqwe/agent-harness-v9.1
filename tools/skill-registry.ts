@@ -39,19 +39,26 @@ export interface SkillRegistrySnapshot {
 }
 
 function findSchemaPath(filename: string): string {
-  const candidates = [
-    join(resolve(__dirname, '..', '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), '..', '..', '..', 'spec', 'contracts'), filename),
-    join(resolve(process.cwd(), 'spec_link', 'contracts'), filename),
-    join(resolve(__dirname, '..', 'spec_link', 'contracts'), filename),
-    join(resolve(process.cwd(), 'spec', 'contracts'), filename),
+  const specRoot = process.env.HARNESS_SPEC_ROOT;
+  if (specRoot) {
+    const p = join(specRoot, 'contracts', filename);
+    if (existsSync(p)) return p;
+  }
+  const dirs = [
+    join(resolve(__dirname, '..', '..', 'spec', 'contracts')),
+    join(resolve(__dirname, '..', '..', '..', 'spec', 'contracts')),
+    join(resolve(__dirname, '..', '..', '..', '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts')),
+    join(resolve(process.cwd(), '..', '..', '..', 'spec', 'contracts')),
   ];
-  for (const p of candidates) { try { if (existsSync(p)) return p; } catch { /* */ } }
-  return candidates[0]!;
+  for (const dir of dirs) {
+    const p = join(dir, filename);
+    try { if (existsSync(p)) return p; } catch { /* */ }
+  }
+  return join(dirs[0]!, filename);
 }
-const SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
+const SKILL_SPEC_SCHEMA_PATHconst SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
