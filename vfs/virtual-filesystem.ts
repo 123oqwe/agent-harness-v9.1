@@ -14,7 +14,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, realpathSync, existsSync, rmSync } from 'node:fs';
-import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
+import { dirname, join, relative, resolve, isAbsolute, basename } from 'node:path';
 
 export type VfsBackendKind = 'local' | 'overlay' | 'store' | 'evidence';
 
@@ -53,7 +53,16 @@ export function assertSafeVfsPath(path: string): void {
   if (/(^|\/)\.\.(\/|$)/.test(path)) throw new VfsError(`traversal rejected: ${path}`);
 }
 
-function realpathSafe(p: string): string { try { return realpathSync(p); } catch { return p; } }
+function realpathSafe(p: string): string {
+  try { return realpathSync(p); } catch {
+    // For non-existent paths, resolve the parent directory and rejoin
+    try {
+      const dir = dirname(p);
+      const dirReal = realpathSync(dir);
+      return join(dirReal, basename(p));
+    } catch { return p; }
+  }
+}
 function clone(b: Buffer | undefined): Buffer { if (!b) throw new VfsError('not found'); return Buffer.from(b); }
 function sha(b: Buffer): string { return createHash('sha256').update(b).digest('hex'); }
 function now(): string { return new Date().toISOString(); }
@@ -68,6 +77,7 @@ export class LocalBackend implements Backend {
     return resolve(this.root, rel);
   }
   private safe(osPath: string): string {
+    // Resolve both paths through realpath to handle macOS /var -> /private/var
     const real = realpathSafe(osPath);
     const rootReal = realpathSafe(this.root);
     const rel = relative(rootReal, real);
@@ -85,9 +95,12 @@ export class LocalBackend implements Backend {
   }
   write(path: string, data: Buffer): void {
     const os = this.osPath(path);
-    mkdirSync(dirname(os), { recursive: true });
-    writeFileSync(os, data);
+    // Check symlink escape BEFORE writing (not after) to prevent writing outside root
     this.safe(os);
+    mkdirSync(dirname(os), { recursive: true });
+    // Re-check after mkdir in case a symlink was created in the parent dir
+    this.safe(os);
+    writeFileSync(os, data);
   }
   delete(path: string): void { rmSync(this.osPath(path), { recursive: true, force: true }); }
   exists(path: string): boolean { try { this.safe(this.osPath(path)); return existsSync(this.osPath(path)); } catch { return false; } }
@@ -210,17 +223,29 @@ export class VirtualFilesystem {
   /** Atomically commit a RunPlan overlay into its commit target backend. */
   commitOverlay(overlay: OverlayBackend, target: Backend): void {
     if (overlay.isCommitted() || overlay.isDiscarded()) throw new VfsError('overlay already finalized');
-    for (const [path, buf] of overlay.stagedEntries()) {
-      this.checkPermission(path, true);
-      target.write(path, buf);
-      this.record({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
+    // Phase 1 atomicity: write all entries, track written paths for rollback on failure.
+    const writtenPaths: string[] = [];
+    try {
+      for (const [path, buf] of overlay.stagedEntries()) {
+        this.checkPermission(path, true);
+        target.write(path, buf);
+        writtenPaths.push(path);
+        this.record({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
+      }
+      for (const path of overlay.stagedTombstones()) {
+        this.checkPermission(path, true);
+        target.delete(path);
+        this.record({ path, backend: target.kind, operation: 'commit', timestamp: now() });
+      }
+      overlay.markCommitted();
+    } catch (e) {
+      // Rollback: delete any partially written files
+      for (const path of writtenPaths) {
+        try { target.delete(path); } catch { /* best effort rollback */ }
+      }
+      this.record({ path: overlay.prefix, backend: target.kind, operation: 'discard', timestamp: now() });
+      throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}`);
     }
-    for (const path of overlay.stagedTombstones()) {
-      this.checkPermission(path, true);
-      try { target.delete(path); } catch { /* best effort */ }
-      this.record({ path, backend: target.kind, operation: 'commit', timestamp: now() });
-    }
-    overlay.markCommitted();
   }
   discardOverlay(overlay: OverlayBackend): void {
     overlay.markDiscarded();
