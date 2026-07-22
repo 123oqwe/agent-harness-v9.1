@@ -95,4 +95,33 @@ describe('AH-EVAL-RUNNER-001 eval runner', () => {
     const r = new EvalRunner().run(manifest);
     expect(r.results[0]!.passed).toBe(true);
   });
+
+
+  it('expected_exit is actually checked: command exits 0 but expected_exit=1 must fail', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'AH-TEST',
+      suites: [{ id: 'ex1', kind: 'unit', command: 'echo ok', expected_exit: 1 }],
+    };
+    const report = new EvalRunner().run(manifest);
+    // Command exits 0, but expected_exit=1 — must be marked as failed
+    expect(report.results[0]!.passed).toBe(false);
+    expect(report.all_passed).toBe(false);
+  });
+
+  it('expected_exit=0 with command exit 0 passes, expected_exit=2 with exit 2 passes', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'AH-TEST',
+      suites: [
+        { id: 'ex2', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+        { id: 'ex3', kind: 'unit', command: 'exit 2', expected_exit: 2 },
+      ],
+    };
+    const report = new EvalRunner().run(manifest);
+    expect(report.results[0]!.passed).toBe(true);
+    expect(report.results[1]!.passed).toBe(true);
+    expect(report.all_passed).toBe(true);
+  });
+
 });

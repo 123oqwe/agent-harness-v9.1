@@ -89,16 +89,23 @@ export class EvalRunner {
   }
 
   private runCase(c: EvalCase, cwd: string): EvalResult {
+    let exit_code: number;
+    let stdout: string;
+    let stderr: string;
     try {
-      const out = execSync(c.command, { cwd, timeout: 120_000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-      const passed = true; // exit 0
-      return { case_id: c.id, passed, exit_code: 0, stdout_hash: sha(out), stderr_hash: null, fixture_version: c.fixture_version };
+      stdout = execSync(c.command, { cwd, timeout: 120_000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      stderr = '';
+      exit_code = 0;
     } catch (e) {
       const err = e as { status?: number; stdout?: string; stderr?: string };
-      const exit_code = err.status ?? 1;
-      // a failing eval cannot be represented as pass
-      return { case_id: c.id, passed: false, exit_code, stdout_hash: sha(err.stdout ?? ''), stderr_hash: sha(err.stderr ?? ''), reason: `exit ${exit_code}`, fixture_version: c.fixture_version };
+      exit_code = err.status ?? 1;
+      stdout = err.stdout ?? '';
+      stderr = err.stderr ?? '';
     }
+    // Check expected_exit: passed only if actual exit matches expected
+    const passed = exit_code === c.expected_exit;
+    const reason = passed ? undefined : `expected exit ${c.expected_exit}, got ${exit_code}`;
+    return { case_id: c.id, passed, exit_code, stdout_hash: sha(stdout), stderr_hash: sha(stderr || null), reason, fixture_version: c.fixture_version };
   }
 
   /** Verify a manifest is well-formed (no missing evals). */
