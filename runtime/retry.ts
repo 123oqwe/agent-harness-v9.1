@@ -128,19 +128,18 @@ function delay(ms: number): Promise<void> {
  */
 export async function retry<T>(fn: (attempt: number) => Promise<T>, opts: RetryOptions = {}): Promise<T> {
   const { maxAttempts = DEFAULTS.maxAttempts, baseDelay = DEFAULTS.baseDelay, maxDelay = DEFAULTS.maxDelay, jitterMs = DEFAULTS.jitterMs, idempotencyKey, log } = opts;
-  if (!idempotencyKey) {
-    // caller asserts idempotency by providing a key; without one, only 1 attempt for non-idempotent ops
-    // but we allow the caller to opt in; if no key, we still retry but the caller bears responsibility
-  }
+  // Security invariant: retry must NOT replay non-idempotent operations without idempotency key.
+  // Without a key, only 1 attempt is allowed (no retry).
+  const effectiveMaxAttempts = idempotencyKey ? maxAttempts : 1;
   let lastError: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     try {
       const result = await fn(attempt);
       return result;
     } catch (err) {
       lastError = err;
       const classified = classifyError(err);
-      const isLast = attempt >= maxAttempts;
+      const isLast = attempt >= effectiveMaxAttempts;
       const delayMs = isLast || !classified.retryable ? 0 : Math.min(baseDelay * Math.pow(2, attempt - 1) + randomInt(0, jitterMs), maxDelay);
       log?.({ attempt, delayMs, error: classified.message, timestamp: new Date().toISOString() });
       if (!classified.retryable) throw err;
@@ -148,5 +147,5 @@ export async function retry<T>(fn: (attempt: number) => Promise<T>, opts: RetryO
       await delay(delayMs);
     }
   }
-  throw new RetryExhausted(lastError, maxAttempts);
+  throw new RetryExhausted(lastError, effectiveMaxAttempts);
 }

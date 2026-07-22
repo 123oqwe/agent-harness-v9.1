@@ -5,7 +5,7 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
   describe('retry', () => {
     it('calls fn at most maxAttempts times', async () => {
       let calls = 0;
-      await expect(retry(async () => { calls++; if (calls < 3) throw Object.assign(new Error('srv'), { status: 500 }); return 'ok'; }, { maxAttempts: 3, baseDelay: 1, jitterMs: 1 })).resolves.toBe('ok');
+      await expect(retry(async () => { calls++; if (calls < 3) throw Object.assign(new Error('srv'), { status: 500 }); return 'ok'; }, { maxAttempts: 3, baseDelay: 1, jitterMs: 1, idempotencyKey: 'test-1' })).resolves.toBe('ok');
       expect(calls).toBe(3);
     });
     it('non-retryable error (400) does NOT trigger retry', async () => {
@@ -25,7 +25,7 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
     it('backoff: attempt N waits baseDelay * 2^(N-1) + random(0, jitterMs)', async () => {
       const delays: number[] = [];
       let calls = 0;
-      await retry(async () => { calls++; if (calls < 3) throw Object.assign(new Error('srv'), { status: 500 }); return 'ok'; }, { maxAttempts: 3, baseDelay: 10, jitterMs: 5, log: e => delays.push(e.delayMs) });
+      await retry(async () => { calls++; if (calls < 3) throw Object.assign(new Error('srv'), { status: 500 }); return 'ok'; }, { maxAttempts: 3, baseDelay: 10, jitterMs: 5, idempotencyKey: 'backoff', log: e => delays.push(e.delayMs) });
       expect(delays).toHaveLength(2); // 2 retries
       expect(delays[0]).toBeGreaterThanOrEqual(10); // baseDelay*2^0 + jitter
       expect(delays[0]).toBeLessThanOrEqual(15);
@@ -33,12 +33,12 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
       expect(delays[1]).toBeLessThanOrEqual(25);
     });
     it('RetryExhausted includes last error and attempt count', async () => {
-      try { await retry(async () => { throw Object.assign(new Error('srv'), { status: 500 }); }, { maxAttempts: 2, baseDelay: 1 }); expect.fail('should throw'); }
+      try { await retry(async () => { throw Object.assign(new Error('srv'), { status: 500 }); }, { maxAttempts: 2, baseDelay: 1, idempotencyKey: 'exhaust' }); expect.fail('should throw'); }
       catch (e) { expect(e).toBeInstanceOf(RetryExhausted); expect((e as RetryExhausted).attempts).toBe(2); expect((e as RetryExhausted).lastError).toBeDefined(); }
     });
     it('all retry attempts logged with attempt number, delay, error', async () => {
       const logs: RetryLogEntry[] = [];
-      try { await retry(async () => { throw Object.assign(new Error('srv'), { status: 500 }); }, { maxAttempts: 2, baseDelay: 1, log: e => logs.push(e) }); } catch { /* */ }
+      try { await retry(async () => { throw Object.assign(new Error('srv'), { status: 500 }); }, { maxAttempts: 2, baseDelay: 1, idempotencyKey: 'log', log: e => logs.push(e) }); } catch { /* */ }
       expect(logs).toHaveLength(2);
       expect(logs[0]!.attempt).toBe(1);
       expect(logs[0]!.error).toBeTruthy();
@@ -76,14 +76,21 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
     });
   });
 
-  describe('idempotency', () => {
-    it('retry does not replay non-idempotent ops without idempotency key (caller responsibility)', async () => {
-      // The retry function accepts an idempotencyKey; without it the caller must ensure idempotency.
-      // This test documents the contract: retry executes the same fn, so the fn must be idempotent or keyed.
+  describe('idempotency enforcement', () => {
+    it('does NOT retry when idempotencyKey is absent (prevents non-idempotent replay)', async () => {
       let calls = 0;
-      const result = await retry(async () => { calls++; return calls; }, { maxAttempts: 3, baseDelay: 1, idempotencyKey: 'key-1' });
-      expect(result).toBe(1);
+      const fn = async () => { calls++; if (calls < 3) throw { status: 500 }; return 'ok'; };
+      // Without idempotencyKey, retry must only attempt once — no replay
+      await expect(retry(fn, { maxAttempts: 3, baseDelay: 1 })).rejects.toThrow();
       expect(calls).toBe(1);
+    });
+
+    it('retries when idempotencyKey is present (safe to replay)', async () => {
+      let calls = 0;
+      const fn = async () => { calls++; if (calls < 3) throw { status: 500 }; return 'ok'; };
+      const result = await retry(fn, { maxAttempts: 3, baseDelay: 1, idempotencyKey: 'key-1' });
+      expect(result).toBe('ok');
+      expect(calls).toBe(3);
     });
   });
 });
