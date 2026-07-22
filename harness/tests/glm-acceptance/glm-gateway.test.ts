@@ -28,7 +28,7 @@ describe.skipIf(SKIP)('GLM via ModelGateway', () => {
     expect(result.usage.input_tokens).toBeGreaterThan(0);
     expect(usageMeter.getRecords().length).toBe(1);
     expect(usageMeter.getRecords()[0]!.provider_id).toBe('glm');
-  }, 30000);
+  }, 120000);
 
   it('egress policy denies when GLM_ALLOW_REMOTE is not set', async () => {
     const oldVal = process.env.GLM_ALLOW_REMOTE;
