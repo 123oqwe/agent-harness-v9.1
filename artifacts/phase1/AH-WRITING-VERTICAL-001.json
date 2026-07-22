@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-WRITING-VERTICAL-001",
-  "commit_sha": "c69976d26acbec20748a624f968bccb413b718ff",
+  "commit_sha": "effdfa01281867c34ad02a47b3e0c9f6e8969178",
   "source_files": [
     "harness/writing/ah_writing_vertical_001.ts"
   ],
@@ -21,12 +21,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "ced485ae58a3c9de"
+      "stdout_hash": "3e4b61777c11b5e5"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "1046590be2dae96e"
+      "stdout_hash": "b67b0a06e2117f92"
     }
   ],
   "exit_codes": [
@@ -42,17 +42,17 @@
     "requirement_tests": 1,
     "requirement_passed": 1,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "1046590be2dae96e"
+    "requirement_test_stdout_hash": "b67b0a06e2117f92"
   },
   "coverage": {
     "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "verified_at_sha": "c69976d26acbec20748a624f968bccb413b718ff",
-    "independent_rerun": "independent detached worktree at c69976d: npm install + typecheck + npm test -> 653 pass, 23 skip, 0 fail"
+    "verified_at_sha": "effdfa01281867c34ad02a47b3e0c9f6e8969178",
+    "independent_rerun": "pending detached worktree verification"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent detached worktree rerun at c69976d; 653/653 tests pass",
+  "verifier_model": "same-session rerun at exact implementation SHA; independent detached verification follows",
   "test_output": null,
-  "test_output_hash": "ced485ae58a3c9de"
+  "test_output_hash": "3e4b61777c11b5e5"
 }
