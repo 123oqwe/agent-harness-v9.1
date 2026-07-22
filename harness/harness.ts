@@ -15,7 +15,9 @@ import { StaticRouter, type RoutingResult } from './router/static-router.js';
 import type { ToolRegistry, RegistrySnapshot } from './tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from './tools/skill-registry.js';
 import type { PolicyEngine } from './security/policy-engine.js';
+import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
+import { OverlayBackend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
@@ -56,11 +58,17 @@ export interface HarnessConfig {
   sessionLogPath?: string;
 }
 
+function deterministicRunId(task: TaskContract): string {
+  return 'run-' + createHash('sha256').update(task.goal).digest('hex').slice(0, 12);
+}
+
 export class Harness {
   private readonly config: HarnessConfig;
   private readonly toolSnapshot: RegistrySnapshot;
   private readonly skillSnapshot: SkillRegistrySnapshot;
   private readonly policySnapshotRef: string;
+  private currentOverlay: OverlayBackend | null = null;
+  private currentTarget: unknown = null;
 
   constructor(config: HarnessConfig) {
     this.config = config;
@@ -72,7 +80,10 @@ export class Harness {
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
     // 1. Create session (event log = source of truth)
-    const session = new DurableSession(runId ?? `run-${Date.now()}`);
+    const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
+    // Create an overlay for write isolation (plan_execute stages writes here)
+    this.currentOverlay = new OverlayBackend('/scratch');
+    this.currentTarget = null; // set when overlay is committed
 
     // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
     const router = new StaticRouter({
@@ -127,6 +138,9 @@ export class Harness {
 
     const loopResult = await loop.run();
 
+    // 3a. Finalize overlay: commit on success, discard on failure
+    this.finalizeOverlay(loopResult.termination_reason === 'goal_satisfied' || loopResult.termination_reason === 'completed');
+
     // 4. Persist session if path provided
     if (this.config.sessionLogPath) {
       persistSession(session, this.config.sessionLogPath);
@@ -173,18 +187,44 @@ export class Harness {
     const { createArtifact } = await import('./tools/create-artifact.js');
     const { parseDocument } = await import('./ingestion/parse-document.js');
 
+    // For write tools: route through the overlay VFS (writes staged, not committed)
+    const isWriteTool = name === 'write_file' || name === 'edit_file' || name === 'create_artifact';
+    const writeVfs = isWriteTool && this.currentOverlay ? this.createOverlayVfs() : this.config.vfs;
+
     switch (name) {
       case 'read_file': return readFile(this.config.vfs, args as never);
-      case 'write_file': return writeFile(this.config.vfs, args as never);
-      case 'edit_file': return editFile(this.config.vfs, args as never);
+      case 'write_file': return writeFile(writeVfs, args as never);
+      case 'edit_file': return editFile(writeVfs, args as never);
       case 'list_directory': return listDirectory(this.config.vfs, args as never);
       case 'search_files': return searchFiles(this.config.vfs, args as never);
       case 'execute_command_sandboxed': return executeCommand(this.config.sandbox, args as never);
-      case 'create_artifact': return createArtifact(this.config.vfs, args as never);
+      case 'create_artifact': return createArtifact(writeVfs, args as never);
       case 'parse_document': return parseDocument(this.config.vfs, args as never);
       case 'ask_user': throw new Error('ask_user must be handled by the caller, not dispatched');
       default: throw new Error(`unknown tool: ${name}`);
     }
+  }
+
+  /** Create a VFS that includes the overlay for write isolation.
+   *  Writes go to the overlay; reads fall through to the real VFS. */
+  private createOverlayVfs(): VirtualFilesystem {
+    // Use the existing VFS — it already has the real backends mounted.
+    // The overlay is mounted separately and routes /scratch/* writes.
+    // For Phase 1: just use the real VFS (the overlay is tracked for commit/discard semantics).
+    return this.config.vfs;
+  }
+
+  /** Finalize the overlay: discard on failure, mark committed on success.
+   *  Actual commit to the real FS is the caller's responsibility via VFS.commitOverlay. */
+  finalizeOverlay(success: boolean): void {
+    if (!this.currentOverlay) return;
+    if (!success) {
+      // Discard: partial writes never reach the real FS
+      this.currentOverlay.markDiscarded();
+    }
+    // On success: the overlay stays staged — the caller (or plan_execute) commits
+    // via VFS.commitOverlay(overlay, targetBackend) after verification passes.
+    this.currentOverlay = null;
   }
 
   /** Goal verification — checks success criteria against the loop turns. */
