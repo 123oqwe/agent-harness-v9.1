@@ -141,27 +141,54 @@ export class EvidenceBackend implements Backend {
   exists(path: string): boolean { return this.files.has(path); }
 }
 
-/** Per-RunPlan transactional overlay: stages writes, commits atomically or discards. */
+/** Per-RunPlan transactional overlay: stages writes, commits atomically or discards.
+ *  Supports read-through to a base backend for paths not staged or tombstoned. */
 export class OverlayBackend implements Backend {
   readonly kind = 'overlay' as const;
   private readonly staged = new Map<string, Buffer>();
   private readonly tombstones = new Set<string>();
   private committed = false;
   private discarded = false;
+  private baseBackend: Backend | null = null;
   constructor(readonly prefix: string) {}
+  /** Set the base backend for read-through (un-staged paths fall through to base). */
+  setBaseBackend(base: Backend): void { this.baseBackend = base; }
   private checkTx(): void {
     if (this.committed) throw new VfsError('overlay already committed');
     if (this.discarded) throw new VfsError('overlay already discarded');
   }
-  read(path: string): Buffer { if (this.tombstones.has(path)) throw new VfsError(`not found: ${path}`); return clone(this.staged.get(path)); }
+  read(path: string): Buffer {
+    if (this.tombstones.has(path)) throw new VfsError(`not found: ${path}`);
+    if (this.staged.has(path)) return clone(this.staged.get(path));
+    // Read-through to base backend for un-staged paths
+    if (this.baseBackend) return this.baseBackend.read(path);
+    throw new VfsError(`not found: ${path}`);
+  }
   list(path: string): VfsEntry[] {
     const out: VfsEntry[] = [];
-    for (const k of this.staged.keys()) if (!this.tombstones.has(k) && k.startsWith(path === '/' ? '/' : path + '/')) out.push({ path: k, kind: 'file', size: this.staged.get(k)!.length });
+    const seen = new Set<string>();
+    for (const k of this.staged.keys()) {
+      if (!this.tombstones.has(k) && k.startsWith(path === '/' ? '/' : path + '/')) {
+        out.push({ path: k, kind: 'file', size: this.staged.get(k)!.length });
+        seen.add(k);
+      }
+    }
+    // Merge with base backend entries
+    if (this.baseBackend) {
+      for (const e of this.baseBackend.list(path)) {
+        if (!seen.has(e.path) && !this.tombstones.has(e.path)) out.push(e);
+      }
+    }
     return out;
   }
   write(path: string, data: Buffer): void { this.checkTx(); this.staged.set(path, clone(data)); this.tombstones.delete(path); }
   delete(path: string): void { this.checkTx(); this.tombstones.add(path); this.staged.delete(path); }
-  exists(path: string): boolean { return !this.tombstones.has(path) && this.staged.has(path); }
+  exists(path: string): boolean {
+    if (this.tombstones.has(path)) return false;
+    if (this.staged.has(path)) return true;
+    if (this.baseBackend) return this.baseBackend.exists(path);
+    return false;
+  }
   stagedEntries(): ReadonlyArray<readonly [string, Buffer]> { return [...this.staged.entries()].map(([p, b]) => [p, clone(b)] as const); }
   stagedTombstones(): readonly string[] { return [...this.tombstones]; }
   markCommitted(): void { this.committed = true; }
@@ -220,28 +247,48 @@ export class VirtualFilesystem {
     return matches;
   }
 
-  /** Atomically commit a RunPlan overlay into its commit target backend. */
+  /** Atomically commit a RunPlan overlay into its commit target backend.
+   *  Saves original content before overwriting; restores on failure. */
   commitOverlay(overlay: OverlayBackend, target: Backend): void {
     if (overlay.isCommitted() || overlay.isDiscarded()) throw new VfsError('overlay already finalized');
-    // Phase 1 atomicity: write all entries, track written paths for rollback on failure.
+    // Save originals for rollback: content of existing files + existence of new files
+    const originals = new Map<string, Buffer | null>(); // null = file did not exist
+    const deletedFiles = new Map<string, Buffer>(); // path -> original content (for restore)
     const writtenPaths: string[] = [];
     try {
-      for (const [path, buf] of overlay.stagedEntries()) {
+      // Phase 1: Save originals for all staged writes and tombstones
+      for (const [path] of overlay.stagedEntries()) {
         this.checkPermission(path, true);
+        try { originals.set(path, target.read(path)); } catch { originals.set(path, null); }
+      }
+      for (const path of overlay.stagedTombstones()) {
+        this.checkPermission(path, true);
+        try { deletedFiles.set(path, target.read(path)); } catch { /* file may not exist */ }
+      }
+      // Phase 2: Write all entries
+      for (const [path, buf] of overlay.stagedEntries()) {
         target.write(path, buf);
         writtenPaths.push(path);
         this.record({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
       }
+      // Phase 3: Delete tombstoned files
       for (const path of overlay.stagedTombstones()) {
-        this.checkPermission(path, true);
         target.delete(path);
         this.record({ path, backend: target.kind, operation: 'commit', timestamp: now() });
       }
       overlay.markCommitted();
     } catch (e) {
-      // Rollback: delete any partially written files
-      for (const path of writtenPaths) {
-        try { target.delete(path); } catch { /* best effort rollback */ }
+      // Rollback: restore original content for overwritten files, restore deleted files, delete new files
+      for (const [path, original] of originals) {
+        if (original !== null) {
+          try { target.write(path, original); } catch { /* best effort */ }
+        } else {
+          // File was new — delete it
+          try { target.delete(path); } catch { /* best effort */ }
+        }
+      }
+      for (const [path, original] of deletedFiles) {
+        try { target.write(path, original); } catch { /* best effort */ }
       }
       this.record({ path: overlay.prefix, backend: target.kind, operation: 'discard', timestamp: now() });
       throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}`);

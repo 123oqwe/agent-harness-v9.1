@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, symlinkSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, symlinkSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -250,4 +250,98 @@ describe('VFS backend direct coverage', () => {
     vfs.delete('/workspace/del.txt');
     expect(vfs.exists('/workspace/del.txt')).toBe(false);
   });
+
+
+  // -----------------------------------------------------------------------
+  // P0: Overlay must support read-through to the base backend
+  // -----------------------------------------------------------------------
+  it('OverlayBackend read-through: staged write returns staged content, un-staged path falls through to base', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'vfs-rt-'));
+    writeFileSync(join(tmp, 'existing.txt'), 'real-content');
+    const base = new LocalBackend('/workspace', tmp);
+    const overlay = new OverlayBackend('/workspace');
+    overlay.setBaseBackend(base);
+    // Staged write returns staged content
+    overlay.write('/workspace/staged.txt', Buffer.from('staged'));
+    expect(overlay.read('/workspace/staged.txt').toString()).toBe('staged');
+    // Un-staged path must fall through to base backend (NOT throw)
+    expect(overlay.read('/workspace/existing.txt').toString()).toBe('real-content');
+  });
+
+  // -----------------------------------------------------------------------
+  // P0: commitOverlay must save original content and restore on multi-file failure
+  // -----------------------------------------------------------------------
+  it('commitOverlay restores original content when second file commit fails', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'vfs-rollback-'));
+    writeFileSync(join(tmp, 'file-a.txt'), 'original-a');
+    writeFileSync(join(tmp, 'file-b.txt'), 'original-b');
+    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
+    const base = new LocalBackend('/workspace', tmp);
+    vfs.mount(base);
+
+    // Stage two overwrites in one overlay
+    const overlay = new OverlayBackend('/workspace');
+    overlay.write('/workspace/file-a.txt', Buffer.from('new-a'));
+    overlay.write('/workspace/file-b.txt', Buffer.from('new-b'));
+
+    // Use a wrapper that allows the first write but fails on the second
+    let writeCount = 0;
+    const partiallyFailingTarget = {
+      kind: 'local' as const,
+      prefix: '/workspace',
+      read: (p: string) => base.read(p),
+      list: (p: string) => base.list(p),
+      write: (p: string, d: Buffer) => {
+        writeCount++;
+        if (writeCount === 2) throw new VfsError('simulated failure on second write');
+        base.write(p, d);
+      },
+      delete: (p: string) => base.delete(p),
+      exists: (p: string) => base.exists(p),
+    };
+
+    expect(() => vfs.commitOverlay(overlay, partiallyFailingTarget as unknown as Backend)).toThrow();
+    // file-a.txt was overwritten with 'new-a' — rollback must restore 'original-a'
+    expect(readFileSync(join(tmp, 'file-a.txt'), 'utf8')).toBe('original-a');
+    // file-b.txt should still have its original content
+    expect(readFileSync(join(tmp, 'file-b.txt'), 'utf8')).toBe('original-b');
+  });
+
+  // -----------------------------------------------------------------------
+  // P0: commitOverlay must restore deleted files on rollback
+  // -----------------------------------------------------------------------
+  it('commitOverlay restores deleted files when commit fails', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'vfs-del-rollback-'));
+    writeFileSync(join(tmp, 'keep.txt'), 'keep-content');
+    writeFileSync(join(tmp, 'other.txt'), 'other-content');
+    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
+    const base = new LocalBackend('/workspace', tmp);
+    vfs.mount(base);
+
+    // Stage: write one file + delete another
+    const overlay = new OverlayBackend('/workspace');
+    overlay.write('/workspace/new.txt', Buffer.from('new'));
+    overlay.delete('/workspace/keep.txt');
+
+    // Use a wrapper that allows the write but fails on the delete
+    let opCount = 0;
+    const failingTarget = {
+      kind: 'local' as const,
+      prefix: '/workspace',
+      read: (p: string) => base.read(p),
+      list: (p: string) => base.list(p),
+      write: (p: string, d: Buffer) => { base.write(p, d); },
+      delete: (p: string) => {
+        opCount++;
+        if (opCount === 1) throw new VfsError('simulated delete failure');
+        base.delete(p);
+      },
+      exists: (p: string) => base.exists(p),
+    };
+
+    expect(() => vfs.commitOverlay(overlay, failingTarget as unknown as Backend)).toThrow();
+    // keep.txt must still exist with original content
+    expect(readFileSync(join(tmp, 'keep.txt'), 'utf8')).toBe('keep-content');
+  });
+
 });
