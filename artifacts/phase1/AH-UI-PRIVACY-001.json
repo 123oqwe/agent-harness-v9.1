@@ -1,6 +1,6 @@
 {
   "requirement_id": "AH-UI-PRIVACY-001",
-  "commit_sha": "13522c6e768415d6ab7d403fd597bf16df8b1318",
+  "commit_sha": "c69976d26acbec20748a624f968bccb413b718ff",
   "source_files": [
     "harness/ui/ah_ui_privacy_001.ts"
   ],
@@ -21,12 +21,12 @@
     {
       "command": "npm test",
       "exit_code": 0,
-      "stdout_hash": "fb0ef7a1f9134471"
+      "stdout_hash": "ced485ae58a3c9de"
     },
     {
       "command": "npx vitest run <requirement tests>",
       "exit_code": 0,
-      "stdout_hash": "ffeff0900bb0bc52"
+      "stdout_hash": "ef4a2e86ab4f81a5"
     }
   ],
   "exit_codes": [
@@ -36,23 +36,23 @@
     0
   ],
   "test_results": {
-    "suite_total_files": "80",
-    "suite_total_tests": "648",
-    "suite_passed": "648",
+    "suite_total_files": "81",
+    "suite_total_tests": "653",
+    "suite_passed": "653",
     "requirement_tests": 4,
     "requirement_passed": 4,
     "requirement_failed": 0,
-    "requirement_test_stdout_hash": "ffeff0900bb0bc52"
+    "requirement_test_stdout_hash": "ef4a2e86ab4f81a5"
   },
   "coverage": {
     "note": "Full suite coverage: see coverage/coverage-summary.json"
   },
   "security_checks": {
-    "verified_at_sha": "13522c6e768415d6ab7d403fd597bf16df8b1318",
-    "independent_rerun": "independent detached worktree at 13522c6: npm ci + typecheck + npm test -> 648 pass, 23 skip, 0 fail"
+    "verified_at_sha": "c69976d26acbec20748a624f968bccb413b718ff",
+    "independent_rerun": "independent detached worktree at c69976d: npm install + typecheck + npm test -> 653 pass, 23 skip, 0 fail"
   },
   "verifier_result": "pass",
-  "verifier_model": "independent detached worktree rerun at 13522c6; 648/640 tests pass",
+  "verifier_model": "independent detached worktree rerun at c69976d; 653/653 tests pass",
   "test_output": null,
-  "test_output_hash": "fb0ef7a1f9134471"
+  "test_output_hash": "ced485ae58a3c9de"
 }
