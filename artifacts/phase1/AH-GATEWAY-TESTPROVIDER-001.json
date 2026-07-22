@@ -1,7 +1,8 @@
 {
   "requirement_id": "AH-GATEWAY-TESTPROVIDER-001",
-  "commit_sha": "2c2c319",
-  "verification_commit_sha": "pending",
+  "product_commit_sha": "2c2c319",
+  "verification_commit_sha": null,
+  "status": "implemented",
   "source_files": [
     "harness/gateway/scripted-provider.ts",
     "harness/index.ts",
@@ -19,26 +20,50 @@
   ],
   "commands_run": [
     {
-      "command": ["npx", "vitest", "run", "tests/gateway/scripted-provider.test.ts", "tests/packaging/package.test.ts"],
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "tests/gateway/scripted-provider.test.ts",
+        "tests/packaging/package.test.ts"
+      ],
       "exit_code": 0,
       "test_count": 76,
       "passed": 76,
       "failed": 0
     },
     {
-      "command": ["npx", "tsc", "--noEmit"],
+      "command": [
+        "npx",
+        "tsc",
+        "--noEmit"
+      ],
       "exit_code": 0
     },
     {
-      "command": ["npx", "tsc", "-p", "tsconfig.build.json"],
+      "command": [
+        "npx",
+        "tsc",
+        "-p",
+        "tsconfig.build.json"
+      ],
       "exit_code": 0
     },
     {
-      "command": ["npx", "eslint", "scripts", "tests/packaging/package.test.ts"],
+      "command": [
+        "npx",
+        "eslint",
+        "scripts",
+        "tests/packaging/package.test.ts"
+      ],
       "exit_code": 0
     },
     {
-      "command": ["npm", "audit", "--audit-level=high"],
+      "command": [
+        "npm",
+        "audit",
+        "--audit-level=high"
+      ],
       "exit_code": 0,
       "vulnerabilities": 0
     }
@@ -49,7 +74,8 @@
     "failed": 0,
     "skipped": 0
   },
-  "coverage": "pending full suite coverage run",
+  "coverage": "NOT_RUN_YET",
+  "mutation": "NOT_RUN_YET",
   "security_checks": {
     "injection_fixed": true,
     "no_shell_concat": true,
@@ -59,10 +85,12 @@
     "zero_vulnerabilities": true
   },
   "known_limitations": [
-    "Full suite coverage and mutation score not yet run for this requirement in isolation"
+    "Coverage not yet run for this requirement",
+    "Mutation score not yet run for this requirement",
+    "Independent verifier not yet performed (detached worktree rerun was done for tests only, not full gate)",
+    "Cannot be marked verified until Coverage, Mutation, and independent verifier are complete"
   ],
-  "verifier_result": "pass",
-  "verifier_model": "detached-worktree-rerun",
-  "verifier_details": "Detached worktree at SHA 2c2c319: 76/76 tests pass, typecheck=0, build=0, lint=0, audit=0",
+  "verifier_result": "pending",
+  "verifier_model": null,
   "defect_fixed": "run-stryker.mjs used execSync with shell string concatenation and npx temporary download, enabling argument injection"
 }
