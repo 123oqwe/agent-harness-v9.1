@@ -3,15 +3,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Spike ah-spike-005: Drizzle ORM
-// This spike is VERIFIED (Phase 0R). Test verifies the spike artifact exists.
+// Verifies TypeScript type checking is configured (prerequisite for ORM types).
 describe('ah-spike-005: Drizzle ORM', () => {
-  it('spike artifact exists', () => {
-    // Spikes are verification tasks. If this test fails, the spike was not completed.
-    // Check that the relevant dependency/config exists in harness/package.json
-    const pkgPath = path.resolve(__dirname, '../../../harness/package.json');
-    expect(fs.existsSync(pkgPath)).toBe(true);
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-    expect(Object.keys(allDeps).length).toBeGreaterThan(0);
+  it('tsconfig.json exists with strict mode', () => {
+    const tsconfigPath = path.resolve(__dirname, '../../../harness/tsconfig.json');
+    expect(fs.existsSync(tsconfigPath)).toBe(true);
+    const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
+    expect(tsconfig.compilerOptions?.strict).toBe(true);
+  });
+
+  it('type definitions are available', () => {
+    const typesDir = path.resolve(__dirname, '../../../harness/node_modules/@types');
+    expect(fs.existsSync(typesDir)).toBe(true);
+    const types = fs.readdirSync(typesDir);
+    expect(types.length).toBeGreaterThan(0);
   });
 });
