@@ -2,7 +2,7 @@
 import type { TaskContract } from '../../spec/types/task-contract.js';
 import type { Harness, HarnessOutcome } from '../harness.js';
 
-export interface DocVerticalInput { path: string; max_pages?: number }
+export interface DocVerticalInput { path: string; max_pages?: number | undefined }
 export interface DocVerticalOutput {
   summary: string;
   citations: { page: number; excerpt: string }[];
@@ -23,9 +23,22 @@ export function docTaskContract(input: DocVerticalInput): TaskContract {
 
 export async function runDocVertical(harness: Harness, input: DocVerticalInput): Promise<DocVerticalOutput> {
   const outcome = await harness.run(docTaskContract(input), `doc-${Date.now()}`);
+  const events = outcome.session.getEvents();
+  const toolResults = events.filter(e => e.type === 'tool_result');
+  const parseResult = toolResults.find(e => (e.data as { tool: string }).tool === 'parse_document');
+  let citations: { page: number; excerpt: string }[] = [];
+  if (parseResult) {
+    try {
+      const parseData = JSON.parse((parseResult.data as { result?: string }).result ?? '') as { pages?: Array<{ page: number; text: string }> };
+      citations = (parseData.pages ?? []).map(p => ({
+        page: p.page,
+        excerpt: (p.text.split(/[.!?]/)[0] ?? '').trim().slice(0, 120),
+      }));
+    } catch { /* empty citations on parse failure */ }
+  }
   return {
     summary: outcome.loop_result.turns.at(-1)?.model.content ?? '',
-    citations: [],
+    citations,
     outcome,
   };
 }
