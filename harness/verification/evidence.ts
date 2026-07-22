@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import Ajv from 'ajv/dist/2020.js';
 
 export interface CommandResult {
   command: string;
@@ -67,10 +68,16 @@ export function generateEvidence(params: {
   const commit_sha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
   if (!/^[0-9a-f]{40}$/.test(commit_sha)) throw new EvidenceError(`invalid commit_sha: ${commit_sha}`);
 
-  // verify source_files and tests_added exist
+  // verify source_files and tests_added exist — fail on missing, do not silently filter
   const base = params.cwd ?? process.cwd();
-  const source_files = params.source_files.filter(f => existsSync(resolve(base, f)));
-  const tests_added = params.tests_added.filter(f => existsSync(resolve(base, f)));
+  for (const f of params.source_files) {
+    if (!existsSync(resolve(base, f))) throw new EvidenceError(`source_file does not exist: ${f}`);
+  }
+  for (const f of params.tests_added) {
+    if (!existsSync(resolve(base, f))) throw new EvidenceError(`tests_added file does not exist: ${f}`);
+  }
+  const source_files = params.source_files;
+  const tests_added = params.tests_added;
 
   const commands_run = params.commands.map(c => runCommand(c, base));
   const exit_codes = commands_run.map(c => c.exit_code);
@@ -109,13 +116,16 @@ export function writeEvidence(evidence: EvidencePackage, path: string): void {
   writeFileSync(path, JSON.stringify(evidence, null, 2));
 }
 
-/** Validate an EvidencePackage against the schema. */
+/** Validate an EvidencePackage against the schema using AJV. */
 export function validateEvidence(evidence: unknown, schemaPath: string): boolean {
-  try { JSON.parse(readFileSync(schemaPath, 'utf8')); } catch { /* schema file may not exist in sandbox */ }
-  // minimal structural validation (full ajv validation done in tests)
+  const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(schema);
+  if (!validate(evidence)) {
+    const errors = validate.errors?.map((e: { instancePath: string; message?: string }) => `${e.instancePath}: ${e.message}`).join('; ') ?? 'unknown';
+    throw new EvidenceError(`evidence schema validation failed: ${errors}`);
+  }
   const e = evidence as EvidencePackage;
-  const required = ['requirement_id', 'commit_sha', 'source_files', 'tests_added', 'commands_run', 'exit_codes', 'test_results', 'coverage', 'security_checks', 'verifier_result'];
-  for (const k of required) if (!(k in e)) throw new EvidenceError(`missing required field: ${k}`);
   if (!/^[0-9a-f]{40}$/.test(e.commit_sha)) throw new EvidenceError(`commit_sha must be a 40-char SHA: ${e.commit_sha}`);
   if (e.verifier_result === 'pass' && e.commands_run.length === 0) throw new EvidenceError('PASS without commands is forbidden');
   if (e.verifier_result === 'pass' && e.commit_sha === 'pending') throw new EvidenceError('PASS with pending commit_sha is forbidden');
