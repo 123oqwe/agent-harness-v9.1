@@ -258,8 +258,18 @@ export class LoopEngine {
       return;
     }
 
-    // Track completed steps for crash restore (no duplicate side effects)
+    // Track completed steps: rebuild from session event log for crash restore
     const completedSteps = new Set<string>();
+    for (const ev of this.deps.session.getEvents()) {
+      if (ev.type === 'tool_result') {
+        const data = ev.data as { step?: string };
+        if (data.step) completedSteps.add(data.step);
+      }
+      if (ev.type === 'system') {
+        const data = ev.data as { step?: string; status?: string };
+        if (data.step && data.status === 'done') completedSteps.add(data.step);
+      }
+    }
     const failedSteps = new Set<string>();
 
     // Execute steps in topological order
