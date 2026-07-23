@@ -3,7 +3,7 @@
  * Generate TypeScript types from spec/contracts/*.schema.json.
  * Output: harness/contracts/generated/*.ts
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileFromFile } from 'json-schema-to-typescript';
