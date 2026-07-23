@@ -632,3 +632,171 @@ describe('Evidence edge-case mutation-killing tests', () => {
     expect(validateEvidence(ev, SCHEMA_PATH)).toBe(true);
   });
 });
+
+describe('Verification final mutation-killing tests', () => {
+  const runner = new EvalRunner();
+
+  it('all_passed is false when at least one case fails among passing ones', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-AP',
+      suites: [
+        { id: 'ap1', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+        { id: 'ap2', kind: 'unit', command: 'exit 1', expected_exit: 0 },
+        { id: 'ap3', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    expect(report.all_passed).toBe(false);
+  });
+
+  it('validateManifest rejects null manifest', () => {
+    expect(() => EvalRunner.validateManifest(null)).toThrow(EvalRunnerError);
+  });
+
+  it('validateManifest rejects undefined manifest', () => {
+    expect(() => EvalRunner.validateManifest(undefined)).toThrow(EvalRunnerError);
+  });
+
+  it('validateManifest rejects suites not an array', () => {
+    expect(() => EvalRunner.validateManifest({
+      manifest_version: 'eval-manifest.v1', requirement_id: 'x', suites: 'not-array',
+    })).toThrow(EvalRunnerError);
+  });
+
+  it('validateManifest rejects case with undefined fields', () => {
+    expect(() => EvalRunner.validateManifest({
+      manifest_version: 'eval-manifest.v1', requirement_id: 'x',
+      suites: [{ kind: 'unit', command: 'echo', expected_exit: 0 }],
+    })).toThrow(EvalRunnerError);
+  });
+
+  it('validateManifest error message contains invalid manifest_version', () => {
+    try {
+      EvalRunner.validateManifest({ manifest_version: 'wrong', requirement_id: 'x', suites: [] });
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('manifest_version');
+    }
+  });
+
+  it('validateManifest error message contains requirement_id', () => {
+    try {
+      EvalRunner.validateManifest({ manifest_version: 'eval-manifest.v1', suites: [] });
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('requirement_id');
+    }
+  });
+
+  it('validateManifest error message contains non-empty suites', () => {
+    try {
+      EvalRunner.validateManifest({ manifest_version: 'eval-manifest.v1', requirement_id: 'x', suites: [] });
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('non-empty');
+    }
+  });
+
+  it('validateManifest error message contains id and command', () => {
+    try {
+      EvalRunner.validateManifest({
+        manifest_version: 'eval-manifest.v1', requirement_id: 'x',
+        suites: [{ id: '', command: '', expected_exit: 0 }],
+      });
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('id and command');
+    }
+  });
+
+  it('generateEvidence with cwd parameter uses that cwd', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ev-cwd-'));
+    try {
+      const ev = generateEvidence({
+        requirement_id: 'AH-CWD-PARAM', source_files: [], tests_added: [],
+        commands: ['echo ok'], cwd: dir, test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.verifier_result).toBe('pass');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('generateEvidence without cwd parameter uses process.cwd', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-NO-CWD', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.verifier_result).toBe('pass');
+  });
+
+  it('validateEvidence rejects non-40-char commit_sha with 39 chars', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(39), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('validateEvidence rejects non-40-char commit_sha with 41 chars', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(41), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('validateEvidence accepts 40-char hex commit_sha with fail result', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [{ command: 'exit 1', exit_code: 1, stdout_hash: null }],
+      exit_codes: [1], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).not.toThrow();
+  });
+
+  it('validateEvidence rejects pass with commands but pending commit_sha', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'pending', source_files: [], tests_added: [],
+      commands_run: [{ command: 'echo', exit_code: 0, stdout_hash: 'abc' }], exit_codes: [0],
+      test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('writeEvidence existing pass file rejects fail overwrite with immutable message', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ev-imm-'));
+    try {
+      const path = join(dir, 'evidence.json');
+      const passEv = generateEvidence({
+        requirement_id: 'AH-IMM', source_files: ['package.json'], tests_added: [],
+        commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      writeEvidence(passEv, path);
+      const failEv: EvidencePackage = {
+        requirement_id: 'AH-IMM', commit_sha: 'b'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [{ command: 'exit 1', exit_code: 1, stdout_hash: null }],
+        exit_codes: [1], test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'fail',
+      };
+      try {
+        writeEvidence(failEv, path);
+        expect.fail('should have thrown');
+      } catch (e) {
+        expect((e as Error).message).toContain('immutable');
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
