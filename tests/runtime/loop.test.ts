@@ -1344,4 +1344,119 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: oscillation key and detectContextReset precision', () => {
+    it('oscillation key uses sorted keys for canonical comparison', async () => {
+      const sess = session();
+      let callCount = 0;
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 10, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => {
+            callCount++;
+            // Same tool+args but with different key order — should still oscillate
+            const args = callCount % 2 === 0 ? { b: 2, a: 1 } : { a: 1, b: 2 };
+            return { content: '', decision_summary: 'same', stop_reason: 'tool_use', tool_calls: [{ id: String(callCount), name: 'read_file', arguments: args }] };
+          },
+          toolExecute: async () => 'content',
+          goalSatisfied: () => false,
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('tool_oscillation');
+    });
+
+    it('detectContextReset: last 2 turns both with tool_calls returns false', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call1', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/a' } }] };
+            if (msgs.length <= 3) return { content: '', decision_summary: 'call2', stop_reason: 'tool_use', tool_calls: [{ id: '2', name: 'read_file', arguments: { path: '/b' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'content',
+          goalSatisfied: (turns) => turns.length >= 3,
+        },
+      );
+      const result = await loop.run();
+      expect(result.context_reset_emitted).toBe(false);
+    });
+
+    it('detectContextReset: 1 turn with tool, 1 without returns true', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            if (msgs.length <= 1) return { content: '', decision_summary: 'tool', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read', arguments: {} }] };
+            return { content: 'no tool', decision_summary: 'no tool', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'ok',
+          goalSatisfied: () => false,
+        },
+      );
+      const result = await loop.run();
+      // First turn has tool, second doesn't — detectContextReset checks last 2 turns
+      // Turn 1: has tool_calls. Turn 2: no tool_calls. detectContextReset checks if BOTH last 2 have no tool calls.
+      // So it should NOT fire on just 1 no-tool turn. It needs 2 consecutive no-tool turns.
+      // With max_iterations=5 and goalSatisfied=false, after 2 turns it should context_reset on turn 3+4
+      expect(result.termination_reason).toBe('context_reset');
+    });
+
+    it('react: assistant message pushed after no-tool turn', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: 'thinking', decision_summary: 'no progress', stop_reason: 'stop' }),
+          goalSatisfied: () => false,
+        },
+      );
+      await loop.run();
+      // Session should have assistant events with decision_summary
+      const events = sess.getEvents();
+      const assistantEvents = events.filter(e => e.type === 'assistant');
+      expect(assistantEvents.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('plan_execute: all steps done, no goalSatisfied provided, terminates completed', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'decision' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('plan_execute: overlay_commit event recorded on success', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'verification' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+      const events = sess.getEvents();
+      const commitEvent = events.find(e => e.type === 'system' && (e.data as { action?: string }).action === 'overlay_commit');
+      expect(commitEvent).toBeDefined();
+      expect((commitEvent!.data as { reason: string }).reason).toBe('all steps completed');
+    });
+  });
+
 });
