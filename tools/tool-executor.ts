@@ -41,6 +41,7 @@ export interface ToolReceipt {
   output_hash?: string | undefined;
   token_id?: string | undefined;
   policy_decision?: string | undefined;
+  derived_risk_tier?: number | undefined;
 }
 
 export interface ToolExecutorDeps {
@@ -190,6 +191,7 @@ export class ToolExecutor {
 
     // 4. Issue a single-use capability token
     let token: CapabilityToken;
+    let tier: number | undefined;
     const issueTime = this.injectedNow();
     try {
       const decision = this.deps.policyEngine.evaluate({
@@ -198,6 +200,7 @@ export class ToolExecutor {
         risk,
         context: policyContext,
       });
+      tier = decision.derived_risk_tier;
       if (!decision.allowed) {
         this.deps.session.append('error', { tool: toolName, reason: `policy denied: ${decision.reason_code}` });
         throw new ToolExecutorError(`policy denied: ${decision.reason_code}`);
@@ -277,6 +280,7 @@ export class ToolExecutor {
       output_hash: error === undefined ? hash(result).slice(0, 16) : undefined,
       token_id: tokenId,
       policy_decision: 'allow',
+      derived_risk_tier: tier,
     };
 
     // 8. Evidence

@@ -354,4 +354,102 @@ describe('ToolExecutor unified pipeline', () => {
     await expect(executor.execute('read_file', null, async () => 'x')).rejects.toThrow();
   });
 
+
+
+  it('receipt derived_risk_tier is 0 for default read-only local tool', async () => {
+    writeFileSync(join(tmp, 'tier0.txt'), 'data');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/tier0.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier0.txt' }));
+    expect(receipt.derived_risk_tier).toBe(0);
+  });
+
+  it('receipt derived_risk_tier is 3 for write operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'write', tags: [], transport: 'native', operation: 'write', locality: 'local', reversibility: 'best_effort', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'tier2.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier2.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier2.txt' }));
+    expect(receipt.derived_risk_tier).toBe(3);
+  });
+
+  it('receipt derived_risk_tier is 4 for execute operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'exec', tags: [], transport: 'native', operation: 'execute', locality: 'local', reversibility: 'none', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'tier_exec.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_exec.txt' }));
+    expect(receipt.derived_risk_tier).toBe(4);
+  });
+
+  it('receipt derived_risk_tier is 1 for remote locality tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'remote', tags: [], transport: 'native', operation: 'read', locality: 'remote', reversibility: 'guaranteed', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'tier_remote.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_remote.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_remote.txt' }));
+    expect(receipt.derived_risk_tier).toBe(1);
+  });
+
+  it('receipt derived_risk_tier reflects credential_access', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'cred', tags: [], transport: 'native', operation: 'read', locality: 'local', reversibility: 'guaranteed', data_egress: 'none', network_access: false, credential_access: true, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'tier_cred.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_cred.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_cred.txt' }));
+    expect(receipt.derived_risk_tier).toBe(2);
+  });
+
+  it('receipt derived_risk_tier reflects data_egress', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'egress', tags: [], transport: 'native', operation: 'read', locality: 'local', reversibility: 'guaranteed', data_egress: 'content', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'tier_egress.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_egress.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_egress.txt' }));
+    expect(receipt.derived_risk_tier).toBe(2);
+  });
+
 });
