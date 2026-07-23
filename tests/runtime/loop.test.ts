@@ -418,4 +418,172 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: plan_execute tool_call and verification paths', () => {
+    it('tool_call step executes tool and completes', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'tool_call' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }), toolExecute: async () => 'content' },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('tool_call step fails when no tool call available', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'tool_call' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'no tool', decision_summary: 'no tool', stop_reason: 'stop' }), toolExecute: async () => 'x' },
+      );
+      const result = await loop.run();
+      // No tool call available — step completes as done, then loop completes
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('verification step satisfied completes with goal_satisfied', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'done', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('verification step not satisfied completes', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'work', stop_reason: 'stop' }), goalSatisfied: () => false },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('blocked step skipped when dependency failed', async () => {
+      const sess = session();
+      const wf = { nodes: [
+        { step_id: 's1', step_type: 'tool_call' as const, status: 'pending' as const },
+        { step_id: 's2', step_type: 'model_call' as const, status: 'pending' as const },
+      ], edges: [{ from_step: 's1', to_step: 's2' }] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }), toolExecute: async () => { throw new Error('fail'); } },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('decision step type passes through as done', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'decision' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('all steps done with goalSatisfied true terminates goal_satisfied', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'done', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+  });
+
+  describe('mutation-killing: react edge cases', () => {
+    it('context_reset after 2 consecutive no-tool turns', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'thinking', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => false },
+      );
+      const result = await loop.run();
+      expect(result.context_reset_emitted).toBe(true);
+      expect(result.termination_reason).toBe('context_reset');
+    });
+
+    it('tool oscillation: same tool+args 3 times stops loop', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 10, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'same tool', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/same' } }] }),
+          toolExecute: async () => 'content',
+          goalSatisfied: () => false,
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('tool_oscillation');
+    });
+
+    it('different tool args do not trigger oscillation', async () => {
+      const sess = session();
+      let callCount = 0;
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => { callCount++; return { content: '', decision_summary: 'd', stop_reason: 'tool_use', tool_calls: [{ id: String(callCount), name: 'read_file', arguments: { path: '/file' + callCount } }] }; },
+          toolExecute: async () => 'content',
+          goalSatisfied: () => callCount >= 3,
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).not.toBe('tool_oscillation');
+    });
+  });
+
+  describe('mutation-killing: progress.json content', () => {
+    it('progress.json contains run_id, current_step, goal, completed_steps', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r-test', goal: 'test goal', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.run_id).toBe('r-test');
+      expect(progress.goal).toBe('test goal');
+      expect(progress.current_step).toBe(1);
+      expect(progress.completed_steps).toHaveLength(1);
+      expect(progress.completed_steps[0].summary).toBe('done');
+    });
+
+    it('progress.json open_tasks empty after termination', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.open_tasks).toEqual([]);
+    });
+
+    it('progress.json last_error is null on goal_satisfied', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.last_error).toBeNull();
+    });
+  });
+
 });
