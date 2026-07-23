@@ -1051,4 +1051,191 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: tool_call step direct execution', () => {
+    it('tool_call step executes tool from previous model_call tool_calls', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+          { step_id: 's3', step_type: 'verification' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }, { from_step: 's2', to_step: 's3' }],
+      };
+      let toolCalled = false;
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call tool', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { toolCalled = true; return 'tool result'; },
+          goalSatisfied: () => true,
+        },
+      );
+      const result = await loop.run();
+      expect(toolCalled).toBe(true);
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('tool_call step with tool error sets node failed and terminates', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { throw new Error('permission denied'); },
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'error' && (e.data as { error: string }).error === 'permission denied')).toBe(true);
+    });
+
+    it('tool_call step records overlay_discard on failure', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'write_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { throw new Error('disk full'); },
+        },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const discardEvent = events.find(e => e.type === 'system' && (e.data as { action?: string }).action === 'overlay_discard');
+      expect(discardEvent).toBeDefined();
+      expect((discardEvent!.data as { reason: string }).reason).toBe('tool failure');
+    });
+
+    it('tool_call step with no prior model turn completes as done (no tool to execute)', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [{ step_id: 's1', step_type: 'tool_call' as const, status: 'pending' as const }],
+        edges: [],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: 'no tools', decision_summary: 'no tools', stop_reason: 'stop' }),
+          toolExecute: async () => 'should not be called',
+        },
+      );
+      const result = await loop.run();
+      // No prior model turn with tool_calls — step completes as done
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('writeProgress records progress_path in LoopResult', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r-test', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.progress_path).toBe(join(dir, 'progress.json'));
+    });
+
+    it('writeProgress not called when no data_dir', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.progress_path).toBeUndefined();
+    });
+
+    it('context_reset_emitted is true on context_reset termination', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'thinking', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => false },
+      );
+      const result = await loop.run();
+      expect(result.context_reset_emitted).toBe(true);
+      expect(result.termination_reason).toBe('context_reset');
+    });
+
+    it('context_reset_emitted is false on non-context_reset termination', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.context_reset_emitted).toBe(false);
+    });
+
+    it('detectContextReset returns false with only 1 turn', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.context_reset_emitted).toBe(false);
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('react with goalSatisfied after first tool call stops with goal_satisfied', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'content',
+          goalSatisfied: (turns) => turns.length >= 2,
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+      expect(result.iterations).toBe(2);
+    });
+
+    it('react with assistant message pushed on no-tool turn', async () => {
+      const sess = session();
+      let msgCount = 0;
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            msgCount = msgs.length;
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read', arguments: { path: '/a' } }] };
+            return { content: 'thinking', decision_summary: 'no tool this time', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'ok',
+          goalSatisfied: () => false,
+        },
+      );
+      await loop.run();
+      // After first tool call, second model call returns no tool → context_reset
+      expect(msgCount).toBeGreaterThan(1);
+    });
+  });
+
 });
