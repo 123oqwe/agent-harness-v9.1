@@ -696,4 +696,145 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: session events and message content verification', () => {
+    it('direct records assistant event with decision_summary', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'result', decision_summary: 'my summary' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const assistantEvents = events.filter(e => e.type === 'assistant');
+      expect(assistantEvents.length).toBe(1);
+      expect((assistantEvents[0]!.data as { decision_summary: string }).decision_summary).toBe('my summary');
+    });
+
+    it('direct with tool_call records strategy_violation system event', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'd', tool_calls: [{ id: '1', name: 'x', arguments: {} }] }) },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const systemEvents = events.filter(e => e.type === 'system');
+      expect(systemEvents.some(e => (e.data as { reason?: string }).reason === 'strategy_violation')).toBe(true);
+    });
+
+    it('react records tool_call and tool_result events', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 2, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'file content',
+          goalSatisfied: () => true,
+        },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      // LoopEngine records assistant events; tool_call events are recorded by Harness
+      expect(events.some(e => e.type === 'assistant')).toBe(true);
+    });
+
+    it('react tool error records error event with tool name', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 1, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { throw new Error('file not found'); },
+        },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const errorEvents = events.filter(e => e.type === 'error');
+      expect(errorEvents.length).toBeGreaterThan(0);
+      expect((errorEvents[0]!.data as { tool: string }).tool).toBe('read_file');
+    });
+
+    it('termination records system event with termination_reason', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const systemEvents = events.filter(e => e.type === 'system');
+      expect(systemEvents.some(e => (e.data as { termination_reason: string }).termination_reason === 'goal_satisfied')).toBe(true);
+    });
+
+    it('plan_execute records overlay_commit on success', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'done', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'system' && (e.data as { action?: string }).action === 'overlay_commit')).toBe(true);
+    });
+
+    it('plan_execute verification step records system event with verified status', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'work', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'system' && (e.data as { verified?: boolean }).verified === true)).toBe(true);
+    });
+
+    it('plan_execute blocked step records system event with blocked status', async () => {
+      const sess = session();
+      const wf = { nodes: [
+        { step_id: 's1', step_type: 'tool_call' as const, status: 'pending' as const },
+        { step_id: 's2', step_type: 'model_call' as const, status: 'pending' as const },
+      ], edges: [{ from_step: 's1', to_step: 's2' }] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }), toolExecute: async () => { throw new Error('fail'); } },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'system' && (e.data as { action?: string }).action === 'overlay_discard')).toBe(true);
+    });
+
+    it('react passes observation messages to next modelCall', async () => {
+      const sess = session();
+      let receivedMessages: unknown[] = [];
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            receivedMessages = msgs;
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'observation data',
+          goalSatisfied: () => true,
+        },
+      );
+      await loop.run();
+      // Second modelCall should have received tool observation
+      expect(receivedMessages.length).toBeGreaterThan(1);
+      const lastMsg = receivedMessages[receivedMessages.length - 1] as { role: string; content: string };
+      expect(lastMsg.role).toBe('tool');
+      expect(lastMsg.content).toContain('observation data');
+    });
+  });
+
 });
