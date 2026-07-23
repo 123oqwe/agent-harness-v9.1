@@ -2,30 +2,114 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GlmAcceptanceResult",
   "type": "object",
-  "required": ["model", "reasoning_effort", "total_cases", "passed", "failed", "results", "timestamp"],
+  "required": [
+    "model",
+    "reasoning_effort",
+    "total_cases",
+    "passed",
+    "failed",
+    "results",
+    "unresolved_high_findings",
+    "unresolved_critical_findings",
+    "timestamp",
+    "any_case_failed",
+    "actual_test_summary"
+  ],
   "properties": {
-    "model": { "type": "string" },
-    "reasoning_effort": { "type": "string" },
-    "total_cases": { "type": "integer" },
-    "passed": { "type": "integer" },
-    "failed": { "type": "integer" },
+    "model": {
+      "type": "string"
+    },
+    "reasoning_effort": {
+      "type": "string"
+    },
+    "total_cases": {
+      "type": "integer"
+    },
+    "passed": {
+      "type": "integer"
+    },
+    "failed": {
+      "type": "integer"
+    },
     "results": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["case_id", "passed", "finding_severity", "confidence"],
+        "required": [
+          "case_id",
+          "passed",
+          "finding_severity",
+          "evidence_ref",
+          "confidence",
+          "detail"
+        ],
         "properties": {
-          "case_id": { "type": "string" },
-          "passed": { "type": "boolean" },
-          "finding_severity": { "enum": ["none", "low", "medium", "high", "critical"] },
-          "evidence_ref": { "type": "string" },
-          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-          "detail": { "type": "string" }
-        }
+          "case_id": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "finding_severity": {
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "evidence_ref": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     },
-    "unresolved_high_findings": { "type": "integer" },
-    "unresolved_critical_findings": { "type": "integer" },
-    "timestamp": { "type": "string", "format": "date-time" }
-  }
+    "unresolved_high_findings": {
+      "type": "integer"
+    },
+    "unresolved_critical_findings": {
+      "type": "integer"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "any_case_failed": {
+      "type": "boolean"
+    },
+    "actual_test_summary": {
+      "type": "object",
+      "required": [
+        "total",
+        "passed",
+        "failed",
+        "test_files"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "passed": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
+        "test_files": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
 }

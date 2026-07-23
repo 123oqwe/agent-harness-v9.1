@@ -13,7 +13,7 @@ function makeModelCaller(response: string): ModelCaller {
 
 describe('AH-RUNTIME-001: runtime loop', () => {
   it('executes a direct strategy request end-to-end', async () => {
-    const loop = new RuntimeLoop();
+    const loop = new RuntimeLoop({ modelCaller: makeModelCaller("test") });
     const result = await loop.execute(
       { prompt: 'What is 2+2?' },
       { modelCaller: makeModelCaller('4') },
@@ -26,7 +26,7 @@ describe('AH-RUNTIME-001: runtime loop', () => {
   });
 
   it('records events in durable session', async () => {
-    const loop = new RuntimeLoop();
+    const loop = new RuntimeLoop({ modelCaller: makeModelCaller("test") });
     await loop.execute(
       { prompt: 'What is 2+2?' },
       { modelCaller: makeModelCaller('4') },
@@ -40,7 +40,7 @@ describe('AH-RUNTIME-001: runtime loop', () => {
   });
 
   it('generates notifications from events', async () => {
-    const loop = new RuntimeLoop();
+    const loop = new RuntimeLoop({ modelCaller: makeModelCaller("test") });
     await loop.execute(
       { prompt: 'What is 2+2?' },
       { modelCaller: makeModelCaller('4') },
@@ -78,7 +78,7 @@ describe('AH-RUNTIME-001: runtime loop', () => {
       },
     };
 
-    const loop = new RuntimeLoop();
+    const loop = new RuntimeLoop({ modelCaller: makeModelCaller("test") });
     const result = await loop.execute(
       { prompt: 'Read the content and maybe search', max_iterations: 5 },
       { modelCaller: combinedCaller, toolExecutor },
@@ -101,7 +101,7 @@ describe('AH-RUNTIME-001: runtime loop', () => {
         return { tool_name: toolName, success: true, output: 'data' };
       },
     };
-    const loop = new RuntimeLoop();
+    const loop = new RuntimeLoop({ modelCaller: makeModelCaller("test") });
     const result = await loop.execute(
       { prompt: 'Read the content and maybe search', max_iterations: 2 },
       { modelCaller, toolExecutor },

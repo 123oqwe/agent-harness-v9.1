@@ -29,20 +29,21 @@
     "test:security": "vitest run tests/security tests/capability tests/sandbox",
     "test:e2e": "vitest run tests/package tests/domain",
     "test:coverage": "vitest run --coverage",
-    "test:mutation": "stryker run",
+    "test:mutation": "STRYKER=true stryker run",
     "test:all": "npm run typecheck && npm run build && npm run lint && vitest run --coverage",
     "format": "prettier --write tests/",
-    "eval:glm": "node --import tsx verification/glm-acceptance.ts"
+    "eval:glm": "tsx verification/glm-acceptance.ts"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "^8.0.0",
-    "@stryker-mutator/vitest-runner": "^8.0.0",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.10",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
@@ -51,5 +52,8 @@
     "@trpc/server": "^11.0.0",
     "fastify": "^5.0.0",
     "zod": "^3.23.0"
+  },
+  "overrides": {
+    "tmp": "^0.2.6"
   }
 }
