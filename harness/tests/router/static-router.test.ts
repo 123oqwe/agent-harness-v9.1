@@ -525,4 +525,171 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     });
   });
 
+
+
+  describe('mutation-killing: RunPlan exact value assertions', () => {
+    it('agent_graph has exact agent_id, role, model_binding_ref values', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: Record<string, unknown>[] };
+      expect(ag.nodes[0]!.agent_id).toBe('agent-1');
+      expect(ag.nodes[0]!.role).toBe('worker');
+      expect(ag.nodes[0]!.model_binding_ref).toBe('binding-1');
+    });
+
+    it('agent_graph budget_ceiling has exact token_limit and usd_micros', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: { budget_ceiling: { token_limit: string; usd_micros: string } }[] };
+      expect(ag.nodes[0]!.budget_ceiling.token_limit).toBe('1000000');
+      expect(ag.nodes[0]!.budget_ceiling.usd_micros).toBe('5000000');
+    });
+
+    it('agent_graph has status pending, delegation_depth 0, isolation none', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: Record<string, unknown>[] };
+      expect(ag.nodes[0]!.status).toBe('pending');
+      expect(ag.nodes[0]!.delegation_depth).toBe(0);
+      expect(ag.nodes[0]!.isolation).toBe('none');
+    });
+
+    it('context_graph has exact node_id, agent_id_ref, context_scope', () => {
+      const r = router.route(task('fix the bug'));
+      const cg = r.run_plan!.context_graph as { nodes: Record<string, unknown>[] };
+      expect(cg.nodes[0]!.node_id).toBe('ctx-1');
+      expect(cg.nodes[0]!.agent_id_ref).toBe('agent-1');
+      expect(cg.nodes[0]!.context_scope).toBe('full');
+    });
+
+    it('verification_graph for test criterion has verification_type test_execution', () => {
+      const r = router.route(task('fix the bug', { success_criteria: [{ criterion: 'tests pass', verification_method: 'test' }] }));
+      const vg = r.run_plan!.verification_graph as { nodes: Record<string, unknown>[] };
+      expect(vg.nodes[0]!.verification_id).toBe('verify-0');
+      expect(vg.nodes[0]!.verification_type).toBe('test_execution');
+      expect(vg.nodes[0]!.strictness).toBe('standard');
+    });
+
+    it('verification_graph for deterministic criterion has verification_type deterministic', () => {
+      const r = router.route(task('fix the bug', { success_criteria: [{ criterion: 'diff only modifies', verification_method: 'deterministic' }] }));
+      const vg = r.run_plan!.verification_graph as { nodes: Record<string, unknown>[] };
+      expect(vg.nodes[0]!.verification_type).toBe('deterministic');
+    });
+
+    it('verification_graph for human_review criterion has verification_type human_review', () => {
+      const r = router.route(task('fix the bug', { success_criteria: [{ criterion: 'user approves', verification_method: 'human_review' }] }));
+      const vg = r.run_plan!.verification_graph as { nodes: Record<string, unknown>[] };
+      expect(vg.nodes[0]!.verification_type).toBe('human_review');
+    });
+
+    it('verification_graph for semantic criterion has verification_type schema_validation', () => {
+      const r = router.route(task('fix the bug', { success_criteria: [{ criterion: 'good writing', verification_method: 'semantic' }] }));
+      const vg = r.run_plan!.verification_graph as { nodes: Record<string, unknown>[] };
+      expect(vg.nodes[0]!.verification_type).toBe('schema_validation');
+    });
+
+    it('verification_graph step_id_ref points to last step', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const vg = r.run_plan!.verification_graph as { nodes: { step_id_ref: string }[] };
+      const wf = r.run_plan!.workflow_graph as { nodes: { step_id: string }[] };
+      const lastStepId = wf.nodes[wf.nodes.length - 1]!.step_id;
+      expect(vg.nodes[0]!.step_id_ref).toBe(lastStepId);
+    });
+
+    it('model_bindings has exact provider, model_id, modality_role, capability_match_score', () => {
+      const r = router.route(task('fix the bug'));
+      const mb = r.run_plan!.model_bindings[0]!;
+      expect(mb.provider).toBe('scripted_test');
+      expect(mb.model_id).toBe('scripted-test');
+      expect(mb.modality_role).toBe('reasoning');
+      expect(mb.capability_match_score).toBe(1.0);
+    });
+
+    it('schema_version is run-plan.v1', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.schema_version).toBe('run-plan.v1');
+    });
+
+    it('revision is 1', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.revision).toBe(1);
+    });
+
+    it('previous_revision_hash is null', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.previous_revision_hash).toBeNull();
+    });
+
+    it('experience_profile is default', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.experience_profile).toBe('default');
+    });
+
+    it('policy_snapshot_ref matches input', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.policy_snapshot_ref).toBe('policy-v1');
+    });
+
+    it('fallback_policy on_failure is abort', () => {
+      const r = router.route(task('fix the bug'));
+      expect((r.run_plan as unknown as { fallback_policy: { on_failure: string } }).fallback_policy.on_failure).toBe('abort');
+    });
+
+    it('derived_risk_assessment egress is none', () => {
+      const r = router.route(task('fix the bug'));
+      expect((r.run_plan as unknown as { derived_risk_assessment: { egress: string } }).derived_risk_assessment.egress).toBe('none');
+    });
+
+    it('router abstain returns intent with goal', () => {
+      const tr = new ToolRegistry();
+      const sr = new SkillRegistry();
+      const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
+      const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p' });
+      const result = r.route(task('fix the bug then run the tests'));
+      expect(result.outcome).toBe('abstain');
+      expect(result.intent.goal).toBe('fix the bug then run the tests');
+      expect(result.policy_prefilter_passed).toBe(false);
+    });
+
+    it('router ask_user returns intent with goal', () => {
+      const result = router.route(task('do something', { success_criteria: [] as TaskContract['success_criteria'] }));
+      expect(result.outcome).toBe('ask_user');
+      expect(result.intent.goal).toBe('do something');
+      expect(result.ask_user_message).toContain('success criteria');
+    });
+
+    it('requiredToolsFor returns write_file, edit_file for writes', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
+      expect(tg.some(g => g.tool === 'write_file')).toBe(true);
+      expect(tg.some(g => g.tool === 'edit_file')).toBe(true);
+    });
+
+    it('requiredToolsFor returns execute_command_sandboxed for tests', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
+      expect(tg.some(g => g.tool === 'execute_command_sandboxed')).toBe(true);
+    });
+
+    it('requiredToolsFor returns read_file for read-only tasks', () => {
+      const r = router.route(task('read the file and report'));
+      const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
+      expect(tg.some(g => g.tool === 'read_file')).toBe(true);
+    });
+
+    it('direct strategy has no tool_grants', () => {
+      const r = router.route(task('rewrite this text'));
+      const tg = (r.run_plan as unknown as { tool_grants: unknown[] }).tool_grants;
+      expect(tg).toHaveLength(0);
+    });
+
+    it('run_plan_hash is 64 hex chars', () => {
+      const r = router.route(task('fix the bug'));
+      expect(r.run_plan!.run_plan_hash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('context_strategy active_plan_injection is true', () => {
+      const r = router.route(task('fix the bug'));
+      const cs = (r.run_plan as unknown as { context_strategy: { active_plan_injection: boolean } }).context_strategy;
+      expect(cs.active_plan_injection).toBe(true);
+    });
+  });
+
 });
