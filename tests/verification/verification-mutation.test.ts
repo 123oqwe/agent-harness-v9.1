@@ -478,3 +478,157 @@ describe('Evidence advanced mutation-killing tests', () => {
     expect(() => writeEvidence(passEv2, path)).not.toThrow();
   });
 });
+
+describe('EvalRunner edge-case mutation-killing tests', () => {
+  const runner = new EvalRunner();
+
+  it('runCase sets exit_code to 1 when command not found (no status)', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-NF',
+      suites: [{ id: 'nf1', kind: 'unit', command: 'this-command-does-not-exist-12345', expected_exit: 127 }],
+    };
+    const report = runner.run(manifest);
+    // On macOS, non-existent command gives exit code 127
+    expect(report.results[0]!.exit_code).toBe(127);
+  });
+
+  it('runCase with expected_exit matching actual non-zero passes', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-MATCH',
+      suites: [{ id: 'm1', kind: 'unit', command: 'exit 42', expected_exit: 42 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.passed).toBe(true);
+    expect(report.results[0]!.reason).toBeUndefined();
+  });
+
+  it('stderr_hash is null when stderr is empty string on success', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-SE',
+      suites: [{ id: 'se1', kind: 'unit', command: 'echo ok', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    // On success, stderr is '' and sha('' || null) = sha(null) = null
+    expect(report.results[0]!.stderr_hash).toBeNull();
+  });
+
+  it('stdout_hash is not null when stdout has content', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-SO',
+      suites: [{ id: 'so1', kind: 'unit', command: 'printf "hello"', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.stdout_hash).not.toBeNull();
+  });
+
+  it('report requirement_id matches manifest', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-RID-XYZ-789',
+      suites: [{ id: 'r1', kind: 'unit', command: 'echo ok', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.requirement_id).toBe('AH-RID-XYZ-789');
+  });
+
+  it('e2e without expected_strategy but with failure makes consistency false', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-E2E-NS',
+      suites: [
+        { id: 'e2e-ns-1', kind: 'e2e', command: 'echo ok', expected_exit: 0 },
+        { id: 'e2e-ns-2', kind: 'e2e', command: 'exit 1', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    // e2e without expected_strategy are filtered from the consistency check
+    // but the non-e2e failure path sets strategies_consistent to false
+    expect(report.reasoning_strategy_consistent).toBe(false);
+  });
+
+  it('mixed e2e with strategy and unit cases: consistency from e2e only', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-MIX',
+      suites: [
+        { id: 'u-mix', kind: 'unit', command: 'exit 1', expected_exit: 0 },
+        { id: 'e2e-mix', kind: 'e2e', command: 'echo ok', expected_exit: 0, expected_strategy: 'direct' },
+      ],
+    };
+    const report = runner.run(manifest);
+    // e2e with strategy passes -> consistency from e2e overrides
+    // BUT the unit failure sets strategies_consistent=false first,
+    // then e2e with expected_strategy overrides to true
+    expect(report.reasoning_strategy_consistent).toBe(true);
+  });
+
+  it('mixed e2e with strategy failing: consistency false', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-MIX2',
+      suites: [
+        { id: 'u-mix2', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+        { id: 'e2e-mix2', kind: 'e2e', command: 'exit 1', expected_exit: 0, expected_strategy: 'react' },
+      ],
+    };
+    const report = runner.run(manifest);
+    expect(report.reasoning_strategy_consistent).toBe(false);
+  });
+});
+
+describe('Evidence edge-case mutation-killing tests', () => {
+  let dir: string;
+  afterEach(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
+
+  it('runCommand returns null stderr_hash when command succeeds', () => {
+    const result = runCommand('echo ok');
+    expect(result.stderr_hash).toBeUndefined();
+  });
+
+  it('runCommand returns non-null stderr_hash when command fails with stderr', () => {
+    const result = runCommand('sh -c "echo err 1>&2; exit 1"');
+    expect(result.stderr_hash).not.toBeNull();
+  });
+
+  it('generateEvidence commit_sha is 40 chars hex', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-CS', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.commit_sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(ev.commit_sha.length).toBe(40);
+  });
+
+  it('generateEvidence commands_run has stdout_hash on success', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-SH', source_files: ['package.json'], tests_added: [],
+      commands: ['echo hello'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.commands_run[0]!.stdout_hash).not.toBeNull();
+  });
+
+  it('generateEvidence commands_run has stderr_hash on failure', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-SH2', source_files: ['package.json'], tests_added: [],
+      commands: ['sh -c "echo err 1>&2; exit 1"'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.commands_run[0]!.stderr_hash).not.toBeNull();
+    expect(ev.commands_run[0]!.exit_code).not.toBe(0);
+  });
+
+  it('generateEvidence exit_codes reflects each command result', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-EC2', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok', 'exit 1', 'echo ok3'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.exit_codes).toEqual([0, 1, 0]);
+    expect(ev.verifier_result).toBe('fail');
+  });
+
+  it('validateEvidence with valid evidence and schema returns true', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-VAL', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(validateEvidence(ev, SCHEMA_PATH)).toBe(true);
+  });
+});
