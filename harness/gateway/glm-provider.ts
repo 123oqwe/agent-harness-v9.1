@@ -115,7 +115,7 @@ export class GlmProvider {
     if (!this.model) throw new GlmProviderError('GLM_MODEL not set in env — must be a GLM-5.2 model ID, no default fallback');
     const res = await fetch(this.endpoint, {
       method: 'POST',
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(120_000),
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify(body),
     });
