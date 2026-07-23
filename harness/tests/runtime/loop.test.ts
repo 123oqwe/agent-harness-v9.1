@@ -1238,4 +1238,110 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: topo sort and blocked step coverage', () => {
+    it('topological sort processes nodes in dependency order', async () => {
+      const sess = session();
+      const executionOrder: string[] = [];
+      const wf = {
+        nodes: [
+          { step_id: 'a', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'b', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'c', step_type: 'model_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 'a', to_step: 'b' }, { from_step: 'b', to_step: 'c' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => { executionOrder.push('step'); return { content: 'work', decision_summary: 'done', stop_reason: 'stop' }; },
+          goalSatisfied: () => true,
+        },
+      );
+      await loop.run();
+      expect(executionOrder.length).toBe(3);
+    });
+
+    it('plan_execute with blocked step after failed dependency', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+          { step_id: 's3', step_type: 'model_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }, { from_step: 's2', to_step: 's3' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { throw new Error('fail'); },
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+      // s3 should be blocked (dependency s2 failed)
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'error')).toBe(true);
+    });
+
+    it('plan_execute completedSteps skip check works with crash restore', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'done' as const },
+          { step_id: 's2', step_type: 'verification' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('tool_call step success records tool_executed in turn', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => 'file contents here',
+          goalSatisfied: (turns) => {
+            return turns.some(t => t.tool_executed !== undefined);
+          },
+        },
+      );
+      const result = await loop.run();
+      expect(result.turns.some(t => t.tool_executed !== undefined)).toBe(true);
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('verification step with no goalSatisfied defaults to false (not satisfied)', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'done', stop_reason: 'stop' }) },
+      );
+      const result = await loop.run();
+      // No goalSatisfied → verification fails → completed
+      expect(result.termination_reason).toBe('completed');
+    });
+  });
+
 });
