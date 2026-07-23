@@ -586,4 +586,114 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: credentials and progress deep coverage', () => {
+    it('stripCredentialsFromEnv removes all credential patterns', () => {
+      process.env.MY_TOKEN = 't1';
+      process.env.MY_API_KEY = 'k1';
+      process.env.MY_SECRET = 's1';
+      process.env.MY_PASSWORD = 'p1';
+      process.env.MY_CREDENTIAL = 'c1';
+      process.env.SAFE_VAR = 'keep';
+      const stripped = stripCredentialsFromEnv();
+      expect(stripped).toContain('MY_TOKEN');
+      expect(stripped).toContain('MY_API_KEY');
+      expect(stripped).toContain('MY_SECRET');
+      expect(stripped).toContain('MY_PASSWORD');
+      expect(stripped).toContain('MY_CREDENTIAL');
+      expect(process.env.MY_TOKEN).toBeUndefined();
+      expect(process.env.MY_API_KEY).toBeUndefined();
+      expect(process.env.MY_SECRET).toBeUndefined();
+      expect(process.env.MY_PASSWORD).toBeUndefined();
+      expect(process.env.MY_CREDENTIAL).toBeUndefined();
+      expect(process.env.SAFE_VAR).toBe('keep');
+    });
+
+    it('loop run restores credentials after agent phase', async () => {
+      process.env.LOOP_TEST_CREDENTIAL = 'secret-value';
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      expect(process.env.LOOP_TEST_CREDENTIAL).toBe('secret-value');
+    });
+
+    it('progress.json checkpoint_refs contains timestamps', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.checkpoint_refs).toHaveLength(1);
+      expect(progress.checkpoint_refs[0]).toMatch(/^\d{4}-/);
+    });
+
+    it('progress.json last_error is malformed on malformed_response', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'd', stop_reason: 'length' }) },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.last_error).toBe('malformed');
+    });
+
+    it('progress.json last_updated is ISO timestamp', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g', data_dir: dir },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const progress = JSON.parse(readFileSync(join(dir, 'progress.json'), 'utf8'));
+      expect(progress.last_updated).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('direct strategy with tool_calls terminates malformed_response', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'd', tool_calls: [{ id: '1', name: 'x', arguments: {} }] }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('react with no toolExecute and tool_calls terminates malformed_response', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: '', decision_summary: 'd', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'x', arguments: {} }] }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('decision_summaries are recorded for each turn', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (_msgs, attempt) => {
+            if (attempt < 3) return { content: '', decision_summary: 'turn-' + attempt, stop_reason: 'tool_use', tool_calls: [{ id: String(attempt), name: 'read', arguments: { path: '/f' + attempt } }] };
+            return { content: 'done', decision_summary: 'final', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'content',
+          goalSatisfied: (turns) => turns.length >= 3,
+        },
+      );
+      const result = await loop.run();
+      expect(result.decision_summaries).toContain('turn-1');
+      expect(result.decision_summaries).toContain('turn-2');
+      expect(result.decision_summaries).toContain('final');
+    });
+  });
+
 });
