@@ -1459,4 +1459,131 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  describe('mutation-killing: final push to 70%', () => {
+    it('plan_execute tool_call step with tc executes and pushes tool message', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+          { step_id: 's3', step_type: 'model_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }, { from_step: 's2', to_step: 's3' }],
+      };
+      let msgSnapshot: unknown[] = [];
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            msgSnapshot = [...msgs];
+            if (msgs.length <= 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'read_file', arguments: { path: '/x' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => 'file data',
+          goalSatisfied: () => true,
+        },
+      );
+      await loop.run();
+      // After tool_call step, messages should contain a tool message
+      const toolMsg = msgSnapshot.find((m: unknown) => (m as { role?: string }).role === 'tool');
+      expect(toolMsg).toBeDefined();
+    });
+
+    it('plan_execute tool_call step with no prior model tool_calls (tc undefined) skips to done', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: 'no tool calls', decision_summary: 'plain text', stop_reason: 'stop' }),
+          toolExecute: async () => 'should not be called',
+        },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('plan_execute verification failed records status failed in session', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'work', stop_reason: 'stop' }), goalSatisfied: () => false },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const verifyEvent = events.find(e => e.type === 'system' && (e.data as { status?: string }).status === 'failed');
+      expect(verifyEvent).toBeDefined();
+      expect((verifyEvent!.data as { verified: boolean }).verified).toBe(false);
+    });
+
+    it('plan_execute verification succeeded records status done in session', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'verification' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'work', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      const events = sess.getEvents();
+      const verifyEvent = events.find(e => e.type === 'system' && (e.data as { status?: string }).status === 'done');
+      expect(verifyEvent).toBeDefined();
+      expect((verifyEvent!.data as { verified: boolean }).verified).toBe(true);
+    });
+
+    it('plan_execute: unknown step type (compensation) passes through as done', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'compensation' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('plan_execute: human_input step type passes through as done', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'human_input' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('plan_execute: parallel_fork step type passes through as done', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'parallel_fork' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('plan_execute: parallel_join step type passes through as done', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'parallel_join' as const, status: 'pending' as const }], edges: [] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+  });
+
 });
