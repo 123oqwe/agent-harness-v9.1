@@ -106,8 +106,8 @@ function extractResourceIds(args: Record<string, unknown>): string[] {
 }
 
 /** Build a minimal ActionManifest for a tool call. */
-function buildManifest(toolName: string, input: unknown, policyVersion: string, taskId: string, planId: string, stepId: string): ActionManifest {
-  const isWrite = false; // determined by ToolSpec.effect_model, not by name
+function buildManifest(toolName: string, input: unknown, policyVersion: string, taskId: string, planId: string, stepId: string, risk: EffectRisk): ActionManifest {
+  const isWrite = ['write', 'delete', 'create'].includes(risk.operation);
   const canonicalArgs = input as Record<string, unknown>;
   const manifestHash = hash({ toolName, input, policyVersion });
   return {
@@ -178,9 +178,9 @@ export class ToolExecutor {
     }
 
     // 3. Build manifest and evaluate risk
-    const manifest = buildManifest(toolName, input, policy.version, 'task-1', 'plan-1', `step-${this.callCount}`);
     const toolSpec = this.deps.toolRegistry.get(toolName);
     const risk = extractRisk(toolSpec);
+    const manifest = buildManifest(toolName, input, policy.version, 'task-1', 'plan-1', `step-${this.callCount}`, risk);
     const policyContext: PolicyContext = {
       tenant_id: 'tenant-1',
       user_id: 'user-1',
