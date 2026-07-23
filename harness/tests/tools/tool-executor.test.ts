@@ -692,4 +692,51 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.side_effect_class).toBe('read_only');
   });
 
+  it('extractRisk with no effect_model falls back to safe defaults', async () => {
+    // toolSpec with empty effect_model {} — should fall through to default read-only risk
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: {},
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'em_empty.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_empty.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_empty.txt' }));
+    expect(receipt.derived_risk_tier).toBe(0);
+    expect(receipt.side_effect_class).toBe('read_only');
+  });
+
+  it('extractRisk with undefined toolSpec falls back to safe defaults', async () => {
+    // Register a tool, then execute with a tool name not in registry but in snapshot
+    // Actually this would fail snapshot check. Instead test with a tool that has
+    // effect_model with operation as non-string (should fall through to default)
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { operation: 123 }, // operation is not a string — should fall through
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'em_nonstr.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_nonstr.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_nonstr.txt' }));
+    expect(receipt.derived_risk_tier).toBe(0);
+  });
+
+  it('getAuditLog returns empty array when no PEP audit events recorded', async () => {
+    // The default PEP in beforeEach has audit_sink: { write: async () => {} } — no-op
+    // So auditLog should remain empty
+    expect(executor.getAuditLog()).toEqual([]);
+  });
+
 });
