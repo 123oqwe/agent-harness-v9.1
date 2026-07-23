@@ -15,6 +15,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, cpSync, globSync } 
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mutationModules, phase1Minimum, mutationExclusions } from '../mutation/modules.mjs';
+import { strykerBase } from '../mutation/stryker.base.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, '..');
@@ -66,15 +67,12 @@ function runModule(moduleName) {
   const moduleReportDir = join(reportsDir, moduleName);
   mkdirSync(moduleReportDir, { recursive: true });
 
-  // Build a temporary Stryker config for this module
-  const strykerBaseContent = readFileSync(join(harnessRoot, 'mutation', 'stryker.base.mjs'), 'utf8');
-  const baseMatch = strykerBaseContent.match(/export const strykerBase = (\{[\s\S]*\});/);
-  const baseConfig = baseMatch ? JSON.parse(baseMatch[1]) : {};
+ // Build a temporary Stryker config for this module
 
-  const config = {
-    ...baseConfig,
-    mutate: mutateFiles,
-    tempDirName: `.stryker-tmp/${moduleName}`,
+ const config = {
+   ...strykerBase,
+   mutate: mutateFiles,
+   tempDirName: `.stryker-tmp/${moduleName}`,
     thresholds: {
       high: mod.minimum,
       low: mod.minimum - 5,
@@ -95,7 +93,11 @@ function runModule(moduleName) {
       cwd: harnessRoot,
       stdio: 'inherit',
       timeout: 600000,
-      env: { ...process.env, STRYKER: 'true' },
+      env: {
+        ...process.env,
+        STRYKER: 'true',
+        HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
+      },
     });
   } catch (err) {
     console.error(`Stryker exited with code ${err.status ?? 'unknown'} for module ${moduleName}`);
@@ -143,21 +145,24 @@ function runPhase1() {
     try {
       runModule(mod);
       const jsonPath = join(reportsDir, mod, 'mutation.json');
-      if (existsSync(jsonPath)) {
-        const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
-        const files = data.files || [];
-        for (const f of files) {
-          const mutants = f.mutants || [];
-          aggregate.total += mutants.length;
-          for (const m of mutants) {
-            if (m.status === 'Killed') aggregate.killed++;
-            else if (m.status === 'Timeout') aggregate.timeout++;
-            else if (m.status === 'Survived') aggregate.survived++;
-            else if (m.status === 'NoCoverage') aggregate.noCoverage++;
-            else if (m.status === 'Ignored') aggregate.ignored++;
-          }
-        }
-      }
+     if (existsSync(jsonPath)) {
+       const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
+       // Handle Stryker v9 (files as object) and v8 (files as array)
+       const fileEntries = data.files
+         ? (Array.isArray(data.files) ? data.files : Object.values(data.files))
+         : [];
+       for (const f of fileEntries) {
+         const mutants = f.mutants || [];
+         aggregate.total += mutants.length;
+         for (const m of mutants) {
+           if (m.status === 'Killed') aggregate.killed++;
+           else if (m.status === 'Timeout') aggregate.timeout++;
+           else if (m.status === 'Survived') aggregate.survived++;
+           else if (m.status === 'NoCoverage') aggregate.noCoverage++;
+           else if (m.status === 'Ignored') aggregate.ignored++;
+         }
+       }
+     }
     } catch {
       allPassed = false;
     }
@@ -178,13 +183,14 @@ function runPhase1() {
     modules: moduleNames.map(m => {
       const jp = join(reportsDir, m, 'mutation.json');
       if (!existsSync(jp)) return { module: m, status: 'MISSING' };
-      const d = JSON.parse(readFileSync(jp, 'utf8'));
-      const total = (d.files || []).reduce((s, f) => s + (f.mutants || []).length, 0);
-      const killed = (d.files || []).reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Killed').length, 0);
-      const timeout = (d.files || []).reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Timeout').length, 0);
-      const survived = (d.files || []).reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Survived').length, 0);
-      const noCov = (d.files || []).reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'NoCoverage').length, 0);
-      const ignored = (d.files || []).reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Ignored').length, 0);
+     const d = JSON.parse(readFileSync(jp, 'utf8'));
+     const fileArr = d.files ? (Array.isArray(d.files) ? d.files : Object.values(d.files)) : [];
+     const total = fileArr.reduce((s, f) => s + (f.mutants || []).length, 0);
+     const killed = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Killed').length, 0);
+     const timeout = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Timeout').length, 0);
+     const survived = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Survived').length, 0);
+     const noCov = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'NoCoverage').length, 0);
+     const ignored = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Ignored').length, 0);
       const testable = total - ignored;
       const score = testable > 0 ? parseFloat(((killed + timeout) / testable * 100).toFixed(2)) : 0;
       const min = mutationModules[m].minimum;
