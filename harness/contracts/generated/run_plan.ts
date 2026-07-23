@@ -1,0 +1,348 @@
+/* eslint-disable */
+/** AUTO-GENERATED from spec/contracts/run-plan.schema.json. Do not modify by hand. */
+
+/**
+ * The only normative execution contract. Router outputs this; Runtime Core executes it.
+ */
+export interface RunPlan {
+  schema_version: "run-plan.v1";
+  run_id: string;
+  revision: number;
+  run_plan_hash: string;
+  previous_revision_hash?: string | null;
+  task: TaskContract;
+  experience_profile: string;
+  /**
+   * Frozen Phase 1 reasoning strategy. Changing strategy requires a new RunPlan revision.
+   */
+  reasoning_strategy: "direct" | "react" | "plan_execute";
+  workflow_graph: WorkflowGraph;
+  agent_graph: AgentGraph;
+  context_graph: ContextGraph;
+  verification_graph: VerificationGraph;
+  model_bindings: ModelBinding[];
+  tool_grants: {
+    [k: string]: unknown;
+  }[];
+  skill_bindings: {
+    [k: string]: unknown;
+  }[];
+  environment_bindings: {
+    [k: string]: unknown;
+  }[];
+  schedule_binding?: {
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Referenced, not output by Router
+   */
+  policy_snapshot_ref: string;
+  registry_snapshot_refs: {
+    [k: string]: unknown;
+  };
+  /**
+   * Router outputs risk ASSESSMENT, not risk POLICY
+   */
+  derived_risk_assessment: {
+    [k: string]: unknown;
+  };
+  /**
+   * Router outputs consent REQUIREMENT, not consent POLICY
+   */
+  required_consent: {
+    [k: string]: unknown;
+  };
+  budget_allocation: {
+    [k: string]: unknown;
+  };
+  persistence_policy: {
+    [k: string]: unknown;
+  };
+  cancellation_policy: {
+    [k: string]: unknown;
+  };
+  fallback_policy: {
+    [k: string]: unknown;
+  };
+  /**
+   * FG2 two-phase runtime configuration. Defines setup (network-enabled) and agent (offline-by-default, credentials stripped) phases.
+   */
+  run_phase?: {
+    /**
+     * Network-enabled phase for dependency install. egress_policy.mode may be open/allowlist.
+     */
+    setup?: {
+      [k: string]: unknown;
+    };
+    /**
+     * Offline-by-default phase. egress_policy.mode = disabled unless explicit allowlist. Credentials stripped from env; single-exchange at dispatch.
+     */
+    agent?: {
+      [k: string]: unknown;
+    };
+  };
+  /**
+   * FG5/FG10/FG11 context engineering knobs. cache_breakpoints, offload_token_threshold, summarize_at_window_ratio, tool_masking.
+   */
+  context_strategy?: {
+    cache_breakpoints?: string[];
+    offload_token_threshold?: number;
+    /**
+     * Lossy compaction boundary after VFS offload; 0.40 is the offload boundary and 0.85 is the hard context_reset boundary.
+     */
+    summarize_at_window_ratio?: number;
+    tool_masking?: boolean;
+    /**
+     * G-MAN1: inject active plan (current step, remaining steps) into context at each turn. Default true.
+     */
+    active_plan_injection: boolean;
+  };
+}
+/**
+ * User's task definition. The root input to the Router.
+ */
+export interface TaskContract {
+  /**
+   * What the user wants to achieve
+   */
+  goal: string;
+  success_criteria: {
+    criterion: string;
+    /**
+     * How to verify this criterion is met
+     */
+    verification_method: "deterministic" | "test" | "human_review" | "semantic";
+  }[];
+  constraints: {
+    type: "budget" | "time" | "risk_ceiling" | "privacy" | "tool_restriction" | "model_restriction";
+    /**
+     * Constraint value (e.g., '5000000' for $5 budget, 'local_only' for privacy)
+     */
+    value: string;
+  }[];
+  deadline?: string | null;
+  /**
+   * Agent can use for scheduling
+   */
+  priority?: "low" | "normal" | "high" | "urgent";
+}
+/**
+ * Workflow step DAG. Defines execution order and dependencies.
+ */
+export interface WorkflowGraph {
+  nodes: {
+    step_id: string;
+    step_type:
+      | "model_call"
+      | "tool_call"
+      | "verification"
+      | "decision"
+      | "parallel_fork"
+      | "parallel_join"
+      | "human_input"
+      | "compensation";
+    status: "pending" | "dispatched" | "executing" | "verifying" | "done" | "failed" | "blocked" | "skipped";
+    /**
+     * Which agent executes this step
+     */
+    agent_id_ref?: string | null;
+    /**
+     * For tool_call steps
+     */
+    tool_name?: string | null;
+    retry_count?: number;
+    /**
+     * Agent can tune during implementation
+     */
+    max_retries?: number;
+    /**
+     * Agent can tune during implementation
+     */
+    timeout_ms?: number;
+  }[];
+  edges: {
+    from_step: string;
+    to_step: string;
+    /**
+     * Optional condition expression for conditional edges (e.g., 'result.success == true')
+     */
+    condition?: string | null;
+  }[];
+}
+/**
+ * Agent topology graph. Defines which agents participate and how they communicate.
+ */
+export interface AgentGraph {
+  /**
+   * FG7/FG9. static_dag = frozen AgentGraph (default). routing_slip = itinerary travels with message, agents may insert steps (open missions). workflow_script = orchestration is a script holding intermediate results out-of-context (large fan-out).
+   */
+  execution_mode?: "static_dag" | "routing_slip" | "workflow_script";
+  /**
+   * FG7. Present only when execution_mode=routing_slip. Itinerary + executed log + compensation log + inserted_steps count.
+   */
+  routing_slip?: {
+    itinerary?: unknown[];
+    executed?: unknown[];
+    compensations?: unknown[];
+    inserted_steps?: number;
+    insert_limit?: number;
+  };
+  /**
+   * FG8. Cross-process message integrity. Applied to communication/result_handoff edges when agents run in separate processes.
+   */
+  message_security?: {
+    obo_token_required?: boolean;
+    jws_signature_required?: boolean;
+    jwe_optional?: boolean;
+  };
+  nodes: {
+    /**
+     * Unique agent identifier
+     */
+    agent_id: string;
+    /**
+     * Agent role in topology
+     */
+    role: "supervisor" | "worker" | "verifier" | "planner" | "specialist";
+    /**
+     * Reference to ModelBinding in RunPlan.model_bindings
+     */
+    model_binding_ref: string;
+    budget_ceiling: {
+      token_limit: string;
+      usd_micros: string;
+      [k: string]: unknown;
+    };
+    status: "pending" | "running" | "completed" | "failed" | "cancelled";
+    /**
+     * Parent agent for subagent delegation
+     */
+    parent_agent_id?: string | null;
+    /**
+     * 0 for root agent, decremented for children
+     */
+    delegation_depth?: number;
+    /**
+     * References to ToolGrant IDs in RunPlan.tool_grants
+     */
+    tool_grant_refs?: string[];
+    skill_binding_refs?: string[];
+    /**
+     * G-CC1. Execution isolation level. process=separate process; worktree=git worktree + separate process; sandbox=OS sandbox (G-OS1); none=same process (Phase 1 default, not for Phase 3+ workers)
+     */
+    isolation?: "process" | "worktree" | "sandbox" | "none";
+    /**
+     * G-CC1. Reference to HookConfig ID; null = inherit parent hooks.
+     */
+    hooks_ref?: string | null;
+    /**
+     * G-CC1. inherit=share parent memory store; isolated=own store, no cross-read; scoped=own store + explicitly shared items (maps to 7 context topologies)
+     */
+    memory_scope?: "inherit" | "isolated" | "scoped";
+    /**
+     * G-CC1. Reasoning effort for this node. Distinct from model_binding_ref: same model may run at different effort per node.
+     */
+    effort?: "low" | "medium" | "high";
+    /**
+     * G-CC1. Tools explicitly denied to this node even if in tool_grant_refs. deny wins (deny-by-default).
+     */
+    disallowed_tool_refs?: string[];
+  }[];
+  edges: {
+    from_agent: string;
+    to_agent: string;
+    /**
+     * dependency=wait for, communication=send message, delegation=parent-child, result_handoff=artifact transfer
+     */
+    edge_type: "dependency" | "communication" | "delegation" | "result_handoff";
+    /**
+     * What artifact types flow on this edge
+     */
+    artifact_types?: string[];
+  }[];
+}
+/**
+ * Context sharing topology. Defines how context flows between agents.
+ */
+export interface ContextGraph {
+  nodes: {
+    node_id: string;
+    /**
+     * Reference to AgentGraph node agent_id
+     */
+    agent_id_ref: string;
+    /**
+     * How much context this agent has access to
+     */
+    context_scope: "full" | "selective" | "isolated";
+    /**
+     * For selective scope: which fields are shared
+     */
+    allowed_fields?: string[];
+    sensitivity_ceiling?: "public" | "internal" | "confidential" | "secret";
+  }[];
+  edges: {
+    from_node: string;
+    to_node: string;
+    mode: "full" | "selective" | "artifact_only" | "blackboard" | "none";
+    /**
+     * For artifact_only mode: JSON, Patch, EvidenceBundle, TestReport, PlanArtifact, DecisionRecord
+     */
+    allowed_artifact_types?: string[];
+    /**
+     * How long shared context is retained (e.g., 'task', 'session', 'mission')
+     */
+    retention?: string;
+    provenance_required?: boolean;
+  }[];
+}
+/**
+ * Verification plan. Defines how each step's output is verified.
+ */
+export interface VerificationGraph {
+  nodes: {
+    verification_id: string;
+    /**
+     * Which WorkflowGraph step this verifies
+     */
+    step_id_ref: string;
+    verification_type:
+      | "deterministic"
+      | "schema_validation"
+      | "test_execution"
+      | "read_back"
+      | "blind_verification"
+      | "independent_verifier"
+      | "human_review";
+    /**
+     * Agent can tune: fast=skip optional checks, paranoid=independent verifier + human review
+     */
+    strictness: "fast" | "standard" | "strict" | "paranoid";
+    /**
+     * For independent_verifier: which agent verifies
+     */
+    verifier_agent_id?: string | null;
+    /**
+     * Which acceptance criteria this verification checks
+     */
+    acceptance_criteria_refs?: string[];
+  }[];
+  edges: {
+    from_verification: string;
+    to_verification: string;
+    /**
+     * True if this edge represents verification escalation (e.g., deterministic → blind → independent)
+     */
+    escalation?: boolean;
+  }[];
+}
+export interface ModelBinding {
+  provider: string;
+  model_id: string;
+  modality_role: "reasoning" | "vision" | "image_gen" | "code" | "speech" | "embedding" | "reranking";
+  capability_match_score: number;
+  cost_estimate?: {
+    [k: string]: unknown;
+  };
+  latency_estimate_ms?: number;
+}

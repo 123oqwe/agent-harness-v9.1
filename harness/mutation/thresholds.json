@@ -1,0 +1,23 @@
+{
+  "phase1": 85,
+  "modules": {
+    "gateway": 85,
+    "router": 90,
+    "toolsRegistry": 90,
+    "toolsLeaf": 85,
+    "skills": 85,
+    "strategies": 85,
+    "actionControl": 90,
+    "identitySecrets": 90,
+    "vfs": 90,
+    "sandbox": 90,
+    "session": 90,
+    "runtime": 90,
+    "verification": 85,
+    "verticals": 85
+  },
+  "perFileMinimums": {
+    "toolsLeaf": 80,
+    "verticals": 80
+  }
+}
