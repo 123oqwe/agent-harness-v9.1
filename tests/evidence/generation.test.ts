@@ -418,4 +418,33 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
     });
   });
 
+
+
+  describe('mutation-killing: final evidence precision', () => {
+    it('runCommand returns stderr_hash null on success (no stderr)', () => {
+      const r = runCommand('echo ok');
+      expect(r.exit_code).toBe(0);
+      expect(r.stderr_hash).toBeUndefined();
+    });
+
+    it('runCommand returns both stdout_hash and stderr_hash on failure', () => {
+      const r = runCommand('echo out; echo err >&2; exit 5');
+      expect(r.exit_code).toBe(5);
+      expect(r.stdout_hash).toMatch(/^[0-9a-f]{16}$/);
+      expect(r.stderr_hash).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('writeEvidence creates new file when path does not exist', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-new-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-NEW', source_files: [], tests_added: [],
+        commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      const path = join(dir, 'new.json');
+      expect(!existsSync(path)).toBe(true);
+      writeEvidence(ev, path);
+      expect(existsSync(path)).toBe(true);
+    });
+  });
+
 });
