@@ -274,4 +274,255 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     });
   });
 
+
+
+  describe('mutation-killing: profileIntent edge cases', () => {
+    it('detects "delete" as a write operation', () => {
+      expect(profileIntent(task('delete the file')).requires_writes).toBe(true);
+    });
+    it('detects "remove" as a write operation', () => {
+      expect(profileIntent(task('remove the old code')).requires_writes).toBe(true);
+    });
+    it('detects "modify" as a write operation', () => {
+      expect(profileIntent(task('modify the function')).requires_writes).toBe(true);
+    });
+    it('detects "update" as a write operation', () => {
+      expect(profileIntent(task('update the config')).requires_writes).toBe(true);
+    });
+    it('detects "implement" as a write operation', () => {
+      expect(profileIntent(task('implement the feature')).requires_writes).toBe(true);
+    });
+    it('detects "refactor" as a write operation', () => {
+      expect(profileIntent(task('refactor the module')).requires_writes).toBe(true);
+    });
+    it('detects "patch" as a write operation', () => {
+      expect(profileIntent(task('patch the vulnerability')).requires_writes).toBe(true);
+    });
+    it('detects "test" as requiring tests', () => {
+      expect(profileIntent(task('test the function')).requires_tests).toBe(true);
+    });
+    it('detects "verify" as requiring tests', () => {
+      expect(profileIntent(task('verify the output')).requires_tests).toBe(true);
+    });
+    it('detects "build" as requiring tests', () => {
+      expect(profileIntent(task('build the project')).requires_tests).toBe(true);
+    });
+    it('detects "compile" as requiring tests', () => {
+      expect(profileIntent(task('compile the code')).requires_tests).toBe(true);
+    });
+    it('detects "lint" as requiring tests', () => {
+      expect(profileIntent(task('lint the source')).requires_tests).toBe(true);
+    });
+    it('detects "check" as requiring tests', () => {
+      expect(profileIntent(task('check the results')).requires_tests).toBe(true);
+    });
+    it('detects "run" as requiring tests', () => {
+      expect(profileIntent(task('run the suite')).requires_tests).toBe(true);
+    });
+    it('detects "plan" as explicit plan', () => {
+      expect(profileIntent(task('plan the migration')).explicit_plan).toBe(true);
+    });
+    it('detects "step by step" as explicit plan', () => {
+      expect(profileIntent(task('do this step by step')).explicit_plan).toBe(true);
+    });
+    it('detects "workflow" as explicit plan', () => {
+      expect(profileIntent(task('create a workflow for this')).explicit_plan).toBe(true);
+    });
+    it('detects "pipeline" as explicit plan', () => {
+      expect(profileIntent(task('build a pipeline for data')).explicit_plan).toBe(true);
+    });
+    it('detects "sequence" as explicit plan', () => {
+      expect(profileIntent(task('execute the sequence of steps')).explicit_plan).toBe(true);
+    });
+    it('detects step markers: "then"', () => {
+      expect(profileIntent(task('read the file then summarize it')).multi_step).toBe(true);
+    });
+    it('detects step markers: "after"', () => {
+      expect(profileIntent(task('read data after processing')).multi_step).toBe(true);
+    });
+    it('detects step markers: "next"', () => {
+      expect(profileIntent(task('read the file next analyze it')).multi_step).toBe(true);
+    });
+
+    it('detects step markers: semicolons', () => {
+      expect(profileIntent(task('read the file; summarize it')).multi_step).toBe(true);
+    });
+    it('short goal has low ambiguity', () => {
+      expect(profileIntent(task('hi')).ambiguity).toBe('low');
+    });
+    it('no success criteria has high ambiguity', () => {
+      expect(profileIntent(task('do something', { success_criteria: [] as TaskContract['success_criteria'] })).ambiguity).toBe('high');
+    });
+    it('detects coding domain', () => {
+      expect(profileIntent(task('fix the bug in the function')).domains).toContain('coding');
+    });
+    it('detects documents domain', () => {
+      expect(profileIntent(task('summarize the document')).domains).toContain('documents');
+    });
+    it('detects research domain', () => {
+      expect(profileIntent(task('research the sources and cite')).domains).toContain('research');
+    });
+    it('detects writing domain', () => {
+      expect(profileIntent(task('write a draft article')).domains).toContain('writing');
+    });
+    it('detects planning domain', () => {
+      expect(profileIntent(task('plan the task schedule')).domains).toContain('planning');
+    });
+    it('requires_tools is true for write tasks', () => {
+      expect(profileIntent(task('write the file')).requires_tools).toBe(true);
+    });
+    it('requires_tools is true for test tasks', () => {
+      expect(profileIntent(task('run the tests')).requires_tools).toBe(true);
+    });
+    it('requires_tools is true for read tasks', () => {
+      expect(profileIntent(task('read the file')).requires_tools).toBe(true);
+    });
+    it('requires_tools is false for pure text tasks', () => {
+      expect(profileIntent(task('rewrite this paragraph')).requires_tools).toBe(false);
+    });
+  });
+
+  describe('mutation-killing: selectStrategy edge cases', () => {
+    it('plan_execute for write+test', () => {
+      expect(selectStrategy({ goal: '', domains: [], requires_tools: true, requires_writes: true, requires_tests: true, multi_step: true, explicit_plan: false, ambiguity: 'none', missing_info: [], success_criteria_count: 1 })).toBe('plan_execute');
+    });
+    it('plan_execute for explicit plan', () => {
+      expect(selectStrategy({ goal: '', domains: [], requires_tools: false, requires_writes: false, requires_tests: false, multi_step: false, explicit_plan: true, ambiguity: 'none', missing_info: [], success_criteria_count: 1 })).toBe('plan_execute');
+    });
+    it('react for tool-required non-write non-test', () => {
+      expect(selectStrategy({ goal: '', domains: [], requires_tools: true, requires_writes: false, requires_tests: false, multi_step: false, explicit_plan: false, ambiguity: 'none', missing_info: [], success_criteria_count: 1 })).toBe('react');
+    });
+    it('direct for no tools', () => {
+      expect(selectStrategy({ goal: '', domains: [], requires_tools: false, requires_writes: false, requires_tests: false, multi_step: false, explicit_plan: false, ambiguity: 'none', missing_info: [], success_criteria_count: 1 })).toBe('direct');
+    });
+  });
+
+
+
+  describe('mutation-killing: RunPlan structural verification', () => {
+    it('plan_execute RunPlan has multiple steps (plan, execute, execute, execute, verify)', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const wf = r.run_plan!.workflow_graph as { nodes: { step_type: string }[] };
+      expect(wf.nodes.length).toBeGreaterThan(2);
+      expect(wf.nodes.some(n => n.step_type === 'verification')).toBe(true);
+      expect(wf.nodes.some(n => n.step_type === 'model_call')).toBe(true);
+    });
+
+    it('direct RunPlan has single step', () => {
+      const r = router.route(task('rewrite this text'));
+      const wf = r.run_plan!.workflow_graph as { nodes: unknown[] };
+      expect(wf.nodes.length).toBe(1);
+    });
+
+    it('workflow edges have condition: null', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const wf = r.run_plan!.workflow_graph as { edges: { condition: unknown }[] };
+      for (const e of wf.edges) {
+        expect(e.condition).toBeNull();
+      }
+    });
+
+    it('agent node has budget_ceiling with token_limit and usd_micros', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: { budget_ceiling: { token_limit: string; usd_micros: string } }[] };
+      const bc = ag.nodes[0]!.budget_ceiling;
+      expect(bc.token_limit).toBe('1000000');
+      expect(bc.usd_micros).toBe('5000000');
+    });
+
+    it('agent node has delegation_depth 0 and isolation none', () => {
+      const r = router.route(task('fix the bug'));
+      const ag = r.run_plan!.agent_graph as { nodes: { delegation_depth: number; isolation: string }[] };
+      expect(ag.nodes[0]!.delegation_depth).toBe(0);
+      expect(ag.nodes[0]!.isolation).toBe('none');
+    });
+
+    it('model_binding has provider scripted_test and model_id scripted-test', () => {
+      const r = router.route(task('fix the bug'));
+      const mb = r.run_plan!.model_bindings[0]!;
+      expect(mb.provider).toBe('scripted_test');
+      expect(mb.model_id).toBe('scripted-test');
+      expect(mb.modality_role).toBe('reasoning');
+      expect(mb.capability_match_score).toBe(1.0);
+    });
+
+    it('environment_bindings has sandbox true and network false', () => {
+      const r = router.route(task('fix the bug'));
+      const eb = (r.run_plan as unknown as { environment_bindings: { sandbox: boolean; network: boolean }[] }).environment_bindings;
+      expect(eb[0]!.sandbox).toBe(true);
+      expect(eb[0]!.network).toBe(false);
+    });
+
+    it('derived_risk_assessment has risk_tier 2 for writes', () => {
+      const r = router.route(task('fix the bug'));
+      const dra = (r.run_plan as unknown as { derived_risk_assessment: { risk_tier: number; egress: string } }).derived_risk_assessment;
+      expect(dra.risk_tier).toBe(2);
+      expect(dra.egress).toBe('none');
+    });
+
+    it('derived_risk_assessment has risk_tier 1 for no writes', () => {
+      const r = router.route(task('rewrite this text'));
+      const dra = (r.run_plan as unknown as { derived_risk_assessment: { risk_tier: number } }).derived_risk_assessment;
+      expect(dra.risk_tier).toBe(1);
+    });
+
+    it('required_consent required is true for writes', () => {
+      const r = router.route(task('fix the bug'));
+      const rc = (r.run_plan as unknown as { required_consent: { required: boolean } }).required_consent;
+      expect(rc.required).toBe(true);
+    });
+
+    it('required_consent required is false for no writes', () => {
+      const r = router.route(task('rewrite this text'));
+      const rc = (r.run_plan as unknown as { required_consent: { required: boolean } }).required_consent;
+      expect(rc.required).toBe(false);
+    });
+
+    it('registry_snapshot_refs has tool_registry and skill_registry keys', () => {
+      const r = router.route(task('fix the bug'));
+      const refs = r.run_plan!.registry_snapshot_refs as Record<string, string>;
+      expect(refs.tool_registry).toBeDefined();
+      expect(refs.skill_registry).toBeDefined();
+    });
+
+    it('budget_allocation max_iterations is 1 for direct', () => {
+      const r = router.route(task('rewrite this text'));
+      const ba = (r.run_plan as unknown as { budget_allocation: { max_iterations: number } }).budget_allocation;
+      expect(ba.max_iterations).toBe(1);
+    });
+
+    it('budget_allocation max_iterations is 3 for react', () => {
+      const r = router.route(task('read the file'));
+      const ba = (r.run_plan as unknown as { budget_allocation: { max_iterations: number } }).budget_allocation;
+      expect(ba.max_iterations).toBe(3);
+    });
+
+    it('persistence_policy has event_log true and snapshot true', () => {
+      const r = router.route(task('fix the bug'));
+      const pp = (r.run_plan as unknown as { persistence_policy: { event_log: boolean; snapshot: boolean } }).persistence_policy;
+      expect(pp.event_log).toBe(true);
+      expect(pp.snapshot).toBe(true);
+    });
+
+    it('cancellation_policy has abortable true', () => {
+      const r = router.route(task('fix the bug'));
+      const cp = (r.run_plan as unknown as { cancellation_policy: { abortable: boolean } }).cancellation_policy;
+      expect(cp.abortable).toBe(true);
+    });
+
+    it('fallback_policy has on_failure abort', () => {
+      const r = router.route(task('fix the bug'));
+      const fp = (r.run_plan as unknown as { fallback_policy: { on_failure: string } }).fallback_policy;
+      expect(fp.on_failure).toBe('abort');
+    });
+
+    it('tool_grants have granted false for all tools', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const tg = (r.run_plan as unknown as { tool_grants: { tool: string; granted: boolean }[] }).tool_grants;
+      for (const g of tg) {
+        expect(g.granted).toBe(false);
+      }
+    });
+  });
+
 });
