@@ -178,3 +178,15 @@ export { ReactStrategy } from './runtime/react.js';
 export { PlanExecuteStrategy } from './runtime/plan-execute.js';
 export type { ReasoningStrategy, StrategyContext, StrategyResult, ToolExecutor, ModelCaller, ReasoningStrategyHandler } from './runtime/reasoning-strategy.js';
 export type { PlanStep, RunPlan, PlanExecutorOptions } from './runtime/plan-execute.js';
+
+// Session: durable session
+export { DurableSession } from './session/durable-session.js';
+export type { SessionEvent, SessionSnapshot, RestoreResult, EventType } from './session/durable-session.js';
+
+// Runtime: loop, retry, notifications
+export { RuntimeLoop } from './runtime/loop.js';
+export type { RuntimeRequest, RuntimeResult, RuntimeLoopOptions } from './runtime/loop.js';
+export { withRetry, createRetryableError, isRetryable, calculateBackoff } from './runtime/retry.js';
+export type { RetryOptions, RetryResult, RetryableError } from './runtime/retry.js';
+export { NotificationQueue } from './runtime/notifications.js';
+export type { Notification, NotificationLevel, NotificationCategory } from './runtime/notifications.js';
