@@ -122,3 +122,24 @@ export type {
   ExchangeCredential,
   SecretsBrokerOptions,
 } from './security/secrets-broker.js';
+
+// VFS: virtual filesystem
+export { VirtualFilesystem } from './vfs/virtual-filesystem.js';
+
+export type {
+  VfsPermission,
+  VfsOptions,
+  VfsDiff,
+  VfsCheckpoint,
+  VfsWriteOptions,
+  VfsCommitResult,
+} from './vfs/virtual-filesystem.js';
+
+// Runtime: sandbox
+export { Sandbox } from './runtime/sandbox.js';
+
+export type {
+  SandboxConfig,
+  SandboxExecuteRequest,
+  SandboxResult,
+} from './runtime/sandbox.js';
