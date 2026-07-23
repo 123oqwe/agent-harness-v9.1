@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
  * Reads raw Stryker JSON and reports mutation metrics.
- * Verifies module and per-file floors.
- * Returns non-zero when a floor fails.
+ * Handles Stryker v9 JSON format (files as object keyed by filename).
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -22,11 +21,22 @@ function readStrykerJson(moduleName) {
   return JSON.parse(readFileSync(p, 'utf8'));
 }
 
-function countMutants(data) {
-  const files = data.files || [];
+function getFileList(data) {
+  // Stryker v9: files is an object keyed by filename
+  if (data.files && typeof data.files === 'object' && !Array.isArray(data.files)) {
+    return Object.entries(data.files).map(([name, f]) => ({ name, mutants: f.mutants || [] }));
+  }
+  // Stryker v8: files is an array
+  if (Array.isArray(data.files)) {
+    return data.files.map(f => ({ name: f.name, mutants: f.mutants || [] }));
+  }
+  return [];
+}
+
+function countMutants(files) {
   const result = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
   for (const f of files) {
-    for (const m of f.mutants || []) {
+    for (const m of f.mutants) {
       result.total++;
       switch (m.status) {
         case 'Killed': result.killed++; break;
@@ -54,11 +64,12 @@ function checkModule(moduleName) {
   }
 
   const data = readStrykerJson(moduleName);
-  const counts = countMutants(data);
+  const files = getFileList(data);
+  const counts = countMutants(files);
   const score = computeScore(counts);
 
   console.log(`\n=== Mutation Report: ${moduleName} ===`);
-  console.log(`Source files: ${(data.files || []).map(f => f.name).join(', ') || 'N/A'}`);
+  console.log(`Source files: ${files.map(f => f.name).join(', ') || 'N/A'}`);
   console.log(`Total mutants:  ${counts.total}`);
   console.log(`Killed:         ${counts.killed}`);
   console.log(`Timeout:        ${counts.timeout}`);
@@ -72,19 +83,8 @@ function checkModule(moduleName) {
   let failed = score < mod.minimum;
 
   if (mod.perFileMinimum) {
-    for (const f of data.files || []) {
-      const mutants = f.mutants || [];
-      const fc = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
-      for (const m of mutants) {
-        fc.total++;
-        switch (m.status) {
-          case 'Killed': fc.killed++; break;
-          case 'Timeout': fc.timeout++; break;
-          case 'Survived': fc.survived++; break;
-          case 'NoCoverage': fc.noCoverage++; break;
-          case 'Ignored': fc.ignored++; break;
-        }
-      }
+    for (const f of files) {
+      const fc = countMutants([f]);
       const fScore = computeScore(fc);
       if (fScore < mod.perFileMinimum) {
         console.log(`  [FAIL] ${f.name}: ${fScore}% < ${mod.perFileMinimum}%`);
@@ -96,13 +96,17 @@ function checkModule(moduleName) {
   }
 
   if (counts.survived > 0 || counts.noCoverage > 0) {
-    console.log(`\nSurviving / uncovered mutants:`);
-    for (const f of data.files || []) {
-      for (const m of f.mutants || []) {
+    console.log(`\nSurviving / uncovered mutants (first 50):`);
+    let shown = 0;
+    for (const f of files) {
+      for (const m of f.mutants) {
         if (m.status === 'Survived' || m.status === 'NoCoverage') {
-          console.log(`  [${m.status}] ${f.name}:${m.location?.start?.line ?? '?'} - ${m.mutatorName} (${m.replacement ?? m.description ?? 'N/A'})`);
+          console.log(`  [${m.status}] ${f.name}:${m.location?.start?.line ?? '?'} - ${m.mutatorName}`);
+          shown++;
+          if (shown >= 50) break;
         }
       }
+      if (shown >= 50) break;
     }
   }
 

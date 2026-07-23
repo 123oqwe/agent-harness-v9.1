@@ -3,10 +3,14 @@
 // and a minimum mutation score (plus optional per-file floor).
 
 export const mutationModules = {
-  gateway: {
-    mutate: ['gateway/**/*.ts'],
-    minimum: 85,
-  },
+ gateway: {
+   mutate: [
+     'gateway/model-gateway.ts',
+     'gateway/scripted-provider.ts',
+   ],
+   // GLM provider files excluded: require GLM_API_KEY for coverage
+   minimum: 85,
+ },
   router: {
     mutate: ['router/**/*.ts'],
     minimum: 90,
