@@ -17,3 +17,5 @@ worktrees/
 *~
 factory/state-store/state.json
 factory/state-store/state.json.lock
+reports/
+.stryker.*.config.json
