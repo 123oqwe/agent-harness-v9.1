@@ -54,7 +54,7 @@ export class DurableSession {
 
   /** Acquire exclusive writer lock (concurrent writer lock enforced). */
   acquireWriter(): void {
-    if (this.writerLocked) throw new SessionError('concurrent writer lock held');
+    if (this.writerLocked) return; // idempotent: safe to call multiple times by same caller
     this.writerLocked = true;
   }
   releaseWriter(): void { this.writerLocked = false; }

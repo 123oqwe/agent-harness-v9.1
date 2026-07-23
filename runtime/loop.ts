@@ -21,7 +21,7 @@ import type { RunPlan } from '../../spec/types/run-plan.js';
 export type TerminationReason =
   | 'iteration_limit' | 'budget_exhausted' | 'user_cancel' | 'deadline'
   | 'model_refusal' | 'malformed_response' | 'tool_oscillation' | 'goal_satisfied'
-  | 'context_reset' | 'completed';
+  | 'context_reset' | 'completed' | 'denied';
 
 export type LoopStrategy = 'direct' | 'react' | 'plan_execute';
 
@@ -114,8 +114,12 @@ export class LoopEngine {
         await this.runDirect(messages);
       } else if (this.config.strategy === 'react') {
         await this.runReact(messages);
-      } else {
+      } else if (this.config.strategy === 'plan_execute') {
         await this.runPlanExecute(messages);
+      } else {
+        // Unknown strategy: fail-closed — do NOT default to Direct
+        this.terminate('denied');
+        throw new LoopError(`unknown strategy: ${this.config.strategy}`);
       }
     } finally {
       this.writeProgress();

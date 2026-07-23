@@ -209,7 +209,7 @@ export class VirtualFilesystem {
     this.backends.sort((a, b) => b.prefix.length - a.prefix.length);
   }
   addPermissionRule(rule: VfsPermissionRule): void { this.permissions.push(rule); }
-  private route(path: string): Backend {
+  route(path: string): Backend {
     assertSafeVfsPath(path);
     for (const b of this.backends) if (path === b.prefix || path.startsWith(b.prefix === '/' ? '/' : b.prefix + '/')) return b;
     throw new VfsError(`no backend for path: ${path}`);
@@ -247,11 +247,13 @@ export class VirtualFilesystem {
     return matches;
   }
 
-  /** Atomically commit a RunPlan overlay into its commit target backend.
-   *  Saves original content before overwriting; restores on failure. */
-  commitOverlay(overlay: OverlayBackend, target: Backend): void {
-    if (overlay.isCommitted() || overlay.isDiscarded()) throw new VfsError('overlay already finalized');
-    // Save originals for rollback: content of existing files + existence of new files
+ /** Atomically commit a RunPlan overlay into its commit target backend.
+  *  Saves original content before overwriting; restores on failure. */
+ commitOverlay(overlay: OverlayBackend, target?: Backend): void {
+   if (overlay.isCommitted() || overlay.isDiscarded()) throw new VfsError('overlay already finalized');
+   // If no target provided, route to the overlay's prefix to find the backend
+   if (!target) target = this.route(overlay.prefix);
+   // Save originals for rollback: content of existing files + existence of new files
     const originals = new Map<string, Buffer | null>(); // null = file did not exist
     const deletedFiles = new Map<string, Buffer>(); // path -> original content (for restore)
     const writtenPaths: string[] = [];
