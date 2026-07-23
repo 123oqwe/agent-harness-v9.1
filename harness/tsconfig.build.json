@@ -1,0 +1,41 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "emitDeclarationOnly": false
+  },
+  "include": [
+    "index.ts",
+    "gateway/**/*.ts",
+    "security/**/*.ts",
+    "router/**/*.ts",
+    "runtime/**/*.ts",
+    "session/**/*.ts",
+    "vfs/**/*.ts",
+    "tools/**/*.ts",
+    "ingestion/**/*.ts",
+    "verification/**/*.ts",
+    "domains/**/*.ts",
+    "personal_assistant/**/*.ts",
+    "planning/**/*.ts",
+    "research/**/*.ts",
+    "writing/**/*.ts",
+    "ui/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "vitest.config.ts",
+    "stryker.config.json",
+    "eslint.config.js",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "../spec/**"
+  ]
+}

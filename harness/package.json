@@ -1,32 +1,54 @@
 {
   "name": "agent-harness",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "description": "Agent Harness Runtime - single-agent execution kernel with Direct, ReAct, and Plan+Execute strategies",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "vitest run tests/contracts tests/state-machines tests/spikes tests/threat-model tests/api",
+    "test:integration": "vitest run tests/gateway tests/policy tests/runtime tests/session tests/tools tests/ingestion tests/vfs tests/sandbox tests/evidence tests/verification tests/domain tests/ui",
+    "test:security": "vitest run tests/security tests/capability tests/sandbox",
+    "test:e2e": "vitest run tests/package tests/domain",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
-    "lint": "test -d src && eslint src/ tests/ || echo 'lint: no src/ yet (Phase 0), tests covered by tsc'",
+    "test:all": "npm run typecheck && npm run build && npm run lint && vitest run --coverage",
     "format": "prettier --write tests/"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.0.0",
     "@stryker-mutator/core": "^8.0.0",
     "@stryker-mutator/vitest-runner": "^8.0.0",
     "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^2.0.0"
   },
   "dependencies": {
-    "fastify": "^5.0.0",
     "@trpc/server": "^11.0.0",
+    "fastify": "^5.0.0",
     "zod": "^3.23.0"
   }
 }
