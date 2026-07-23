@@ -1,0 +1,40 @@
+/* eslint-disable */
+/** AUTO-GENERATED from spec/contracts/action-manifest.schema.json. Do not modify by hand. */
+
+export interface ActionManifest {
+  task_id: string;
+  plan_id: string;
+  step_id: string;
+  tool_name: string;
+  tool_version: string;
+  schema_hash: string;
+  canonical_args: {
+    [k: string]: unknown;
+  };
+  resource_ids: string[];
+  resource_versions: {
+    [k: string]: unknown;
+  };
+  preconditions: {
+    [k: string]: unknown;
+  };
+  expected_postconditions: {
+    [k: string]: unknown;
+  };
+  reads: string[];
+  writes: string[];
+  external_effects: string[];
+  side_effect_class: "pure" | "read_only" | "idempotent_write" | "non_idempotent_write" | "irreversible";
+  credential_scope: string[];
+  max_attempts: number;
+  max_cost: {
+    [k: string]: unknown;
+  };
+  expires_at: string;
+  compensation_plan: string | null;
+  policy_version: string;
+  /**
+   * Excluded from hash payload
+   */
+  manifest_hash: string;
+}

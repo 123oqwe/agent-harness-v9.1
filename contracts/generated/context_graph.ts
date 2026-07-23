@@ -1,0 +1,38 @@
+/* eslint-disable */
+/** AUTO-GENERATED from spec/contracts/context-graph.schema.json. Do not modify by hand. */
+
+/**
+ * Context sharing topology. Defines how context flows between agents.
+ */
+export interface ContextGraph {
+  nodes: {
+    node_id: string;
+    /**
+     * Reference to AgentGraph node agent_id
+     */
+    agent_id_ref: string;
+    /**
+     * How much context this agent has access to
+     */
+    context_scope: "full" | "selective" | "isolated";
+    /**
+     * For selective scope: which fields are shared
+     */
+    allowed_fields?: string[];
+    sensitivity_ceiling?: "public" | "internal" | "confidential" | "secret";
+  }[];
+  edges: {
+    from_node: string;
+    to_node: string;
+    mode: "full" | "selective" | "artifact_only" | "blackboard" | "none";
+    /**
+     * For artifact_only mode: JSON, Patch, EvidenceBundle, TestReport, PlanArtifact, DecisionRecord
+     */
+    allowed_artifact_types?: string[];
+    /**
+     * How long shared context is retained (e.g., 'task', 'session', 'mission')
+     */
+    retention?: string;
+    provenance_required?: boolean;
+  }[];
+}

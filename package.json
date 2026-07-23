@@ -33,7 +33,12 @@
     "test:e2e": "vitest run tests/contracts tests/api tests/domain tests/integration tests/glm-acceptance",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "node scripts/run-stryker.mjs",
-    "format": "prettier --write gateway security index.ts tests *.config.* *.json scripts"
+    "format": "prettier --write gateway security index.ts tests *.config.* *.json scripts",
+    "test:mutation:module": "node scripts/run-mutation.mjs",
+    "test:mutation:phase1": "node scripts/run-mutation.mjs phase1",
+    "test:mutation:check": "node scripts/check-mutation-thresholds.mjs",
+    "verify:phase1:local": "npm run typecheck && npm run build && npm run lint && npm test && npm run test:coverage && npm run test:mutation:phase1",
+    "generate:contracts": "node scripts/generate-contracts.mjs"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -47,6 +52,7 @@
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "eslint": "^10.7.0",
+    "json-schema-to-typescript": "^15.0.4",
     "prettier": "^3.9.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",

@@ -11,7 +11,9 @@
     "dist",
     "coverage",
     ".stryker-tmp",
+    "reports",
     "tests",
+    "mutation",
     "*.config.ts"
   ]
 }
