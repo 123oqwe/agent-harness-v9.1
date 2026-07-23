@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DurableSession } from '../../session/durable-session.js';
-import { LoopEngine, stripCredentialsFromEnv, type ModelTurn } from '../../runtime/loop.js';
+import { LoopEngine, stripCredentialsFromEnv, LoopError, type ModelTurn } from '../../runtime/loop.js';
 
 describe('AH-RUNTIME-LOOP-001 loop engine', () => {
   let dir: string;
@@ -834,6 +834,116 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
       const lastMsg = receivedMessages[receivedMessages.length - 1] as { role: string; content: string };
       expect(lastMsg.role).toBe('tool');
       expect(lastMsg.content).toContain('observation data');
+    });
+  });
+
+
+
+  describe('mutation-killing: no-coverage path activation', () => {
+    it('direct with stop_reason=length terminates malformed_response', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'truncated', decision_summary: 'd', stop_reason: 'length' }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('direct with goal not satisfied terminates completed', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'result', decision_summary: 'done' }), goalSatisfied: () => false },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('react budget check before model call', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, budget_tokens: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop', usage: { input_tokens: 1, output_tokens: 1 } }) },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('budget_exhausted');
+    });
+
+    it('plan_execute with complex DAG topology', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 'a', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'b', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'c', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'd', step_type: 'verification' as const, status: 'pending' as const },
+        ],
+        edges: [
+          { from_step: 'a', to_step: 'b' },
+          { from_step: 'b', to_step: 'c' },
+          { from_step: 'c', to_step: 'd' },
+        ],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'step done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+      expect(result.iterations).toBe(4);
+    });
+
+    it('plan_execute with parallel branches in DAG', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 'a', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'b', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 'c', step_type: 'model_call' as const, status: 'pending' as const },
+        ],
+        edges: [
+          { from_step: 'a', to_step: 'b' },
+          { from_step: 'a', to_step: 'c' },
+        ],
+      };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('LoopError has correct name and prototype', () => {
+      const err = new LoopError('test error');
+      expect(err.name).toBe('LoopError');
+      expect(err.message).toBe('test error');
+      expect(err instanceof Error).toBe(true);
+      expect(err instanceof LoopError).toBe(true);
+    });
+
+    it('progress.json not written when data_dir is undefined', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'ok', decision_summary: 'done' }), goalSatisfied: () => true },
+      );
+      await loop.run();
+      // No data_dir set, so progress.json should not exist
+      expect(existsSync(join(dir, 'progress.json'))).toBe(false);
+    });
+
+    it('turns array contains model content and decision_summary', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'direct', max_iterations: 1, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'my content', decision_summary: 'my summary' }), goalSatisfied: () => true },
+      );
+      const result = await loop.run();
+      expect(result.turns).toHaveLength(1);
+      expect(result.turns[0]!.model.content).toBe('my content');
+      expect(result.turns[0]!.model.decision_summary).toBe('my summary');
     });
   });
 
