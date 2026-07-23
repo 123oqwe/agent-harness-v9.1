@@ -238,7 +238,6 @@ export class Harness {
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
  private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
-   const ctx = this.execCtx!;
    const executor = new ToolExecutor(
      { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
      { authz: this.injectedAuthz, pep: this.injectedPep, stateStore: this.injectedStateStore, now: () => this.now() },
