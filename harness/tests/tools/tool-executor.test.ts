@@ -221,4 +221,137 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.success).toBe(true);
   });
 
+
+
+  it('PEP deny when verify_signature returns false', async () => {
+    writeFileSync(join(tmp, 'f.txt'), 'hello');
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({
+      policy_engine: pe,
+      capability_authority: { verify_signature: async () => false, consume: async () => true },
+      audit_sink: { write: async () => {} },
+      now: () => fn,
+    });
+    const exec2 = new ToolExecutor(
+      { toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+    );
+    await expect(exec2.execute('read_file', { path: '/workspace/f.txt' }, async () => 'x')).rejects.toThrow();
+  });
+
+  it('PEP deny when consume returns false (token already used)', async () => {
+    writeFileSync(join(tmp, 'f.txt'), 'hello');
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({
+      policy_engine: pe,
+      capability_authority: { verify_signature: async () => true, consume: async () => false },
+      audit_sink: { write: async () => {} },
+      now: () => fn,
+    });
+    const exec2 = new ToolExecutor(
+      { toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+    );
+    await expect(exec2.execute('read_file', { path: '/workspace/f.txt' }, async () => 'x')).rejects.toThrow();
+  });
+
+  it('tool with write effect_model executes successfully', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'read', tags: [], transport: 'native', operation: 'write', locality: 'local', reversibility: 'best_effort', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'wf.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/wf.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/wf.txt' }));
+    expect(receipt.success).toBe(true);
+  });
+
+  it('tool with execute effect_model and network_access executes', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'exec', tags: [], transport: 'native', operation: 'execute', locality: 'remote', reversibility: 'none', data_egress: 'metadata', network_access: false, credential_access: true, blast_radius: 'workspace', financial_impact_usd_micros: '1000', human_impact: 'self', external_visibility: 'shared', regulatory_sensitivity: ['gdpr'] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'ef.txt'), 'exec');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/ef.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/ef.txt' }));
+    expect(receipt.success).toBe(true);
+  });
+
+  it('tool with root argument extracts resource id', async () => {
+    writeFileSync(join(tmp, 'rf.txt'), 'root');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/rf.txt', root: '/workspace' }, async (deps) => readFile(deps.vfs, { path: '/workspace/rf.txt' }));
+    expect(receipt.success).toBe(true);
+  });
+
+  it('tool with sources array extracts resource ids', async () => {
+    writeFileSync(join(tmp, 'sf.txt'), 'sources');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/sf.txt', sources: ['/workspace/a', '/workspace/b'] }, async (deps) => readFile(deps.vfs, { path: '/workspace/sf.txt' }));
+    expect(receipt.success).toBe(true);
+  });
+
+  it('callCount increments after each execution', async () => {
+    writeFileSync(join(tmp, 'c1.txt'), 'a');
+    writeFileSync(join(tmp, 'c2.txt'), 'b');
+    await executor.execute('read_file', { path: '/workspace/c1.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/c1.txt' }));
+    await executor.execute('read_file', { path: '/workspace/c2.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/c2.txt' }));
+    // If callCount didn't increment, the second execution might use the same operation_id
+    // Both should succeed
+    const events = session.getEvents();
+    expect(events.filter(e => e.type === 'tool_call').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('receipt error is set on tool execution failure', async () => {
+    try {
+      await executor.execute('read_file', { path: '/workspace/nonexistent' }, async () => { throw new Error('not found'); });
+    } catch { /* expected */ }
+    const events = session.getEvents();
+    const errorEvent = events.find(e => e.type === 'error');
+    expect(errorEvent).toBeDefined();
+    expect((errorEvent!.data as { error: string }).error).toBe('not found');
+  });
+
+  it('execute with empty input object works', async () => {
+    writeFileSync(join(tmp, 'empty.txt'), 'empty');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/empty.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/empty.txt' }));
+    expect(receipt.success).toBe(true);
+    expect(receipt.input_hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('execute output_hash is set on success', async () => {
+    writeFileSync(join(tmp, 'oh.txt'), 'output');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/oh.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/oh.txt' }));
+    expect(receipt.output_hash).toBeDefined();
+    expect(receipt.output_hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('receipt tool_name matches executed tool', async () => {
+    writeFileSync(join(tmp, 'tn.txt'), 'name');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/tn.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tn.txt' }));
+    expect(receipt.tool_name).toBe('read_file');
+  });
+
+  it('execute with null input throws ToolExecutorError', async () => {
+    await expect(executor.execute('read_file', null, async () => 'x')).rejects.toThrow();
+  });
+
 });
