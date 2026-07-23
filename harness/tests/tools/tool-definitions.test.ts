@@ -25,7 +25,7 @@ describe('Phase 1 Tool Definitions', () => {
     for (const def of defs) {
       expect(def.name).toBeDefined();
       expect(def.version).toBe('1.0.0');
-      expect(def.domains.length).toBeGreaterThan(0);
+      expect(def.domains!.length).toBeGreaterThan(0);
       expect(def.implementation_status).toBe('production_certified');
       expect(def.effect_model).toBeDefined();
       expect(def.maturity).toBe('production_certified');

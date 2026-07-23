@@ -131,7 +131,7 @@ describe('EvalRunner mutation-killing tests', () => {
 });
 
 describe('Evidence mutation-killing tests', () => {
-  let dir: string;
+  let dir: string = "";
   afterEach(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
 
   it('runCommand captures exit code 0 on success', () => {
@@ -380,14 +380,14 @@ describe('EvalRunner advanced mutation-killing tests', () => {
     for (const kind of kinds) {
       expect(() => EvalRunner.validateManifest({
         manifest_version: 'eval-manifest.v1', requirement_id: 'x',
-        suites: [{ id: 'c', command: 'echo', expected_exit: 0, kind: kind as EvalCase['kind'] }],
+        suites: [{ id: 'c', command: 'echo', expected_exit: 0, kind: kind as 'unit' | 'integration' | 'adversarial' | 'vertical' | 'e2e' }],
       })).not.toThrow();
     }
   });
 });
 
 describe('Evidence advanced mutation-killing tests', () => {
-  let dir: string;
+  let dir: string = "";
   afterEach(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
 
   it('runCommand uses cwd when provided', () => {
@@ -573,7 +573,7 @@ describe('EvalRunner edge-case mutation-killing tests', () => {
 });
 
 describe('Evidence edge-case mutation-killing tests', () => {
-  let dir: string;
+  let dir: string = "";
   afterEach(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
 
   it('runCommand returns null stderr_hash when command succeeds', () => {
