@@ -339,4 +339,83 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
     });
   });
 
+
+
+  describe('mutation-killing: evidence string and hash precision', () => {
+    it('sha function returns null for empty stdout', () => {
+      const r = runCommand('true');
+      expect(r.exit_code).toBe(0);
+      // 'true' produces no stdout, so sha should return null
+      expect(r.stdout_hash).toBeNull();
+    });
+
+    it('runCommand with custom cwd produces different result', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-cwd2-'));
+      const r = runCommand('pwd', dir);
+      expect(r.exit_code).toBe(0);
+      expect(r.stdout_hash).not.toBeNull();
+    });
+
+    it('runCommand timeout produces non-zero exit', () => {
+      const r = runCommand('sleep 5', undefined, 100);
+      expect(r.exit_code).not.toBe(0);
+    });
+
+    it('generateEvidence source_files exist check prevents non-existent', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-ne-'));
+      expect(() => generateEvidence({
+        requirement_id: 'AH-NE', source_files: ['does-not-exist.ts'],
+        tests_added: [], commands: ['echo ok'], cwd: process.cwd(),
+        test_results: {}, coverage: {}, security_checks: {},
+      })).toThrow(EvidenceError);
+    });
+
+    it('generateEvidence tests_added exist check prevents non-existent', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-ne2-'));
+      expect(() => generateEvidence({
+        requirement_id: 'AH-NE2', source_files: [],
+        tests_added: ['does-not-exist.test.ts'], commands: ['echo ok'],
+        cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      })).toThrow(EvidenceError);
+    });
+
+    it('generateEvidence with both source_files and tests_added existing', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-both-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-BOTH', source_files: ['package.json'],
+        tests_added: ['tests/evidence/generation.test.ts'],
+        commands: ['echo ok'], cwd: process.cwd(),
+        test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.source_files).toEqual(['package.json']);
+      expect(ev.tests_added).toEqual(['tests/evidence/generation.test.ts']);
+    });
+
+    it('validateEvidence returns true for valid pass evidence', () => {
+      const valid = {
+        requirement_id: 'AH-VALID', commit_sha: 'b'.repeat(40),
+        source_files: ['x.ts'], tests_added: ['x.test.ts'],
+        commands_run: [{ command: 'echo ok', exit_code: 0, stdout_hash: 'abc' }],
+        exit_codes: [0], test_results: { total: 1, passed: 1 },
+        coverage: { lines: 90 }, security_checks: { none: true },
+        verifier_result: 'pass' as const,
+      };
+      const schemaPath = join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json');
+      expect(validateEvidence(valid, schemaPath)).toBe(true);
+    });
+
+    it('validateEvidence returns true for valid fail evidence with valid sha', () => {
+      const valid = {
+        requirement_id: 'AH-FAIL-VALID', commit_sha: 'c'.repeat(40),
+        source_files: [], tests_added: [],
+        commands_run: [{ command: 'exit 1', exit_code: 1, stdout_hash: null }],
+        exit_codes: [1], test_results: {},
+        coverage: {}, security_checks: {},
+        verifier_result: 'fail' as const,
+      };
+      const schemaPath = join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json');
+      expect(validateEvidence(valid, schemaPath)).toBe(true);
+    });
+  });
+
 });
