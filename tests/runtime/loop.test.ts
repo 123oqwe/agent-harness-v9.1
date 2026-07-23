@@ -1607,6 +1607,38 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     const result = await loop.run();
     expect(result.termination_reason).toBe('goal_satisfied');
   });
+
+
+    it('tool_call step fails when tool throws (model_call succeeded first)', async () => {
+      const sess = session();
+      const wf = {
+        nodes: [
+          { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+          { step_id: 's2', step_type: 'tool_call' as const, status: 'pending' as const },
+        ],
+        edges: [{ from_step: 's1', to_step: 's2' }],
+      };
+      let callCount = 0;
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: 'tc1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => {
+            callCount++;
+            // First call (from model_call step) succeeds, second call (from tool_call step) fails
+            if (callCount === 2) throw new Error('tool_call step failure');
+            return 'success';
+          },
+        },
+      );
+      const result = await loop.run();
+      // s1 model_call executes tool successfully, s2 tool_call step fails
+      expect(result.termination_reason).toBe('malformed_response');
+      const events = sess.getEvents();
+      expect(events.some(e => e.type === 'system' && (e.data as { action?: string }).action === 'overlay_discard')).toBe(true);
+    });
+
 });
 
 
