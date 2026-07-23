@@ -52,6 +52,44 @@ export interface HarnessOutcome {
 }
 
 /** Configuration for the Harness — only typed components, no callbacks. */
+/** Execution context: replaces all hardcoded identity values. */
+export interface ExecutionContext {
+  tenant_id: string;
+  user_id: string;
+  session_id: string;
+  run_id: string;
+  plan_id: string;
+  step_id: string;
+  attempt_id: string;
+  operation_id: string;
+  idempotency_key: string;
+  policy_snapshot: string;
+  tool_snapshot: string;
+  budget: { token_limit: number; usd_micros: number };
+  risk_level: number;
+  clock: () => string;
+}
+
+/** Default execution context for tests (deterministic but not hardcoded in production). */
+export function createDefaultExecutionContext(runId: string): ExecutionContext {
+  return {
+    tenant_id: 'default-tenant',
+    user_id: 'default-user',
+    session_id: runId,
+    run_id: runId,
+    plan_id: `plan-${runId}`,
+    step_id: 'step-001',
+    attempt_id: 'attempt-001',
+    operation_id: `op-${runId}`,
+    idempotency_key: `idem-${runId}`,
+    policy_snapshot: 'policy-v1',
+    tool_snapshot: 'tool-v1',
+    budget: { token_limit: 100000, usd_micros: 5000000 },
+   risk_level: 2,
+   clock: (() => { const t = new Date().toISOString(); return () => t; })(),
+ };
+}
+
 export interface HarnessConfig {
   toolRegistry: ToolRegistry;
   skillRegistry: SkillRegistry;
@@ -59,6 +97,7 @@ export interface HarnessConfig {
   vfs: VirtualFilesystem;
   sandbox: SandboxProfile;
   provider: HarnessProvider;
+  executionContext?: ExecutionContext;
   dataDir?: string;
   sessionLogPath?: string;
 }
@@ -75,35 +114,43 @@ export class Harness {
   private currentOverlay: OverlayBackend | null = null;
   private currentTarget: unknown = null;
 
-  constructor(config: HarnessConfig) {
-    this.config = config;
-    this.toolSnapshot = config.toolRegistry.freezeSnapshot();
-    this.skillSnapshot = config.skillRegistry.freezeSnapshot();
-    this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
-    // Composition root: inject deps into ToolExecutor (not self-generated)
-    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-    this.injectedStateStore = new InMemoryCapabilityStateStore();
-    this.injectedAuthz = new AuthorizationService({ private_key: privateKey, public_key: publicKey, state_store: this.injectedStateStore, now: () => this.fixedNow });
-    this.injectedPep = new PolicyEnforcementPoint({
-      policy_engine: config.policyEngine,
-      capability_authority: {
-        verify_signature: async (token) => { try { const r = await this.injectedStateStore.read(token.token_id); return !!r; } catch { return false; } },
-        consume: async (tokenId) => { if (this.consumedTokens.has(tokenId)) return false; this.consumedTokens.add(tokenId); return true; },
-      },
-      audit_sink: { write: async () => {} },
-      now: () => this.fixedNow,
-    });
-  }
-  private readonly injectedAuthz: AuthorizationService;
-  private readonly injectedPep: PolicyEnforcementPoint;
-  private readonly injectedStateStore: InMemoryCapabilityStateStore;
-  private readonly consumedTokens = new Set<string>();
-  private readonly fixedNow = '2026-01-01T00:00:00.000Z';
+ constructor(config: HarnessConfig) {
+   this.config = config;
+   this.execCtx = config.executionContext ?? null;
+   this.toolSnapshot = config.toolRegistry.freezeSnapshot();
+   this.skillSnapshot = config.skillRegistry.freezeSnapshot();
+   this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
+   // Composition root: inject deps into ToolExecutor (not self-generated)
+   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+   this.injectedStateStore = new InMemoryCapabilityStateStore();
+   this.injectedAuthz = new AuthorizationService({ private_key: privateKey, public_key: publicKey, state_store: this.injectedStateStore, now: () => this.now() });
+   this.injectedPep = new PolicyEnforcementPoint({
+     policy_engine: config.policyEngine,
+     capability_authority: {
+       verify_signature: async (token) => { try { const r = await this.injectedStateStore.read(token.token_id); return !!r; } catch { return false; } },
+       consume: async (tokenId) => { if (this.consumedTokens.has(tokenId)) return false; this.consumedTokens.add(tokenId); return true; },
+     },
+     audit_sink: { write: async (entry) => { this.auditLog.push(entry); } },
+     now: () => this.now(),
+   });
+ }
+ private readonly injectedAuthz: AuthorizationService;
+ private readonly injectedPep: PolicyEnforcementPoint;
+ private readonly injectedStateStore: InMemoryCapabilityStateStore;
+ private readonly consumedTokens = new Set<string>();
+ private readonly auditLog: unknown[] = [];
+ private execCtx: ExecutionContext | null = null;
+
+ private now(): string {
+   return this.execCtx?.clock() ?? new Date().toISOString();
+ }
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
-  async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
-    // 1. Create session (event log = source of truth)
-   const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
+ async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
+   const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
+   this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
+   // 1. Create session (event log = source of truth)
+   const session = new DurableSession(actualRunId);
    session.acquireWriter();
    // Create a per-Run overlay for write isolation (stages writes, not committed until verification)
     const overlayPrefix = '/workspace';
@@ -190,16 +237,17 @@ export class Harness {
   }
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
-  private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
-    const executor = new ToolExecutor(
-      { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
-      { authz: this.injectedAuthz, pep: this.injectedPep, stateStore: this.injectedStateStore, now: () => this.fixedNow },
-    );
-    const { result } = await executor.execute(name, args, async (deps) => {
-      return this.dispatchToolViaDeps(name, args, deps.vfs);
-    });
-    return result;
-  }
+ private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
+   const ctx = this.execCtx!;
+   const executor = new ToolExecutor(
+     { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
+     { authz: this.injectedAuthz, pep: this.injectedPep, stateStore: this.injectedStateStore, now: () => this.now() },
+   );
+   const { result } = await executor.execute(name, args, async (deps) => {
+     return this.dispatchToolViaDeps(name, args, deps.vfs);
+   });
+   return result;
+ }
 
   private async dispatchToolViaDeps(name: string, args: Record<string, unknown>, vfs: VirtualFilesystem): Promise<unknown> {
     const { readFile } = await import('./tools/read-file.js');
