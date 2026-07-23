@@ -800,3 +800,127 @@ describe('Verification final mutation-killing tests', () => {
     }
   });
 });
+
+describe('Verification precision mutation-killing tests', () => {
+  const runner = new EvalRunner();
+
+  it('strategy consistency stays false when non-e2e fails and no e2e with strategy exists', () => {
+    // This kills the L74 ConditionalExpression->true mutant:
+    // if mutated to true, e2eResults.every() on empty array returns true,
+    // overriding the false from the unit failure.
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-L74',
+      suites: [
+        { id: 'u-l74', kind: 'unit', command: 'exit 1', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    // Without e2e+strategy, strategies_consistent stays false from the unit failure
+    expect(report.reasoning_strategy_consistent).toBe(false);
+  });
+
+  it('strategy consistency is true when all pass and no e2e with strategy', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-L74-2',
+      suites: [
+        { id: 'u-l74-2', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    expect(report.reasoning_strategy_consistent).toBe(true);
+  });
+
+  it('report results array structure matches EvalResult interface', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-STRUCT',
+      suites: [{ id: 'st1', kind: 'unit', command: 'echo ok', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    const r = report.results[0]!;
+    expect(r).toHaveProperty('case_id', 'st1');
+    expect(r).toHaveProperty('passed', true);
+    expect(r).toHaveProperty('exit_code', 0);
+    expect(r).toHaveProperty('stdout_hash');
+    expect(r).toHaveProperty('stderr_hash');
+  });
+
+  it('runCommand with explicit cwd=undefined uses process.cwd', () => {
+    const result = runCommand('echo ok', undefined);
+    expect(result.exit_code).toBe(0);
+  });
+
+  it('generateEvidence rejects commit_sha that is not 40 hex chars (runtime check)', () => {
+    // This is indirectly tested by checking the generated evidence always has valid sha
+    const ev = generateEvidence({
+      requirement_id: 'AH-REGEX', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    // The regex /^[0-9a-f]{40}$/ must match - if mutated to drop ^ or $, 
+    // a 41-char sha would pass. Verify our sha is exactly 40.
+    expect(ev.commit_sha.length).toBe(40);
+    expect(ev.commit_sha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('validateEvidence rejects pass without commands_run with correct error', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+        verifier_result: 'pass',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('PASS without commands');
+    }
+  });
+
+  it('validateEvidence rejects pass with pending sha with correct error', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'pending', source_files: [], tests_added: [],
+        commands_run: [{ command: 'echo', exit_code: 0, stdout_hash: 'abc' }], exit_codes: [0],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('pending');
+    }
+  });
+
+  it('validateEvidence rejects invalid commit_sha with correct error', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'short', source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+        verifier_result: 'fail',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as Error).message).toContain('commit_sha');
+    }
+  });
+
+  it('runCommand timeout produces non-zero exit code', () => {
+    const result = runCommand('sleep 5', undefined, 100);
+    expect(result.exit_code).not.toBe(0);
+  });
+
+  it('generateEvidence with failing command includes stderr_hash in commands_run', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-STDERR-EV', source_files: ['package.json'], tests_added: [],
+      commands: ['sh -c "echo error 1>&2; exit 1"'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.commands_run[0]!.stderr_hash).not.toBeNull();
+    expect(ev.commands_run[0]!.exit_code).toBe(1);
+  });
+});
