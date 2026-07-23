@@ -43,7 +43,7 @@ export {
 
 export type {
   EffectRisk,
-  CapabilityToken,
+
   PolicyRule,
   Policy,
   PolicyContext,
@@ -75,3 +75,50 @@ export type {
 // Package metadata
 export const PACKAGE_NAME = 'agent-harness';
 export const PACKAGE_VERSION = '0.1.0';
+
+// Security: capability service
+export {
+  CapabilityService,
+} from './security/capability.js';
+
+export type {
+  CapabilityToken,
+  CapabilityContext,
+  CapabilityIssueRequest,
+  CapabilityServiceOptions,
+} from './security/capability.js';
+
+// Security: authorization service
+export {
+  AuthorizationService,
+} from './security/authorization-service.js';
+
+export type {
+  AuthzSubject,
+  AuthzResource,
+  AuthzRequest,
+  AuthzDecision,
+  AuthzEffect,
+} from './security/authorization-service.js';
+
+// Security: auth service
+export {
+  AuthService,
+} from './security/auth.js';
+
+export type {
+  AuthSession,
+  AuthMethodAdapter,
+  AuthServiceOptions,
+} from './security/auth.js';
+
+// Security: secrets broker
+export {
+  SecretsBroker,
+} from './security/secrets-broker.js';
+
+export type {
+  SecretRecord,
+  ExchangeCredential,
+  SecretsBrokerOptions,
+} from './security/secrets-broker.js';
