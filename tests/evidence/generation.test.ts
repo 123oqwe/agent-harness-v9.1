@@ -249,4 +249,94 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
     });
   });
 
+
+
+  describe('mutation-killing: writeEvidence and validateEvidence paths', () => {
+    it('writeEvidence overwrites fail with pass (upgrade allowed)', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-up-'));
+      const ev1 = generateEvidence({
+        requirement_id: 'AH-UP2', source_files: [], tests_added: [],
+        commands: ['exit 1'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      const path = join(dir, 'ev.json');
+      writeEvidence(ev1, path);
+      const ev2 = { ...ev1, verifier_result: 'pass' as const, exit_codes: [0], commands_run: [{ command: 'echo ok', exit_code: 0, stdout_hash: 'abc123' }] };
+      writeEvidence(ev2, path);
+      const read = JSON.parse(readFileSync(path, 'utf8'));
+      expect(read.verifier_result).toBe('pass');
+    });
+
+    it('writeEvidence overwrites pass with pass (same level allowed)', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-pp-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-PP', source_files: [], tests_added: [],
+        commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      const path = join(dir, 'ev.json');
+      writeEvidence(ev, path);
+      writeEvidence(ev, path);
+      expect(existsSync(path)).toBe(true);
+    });
+
+    it('writeEvidence overwrites fail with fail (same level allowed)', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-ff-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-FF', source_files: [], tests_added: [],
+        commands: ['exit 1'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      const path = join(dir, 'ev.json');
+      writeEvidence(ev, path);
+      writeEvidence(ev, path);
+      expect(existsSync(path)).toBe(true);
+    });
+
+    it('validateEvidence passes with fail and empty commands', () => {
+      const ok = {
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'fail' as const,
+      };
+      expect(() => validateEvidence(ok, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).not.toThrow();
+    });
+
+    it('validateEvidence rejects pass with empty commands_run', () => {
+      const bad = {
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass' as const,
+      };
+      expect(() => validateEvidence(bad, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    });
+
+    it('validateEvidence rejects object missing required fields via AJV', () => {
+      const bad = { requirement_id: 'x' };
+      expect(() => validateEvidence(bad, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    });
+
+    it('validateEvidence rejects wrong verifier_result enum', () => {
+      const bad = {
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [{ command: 'x', exit_code: 0, stdout_hash: 'x' }], exit_codes: [0],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'maybe' as const,
+      };
+      expect(() => validateEvidence(bad, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    });
+
+    it('runCommand captures stdout from successful command', () => {
+      const r = runCommand('echo "test output"');
+      expect(r.exit_code).toBe(0);
+      expect(r.stdout_hash).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('generateEvidence produces test_output null and test_output_hash null', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-to-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-TO', source_files: [], tests_added: [],
+        commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.test_output).toBeNull();
+      expect(ev.test_output_hash).toBeNull();
+    });
+  });
+
 });
