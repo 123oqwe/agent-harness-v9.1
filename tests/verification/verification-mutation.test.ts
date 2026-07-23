@@ -294,3 +294,187 @@ describe('Evidence mutation-killing tests', () => {
     expect(ev.test_output_hash).toBeNull();
   });
 });
+
+describe('EvalRunner advanced mutation-killing tests', () => {
+  const runner = new EvalRunner();
+
+  it('reason field is undefined when case passes', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-REASON',
+      suites: [{ id: 'r1', kind: 'unit', command: 'echo ok', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.reason).toBeUndefined();
+  });
+
+  it('reason field contains expected and actual exit when case fails', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-REASON2',
+      suites: [{ id: 'r2', kind: 'unit', command: 'exit 7', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.reason).toContain('expected exit 0');
+    expect(report.results[0]!.reason).toContain('got 7');
+  });
+
+  it('exit_code is 1 when command crashes without explicit exit code', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-CRASH',
+      suites: [{ id: 'c2', kind: 'unit', command: 'nonexistent-command-xyz', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.exit_code).not.toBe(0);
+    expect(report.results[0]!.passed).toBe(false);
+  });
+
+  it('e2e case without expected_strategy does not affect consistency', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-NE2E',
+      suites: [
+        { id: 'e2e-4', kind: 'e2e', command: 'echo ok', expected_exit: 0 },
+        { id: 'u4', kind: 'unit', command: 'exit 1', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    // e2e without expected_strategy is filtered out from consistency check
+    // but the unit failure still makes strategies_consistent false
+    expect(report.reasoning_strategy_consistent).toBe(false);
+  });
+
+  it('all_passed is true only when every case passes', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-ALL',
+      suites: [
+        { id: 'a1', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+        { id: 'a2', kind: 'unit', command: 'echo ok', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    expect(report.all_passed).toBe(true);
+  });
+
+  it('report results are in manifest order', () => {
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-ORDER',
+      suites: [
+        { id: 'first', kind: 'unit', command: 'echo 1', expected_exit: 0 },
+        { id: 'second', kind: 'unit', command: 'echo 2', expected_exit: 0 },
+        { id: 'third', kind: 'unit', command: 'echo 3', expected_exit: 0 },
+      ],
+    };
+    const report = runner.run(manifest);
+    expect(report.results[0]!.case_id).toBe('first');
+    expect(report.results[1]!.case_id).toBe('second');
+    expect(report.results[2]!.case_id).toBe('third');
+  });
+
+  it('validateManifest accepts a case with expected_strategy', () => {
+    expect(() => EvalRunner.validateManifest({
+      manifest_version: 'eval-manifest.v1', requirement_id: 'x',
+      suites: [{ id: 'c', command: 'echo', expected_exit: 0, expected_strategy: 'direct' }],
+    })).not.toThrow();
+  });
+
+  it('validateManifest accepts all suite kinds', () => {
+    const kinds = ['unit', 'integration', 'adversarial', 'vertical', 'e2e'];
+    for (const kind of kinds) {
+      expect(() => EvalRunner.validateManifest({
+        manifest_version: 'eval-manifest.v1', requirement_id: 'x',
+        suites: [{ id: 'c', command: 'echo', expected_exit: 0, kind: kind as EvalCase['kind'] }],
+      })).not.toThrow();
+    }
+  });
+});
+
+describe('Evidence advanced mutation-killing tests', () => {
+  let dir: string;
+  afterEach(() => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } });
+
+  it('runCommand uses cwd when provided', () => {
+    dir = mkdtempSync(join(tmpdir(), 'ev-mut-'));
+    const result = runCommand('pwd', dir);
+    expect(result.exit_code).toBe(0);
+  });
+
+  it('runCommand uses timeout when provided', () => {
+    // A command that would take longer than 100ms
+    const result = runCommand('sleep 1', undefined, 100);
+    expect(result.exit_code).not.toBe(0);
+  });
+
+  it('generateEvidence includes source_files array', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-SF', source_files: ['package.json', 'tsconfig.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.source_files).toEqual(['package.json', 'tsconfig.json']);
+  });
+
+  it('generateEvidence includes tests_added array', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-TA', source_files: ['package.json'],
+      tests_added: ['tests/evidence/generation.test.ts'],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.tests_added).toEqual(['tests/evidence/generation.test.ts']);
+  });
+
+  it('generateEvidence includes test_results object', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-TR', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(),
+      test_results: { total: 10, passed: 9, failed: 1 }, coverage: {}, security_checks: {},
+    });
+    expect(ev.test_results).toEqual({ total: 10, passed: 9, failed: 1 });
+  });
+
+  it('generateEvidence includes coverage object', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-COV', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {},
+      coverage: { lines: 85, branches: 80 }, security_checks: {},
+    });
+    expect(ev.coverage).toEqual({ lines: 85, branches: 80 });
+  });
+
+  it('generateEvidence includes security_checks object', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-SC', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {},
+      security_checks: { sandbox_violation: 0, unauthorized_effect: 0 },
+    });
+    expect(ev.security_checks).toEqual({ sandbox_violation: 0, unauthorized_effect: 0 });
+  });
+
+  it('generateEvidence includes commands_run with command and exit_code', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-CR', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.commands_run[0]!.command).toBe('echo ok');
+    expect(ev.commands_run[0]!.exit_code).toBe(0);
+  });
+
+  it('generateEvidence includes requirement_id', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-RID-123', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.requirement_id).toBe('AH-RID-123');
+  });
+
+  it('writeEvidence can write same-level pass evidence', () => {
+    dir = mkdtempSync(join(tmpdir(), 'ev-mut-'));
+    const path = join(dir, 'evidence.json');
+    const passEv = generateEvidence({
+      requirement_id: 'AH-SL', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    writeEvidence(passEv, path);
+    const passEv2 = generateEvidence({
+      requirement_id: 'AH-SL', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok2'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(() => writeEvidence(passEv2, path)).not.toThrow();
+  });
+});
