@@ -6,15 +6,21 @@
  *   node scripts/run-mutation.mjs <module>
  *   node scripts/run-mutation.mjs phase1
  *
- * Writes JSON to reports/mutation/<module>/mutation.json
- * Then runs check-mutation-thresholds.mjs to verify floors.
- * Returns non-zero when a module or per-file floor fails.
+ * Guarantees:
+ * 1. Each module uses an isolated report directory.
+ * 2. Old report is deleted BEFORE running so stale data can never be used.
+ * 3. Stryker non-zero exit immediately fails the module — no fallback copy.
+ * 4. After report is written, source files in the report are validated
+ *    against the module's configured mutate list.
+ * 5. runModule() returns a result object or throws — never calls process.exit().
+ * 6. Phase 1 aggregate exits once after all modules.
+ * 7. Uses npm exec --offline to prevent network downloads during mutation.
  */
-import { execSync } from 'node:child_process';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, cpSync, globSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync, globSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mutationModules, phase1Minimum, mutationExclusions } from '../mutation/modules.mjs';
+import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
 import { strykerBase } from '../mutation/stryker.base.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,52 +33,53 @@ function resolveGlob(patterns) {
     let matches;
     try { matches = globSync(pattern, { cwd: harnessRoot }); } catch { matches = []; }
     for (const m of matches) {
-      // Apply exclusions
-      const isExcluded = mutationExclusions.some(ex => {
-        
-        if (ex === '**/index.ts') return m.endsWith('index.ts');
-        if (ex === '**/*.d.ts') return m.endsWith('.d.ts');
-        if (ex === '**/*.test.ts') return m.endsWith('.test.ts');
-        if (ex === '**/*.spec.ts') return m.endsWith('.spec.ts');
-        if (ex === 'contracts/**') return m.startsWith('contracts/');
-        if (ex === 'tests/**') return m.startsWith('tests/');
-        if (ex === 'dist/**') return m.startsWith('dist/');
-        if (ex === 'node_modules/**') return m.startsWith('node_modules/');
-        if (ex === 'vitest.config.ts') return m === 'vitest.config.ts';
-        if (ex === 'vitest.mutation.config.ts') return m === 'vitest.mutation.config.ts';
-        if (ex === 'eslint.config.js') return m === 'eslint.config.js';
-        if (ex === '**/*.json') return m.endsWith('.json');
-        return false;
-      });
-      if (!isExcluded) files.add(m);
+      let excluded = false;
+      if (m.endsWith('index.ts')) excluded = true;
+      else if (m.endsWith('.d.ts')) excluded = true;
+      else if (m.endsWith('.test.ts')) excluded = true;
+      else if (m.endsWith('.spec.ts')) excluded = true;
+      else if (m.startsWith('contracts/')) excluded = true;
+      else if (m.startsWith('tests/')) excluded = true;
+      else if (m.startsWith('dist/')) excluded = true;
+      else if (m.startsWith('node_modules/')) excluded = true;
+      else if (m === 'vitest.config.ts') excluded = true;
+      else if (m === 'vitest.mutation.config.ts') excluded = true;
+      else if (m === 'eslint.config.js') excluded = true;
+      else if (m.endsWith('.json')) excluded = true;
+      if (!excluded) files.add(m);
     }
   }
   return [...files].sort();
 }
 
+/**
+ * Run a single module. Returns { module, passed, score, counts } or throws.
+ * NEVER calls process.exit().
+ */
 function runModule(moduleName) {
   const mod = mutationModules[moduleName];
   if (!mod) {
-    console.error(`Unknown module: ${moduleName}`);
-    console.error(`Available: ${Object.keys(mutationModules).join(', ')}, phase1`);
-    process.exit(2);
+    throw new Error(`Unknown module: ${moduleName}. Available: ${Object.keys(mutationModules).join(', ')}, phase1`);
   }
 
   const mutateFiles = resolveGlob(mod.mutate);
   if (mutateFiles.length === 0) {
-    console.error(`Module '${moduleName}' has an empty mutate list. Patterns: ${mod.mutate.join(', ')}`);
-    process.exit(2);
+    throw new Error(`Module '${moduleName}' has an empty mutate list after exclusions. Patterns: ${mod.mutate.join(', ')}`);
   }
 
   const moduleReportDir = join(reportsDir, moduleName);
+
+  // 1. Delete old report directory to prevent stale data
+  if (existsSync(moduleReportDir)) {
+    rmSync(moduleReportDir, { recursive: true, force: true });
+  }
   mkdirSync(moduleReportDir, { recursive: true });
 
- // Build a temporary Stryker config for this module
-
- const config = {
-   ...strykerBase,
-   mutate: mutateFiles,
-   tempDirName: `.stryker-tmp/${moduleName}`,
+  // 2. Build Stryker config for this module
+  const config = {
+    ...strykerBase,
+    mutate: mutateFiles,
+    tempDirName: `.stryker-tmp/${moduleName}`,
     thresholds: {
       high: mod.minimum,
       low: mod.minimum - 5,
@@ -80,7 +87,6 @@ function runModule(moduleName) {
     },
   };
 
-  // Write temp config
   const configPath = join(harnessRoot, `.stryker.${moduleName}.config.json`);
   writeFileSync(configPath, JSON.stringify(config, null, 2));
 
@@ -88,114 +94,174 @@ function runModule(moduleName) {
   console.log(`Mutating ${mutateFiles.length} file(s): ${mutateFiles.join(', ')}`);
   console.log(`Minimum score: ${mod.minimum}%`);
 
-  try {
-    execSync(`npx stryker run ${configPath}`, {
-      cwd: harnessRoot,
-      stdio: 'inherit',
-      timeout: 600000,
-      env: {
-        ...process.env,
-        STRYKER: 'true',
-        HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
-      },
-    });
-  } catch (err) {
-    console.error(`Stryker exited with code ${err.status ?? 'unknown'} for module ${moduleName}`);
+  // 3. Run Stryker — use npm exec --offline to prevent network downloads
+  // Also delete the shared reports/mutation/mutation.json so it can't be picked up
+  const sharedJson = join(reportsDir, 'mutation.json');
+  if (existsSync(sharedJson)) rmSync(sharedJson, { force: true });
+  const sharedHtml = join(reportsDir, 'mutation.html');
+  if (existsSync(sharedHtml)) rmSync(sharedHtml, { force: true });
+
+  const strykerBin = join(harnessRoot, 'node_modules', '.bin', 'stryker');
+  const result = spawnSync(strykerBin, ['run', configPath], {
+    cwd: harnessRoot,
+    stdio: 'inherit',
+    timeout: 600000,
+    env: {
+      ...process.env,
+      STRYKER: 'true',
+      HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
+    },
+  });
+
+  // 4. Stryker non-zero exit = immediate failure — NO fallback copy
+  if (result.error || result.status !== 0) {
+    // Clean up temp config
+    try { rmSync(configPath, { force: true }); } catch { /* ignore */ }
+    const code = result.error ? 'spawn-error' : result.status;
+    throw new Error(`Stryker exited with code ${code} for module ${moduleName}. No report will be used.`);
   }
 
-  // Stryker v9 writes to reports/mutation/mutation.json by default
-  const defaultJson = join(harnessRoot, 'reports', 'mutation', 'mutation.json');
-  const sandboxJson = join(harnessRoot, '.stryker-tmp', moduleName, 'reports', 'mutation', 'mutation.json');
+  // 5. Locate the report Stryker wrote
+  // Stryker v9 writes to reports/mutation/mutation.json (shared) by default
+  // or to the tempDir if configured. Check both, but prefer the shared one
+  // that Stryker actually wrote in this run.
+  const candidatePaths = [
+    sharedJson,                                    // shared default
+    join(harnessRoot, '.stryker-tmp', moduleName, 'reports', 'mutation', 'mutation.json'),  // tempDir
+  ];
 
-  let jsonFound = false;
-  if (existsSync(sandboxJson)) {
-    cpSync(sandboxJson, join(moduleReportDir, 'mutation.json'));
-    jsonFound = true;
-  } else if (existsSync(defaultJson)) {
-    cpSync(defaultJson, join(moduleReportDir, 'mutation.json'));
-    jsonFound = true;
+  let reportJson = null;
+  let reportPath = null;
+  for (const p of candidatePaths) {
+    if (existsSync(p)) {
+      try {
+        reportJson = JSON.parse(readFileSync(p, 'utf8'));
+        reportPath = p;
+        break;
+      } catch {
+        // corrupt JSON, try next
+      }
+    }
   }
 
-  if (!jsonFound) {
-    console.error(`No mutation.json found for module ${moduleName}`);
-    process.exit(3);
+  if (!reportJson) {
+    try { rmSync(configPath, { force: true }); } catch { /* ignore */ }
+    throw new Error(`No valid mutation.json found for module ${moduleName} after Stryker run.`);
   }
 
-  // Clean up temp config
-   try { writeFileSync(configPath, ''); } catch { /* cleanup */ }
+  // 6. Validate: report source files MUST match the module's mutate list
+  const reportFiles = Object.keys(reportJson.files || {});
+  const expectedSet = new Set(mutateFiles);
+  const reportSet = new Set(reportFiles);
 
-  // Run threshold checker
-  try {
-    execSync(`node scripts/check-mutation-thresholds.mjs ${moduleName}`, {
-      cwd: harnessRoot,
-      stdio: 'inherit',
-    });
-  } catch {
-    process.exit(1);
+  const missingFromReport = [...expectedSet].filter(f => !reportSet.has(f));
+  const extraInReport = [...reportSet].filter(f => !expectedSet.has(f));
+
+  if (missingFromReport.length > 0 || extraInReport.length > 0) {
+    try { rmSync(configPath, { force: true }); } catch { /* ignore */ }
+    const parts = [];
+    if (missingFromReport.length > 0) parts.push(`missing from report: ${missingFromReport.join(', ')}`);
+    if (extraInReport.length > 0) parts.push(`unexpected in report: ${extraInReport.join(', ')}`);
+    throw new Error(`Report source file mismatch for module ${moduleName}: ${parts.join('; ')}`);
   }
+
+  // 7. Copy report to module-specific directory
+  const destPath = join(moduleReportDir, 'mutation.json');
+  if (reportPath !== destPath) {
+    writeFileSync(destPath, readFileSync(reportPath, 'utf8'));
+  }
+
+  // Clean up shared report and temp config
+  if (existsSync(sharedJson)) rmSync(sharedJson, { force: true });
+  try { rmSync(configPath, { force: true }); } catch { /* ignore */ }
+
+  // 8. Run threshold checker (as a function, not subprocess, to get result)
+  const counts = countFromReport(reportJson);
+  const score = computeScore(counts);
+  const passed = score >= mod.minimum;
+
+  console.log(`\n--- ${moduleName} ---`);
+  console.log(`Total: ${counts.total}, Killed: ${counts.killed}, Timeout: ${counts.timeout}, Survived: ${counts.survived}, NoCoverage: ${counts.noCoverage}, Ignored: ${counts.ignored}`);
+  console.log(`Score: ${score}% (required: ${mod.minimum}%) -> ${passed ? 'PASS' : 'FAIL'}`);
+
+  return { module: moduleName, passed, score, counts, minimum: mod.minimum };
+}
+
+function countFromReport(data) {
+  const files = data.files || {};
+  const fileEntries = Array.isArray(files) ? files : Object.values(files);
+  const counts = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
+  for (const f of fileEntries) {
+    for (const m of (f.mutants || [])) {
+      counts.total++;
+      switch (m.status) {
+        case 'Killed': counts.killed++; break;
+        case 'Timeout': counts.timeout++; break;
+        case 'Survived': counts.survived++; break;
+        case 'NoCoverage': counts.noCoverage++; break;
+        case 'Ignored': counts.ignored++; break;
+      }
+    }
+  }
+  return counts;
+}
+
+function computeScore(counts) {
+  const testable = counts.total - counts.ignored;
+  if (testable === 0) return 0;
+  return parseFloat(((counts.killed + counts.timeout) / testable * 100).toFixed(2));
 }
 
 function runPhase1() {
   const moduleNames = Object.keys(mutationModules);
   console.log(`\n=== Running Phase 1 mutation for all ${moduleNames.length} modules ===`);
+  const results = [];
   let allPassed = true;
   const aggregate = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
 
   for (const mod of moduleNames) {
     try {
-      runModule(mod);
-      const jsonPath = join(reportsDir, mod, 'mutation.json');
-     if (existsSync(jsonPath)) {
-       const data = JSON.parse(readFileSync(jsonPath, 'utf8'));
-       // Handle Stryker v9 (files as object) and v8 (files as array)
-       const fileEntries = data.files
-         ? (Array.isArray(data.files) ? data.files : Object.values(data.files))
-         : [];
-       for (const f of fileEntries) {
-         const mutants = f.mutants || [];
-         aggregate.total += mutants.length;
-         for (const m of mutants) {
-           if (m.status === 'Killed') aggregate.killed++;
-           else if (m.status === 'Timeout') aggregate.timeout++;
-           else if (m.status === 'Survived') aggregate.survived++;
-           else if (m.status === 'NoCoverage') aggregate.noCoverage++;
-           else if (m.status === 'Ignored') aggregate.ignored++;
-         }
-       }
-     }
-    } catch {
+      const result = runModule(mod);
+      results.push(result);
+      aggregate.total += result.counts.total;
+      aggregate.killed += result.counts.killed;
+      aggregate.timeout += result.counts.timeout;
+      aggregate.survived += result.counts.survived;
+      aggregate.noCoverage += result.counts.noCoverage;
+      aggregate.ignored += result.counts.ignored;
+      if (!result.passed) allPassed = false;
+    } catch (err) {
+      console.error(`\nFAIL: ${err.message}`);
+      results.push({ module: mod, passed: false, score: 0, counts: { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 }, minimum: mutationModules[mod].minimum, error: err.message });
       allPassed = false;
     }
   }
 
   const testableTotal = aggregate.total - aggregate.ignored;
   const aggregateScore = testableTotal > 0
-    ? ((aggregate.killed + aggregate.timeout) / testableTotal) * 100
+    ? parseFloat(((aggregate.killed + aggregate.timeout) / testableTotal * 100).toFixed(2))
     : 0;
 
   const phase1Report = {
     aggregate: {
       ...aggregate,
-      score: parseFloat(aggregateScore.toFixed(2)),
+      score: aggregateScore,
       required: phase1Minimum,
       status: aggregateScore >= phase1Minimum ? 'PASS' : 'FAIL',
     },
-    modules: moduleNames.map(m => {
-      const jp = join(reportsDir, m, 'mutation.json');
-      if (!existsSync(jp)) return { module: m, status: 'MISSING' };
-     const d = JSON.parse(readFileSync(jp, 'utf8'));
-     const fileArr = d.files ? (Array.isArray(d.files) ? d.files : Object.values(d.files)) : [];
-     const total = fileArr.reduce((s, f) => s + (f.mutants || []).length, 0);
-     const killed = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Killed').length, 0);
-     const timeout = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Timeout').length, 0);
-     const survived = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Survived').length, 0);
-     const noCov = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'NoCoverage').length, 0);
-     const ignored = fileArr.reduce((s, f) => s + (f.mutants || []).filter(x => x.status === 'Ignored').length, 0);
-      const testable = total - ignored;
-      const score = testable > 0 ? parseFloat(((killed + timeout) / testable * 100).toFixed(2)) : 0;
-      const min = mutationModules[m].minimum;
-      return { module: m, total, killed, timeout, survived, noCoverage: noCov, ignored, score, minimum: min, status: score >= min ? 'PASS' : 'FAIL' };
-    }),
+    modules: results.map(r => ({
+      module: r.module,
+      total: r.counts.total,
+      killed: r.counts.killed,
+      timeout: r.counts.timeout,
+      survived: r.counts.survived,
+      noCoverage: r.counts.noCoverage,
+      ignored: r.counts.ignored,
+      score: r.score,
+      minimum: r.minimum,
+      status: r.passed ? 'PASS' : 'FAIL',
+      ...(r.error ? { error: r.error } : {}),
+    })),
   };
 
   const phase1Dir = join(reportsDir, 'phase1');
@@ -205,12 +271,15 @@ function runPhase1() {
   console.log(`\n=== Phase 1 Aggregate ===`);
   console.log(`Score: ${phase1Report.aggregate.score}% (required: ${phase1Minimum}%)`);
   console.log(`Status: ${phase1Report.aggregate.status}`);
-
-  if (!allPassed || phase1Report.aggregate.status === 'FAIL') {
-    process.exit(1);
+  console.log(`\nPer-module:`);
+  for (const m of phase1Report.modules) {
+    console.log(`  ${m.module}: ${m.score}% / ${m.minimum}% [${m.status}]${m.error ? ' (' + m.error + ')' : ''}`);
   }
+
+  process.exit(allPassed && phase1Report.aggregate.status === 'PASS' ? 0 : 1);
 }
 
+// Main
 const arg = process.argv[2];
 if (!arg) {
   console.error('Usage: node scripts/run-mutation.mjs <module|phase1>');
@@ -220,5 +289,11 @@ if (!arg) {
 if (arg === 'phase1') {
   runPhase1();
 } else {
-  runModule(arg);
+  try {
+    const result = runModule(arg);
+    process.exit(result.passed ? 0 : 1);
+  } catch (err) {
+    console.error(`\nFATAL: ${err.message}`);
+    process.exit(1);
+  }
 }

@@ -1,6 +1,6 @@
-// Shared Stryker configuration base. Module-specific configs merge this.
-// Uses vitest.config.ts (not vitest.mutation.config.ts) because tests
-// depend on spec/ directory access via HARNESS_SPEC_ROOT env var.
+// Shared Stryker configuration base.
+// Uses vitest.mutation.config.ts (NOT vitest.config.ts) so mutation acceptance
+// is earned by real behavioral tests, not coverage-mirror tests.
 export const strykerBase = {
   testRunner: 'vitest',
   coverageAnalysis: 'perTest',
@@ -8,7 +8,7 @@ export const strykerBase = {
   timeoutMS: 30000,
   concurrency: 4,
   vitest: {
-    configFile: 'vitest.config.ts',
+    configFile: 'vitest.mutation.config.ts',
   },
   thresholds: {
     high: 80,

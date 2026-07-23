@@ -2,7 +2,13 @@
 /**
  * Reads raw Stryker JSON and reports mutation metrics.
  * Handles Stryker v9 JSON format (files as object keyed by filename).
- * Reads equivalent-mutants.json to exclude reviewed equivalent mutants.
+ *
+ * Equivalent mutants are matched by EXACT Stryker mutant ID (not file+line).
+ * The equivalent-mutants.json must contain a "strykerMutantId" field that
+ * matches the "id" field in Stryker's JSON output. File+line matching is
+ * explicitly forbidden because it over-matches.
+ *
+ * Security-critical invariant code cannot be waived.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -14,35 +20,27 @@ const harnessRoot = resolve(__dirname, '..');
 const reportsDir = join(harnessRoot, 'reports', 'mutation');
 const equivPath = join(harnessRoot, 'mutation', 'equivalent-mutants.json');
 
-// Load equivalent mutants
-let equivalentMutants = [];
+// Load equivalent mutants — match by EXACT Stryker mutant ID only
+let equivalentMutantIds = new Set();
 try {
   if (existsSync(equivPath)) {
-    equivalentMutants = JSON.parse(readFileSync(equivPath, 'utf8'));
-  }
-} catch {
-  // Empty or invalid file
-}
-
-function isEquivalentMutant(fileName, mutant) {
-  const line = mutant.location?.start?.line;
-  for (const eq of equivalentMutants) {
-    if (eq.file === fileName) {
-      // Match by line number in location field
-      const eqLineMatch = eq.location?.match(/line (\d+)/);
-      if (eqLineMatch && parseInt(eqLineMatch[1]) === line) {
-        return true;
+    const arr = JSON.parse(readFileSync(equivPath, 'utf8'));
+    if (Array.isArray(arr)) {
+      for (const eq of arr) {
+        if (eq.strykerMutantId && typeof eq.strykerMutantId === 'string') {
+          equivalentMutantIds.add(eq.strykerMutantId);
+        }
       }
     }
   }
-  return false;
+} catch {
+  // Empty or invalid file — no waivers
 }
 
 function readStrykerJson(moduleName) {
   const p = join(reportsDir, moduleName, 'mutation.json');
   if (!existsSync(p)) {
-    console.error(`No mutation.json for module '${moduleName}' at ${p}`);
-    process.exit(3);
+    throw new Error(`No mutation.json for module '${moduleName}' at ${p}`);
   }
   return JSON.parse(readFileSync(p, 'utf8'));
 }
@@ -61,8 +59,8 @@ function countMutants(files) {
   const result = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
   for (const f of files) {
     for (const m of f.mutants) {
-      // Check if this is an equivalent mutant
-      if (isEquivalentMutant(f.name, m)) {
+      // Check if this exact mutant ID is waived
+      if (equivalentMutantIds.has(m.id)) {
         result.ignored++;
         continue;
       }
@@ -88,23 +86,33 @@ function computeScore(counts) {
 function checkModule(moduleName) {
   const mod = mutationModules[moduleName];
   if (!mod) {
-    console.error(`Unknown module: ${moduleName}`);
-    process.exit(2);
+    throw new Error(`Unknown module: ${moduleName}`);
   }
 
   const data = readStrykerJson(moduleName);
   const files = getFileList(data);
+
+  // Validate report source files match module config
+  const reportFiles = files.map(f => f.name).sort();
+  const expectedFiles = mod.mutate.sort();
+  if (JSON.stringify(reportFiles) !== JSON.stringify(expectedFiles)) {
+    console.error(`Source file mismatch for module ${moduleName}:`);
+    console.error(`  Report:   ${reportFiles.join(', ')}`);
+    console.error(`  Expected: ${expectedFiles.join(', ')}`);
+    process.exit(1);
+  }
+
   const counts = countMutants(files);
   const score = computeScore(counts);
 
   console.log(`\n=== Mutation Report: ${moduleName} ===`);
-  console.log(`Source files: ${files.map(f => f.name).join(', ') || 'N/A'}`);
+  console.log(`Source files: ${files.map(f => f.name).join(', ')}`);
   console.log(`Total mutants:  ${counts.total}`);
   console.log(`Killed:         ${counts.killed}`);
   console.log(`Timeout:        ${counts.timeout}`);
   console.log(`Survived:       ${counts.survived}`);
   console.log(`No coverage:    ${counts.noCoverage}`);
-  console.log(`Ignored:        ${counts.ignored} (equivalent mutants excluded)`);
+  console.log(`Ignored:        ${counts.ignored}`);
   console.log(`Mutation score: ${score}%`);
   console.log(`Required score: ${mod.minimum}%`);
   console.log(`Status:         ${score >= mod.minimum ? 'PASS' : 'FAIL'}`);
@@ -125,18 +133,18 @@ function checkModule(moduleName) {
   }
 
   if (counts.survived > 0 || counts.noCoverage > 0) {
-    console.log(`\nSurviving / uncovered mutants (first 50):`);
+    console.log(`\nSurviving / uncovered mutants:`);
     let shown = 0;
     for (const f of files) {
       for (const m of f.mutants) {
-        if (isEquivalentMutant(f.name, m)) continue;
+        if (equivalentMutantIds.has(m.id)) continue;
         if (m.status === 'Survived' || m.status === 'NoCoverage') {
-          console.log(`  [${m.status}] ${f.name}:${m.location?.start?.line ?? '?'} - ${m.mutatorName}`);
+          console.log(`  [${m.status}] id=${m.id} ${f.name}:${m.location?.start?.line ?? '?'} - ${m.mutatorName}`);
           shown++;
-          if (shown >= 50) break;
+          if (shown >= 100) { console.log('  ... (truncated)'); break; }
         }
       }
-      if (shown >= 50) break;
+      if (shown >= 100) break;
     }
   }
 
@@ -158,7 +166,7 @@ function checkPhase1() {
   let failed = false;
   for (const m of data.modules) {
     if (m.status === 'FAIL') failed = true;
-    console.log(`  ${m.module}: ${m.score}% / ${m.minimum}% [${m.status}] (S:${m.survived} NC:${m.noCoverage})`);
+    console.log(`  ${m.module}: ${m.score}% / ${m.minimum}% [${m.status}] (S:${m.survived} NC:${m.noCoverage})${m.error ? ' ' + m.error : ''}`);
   }
   if (failed || agg.status === 'FAIL') process.exit(1);
 }

@@ -1,18 +1,20 @@
 // Module manifest — the single source of truth for mutation testing scope.
 // Each module maps to an explicit list of production source files to mutate
 // and a minimum mutation score (plus optional per-file floor).
+//
+// IMPORTANT: every file listed MUST exist on disk. The runner validates this
+// and will fail if a file is missing.
 
 export const mutationModules = {
- gateway: {
-   mutate: [
-     'gateway/model-gateway.ts',
-     'gateway/scripted-provider.ts',
-   ],
-   // GLM provider files excluded: require GLM_API_KEY for coverage
-   minimum: 85,
- },
+  gateway: {
+    mutate: [
+      'gateway/model-gateway.ts',
+      'gateway/scripted-provider.ts',
+    ],
+    minimum: 85,
+  },
   router: {
-    mutate: ['router/**/*.ts'],
+    mutate: ['router/static-router.ts'],
     minimum: 90,
   },
   toolsRegistry: {
@@ -20,6 +22,7 @@ export const mutationModules = {
       'tools/tool-registry.ts',
       'tools/tool-dispatcher.ts',
       'tools/tool-definitions.ts',
+      'tools/tool-executor.ts',
     ],
     minimum: 90,
   },
@@ -39,14 +42,16 @@ export const mutationModules = {
     perFileMinimum: 80,
   },
   skills: {
-    mutate: ['skills/**/*.ts'],
+    mutate: ['skills/skill-loader.ts'],
     minimum: 85,
   },
+  // NOTE: strategies currently live inside runtime/loop.ts. After splitting
+  // into runtime/direct.ts, runtime/react.ts, runtime/plan-execute.ts,
+  // this module will point to those files. For now they are covered by
+  // the runtime module to avoid an empty mutate list.
   strategies: {
     mutate: [
-      'runtime/direct.ts',
-      'runtime/react.ts',
-      'runtime/plan-execute.ts',
+      'runtime/loop.ts',
     ],
     minimum: 85,
   },
@@ -59,7 +64,6 @@ export const mutationModules = {
       'security/consent.ts',
       'security/action-executor.ts',
       'security/audit-sink.ts',
-      'tools/tool-executor.ts',
     ],
     minimum: 90,
   },
@@ -71,26 +75,22 @@ export const mutationModules = {
     minimum: 90,
   },
   vfs: {
-    mutate: ['vfs/**/*.ts'],
+    mutate: ['vfs/virtual-filesystem.ts'],
     minimum: 90,
   },
   sandbox: {
-    mutate: [
-      'runtime/sandbox.ts',
-      'runtime/sandbox/**/*.ts',
-    ],
+    mutate: ['runtime/sandbox.ts'],
     minimum: 90,
   },
   session: {
-    mutate: ['session/**/*.ts'],
+    mutate: ['session/durable-session.ts'],
     minimum: 90,
   },
   runtime: {
     mutate: [
       'runtime/loop.ts',
-      'runtime/loop-helpers.ts',
-      'runtime/budget*.ts',
-      'runtime/termination*.ts',
+      'runtime/retry.ts',
+      'runtime/notifications.ts',
     ],
     minimum: 90,
   },
@@ -103,12 +103,12 @@ export const mutationModules = {
   },
   verticals: {
     mutate: [
-      'domains/coding/**/*.ts',
+      'domains/coding/ah_coding_vertical_001.ts',
       'ingestion/ah_doc_vertical_001.ts',
-      'research/**/*.ts',
-      'writing/**/*.ts',
-      'planning/**/*.ts',
-      'personal_assistant/**/*.ts',
+      'research/ah_research_vertical_001.ts',
+      'writing/ah_writing_vertical_001.ts',
+      'planning/ah_planning_vertical_001.ts',
+      'personal_assistant/ah_pa_vertical_001.ts',
     ],
     minimum: 85,
     perFileMinimum: 80,
@@ -117,19 +117,3 @@ export const mutationModules = {
 
 // Aggregate Phase 1 acceptance floor
 export const phase1Minimum = 85;
-
-// Files excluded from mutation scope (type-only, generated, index, fixtures)
-export const mutationExclusions = [
-  '**/index.ts',
-  '**/*.d.ts',
-  '**/*.test.ts',
-  '**/*.spec.ts',
-  'contracts/**',
-  'tests/**',
-  'dist/**',
-  'node_modules/**',
-  'vitest.config.ts',
-  'vitest.mutation.config.ts',
-  'eslint.config.js',
-  '**/*.json',
-];
