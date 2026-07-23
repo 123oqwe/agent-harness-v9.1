@@ -42,6 +42,7 @@ export interface ToolReceipt {
   token_id?: string | undefined;
   policy_decision?: string | undefined;
   derived_risk_tier?: number | undefined;
+  side_effect_class?: string | undefined;
 }
 
 export interface ToolExecutorDeps {
@@ -281,6 +282,7 @@ export class ToolExecutor {
       token_id: tokenId,
       policy_decision: 'allow',
       derived_risk_tier: tier,
+      side_effect_class: manifest.side_effect_class,
     };
 
     // 8. Evidence

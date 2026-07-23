@@ -593,4 +593,47 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.derived_risk_tier).toBe(1); // human_impact self (+1)
   });
 
+  it('receipt side_effect_class is read_only for default read tool', async () => {
+    writeFileSync(join(tmp, 'sec0.txt'), 'data');
+    const { receipt } = await executor.execute('read_file', { path: '/workspace/sec0.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec0.txt' }));
+    expect(receipt.side_effect_class).toBe('read_only');
+  });
+
+  it('receipt side_effect_class is idempotent_write for write operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'write', tags: [], transport: 'native', operation: 'write', locality: 'local', reversibility: 'best_effort', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'sec_write.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_write.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_write.txt' }));
+    expect(receipt.side_effect_class).toBe('idempotent_write');
+  });
+
+  it('receipt side_effect_class is idempotent_write for delete operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'delete', tags: [], transport: 'native', operation: 'delete', locality: 'local', reversibility: 'none', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'sec_del.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_del.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_del.txt' }));
+    expect(receipt.side_effect_class).toBe('idempotent_write');
+    expect(receipt.derived_risk_tier).toBe(5);
+  });
+
 });
