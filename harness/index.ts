@@ -201,3 +201,27 @@ export { editFile } from './tools/edit-file.js';
 export { searchFiles } from './tools/search-files.js';
 export { executeCommand } from './tools/execute-command.js';
 export { parseDocument } from './ingestion/parse-document.js';
+
+// Verification: evidence and eval runner
+export { createEvidence, verifyRecord, verifyChain, redactSecrets } from './verification/evidence.js';
+export type { EvidenceRecord } from './verification/evidence.js';
+export { EvalRunner } from './verification/eval-runner.js';
+export type { EvalFixture, EvalSummary } from './verification/eval-runner.js';
+
+// Verticals
+export { runCodingVertical } from './domains/coding/ah_coding_vertical_001.js';
+export { runDocVertical } from './ingestion/ah_doc_vertical_001.js';
+export { runResearchVertical } from './research/ah_research_vertical_001.js';
+export { runWritingVertical } from './writing/ah_writing_vertical_001.js';
+export { runPlanningVertical } from './planning/ah_planning_vertical_001.js';
+export { runPAVertical } from './personal_assistant/ah_pa_vertical_001.js';
+
+// UI adapters
+export { getOnboardingUIState } from './ui/ah_ui_onboarding_001.js';
+export { getSettingsUIState } from './ui/ah_ui_settings_001.js';
+export { getApprovalUIState } from './ui/ah_ui_approval_001.js';
+export { getChatUIState } from './ui/ah_ui_chat_001.js';
+export { getCodingUIState } from './ui/ah_ui_coding_001.js';
+export { getEvidenceUIState } from './ui/ah_ui_evidence_001.js';
+export { getPrivacyUIState } from './ui/ah_ui_privacy_001.js';
+export { getTaskUIState } from './ui/ah_ui_task_001.js';
