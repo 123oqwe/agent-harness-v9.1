@@ -924,3 +924,92 @@ describe('Verification precision mutation-killing tests', () => {
     expect(ev.commands_run[0]!.exit_code).toBe(1);
   });
 });
+
+describe('Verification regex and boolean mutation-killing tests', () => {
+  const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+    ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+    : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+
+  it('validateEvidence rejects 40-char sha with trailing non-hex char (kills regex ^$ removal)', () => {
+    // 40 hex chars + 'g' (non-hex) = 41 chars total
+    // If regex mutated to drop $, 'g'.repeat(40) + 'g' would match /^[0-9a-f]{40}/
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40) + 'g', source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('validateEvidence rejects 40-char sha with leading non-hex char', () => {
+    // 'g' + 40 hex chars = 41 chars
+    // If regex mutated to drop ^, 'g' + hex would match /[0-9a-f]{40}$/
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'g' + 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('validateEvidence rejects 40-char sha with uppercase letters (not in [0-9a-f])', () => {
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'A'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('validateEvidence accepts exactly 40 lowercase hex chars', () => {
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: '0123456789abcdef0123456789abcdef01234567', source_files: [], tests_added: [],
+      commands_run: [{ command: 'echo', exit_code: 0, stdout_hash: 'abc' }], exit_codes: [0],
+      test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass',
+    }, SCHEMA_PATH)).not.toThrow();
+  });
+
+  it('validateEvidence pass with commands but not pending sha is accepted', () => {
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [{ command: 'echo', exit_code: 0, stdout_hash: 'abc' }], exit_codes: [0],
+      test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'pass',
+    }, SCHEMA_PATH)).not.toThrow();
+  });
+
+  it('validateEvidence fail with commands is accepted (not pass, so no special checks)', () => {
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [{ command: 'exit 1', exit_code: 1, stdout_hash: null }], exit_codes: [1],
+      test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'fail',
+    }, SCHEMA_PATH)).not.toThrow();
+  });
+
+  it('validateEvidence pass without commands is rejected with specific message', () => {
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+        verifier_result: 'pass',
+      }, SCHEMA_PATH);
+      expect.fail('should throw');
+    } catch (e) {
+      expect((e as Error).message).toContain('PASS without commands');
+    }
+  });
+
+  it('generateEvidence verifier_result is fail when any command fails (kills BooleanLiteral mutation)', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-BL1', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok', 'exit 1'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.verifier_result).toBe('fail');
+  });
+
+  it('generateEvidence verifier_result is pass when all commands succeed (kills BooleanLiteral mutation)', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-BL2', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok', 'echo ok2'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.verifier_result).toBe('pass');
+  });
+});
