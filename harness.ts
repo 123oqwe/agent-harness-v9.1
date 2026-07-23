@@ -23,6 +23,7 @@ import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ToolExecutor } from './tools/tool-executor.js';
 import { AuthorizationService } from './security/authorization-service.js';
+import { SkillLoader, type SkillActivationResult } from './skills/skill-loader.js';
 import { InMemoryCapabilityStateStore } from './security/capability.js';
 import { PolicyEnforcementPoint } from './security/pep.js';
 import { generateKeyPairSync } from 'node:crypto';
@@ -187,9 +188,29 @@ export class Harness {
      };
    }
 
-    const runPlan = routing.run_plan;
+   const runPlan = routing.run_plan;
 
-    // 3. Runtime: execute the frozen RunPlan.reasoning_strategy
+   // 2a. Skill activation: check if any required skills can activate
+   const allowedTools = (this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools;
+   const skillLoader = new SkillLoader(
+     this.config.skillRegistry,
+     this.skillSnapshot,
+     allowedTools,
+   );
+   let skillActivation: SkillActivationResult | null = null;
+   // If the RunPlan has skill_bindings, try to activate the first one
+   const skillBindings = (runPlan.skill_bindings ?? []) as Array<{ skill_name?: string }>;
+   if (skillBindings.length > 0 && skillBindings[0]!.skill_name) {
+     try {
+       skillActivation = await skillLoader.activate(skillBindings[0]!.skill_name);
+       session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: skillActivation.frozen_version });
+     } catch {
+       // Skill activation failure is non-fatal: continue without skill context
+       session.append('error', { reason: 'skill_activation_failed', skill: skillBindings[0]!.skill_name });
+     }
+   }
+
+   // 3. Runtime: execute the frozen RunPlan.reasoning_strategy
     const loop = new LoopEngine(
       {
         strategy: runPlan.reasoning_strategy,
