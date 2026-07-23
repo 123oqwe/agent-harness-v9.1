@@ -78,8 +78,8 @@ function makeSelection(snapshotHash: string, overrides: Partial<ProviderSelectio
     required_capabilities: [],
     requires_structured_output: false,
     data_policy: { local_only: false, allowed_regions: ['us'], max_retention_days: 90, training_allowed: false },
-    policy: { denied_provider_ids: [] },
-    run_plan: { required_capabilities: [] },
+    policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+    run_plan: { allowed_provider_ids: undefined, required_capabilities: [] },
     ...overrides,
   };
 }
@@ -128,12 +128,12 @@ describe('ModelGateway mutation-killing edge cases', () => {
   });
 
   it('rejects non-USD currency in pricing', () => {
-    const reg = makeReg({ pricing: { currency: 'EUR', input_per_million: 1, output_per_million: 2 } });
+    const reg = makeReg({ pricing: { currency: 'EUR' as 'USD', input_per_million: 1, output_per_million: 2 } });
     expect(() => new FrozenProviderRegistry([reg])).toThrow(ProviderConfigurationError);
   });
 
   it('rejects invalid health value', () => {
-    const reg = makeReg({ health: 'invalid' as unknown as string });
+    const reg = makeReg({ health: 'invalid' as unknown as 'healthy' | 'degraded' | 'down' });
     expect(() => new FrozenProviderRegistry([reg])).toThrow(ProviderConfigurationError);
   });
 
@@ -242,7 +242,7 @@ describe('ModelGateway mutation-killing edge cases', () => {
   it('rejects when policy denies provider', () => {
     const { gateway } = makeGateway();
     const sel = makeSelection(gateway['registry'].snapshot.hash, {
-      policy: { denied_provider_ids: ['p1'] },
+      policy: { allowed_provider_ids: undefined, denied_provider_ids: ['p1'] },
     });
     expect(() => gateway.resolve(sel)).toThrow(ProviderResolutionError);
   });
