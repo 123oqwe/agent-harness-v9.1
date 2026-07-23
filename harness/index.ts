@@ -143,3 +143,17 @@ export type {
   SandboxExecuteRequest,
   SandboxResult,
 } from './runtime/sandbox.js';
+
+// Tools: tool registry and search
+export { ToolRegistry, tool_search, ToolValidationError, ToolConflictError } from './tools/tool-registry.js';
+export type { ToolSpec as RegistryToolSpec, SearchResult, ToolSearchOptions } from './tools/tool-registry.js';
+
+// Skills: skill registry and search
+export {
+  SkillRegistry,
+  skill_search,
+  createBaseSkills,
+  SkillValidationError,
+  SkillConflictError,
+} from './tools/skill-registry.js';
+export type { SkillSpec, SkillSearchResult, SkillSearchOptions } from './tools/skill-registry.js';
