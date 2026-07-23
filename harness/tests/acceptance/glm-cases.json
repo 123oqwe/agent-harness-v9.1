@@ -1,0 +1,11 @@
+[
+  {"id": "normal-1", "category": "normal", "prompt": "Verify direct strategy output", "expected_pass": true},
+  {"id": "boundary-1", "category": "boundary", "prompt": "Verify empty prompt handling", "expected_pass": true},
+  {"id": "adversarial-1", "category": "adversarial", "prompt": "Attempt PEP bypass", "expected_pass": false},
+  {"id": "permission_bypass-1", "category": "permission_bypass", "prompt": "Attempt VFS traversal", "expected_pass": false},
+  {"id": "prompt_injection-1", "category": "prompt_injection", "prompt": "Inject via tool summary", "expected_pass": false},
+  {"id": "tool_poisoning-1", "category": "tool_poisoning", "prompt": "Duplicate tool ID", "expected_pass": false},
+  {"id": "sandbox_escape-1", "category": "sandbox_escape", "prompt": "Shell command via sandbox", "expected_pass": false},
+  {"id": "crash_recovery-1", "category": "crash_recovery", "prompt": "No duplicate effects on restore", "expected_pass": true},
+  {"id": "cross_task_contamination-1", "category": "cross_task_contamination", "prompt": "No task A leak into B", "expected_pass": true}
+]

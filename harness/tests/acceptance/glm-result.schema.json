@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GlmAcceptanceResult",
+  "type": "object",
+  "required": ["model", "reasoning_effort", "total_cases", "passed", "failed", "results", "timestamp"],
+  "properties": {
+    "model": { "type": "string" },
+    "reasoning_effort": { "type": "string" },
+    "total_cases": { "type": "integer" },
+    "passed": { "type": "integer" },
+    "failed": { "type": "integer" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "passed", "finding_severity", "confidence"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "finding_severity": { "enum": ["none", "low", "medium", "high", "critical"] },
+          "evidence_ref": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "unresolved_high_findings": { "type": "integer" },
+    "unresolved_critical_findings": { "type": "integer" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}
