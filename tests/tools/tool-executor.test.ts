@@ -636,4 +636,60 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.derived_risk_tier).toBe(5);
   });
 
+
+
+  it('receipt side_effect_class is idempotent_write for create operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'create', tags: [], transport: 'native', operation: 'create', locality: 'local', reversibility: 'best_effort', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'sec_create.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_create.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_create.txt' }));
+    expect(receipt.side_effect_class).toBe('idempotent_write');
+  });
+
+  it('receipt side_effect_class is read_only for execute operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'exec', tags: [], transport: 'native', operation: 'execute', locality: 'local', reversibility: 'none', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'sec_exec.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_exec.txt' }));
+    expect(receipt.side_effect_class).toBe('read_only');
+  });
+
+  it('receipt side_effect_class is read_only for publish operation tool', async () => {
+    const tr2 = new ToolRegistry();
+    tr2.register({
+      ...toolSpec('read_file'),
+      effect_model: { summary: 'pub', tags: [], transport: 'native', operation: 'publish', locality: 'local', reversibility: 'none', data_egress: 'none', network_access: false, credential_access: false, blast_radius: 'single_resource', financial_impact_usd_micros: '0', human_impact: 'none', external_visibility: 'private', regulatory_sensitivity: [] },
+    } as ToolSpec);
+    const snap2 = tr2.freezeSnapshot();
+    const fn = fixedNow;
+    const { privateKey: pk2, publicKey: pub2 } = generateKeyPairSync('ed25519');
+    const ss2 = new InMemoryCapabilityStateStore();
+    const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
+    const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    writeFileSync(join(tmp, 'sec_pub.txt'), 'data');
+    const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_pub.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_pub.txt' }));
+    expect(receipt.side_effect_class).toBe('read_only');
+  });
+
 });
