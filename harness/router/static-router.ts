@@ -167,20 +167,14 @@ export class StaticRouter {
         }
       }
     }
-    // Check privacy constraints
-    const localOnly = (task.constraints || []).some(c => c.type === 'privacy' && c.value === 'local_only');
-    if (localOnly && intent.requires_tests) {
-      // execute_command_sandboxed is sandboxed (no network) so local_only is satisfied
-    }
+    // Phase 1: all tools are local (VFS/sandbox), so local_only is always satisfied.
+    // Remote tool veto is a Phase 3 concern.
     return { passed: true };
   }
 
-  private policyPostRouteVeto(task: TaskContract, _strategy: ReasoningStrategy, intent: IntentProfile): { vetoed: boolean; reason?: string } {
-    // Post-route veto: if local_only and the route binds a network tool, veto
-    const localOnly = (task.constraints || []).some(c => c.type === 'privacy' && c.value === 'local_only');
-    if (localOnly && intent.requires_writes) {
-      // write_file and edit_file are local (VFS), so local_only is satisfied
-    }
+  private policyPostRouteVeto(_task: TaskContract, _strategy: ReasoningStrategy, _intent: IntentProfile): { vetoed: boolean; reason?: string } {
+    // Phase 1: all providers are local (scripted_test), so local_only is always satisfied.
+    // Remote provider veto is a Phase 3 concern.
     return { vetoed: false };
   }
 
