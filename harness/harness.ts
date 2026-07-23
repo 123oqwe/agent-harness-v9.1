@@ -17,7 +17,7 @@ import type { SkillRegistry, SkillRegistrySnapshot } from './tools/skill-registr
 import type { PolicyEngine } from './security/policy-engine.js';
 import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
-import { OverlayBackend, type Backend } from './vfs/virtual-filesystem.js';
+import { OverlayBackend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
@@ -35,7 +35,7 @@ export interface HarnessProvider {
 
 /** Outcome returned to the caller (Vertical or user). */
 export interface HarnessOutcome {
-  run_plan: RunPlan;
+ run_plan: RunPlan | null;
   routing: RoutingResult;
   loop_result: LoopResult;
   session: DurableSession;
@@ -103,12 +103,13 @@ export class Harness {
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
     // 1. Create session (event log = source of truth)
-    const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
-    // Create a per-Run overlay for write isolation (stages writes, not committed until verification)
-    const overlayPrefix = '/workspace'; // overlay writes to /workspace paths
+   const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
+   session.acquireWriter();
+   // Create a per-Run overlay for write isolation (stages writes, not committed until verification)
+    const overlayPrefix = '/workspace';
     this.currentOverlay = new OverlayBackend(overlayPrefix);
-    // Set base backend so overlay can read-through to real files
-    this.currentOverlay.setBaseBackend(this.config.vfs['backends' as keyof VirtualFilesystem] as unknown as Backend);
+    // Use VFS public API instead of accessing private backends array
+    this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
     this.currentTarget = null;
 
     // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
@@ -122,20 +123,22 @@ export class Harness {
     });
     const routing = router.route(task);
 
-    if (routing.outcome !== 'route' || !routing.run_plan) {
-      session.releaseWriter();
-      return {
-        run_plan: routing.run_plan ?? {} as RunPlan,
-        routing,
-        loop_result: {
-          strategy: 'direct', iterations: 0, termination_reason: 'completed',
-          turns: [], decision_summaries: [], progress_path: undefined, context_reset_emitted: false,
-        },
-        session,
-        evidence: this.buildEvidence(session, routing.run_plan, 'completed', 0),
-        success: false,
-      };
-    }
+   if (routing.outcome !== 'route' || !routing.run_plan) {
+     // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
+     session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
+     session.releaseWriter();
+     return {
+       run_plan: routing.run_plan ?? null,
+       routing,
+       loop_result: {
+         strategy: 'direct', iterations: 0, termination_reason: 'denied',
+         turns: [], decision_summaries: [], progress_path: undefined, context_reset_emitted: false,
+       },
+       session,
+       evidence: this.buildEvidence(session, routing.run_plan, 'denied', 0),
+       success: false,
+     };
+   }
 
     const runPlan = routing.run_plan;
 
@@ -227,7 +230,7 @@ export class Harness {
     if (!this.currentOverlay) return;
     if (success) {
       // Commit overlay to real VFS
-      this.config.vfs.commitOverlay(this.currentOverlay, this.config.vfs['backends' as keyof VirtualFilesystem] as unknown as Backend);
+      this.config.vfs.commitOverlay(this.currentOverlay);
     } else {
       this.config.vfs.discardOverlay(this.currentOverlay);
     }
