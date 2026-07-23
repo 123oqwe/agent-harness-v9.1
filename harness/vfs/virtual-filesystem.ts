@@ -84,6 +84,15 @@ export class VirtualFilesystem {
       throw new Error('VFS: NUL byte in path');
     }
 
+    // If path already starts with root, it's already normalized
+    if (inputPath.startsWith(this.root)) {
+      const full = normalize(inputPath);
+      if (full.includes('..')) {
+        throw new Error(`VFS: path traversal detected - '${inputPath}' contains '..'`);
+      }
+      return full;
+    }
+
     // Remove leading slash for joining
     const relativePath = inputPath.startsWith('/') ? inputPath.slice(1) : inputPath;
 

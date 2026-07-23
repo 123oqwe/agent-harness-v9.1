@@ -190,3 +190,14 @@ export { withRetry, createRetryableError, isRetryable, calculateBackoff } from '
 export type { RetryOptions, RetryResult, RetryableError } from './runtime/retry.js';
 export { NotificationQueue } from './runtime/notifications.js';
 export type { Notification, NotificationLevel, NotificationCategory } from './runtime/notifications.js';
+
+// Tools: nine local tools
+export { createArtifact } from './tools/create-artifact.js';
+export { createAskUserTool } from './tools/ask-user.js';
+export { listDirectory } from './tools/list-directory.js';
+export { readFile } from './tools/read-file.js';
+export { writeFile } from './tools/write-file.js';
+export { editFile } from './tools/edit-file.js';
+export { searchFiles } from './tools/search-files.js';
+export { executeCommand } from './tools/execute-command.js';
+export { parseDocument } from './ingestion/parse-document.js';
