@@ -251,4 +251,171 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+
+
+  // -----------------------------------------------------------------------
+  // Mutation-killing tests: cover untested react and plan_execute paths
+  // -----------------------------------------------------------------------
+  describe('react: comprehensive path coverage', () => {
+    it('budget_tokens stops loop', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 10, budget_tokens: 10, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop', usage: { input_tokens: 5, output_tokens: 5 } }),
+          toolExecute: async () => 'ok',
+        },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('budget_exhausted');
+    });
+
+    it('content_filter stop_reason terminates with model_refusal', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 5, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'filtered', stop_reason: 'content_filter' }),
+          toolExecute: async () => 'ok',
+        },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('model_refusal');
+    });
+
+    it('tool error on last iteration terminates with malformed_response', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 1, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call tool', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => { throw new Error('tool failed'); },
+        },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('tool error on non-last iteration continues to next iteration', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 3, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (_msgs, attempt) => {
+            if (attempt === 1) return { content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async () => { throw new Error('transient'); },
+          goalSatisfied: () => true,
+        },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.iterations).toBeGreaterThanOrEqual(2);
+    });
+
+    it('multiple tool calls in one turn each produce separate tool messages', async () => {
+      const sess = session();
+      const toolResults: string[] = [];
+      const loop = new LoopEngine(
+        { strategy: 'react', max_iterations: 2, run_id: 'r', goal: 'g' },
+        {
+          session: sess,
+          modelCall: async (msgs) => {
+            if (msgs.length <= 1) return { content: '', decision_summary: 'two tools', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/a' } }, { id: '2', name: 'read_file', arguments: { path: '/b' } }] };
+            return { content: 'done', decision_summary: 'done', stop_reason: 'stop' };
+          },
+          toolExecute: async (_name, args) => { toolResults.push(args.path as string); return 'content'; },
+          goalSatisfied: () => true,
+        },
+      );
+      
+      await loop.run();
+      
+      expect(toolResults).toEqual(['/a', '/b']);
+    });
+  });
+
+  describe('plan_execute: comprehensive path coverage', () => {
+    it('executes model_call steps with tool_calls', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const }, { step_id: 's2', step_type: 'verification' as const, status: 'pending' as const }], edges: [{ from_step: 's1', to_step: 's2' }] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        {
+          session: sess,
+          modelCall: async () => ({ content: '', decision_summary: 'call tool', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }),
+          toolExecute: async () => 'file content',
+          goalSatisfied: () => true,
+        },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('goal_satisfied');
+    });
+
+    it('verification failure blocks dependent steps', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const }, { step_id: 's2', step_type: 'verification' as const, status: 'pending' as const }, { step_id: 's3', step_type: 'model_call' as const, status: 'pending' as const }], edges: [{ from_step: 's1', to_step: 's2' }, { from_step: 's2', to_step: 's3' }] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'done', stop_reason: 'stop' }), goalSatisfied: () => false },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('completed');
+    });
+
+    it('cycle in workflow graph is detected', async () => {
+      const sess = session();
+      const wf = { nodes: [{ step_id: 'a', step_type: 'model_call' as const, status: 'pending' as const }, { step_id: 'b', step_type: 'model_call' as const, status: 'pending' as const }], edges: [{ from_step: 'a', to_step: 'b' }, { from_step: 'b', to_step: 'a' }] };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }) },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('missing WorkflowGraph fails closed', async () => {
+      const sess = session();
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 5, run_id: 'r', goal: 'g' },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }) },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('malformed_response');
+    });
+
+    it('iteration limit during plan_execute stops loop', async () => {
+      const sess = session();
+      const wf = { nodes: Array.from({ length: 5 }, (_, i) => ({ step_id: 's' + i, step_type: 'model_call' as const, status: 'pending' as const })), edges: Array.from({ length: 4 }, (_, i) => ({ from_step: 's' + i, to_step: 's' + (i+1) })) };
+      const loop = new LoopEngine(
+        { strategy: 'plan_execute', max_iterations: 2, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+        { session: sess, modelCall: async () => ({ content: 'x', decision_summary: 'd', stop_reason: 'stop' }) },
+      );
+      
+      const result = await loop.run();
+      
+      expect(result.termination_reason).toBe('iteration_limit');
+    });
+  });
+
 });
