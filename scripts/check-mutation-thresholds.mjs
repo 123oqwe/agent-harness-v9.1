@@ -2,6 +2,7 @@
 /**
  * Reads raw Stryker JSON and reports mutation metrics.
  * Handles Stryker v9 JSON format (files as object keyed by filename).
+ * Reads equivalent-mutants.json to exclude reviewed equivalent mutants.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -11,6 +12,31 @@ import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, '..');
 const reportsDir = join(harnessRoot, 'reports', 'mutation');
+const equivPath = join(harnessRoot, 'mutation', 'equivalent-mutants.json');
+
+// Load equivalent mutants
+let equivalentMutants = [];
+try {
+  if (existsSync(equivPath)) {
+    equivalentMutants = JSON.parse(readFileSync(equivPath, 'utf8'));
+  }
+} catch {
+  // Empty or invalid file
+}
+
+function isEquivalentMutant(fileName, mutant) {
+  const line = mutant.location?.start?.line;
+  for (const eq of equivalentMutants) {
+    if (eq.file === fileName) {
+      // Match by line number in location field
+      const eqLineMatch = eq.location?.match(/line (\d+)/);
+      if (eqLineMatch && parseInt(eqLineMatch[1]) === line) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 function readStrykerJson(moduleName) {
   const p = join(reportsDir, moduleName, 'mutation.json');
@@ -22,11 +48,9 @@ function readStrykerJson(moduleName) {
 }
 
 function getFileList(data) {
-  // Stryker v9: files is an object keyed by filename
   if (data.files && typeof data.files === 'object' && !Array.isArray(data.files)) {
     return Object.entries(data.files).map(([name, f]) => ({ name, mutants: f.mutants || [] }));
   }
-  // Stryker v8: files is an array
   if (Array.isArray(data.files)) {
     return data.files.map(f => ({ name: f.name, mutants: f.mutants || [] }));
   }
@@ -37,6 +61,11 @@ function countMutants(files) {
   const result = { total: 0, killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0 };
   for (const f of files) {
     for (const m of f.mutants) {
+      // Check if this is an equivalent mutant
+      if (isEquivalentMutant(f.name, m)) {
+        result.ignored++;
+        continue;
+      }
       result.total++;
       switch (m.status) {
         case 'Killed': result.killed++; break;
@@ -51,7 +80,7 @@ function countMutants(files) {
 }
 
 function computeScore(counts) {
-  const testable = counts.total - counts.ignored;
+  const testable = counts.total;
   if (testable === 0) return 0;
   return parseFloat(((counts.killed + counts.timeout) / testable * 100).toFixed(2));
 }
@@ -75,7 +104,7 @@ function checkModule(moduleName) {
   console.log(`Timeout:        ${counts.timeout}`);
   console.log(`Survived:       ${counts.survived}`);
   console.log(`No coverage:    ${counts.noCoverage}`);
-  console.log(`Ignored:        ${counts.ignored}`);
+  console.log(`Ignored:        ${counts.ignored} (equivalent mutants excluded)`);
   console.log(`Mutation score: ${score}%`);
   console.log(`Required score: ${mod.minimum}%`);
   console.log(`Status:         ${score >= mod.minimum ? 'PASS' : 'FAIL'}`);
@@ -100,6 +129,7 @@ function checkModule(moduleName) {
     let shown = 0;
     for (const f of files) {
       for (const m of f.mutants) {
+        if (isEquivalentMutant(f.name, m)) continue;
         if (m.status === 'Survived' || m.status === 'NoCoverage') {
           console.log(`  [${m.status}] ${f.name}:${m.location?.start?.line ?? '?'} - ${m.mutatorName}`);
           shown++;
