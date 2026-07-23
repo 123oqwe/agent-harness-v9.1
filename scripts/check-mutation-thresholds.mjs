@@ -7,7 +7,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
+import { mutationModules } from '../mutation/modules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, '..');

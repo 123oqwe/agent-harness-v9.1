@@ -29,7 +29,7 @@ function resolveGlob(patterns) {
     for (const m of matches) {
       // Apply exclusions
       const isExcluded = mutationExclusions.some(ex => {
-        const exPattern = ex.replace(/\*\*/g, '*').replace(/\*\./g, '*.');
+        
         if (ex === '**/index.ts') return m.endsWith('index.ts');
         if (ex === '**/*.d.ts') return m.endsWith('.d.ts');
         if (ex === '**/*.test.ts') return m.endsWith('.test.ts');
@@ -122,7 +122,7 @@ function runModule(moduleName) {
   }
 
   // Clean up temp config
-  try { writeFileSync(configPath, ''); } catch {}
+   try { writeFileSync(configPath, ''); } catch { /* cleanup */ }
 
   // Run threshold checker
   try {
