@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { generateEvidence, writeEvidence, validateEvidence, runCommand, EvidenceError } from '../../verification/evidence.js';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -147,6 +147,106 @@ describe('AH-EVIDENCE-001 evidence generation', () => {
       cwd: process.cwd(),
       test_results: {}, coverage: {}, security_checks: {},
     })).toThrow(EvidenceError);
+  });
+
+
+
+  describe('mutation-killing: evidence edge cases', () => {
+    it('runCommand captures non-zero exit code and stderr hash', () => {
+      const r = runCommand('echo err >&2; exit 42');
+      expect(r.exit_code).toBe(42);
+      expect(r.stderr_hash).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('runCommand with stderr output captures stderr hash', () => {
+      const r = runCommand('echo "error" >&2; exit 1');
+      expect(r.exit_code).toBe(1);
+      expect(r.stderr_hash).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('generateEvidence uses provided cwd parameter', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-cwd-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-CWD-001',
+        source_files: [],
+        tests_added: [],
+        commands: ['echo ok'],
+        cwd: dir,
+        test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.commit_sha).toMatch(/^[0-9a-f]{40}$/);
+    });
+
+    it('generateEvidence allPassed is false when any command fails', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-fail-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-FAIL-001',
+        source_files: [], tests_added: [],
+        commands: ['echo ok', 'exit 1'],
+        cwd: process.cwd(),
+        test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.verifier_result).toBe('fail');
+      expect(ev.exit_codes).toContain(1);
+    });
+
+    it('generateEvidence verifier_model defaults to independent rerun string', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-model-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-MODEL-001',
+        source_files: [], tests_added: [],
+        commands: ['echo ok'],
+        cwd: process.cwd(),
+        test_results: {}, coverage: {}, security_checks: {},
+      });
+      expect(ev.verifier_model).toContain('independent');
+    });
+
+    it('generateEvidence with custom verifier_model', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-vm-'));
+      const ev = generateEvidence({
+        requirement_id: 'AH-VM-001',
+        source_files: [], tests_added: [],
+        commands: ['echo ok'],
+        cwd: process.cwd(),
+        test_results: {}, coverage: {}, security_checks: {},
+        verifier_model: 'custom-verifier-v1',
+      });
+      expect(ev.verifier_model).toBe('custom-verifier-v1');
+    });
+
+    it('writeEvidence allows writing fail over pass then pass over fail', () => {
+      dir = mkdtempSync(join(tmpdir(), 'ev-upgrade-'));
+      const ev1 = generateEvidence({
+        requirement_id: 'AH-UP-001', source_files: [], tests_added: [],
+        commands: ['exit 1'], cwd: process.cwd(), test_results: {}, coverage: {}, security_checks: {},
+      });
+      const path = join(dir, 'ev.json');
+      writeEvidence(ev1, path);
+      // Writing pass over fail should be allowed (upgrading)
+      const ev2 = { ...ev1, verifier_result: 'pass' as const, exit_codes: [0], commands_run: [{ command: 'echo ok', exit_code: 0, stdout_hash: 'abc' }] };
+      writeEvidence(ev2, path);
+      const read = JSON.parse(readFileSync(path, 'utf8')) as { verifier_result: string };
+      expect(read.verifier_result).toBe('pass');
+    });
+
+    it('validateEvidence rejects non-40-char commit_sha', () => {
+      const bad = {
+        requirement_id: 'x', commit_sha: 'short', source_files: [], tests_added: [],
+        commands_run: [{ command: 'x', exit_code: 0, stdout_hash: 'x' }], exit_codes: [0],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'fail' as const,
+      };
+      expect(() => validateEvidence(bad, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).toThrow(EvidenceError);
+    });
+
+    it('validateEvidence passes with fail and no commands', () => {
+      const ok = {
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+        commands_run: [], exit_codes: [],
+        test_results: {}, coverage: {}, security_checks: {}, verifier_result: 'fail' as const,
+      };
+      expect(() => validateEvidence(ok, join(process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'), 'contracts', 'evidence-package.schema.json'))).not.toThrow();
+    });
   });
 
 });
