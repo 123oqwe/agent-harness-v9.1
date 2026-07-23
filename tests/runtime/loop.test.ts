@@ -1586,4 +1586,27 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
     });
   });
 
+  it('plan_execute: model_call step with tool_calls but no toolExecute dep still completes step', async () => {
+    const sess = session();
+    const wf = {
+      nodes: [
+        { step_id: 's1', step_type: 'model_call' as const, status: 'pending' as const },
+        { step_id: 's2', step_type: 'verification' as const, status: 'pending' as const },
+      ],
+      edges: [{ from_step: 's1', to_step: 's2' }],
+    };
+    const loop = new LoopEngine(
+      { strategy: 'plan_execute', max_iterations: 10, run_id: 'r', goal: 'g', run_plan: { workflow_graph: wf } as never },
+      {
+        session: sess,
+        modelCall: async () => ({ content: '', decision_summary: 'call', stop_reason: 'tool_use', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/x' } }] }),
+        // No toolExecute — tool calls from model_call step are skipped
+        goalSatisfied: () => true,
+      },
+    );
+    const result = await loop.run();
+    expect(result.termination_reason).toBe('goal_satisfied');
+  });
 });
+
+
