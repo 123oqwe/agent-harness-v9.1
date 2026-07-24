@@ -130,14 +130,10 @@ function validateRequester(requester: unknown): asserts requester is string {
   }
 }
 
-function requireBytes(value: unknown, label: string, expectedLength?: number): Buffer {
+function requireBytes(value: unknown, label: string, expectedLength: number): Buffer {
   if (!(value instanceof Uint8Array)) throw new SecretBrokerError(`invalid ${label}`);
   const copy = Buffer.from(value);
-  if (
-    (expectedLength !== undefined && copy.byteLength !== expectedLength) ||
-    copy.byteLength === 0 ||
-    copy.every((byte) => byte === 0)
-  ) {
+  if (copy.byteLength !== expectedLength || copy.every((byte) => byte === 0)) {
     copy.fill(0);
     throw new SecretBrokerError(`invalid ${label}`);
   }
