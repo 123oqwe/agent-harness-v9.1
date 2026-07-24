@@ -215,7 +215,7 @@ export class Harness {
       try {
         const activation = await skillLoader.activate(skillBindings[0]!.skill_name);
         // Return instructions for context injection (not discarded)
-        skillInstructions = `Skill: ${activation.skill.name} v${activation.frozen_version}`;
+        skillInstructions = activation.instructions || `Skill: ${activation.skill.name} v${activation.frozen_version}`;
         session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: activation.frozen_version });
       } catch (e) {
         // Skill activation failure: log but continue (skill context is optional)

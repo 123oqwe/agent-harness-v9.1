@@ -19,6 +19,7 @@ export interface SkillActivationResult {
   missing_tools: string[];
   risk_ceiling_satisfied: boolean;
   allowed_effects_verified: boolean;
+  instructions: string;
 }
 
 export class SkillLoaderError extends Error {
@@ -78,10 +79,11 @@ export class SkillLoader {
     }
 
     // Load full instructions if a path is specified
+    let instructions = '';
     if (this.skillsDir && skill.workflow_template_ref) {
       const instrPath = resolve(this.skillsDir, skill.workflow_template_ref);
       if (existsSync(instrPath)) {
-        readFileSync(instrPath, 'utf8');
+        instructions = readFileSync(instrPath, 'utf8');
       }
     }
 
@@ -92,6 +94,7 @@ export class SkillLoader {
       missing_tools: [],
       risk_ceiling_satisfied: true,
       allowed_effects_verified: true,
+      instructions,
     };
   }
 }
