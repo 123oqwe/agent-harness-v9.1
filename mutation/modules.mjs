@@ -9,16 +9,15 @@
 export const mutationModules = {
   gateway: {
     mutate: [
+      'gateway/glm-gateway-bridge.ts',
+      'gateway/glm-provider.ts',
       'gateway/model-gateway.ts',
       'gateway/scripted-provider.ts',
     ],
     minimum: 85,
   },
   router: {
-    mutate: [
-      'router/static-router.ts',
-      'router/task-normalizer.ts',
-    ],
+    mutate: ['router/static-router.ts', 'router/task-normalizer.ts'],
     minimum: 90,
   },
   toolsRegistry: {
@@ -46,10 +45,7 @@ export const mutationModules = {
     perFileMinimum: 80,
   },
   skills: {
-    mutate: [
-      'skills/skill-loader.ts',
-      'tools/skill-registry.ts',
-    ],
+    mutate: ['skills/skill-loader.ts', 'tools/skill-registry.ts'],
     minimum: 85,
   },
   strategies: {
@@ -73,14 +69,11 @@ export const mutationModules = {
     minimum: 90,
   },
   identitySecrets: {
-    mutate: [
-      'security/auth.ts',
-      'security/secrets-broker.ts',
-    ],
+    mutate: ['security/auth.ts', 'security/secrets-broker.ts'],
     minimum: 90,
   },
   vfs: {
-    mutate: ['vfs/virtual-filesystem.ts'],
+    mutate: ['vfs/virtual-filesystem.ts', 'vfs/workspace-transaction.ts'],
     minimum: 90,
   },
   sandbox: {
@@ -109,6 +102,7 @@ export const mutationModules = {
     mutate: [
       'verification/evidence.ts',
       'verification/eval-runner.ts',
+      'verification/verification-engine.ts',
     ],
     minimum: 85,
   },

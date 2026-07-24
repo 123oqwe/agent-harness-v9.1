@@ -1,163 +1,346 @@
-/**
- * Mutation infrastructure tests.
- *
- * Verifies that the mutation runner and checker are structurally sound:
- * - All files in the module manifest exist on disk
- * - Equivalent mutants use exact Stryker mutant IDs (not file+line)
- * - Report source files must match module configuration
- * - Empty mutate lists are rejected
- * - Gateway report cannot satisfy identitySecrets module
- */
-import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import {
+  globSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+const {
+  acquireRunLock,
+  buildPhase1Report,
+  computeMutationConfigurationHash,
+  loadEquivalentMutants,
+  releaseRunLock,
+  validatePhase1Report,
+} = await import(
+  // @ts-expect-error The production runner is intentionally plain ESM for Node.
+  '../../scripts/run-mutation.mjs'
+);
+const { mutationModules: rawMutationModules, phase1Minimum: rawPhase1Minimum } =
+  await import(
+    // @ts-expect-error The mutation manifest is intentionally plain ESM for Node.
+    '../../mutation/modules.mjs'
+  );
 
 const harnessRoot = resolve(import.meta.dirname, '..', '..');
-const equivPath = join(harnessRoot, 'mutation', 'equivalent-mutants.json');
-const checkerPath = join(harnessRoot, 'scripts', 'check-mutation-thresholds.mjs');
-const runnerPath = join(harnessRoot, 'scripts', 'run-mutation.mjs');
+const temporaryRoots: string[] = [];
+interface MutationModule {
+  mutate: string[];
+  minimum: number;
+  perFileMinimum?: number;
+}
+const mutationModules = rawMutationModules as Record<string, MutationModule>;
+const phase1Minimum = rawPhase1Minimum as number;
 
-const equivSource = readFileSync(equivPath, 'utf8');
-const checkerSource = readFileSync(checkerPath, 'utf8');
-const runnerSource = readFileSync(runnerPath, 'utf8');
-
-interface ModuleConfig { mutate: string[]; minimum: number; perFileMinimum?: number }
-type ModulesMap = Record<string, ModuleConfig>;
-
-// Read and eval the modules.mjs to get the export (can't import .mjs in TS)
-const modulesSource = readFileSync(join(harnessRoot, 'mutation', 'modules.mjs'), 'utf8');
-function parseModules(): ModulesMap {
-  // Extract the mutationModules object from source
-  const match = modulesSource.match(/export const mutationModules = (\{[\s\S]*?\n\});/);
-  if (!match) throw new Error('cannot parse mutationModules from source');
-  // Use eval to parse (safe: we control the source)
-  return eval(`(${match[1]})`);
+function temporaryRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'ah-mutation-infra-'));
+  temporaryRoots.push(root);
+  return root;
 }
 
-describe('Mutation infrastructure', () => {
-  describe('Module manifest', () => {
-    it('every file in every module exists on disk', () => {
-      const mods = parseModules();
-      const missing: string[] = [];
-      for (const [moduleName, mod] of Object.entries(mods)) {
-        for (const pattern of mod.mutate) {
-          if (pattern.includes('*')) {
-            // Skip glob patterns — validated separately
-            continue;
-          }
-          if (!existsSync(join(harnessRoot, pattern))) {
-            missing.push(`${moduleName}: ${pattern}`);
-          }
-        }
-      }
-      expect(missing).toEqual([]);
-    });
+function zeroCounts() {
+  return {
+    total: 100,
+    killed: 90,
+    timeout: 0,
+    survived: 10,
+    noCoverage: 0,
+    ignored: 0,
+  };
+}
 
-    it('no module has an empty mutate list', () => {
-      const mods = parseModules();
-      for (const [name, mod] of Object.entries(mods)) {
-        expect(mod.mutate.length, `module ${name} has empty mutate list`).toBeGreaterThan(0);
-      }
-    });
+function passingModuleResult(
+  moduleName: keyof typeof mutationModules,
+  runId = 'run-1',
+  commitSha = 'a'.repeat(40),
+  configurationHash = 'b'.repeat(64),
+) {
+  const module = mutationModules[moduleName]!;
+  const perFile = Object.fromEntries(
+    module.mutate.map((sourceFile) => [
+      sourceFile,
+      {
+        ...zeroCounts(),
+        score: 90,
+        minimum: module.perFileMinimum ?? 0,
+        status: 'PASS',
+      },
+    ]),
+  );
+  return {
+    schema_version: 1,
+    run_id: runId,
+    commit_sha: commitSha,
+    configuration_hash: configurationHash,
+    module: moduleName,
+    source_files: [...module.mutate],
+    minimum: module.minimum,
+    score: 90,
+    status: 'PASS',
+    counts: zeroCounts(),
+    per_file: perFile,
+    raw_report_sha256: 'c'.repeat(64),
+    started_at: '2026-07-25T00:00:00.000Z',
+    completed_at: '2026-07-25T00:01:00.000Z',
+  };
+}
 
-    it('every module has a minimum score', () => {
-      const mods = parseModules();
-      for (const [name, mod] of Object.entries(mods)) {
-        expect(mod.minimum, `module ${name} missing minimum`).toBeGreaterThan(0);
-      }
-    });
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) {
+    rmSync(root, { force: true, recursive: true });
+  }
+});
 
-    it('strategies module does not point to non-existent files', () => {
-      const mods = parseModules();
-      const strategies = mods.strategies!;
-      for (const f of strategies.mutate) {
-        expect(existsSync(join(harnessRoot, f)), `strategies file does not exist: ${f}`).toBe(true);
-      }
-    });
+describe('Phase 1 mutation manifest', () => {
+  it('routes the public mutation command through the Phase 1 runner', () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(harnessRoot, 'package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    expect(packageJson.scripts['test:mutation']).toBe(
+      'node scripts/run-mutation.mjs phase1',
+    );
   });
 
-  describe('Equivalent mutant waivers', () => {
-    it('equivalent-mutants.json is valid JSON array', () => {
-      const arr = JSON.parse(equivSource);
-      expect(Array.isArray(arr)).toBe(true);
-    });
+  it('keeps sandbox and command security tests in mutation acceptance', () => {
+    const config = readFileSync(
+      join(harnessRoot, 'vitest.mutation.config.ts'),
+      'utf8',
+    );
+    expect(config).not.toContain('tests/sandbox/limits.test.ts');
+    expect(config).not.toContain('tests/sandbox/network-denied.test.ts');
+    expect(config).not.toContain(
+      'tests/tools/execute-command-security.test.ts',
+    );
+  });
 
-    it('every waiver has a strykerMutantId field (not file+line matching)', () => {
-      const arr = JSON.parse(equivSource);
-      for (const eq of arr) {
-        expect(eq.strykerMutantId, 'waiver missing strykerMutantId').toBeDefined();
-        expect(typeof eq.strykerMutantId).toBe('string');
+  it('owns every executable Phase 1 TypeScript source exactly once', () => {
+    const assigned = new Map<string, string[]>();
+    for (const [moduleName, module] of Object.entries(mutationModules)) {
+      expect(module.mutate.length, moduleName).toBeGreaterThan(0);
+      expect(module.minimum, moduleName).toBeGreaterThanOrEqual(85);
+      for (const sourceFile of module.mutate) {
+        const owners = assigned.get(sourceFile) ?? [];
+        owners.push(moduleName);
+        assigned.set(sourceFile, owners);
+        expect(
+          readFileSync(join(harnessRoot, sourceFile), 'utf8').length,
+          `${moduleName}: ${sourceFile}`,
+        ).toBeGreaterThan(0);
       }
-    });
+    }
 
-    it('every waiver has a human reviewer (not agent)', () => {
-      const arr = JSON.parse(equivSource);
-      for (const eq of arr) {
-        expect(eq.reviewedBy, 'waiver missing reviewedBy').toBeDefined();
-        expect(eq.reviewedBy).not.toBe('agent');
-      }
-    });
-
-    it('checker uses exact mutant ID matching, not file+line', () => {
-      expect(checkerSource).toContain('equivalentMutantIds.has(m.id)');
-      expect(checkerSource).not.toContain('eqLineMatch');
-    });
+    const executableSources = [
+      'harness.ts',
+      ...globSync(
+        '{gateway,router,tools,skills,security,vfs,runtime,session,verification,domains,ingestion,research,writing,planning,personal_assistant,ui}/**/*.ts',
+        { cwd: harnessRoot },
+      ),
+    ]
+      .filter(
+        (sourceFile) =>
+          !sourceFile.endsWith('/index.ts') &&
+          !sourceFile.endsWith('.d.ts') &&
+          sourceFile !== 'runtime/reasoning-strategy.ts',
+      )
+      .sort();
+    expect([...assigned.keys()].sort()).toEqual(executableSources);
+    for (const [sourceFile, owners] of assigned) {
+      expect(owners, `${sourceFile} has duplicate owners`).toHaveLength(1);
+    }
   });
 
-  describe('Runner guarantees', () => {
-    it('runner deletes old report before running', () => {
-      expect(runnerSource).toContain('rmSync(moduleReportDir');
-    });
+  it('keeps the declared aggregate and critical-module floors', () => {
+    expect(phase1Minimum).toBe(85);
+    for (const name of [
+      'router',
+      'toolsRegistry',
+      'actionControl',
+      'identitySecrets',
+      'vfs',
+      'sandbox',
+      'session',
+      'runtime',
+    ] as const) {
+      expect(mutationModules[name]!.minimum, name).toBe(90);
+    }
+    expect(mutationModules.toolsLeaf!.perFileMinimum).toBe(80);
+    expect(mutationModules.verticals!.perFileMinimum).toBe(80);
+  });
+});
 
-    it('runner fails on Stryker non-zero exit (no fallback copy)', () => {
-      expect(runnerSource).toContain('Stryker exited with code');
-      expect(runnerSource).toContain('throw new Error');
-    });
+describe('atomic mutation run ownership', () => {
+  it('rejects a second runner and only lets the owner release the lock', () => {
+    const root = temporaryRoot();
+    const lockPath = join(root, '.phase1.lock');
+    const first = {
+      run_id: 'first',
+      pid: 11,
+      commit_sha: 'a'.repeat(40),
+      started_at: '2026-07-25T00:00:00.000Z',
+    };
+    acquireRunLock(lockPath, first);
 
-    it('runner validates report source files match module config', () => {
-      expect(runnerSource).toContain('missingFromReport');
-      expect(runnerSource).toContain('extraInReport');
-      expect(runnerSource).toContain('Report source file mismatch');
-    });
+    expect(() =>
+      acquireRunLock(lockPath, { ...first, run_id: 'second', pid: 12 }),
+    ).toThrow(/already running/u);
+    expect(() => releaseRunLock(lockPath, 'second')).toThrow(/not own/u);
+    releaseRunLock(lockPath, 'first');
+    acquireRunLock(lockPath, { ...first, run_id: 'third' });
+  });
+});
 
-    it('runner deletes shared reports/mutation/mutation.json before running', () => {
-      expect(runnerSource).toContain('rmSync(sharedJson');
-    });
+describe('equivalent mutant governance', () => {
+  it('rejects malformed, agent-reviewed, stale or security-critical waivers', () => {
+    const root = temporaryRoot();
+    const path = join(root, 'equivalent-mutants.json');
+    const base = {
+      strykerMutantId: '42',
+      module: 'gateway',
+      sourceFile: 'gateway/model-gateway.ts',
+      reason: 'Compiler-equivalent branch proved by generated code.',
+      reviewedBy: 'human@example.com',
+      reviewedAt: '2026-07-25T00:00:00.000Z',
+      commitSha: 'a'.repeat(40),
+      configurationHash: 'b'.repeat(64),
+    };
 
-    it('runModule does not call process.exit inside the function', () => {
-      const runModuleStart = runnerSource.indexOf('function runModule(');
-      const runModuleEnd = runnerSource.indexOf('function countFromReport(');
-      const runModuleBody = runnerSource.substring(runModuleStart, runModuleEnd);
-      expect(runModuleBody).not.toContain('process.exit');
-    });
+    writeFileSync(path, JSON.stringify([{ ...base, reviewedBy: 'agent' }]));
+    expect(() =>
+      loadEquivalentMutants(path, base.commitSha, base.configurationHash),
+    ).toThrow(/human reviewer/u);
+
+    writeFileSync(path, JSON.stringify([{ ...base, module: 'actionControl' }]));
+    expect(() =>
+      loadEquivalentMutants(path, base.commitSha, base.configurationHash),
+    ).toThrow(/cannot be waived/u);
+
+    writeFileSync(
+      path,
+      JSON.stringify([{ ...base, commitSha: 'd'.repeat(40) }]),
+    );
+    expect(() =>
+      loadEquivalentMutants(path, base.commitSha, base.configurationHash),
+    ).toThrow(/current commit/u);
+
+    writeFileSync(path, '{');
+    expect(() =>
+      loadEquivalentMutants(path, base.commitSha, base.configurationHash),
+    ).toThrow(/valid JSON/u);
   });
 
-  describe('Checker guarantees', () => {
-    it('checker validates report source files match module config', () => {
-      expect(checkerSource).toContain('Source file mismatch');
-    });
+  it('accepts only a complete, human-reviewed, run-bound waiver', () => {
+    const root = temporaryRoot();
+    const path = join(root, 'equivalent-mutants.json');
+    const commitSha = 'a'.repeat(40);
+    const configurationHash = 'b'.repeat(64);
+    writeFileSync(
+      path,
+      JSON.stringify([
+        {
+          strykerMutantId: '42',
+          module: 'gateway',
+          sourceFile: 'gateway/model-gateway.ts',
+          reason: 'Compiler-equivalent branch proved by generated code.',
+          reviewedBy: 'human@example.com',
+          reviewedAt: '2026-07-25T00:00:00.000Z',
+          commitSha,
+          configurationHash,
+        },
+      ]),
+    );
+    expect(loadEquivalentMutants(path, commitSha, configurationHash)).toEqual(
+      new Set(['gateway:gateway/model-gateway.ts:42']),
+    );
+  });
+});
 
-    it('checker does not match equivalent mutants by file+line', () => {
-      expect(checkerSource).not.toContain('eqLineMatch');
-    });
+describe('Phase 1 mutation report integrity', () => {
+  it('hashes every mutation authority and changes if one changes', () => {
+    const root = temporaryRoot();
+    mkdirSync(join(root, 'mutation'), { recursive: true });
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    writeFileSync(join(root, 'mutation', 'modules.mjs'), 'modules-a');
+    writeFileSync(join(root, 'mutation', 'thresholds.json'), '{}');
+    writeFileSync(join(root, 'mutation', 'stryker.base.mjs'), 'base');
+    writeFileSync(join(root, 'mutation', 'equivalent-mutants.json'), '[]');
+    writeFileSync(join(root, 'package.json'), '{}');
+    writeFileSync(join(root, 'scripts', 'run-mutation.mjs'), 'runner');
+    writeFileSync(
+      join(root, 'scripts', 'check-mutation-thresholds.mjs'),
+      'checker',
+    );
+    writeFileSync(join(root, 'vitest.mutation.config.ts'), 'vitest');
+
+    const first = computeMutationConfigurationHash(root);
+    writeFileSync(join(root, 'vitest.mutation.config.ts'), 'changed');
+    expect(computeMutationConfigurationHash(root)).not.toBe(first);
   });
 
-  describe('Cross-contamination prevention', () => {
-    it('gateway report cannot satisfy identitySecrets module', () => {
-      const gatewayReportPath = join(harnessRoot, 'reports', 'mutation', 'gateway', 'mutation.json');
-      if (!existsSync(gatewayReportPath)) return;
+  it('requires all 15 modules from one run, commit and configuration', () => {
+    const runId = 'run-1';
+    const commitSha = 'a'.repeat(40);
+    const configurationHash = 'b'.repeat(64);
+    const results = Object.keys(mutationModules).map((moduleName) =>
+      passingModuleResult(
+        moduleName as keyof typeof mutationModules,
+        runId,
+        commitSha,
+        configurationHash,
+      ),
+    );
+    const report = buildPhase1Report(
+      { runId, commitSha, configurationHash },
+      results,
+    );
 
-      const report = JSON.parse(readFileSync(gatewayReportPath, 'utf8'));
-      const reportFiles = Object.keys(report.files || {}).sort();
-      const identityFiles = ['security/auth.ts', 'security/secrets-broker.ts'];
-      const intersection = reportFiles.filter(f => identityFiles.includes(f));
-      expect(intersection.length, 'gateway report contains identitySecrets files').toBe(0);
-    });
+    expect(() =>
+      validatePhase1Report(report, { runId, commitSha, configurationHash }),
+    ).not.toThrow();
+    expect(report.modules).toHaveLength(15);
 
-    it('mock report with wrong source files would be rejected', () => {
-      expect(checkerSource).toContain('Source file mismatch');
-      expect(checkerSource).toContain('reportFiles');
-      expect(checkerSource).toContain('expectedFiles');
-    });
+    expect(() =>
+      validatePhase1Report(
+        { ...report, modules: report.modules.slice(1) },
+        { runId, commitSha, configurationHash },
+      ),
+    ).toThrow(/module set/u);
+
+    const mixed = structuredClone(report);
+    mixed.modules[0]!.commit_sha = 'd'.repeat(40);
+    expect(() =>
+      validatePhase1Report(mixed, { runId, commitSha, configurationHash }),
+    ).toThrow(/commit/u);
+  });
+
+  it('fails aggregate acceptance when a per-file floor fails', () => {
+    const runId = 'run-1';
+    const commitSha = 'a'.repeat(40);
+    const configurationHash = 'b'.repeat(64);
+    const results = Object.keys(mutationModules).map((moduleName) =>
+      passingModuleResult(
+        moduleName as keyof typeof mutationModules,
+        runId,
+        commitSha,
+        configurationHash,
+      ),
+    );
+    const toolsLeaf = results.find((result) => result.module === 'toolsLeaf')!;
+    const firstFile = Object.keys(toolsLeaf.per_file)[0]!;
+    toolsLeaf.per_file[firstFile]!.score = 79.99;
+    toolsLeaf.per_file[firstFile]!.status = 'FAIL';
+    toolsLeaf.status = 'FAIL';
+
+    const report = buildPhase1Report(
+      { runId, commitSha, configurationHash },
+      results,
+    );
+    expect(report.aggregate.status).toBe('FAIL');
+    expect(() =>
+      validatePhase1Report(report, { runId, commitSha, configurationHash }),
+    ).toThrow(/not passing/u);
   });
 });

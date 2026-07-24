@@ -32,7 +32,7 @@
     "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security tests/capability tests/sandbox tests/tools/execute-command-security.test.ts tests/tools/read-file-security.test.ts",
     "test:e2e": "vitest run tests/contracts tests/api tests/domain tests/integration tests/glm-acceptance",
     "test:coverage": "vitest run --coverage",
-    "test:mutation": "node scripts/run-stryker.mjs",
+    "test:mutation": "node scripts/run-mutation.mjs phase1",
     "format": "prettier --write gateway security index.ts tests *.config.* *.json scripts",
     "test:mutation:module": "node scripts/run-mutation.mjs",
     "test:mutation:phase1": "node scripts/run-mutation.mjs phase1",
