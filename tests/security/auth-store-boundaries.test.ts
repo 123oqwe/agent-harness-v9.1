@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { WebAuthnCredential } from '@simplewebauthn/server';
+import bcrypt from 'bcrypt';
 import { describe, expect, it } from 'vitest';
 
 import { AuthApi, AuthError, AuthService, InMemoryAuthStore } from '../../security/auth.js';
@@ -133,6 +134,69 @@ describe('InMemoryAuthStore credential boundaries', () => {
   });
 });
 
+describe('InMemoryAuthStore session and challenge boundaries', () => {
+  it('preserves, copies, lists, revokes, and rejects duplicate sessions exactly', async () => {
+    const store = new InMemoryAuthStore();
+    const record = {
+      token_hash: 'token-hash',
+      user_id: 'user-1',
+      issued_at: NOW,
+      expires_at: '2026-01-02T00:00:00.000Z',
+    };
+    expect(store.findSession('missing')).toBeUndefined();
+    expect(store.revokeSession('missing', NOW)).toBe(false);
+    store.createSession(record);
+    expect(() => store.createSession(record)).toThrow(
+      expect.objectContaining({ name: 'AuthError', code: 'authentication_failed', status: 401 }),
+    );
+    const found = store.findSession('token-hash')!;
+    expect(found).toEqual(record);
+    found.revoked_at = 'tampered';
+    expect(store.findSession('token-hash')).toEqual(record);
+    expect(await store.inspectSessions()).toEqual([record]);
+    expect(Object.isFrozen((await store.inspectSessions())[0])).toBe(true);
+    expect(store.revokeSession('token-hash', '2026-01-01T01:00:00.000Z')).toBe(true);
+    expect(store.findSession('token-hash')?.revoked_at).toBe('2026-01-01T01:00:00.000Z');
+    expect(store.revokeSession('token-hash', '2026-01-01T02:00:00.000Z')).toBe(false);
+  });
+
+  it('consumes each challenge once and purges consumed or expired records before reuse', () => {
+    const store = new InMemoryAuthStore();
+    const active = {
+      key_hash: 'challenge-key',
+      kind: 'authentication' as const,
+      challenge: 'challenge',
+      expires_at: '2026-01-01T00:05:00.000Z',
+    };
+    expect(store.consumeChallenge('missing', NOW)).toBeUndefined();
+    store.createChallenge(active, NOW);
+    expect(() => store.createChallenge(active, NOW)).toThrow(
+      expect.objectContaining({ name: 'AuthError', code: 'authentication_failed', status: 401 }),
+    );
+    expect(store.consumeChallenge('challenge-key', NOW)).toEqual({
+      record: { ...active, consumed_at: NOW },
+      accepted: true,
+    });
+    expect(store.consumeChallenge('challenge-key', NOW)).toEqual({
+      record: { ...active, consumed_at: NOW },
+      accepted: false,
+    });
+    store.createChallenge(active, NOW);
+    expect(store.consumeChallenge('challenge-key', NOW)?.accepted).toBe(true);
+
+    store.createChallenge(
+      {
+        ...active,
+        key_hash: 'expired-key',
+        expires_at: '2025-12-31T23:59:59.999Z',
+      },
+      NOW,
+    );
+    store.createChallenge({ ...active, key_hash: 'replacement-key' }, NOW);
+    expect(store.consumeChallenge('expired-key', NOW)).toBeUndefined();
+  });
+});
+
 describe('Auth input boundaries', () => {
   function service(overrides: Partial<ConstructorParameters<typeof AuthService>[0]> = {}) {
     return new AuthService({
@@ -169,9 +233,15 @@ describe('Auth input boundaries', () => {
   it('normalizes surrounding whitespace and case before account lookup and audit', async () => {
     const auth = service();
     await expectAuthError(auth.login(' USER@Example.Test ', 'password', 'client'), 'authentication_failed', 401);
-    expect(auth.auditEvents.at(-1)?.subject_ref).toBe(
-      createHash('sha256').update('user@example.test').digest('hex'),
-    );
+    expect(auth.auditEvents).toEqual([
+      {
+        timestamp: NOW,
+        action: 'login',
+        outcome: 'denied',
+        subject_ref: createHash('sha256').update('user@example.test').digest('hex'),
+        reason_code: 'authentication_failed',
+      },
+    ]);
   });
 
   it('enforces constructor and client string length boundaries', async () => {
@@ -189,6 +259,60 @@ describe('Auth input boundaries', () => {
     const auth = service({ rp_id: 'a'.repeat(253), rp_name: 'a'.repeat(128) });
     await expectAuthError(auth.login('user@example.test', 'password', 'a'.repeat(257)), 'invalid_request', 400);
   });
+
+  it('allows HTTPS origins, rejects insecure remote HTTP, and enforces the 72-byte password limit', async () => {
+    expect(() => service({ origin: 'https://example.test' })).not.toThrow();
+    expect(() => service({ origin: 'http://example.test' })).toThrow(
+      expect.objectContaining({ name: 'AuthError', code: 'invalid_request', status: 400 }),
+    );
+    const auth = service();
+    await expectAuthError(auth.login('user@example.test', 'a'.repeat(72), 'client'), 'authentication_failed', 401);
+    await expectAuthError(auth.login('user@example.test', 'a'.repeat(73), 'client'), 'invalid_request', 400);
+    await expectAuthError(auth.login('user@example.test', 'é'.repeat(37), 'client'), 'invalid_request', 400);
+  });
+
+  it('records exact allowed, rate-limited, and anonymous-session audit events', async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(
+      user({
+        password_hash: await bcrypt.hash('correct-password', 12),
+      }),
+    );
+    const auth = service({ store });
+    await expect(auth.login('user@example.test', 'correct-password', 'client')).resolves.toMatchObject({
+      user_id: 'user-1',
+    });
+    expect(auth.auditEvents.at(-1)).toEqual({
+      timestamp: NOW,
+      action: 'login',
+      outcome: 'allowed',
+      subject_ref: createHash('sha256').update('user-1').digest('hex'),
+      reason_code: 'authenticated',
+    });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expectAuthError(auth.login('blocked@example.test', 'wrong', 'blocked-client'), 'authentication_failed', 401);
+    }
+    await expectAuthError(auth.login('blocked@example.test', 'wrong', 'blocked-client'), 'rate_limited', 429);
+    expect(auth.auditEvents.at(-1)).toEqual({
+      timestamp: NOW,
+      action: 'login',
+      outcome: 'denied',
+      subject_ref: createHash('sha256').update('blocked@example.test').digest('hex'),
+      reason_code: 'rate_limited',
+    });
+
+    expect(() => auth.authenticate('')).toThrow(
+      expect.objectContaining({ code: 'authentication_required', status: 401 }),
+    );
+    expect(auth.auditEvents.at(-1)).toEqual({
+      timestamp: NOW,
+      action: 'session_check',
+      outcome: 'denied',
+      subject_ref: createHash('sha256').update('anonymous').digest('hex'),
+      reason_code: 'authentication_required',
+    });
+  }, 30_000);
 
   it('fails closed when the injected clock is not an ISO instant', async () => {
     const auth = service({ now: () => 'not-an-instant' });
