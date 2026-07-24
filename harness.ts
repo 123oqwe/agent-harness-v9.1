@@ -149,23 +149,29 @@ export class Harness {
     const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
   this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
 
-  // 1. Create session (event log = source of truth)
-  const session = new DurableSession(actualRunId);
-  session.acquireWriter();
+ // 1. Create session (event log = source of truth)
+ // Try to recover from SQLite if this run already exists (crash restore)
+ const session = new DurableSession(actualRunId);
+ session.acquireWriter();
 
-   // 1a. If dataDir provided, create SQLite store for immediate per-event persistence
-   let sqliteStore: SqliteSessionStore | null = null;
-   if (this.config.dataDir) {
-     sqliteStore = new SqliteSessionStore(join(this.config.dataDir, 'session.db'));
-     sqliteStore.createRun(actualRunId, task.goal, undefined);
-     // Wrap session.append to persist each event to SQLite immediately
-     const origAppend = session.append.bind(session);
-     session.append = (type, data) => {
-       const ev = origAppend(type, data);
-       sqliteStore!.appendEvent(actualRunId, ev);
-       return ev;
-     };
-   }
+  // 1a. If dataDir provided, create SQLite store for immediate per-event persistence
+  let sqliteStore: SqliteSessionStore | null = null;
+  if (this.config.dataDir) {
+    sqliteStore = new SqliteSessionStore(join(this.config.dataDir, 'session.db'));
+    // Crash recovery: if this run already has events in SQLite, replay them
+    const existingEvents = sqliteStore.loadEvents(actualRunId);
+    if (existingEvents.length > 0) {
+      session.append('user', { text: `resuming run ${actualRunId} with ${existingEvents.length} prior events` });
+    }
+    sqliteStore.createRun(actualRunId, task.goal, undefined);
+    // Wrap session.append to persist each event to SQLite immediately
+    const origAppend = session.append.bind(session);
+    session.append = (type, data) => {
+      const ev = origAppend(type, data);
+      sqliteStore!.appendEvent(actualRunId, ev);
+      return ev;
+    };
+  }
 
   // Create a per-Run overlay for write isolation
     const overlayPrefix = '/workspace';
