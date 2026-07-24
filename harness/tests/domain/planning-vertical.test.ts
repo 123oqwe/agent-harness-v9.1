@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
 
-import { Harness, type HarnessProvider } from '../../harness.js';
+import { Harness } from '../../harness.js';
 
 import { ToolRegistry } from '../../tools/tool-registry.js';
 
@@ -28,8 +28,9 @@ function makeHarness(): Harness {
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new StoreBackend('/workspace'));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: '/tmp', allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  const provider: HarnessProvider = { async resolve() { return { content: 'Plan: build, test, deploy', decision_summary: 'I created the plan' }; } };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+  const gw = createScriptedGateway([{ content: 'Plan: build, test, deploy' }]);
+  const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 describe('AH-PLANNING-VERTICAL-001 planning vertical (thin adapter)', () => {

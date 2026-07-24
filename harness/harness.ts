@@ -33,12 +33,8 @@ import type { PolicyEnforcementPoint } from './security/pep.js';
 import { SkillLoader } from './skills/skill-loader.js';
 import { SqliteSessionStore } from './session/sqlite-session-store.js';
 import { execSync } from 'node:child_process';
+import type { ModelGateway, ProviderSelectionRequest, GatewayDispatchResult } from './gateway/model-gateway.js';
 import { join } from 'node:path';
-
-/** A provider port that can be called by the Runtime — typed, not a raw callback. */
-export interface HarnessProvider {
-  resolve(messages: Array<{ role: string; content: string }>): Promise<ModelTurn>;
-}
 
 /** Outcome returned to the caller (Vertical or user). */
 export interface HarnessOutcome {
@@ -78,7 +74,8 @@ export interface ExecutionContext {
 }
 
 /** Default execution context for tests (deterministic but not hardcoded in production). */
-export function createDefaultExecutionContext(runId: string): ExecutionContext {
+export function createDefaultExecutionContext(runId: string, clock?: () => string): ExecutionContext {
+  const fixedTime = new Date().toISOString();
   return {
     tenant_id: 'default-tenant',
     user_id: 'default-user',
@@ -94,7 +91,7 @@ export function createDefaultExecutionContext(runId: string): ExecutionContext {
     budget: { token_limit: 100000, usd_micros: 5000000 },
     risk_level: 2,
     confirmation_key_thumbprint: 'test-thumbprint',
-    clock: () => new Date().toISOString(),
+    clock: clock ?? (() => fixedTime),
  };
 }
 
@@ -112,7 +109,10 @@ export interface HarnessConfig {
   policyEngine: PolicyEngine;
   vfs: VirtualFilesystem;
   sandbox: SandboxProfile;
-  provider: HarnessProvider;
+  /** ModelGateway: all model calls go through gateway.resolve() + dispatch() */
+  gateway: ModelGateway;
+  /** Registry snapshot hash for gateway resolution */
+  registrySnapshotHash: string;
   security: HarnessSecurityDeps;
   executionContext: ExecutionContext;
   dataDir?: string | undefined;
@@ -131,10 +131,11 @@ export class Harness {
   private currentOverlay: OverlayBackend | null = null;
   private readonly auditLog: unknown[] = [];
   private execCtx: ExecutionContext | null = null;
+  private _modelCallCount = 0;
 
   constructor(config: HarnessConfig) {
     this.config = config;
-    this.execCtx = config.executionContext ?? null;
+    this.execCtx = config.executionContext;
     this.toolSnapshot = config.toolRegistry.freezeSnapshot();
     this.skillSnapshot = config.skillRegistry.freezeSnapshot();
     this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
@@ -148,6 +149,7 @@ export class Harness {
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
     const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
   this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
+  this._modelCallCount = 0;
 
  // 1. Create session (event log = source of truth)
  // Try to recover from SQLite if this run already exists (crash restore)
@@ -244,8 +246,27 @@ export class Harness {
         session,
         modelCall: async (messages: unknown[]) => {
           const typedMessages = messages as Array<{ role: string; content: string }>;
-          const turn = await this.config.provider.resolve(typedMessages);
-          return turn;
+          const modelCallCount = (this._modelCallCount++) + 1;
+          const req: ProviderSelectionRequest = {
+            registry_snapshot_hash: this.config.registrySnapshotHash,
+            request: { messages: typedMessages },
+            estimated_input_tokens: Math.min(typedMessages.reduce((s, m) => s + m.content.length, 0), 100000),
+            required_capabilities: ['text_reasoning'],
+            requires_structured_output: false,
+            data_policy: { local_only: true, allowed_regions: ['local'], max_retention_days: 30, training_allowed: false },
+            policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+            run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
+          } as unknown as ProviderSelectionRequest;
+          const resolved = this.config.gateway.resolve(req);
+          const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
+          const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, req, { operation_id: opId });
+          return {
+            content: result.response.content,
+            tool_calls: result.response.tool_calls,
+            stop_reason: result.response.stop_reason,
+            decision_summary: result.response.content.slice(0, 200),
+            usage: result.usage,
+          } as ModelTurn;
         },
         toolExecute: async (name: string, args: Record<string, unknown>) => {
           return this.executeTool(name, args, session);

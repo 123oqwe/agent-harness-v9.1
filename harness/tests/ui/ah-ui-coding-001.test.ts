@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 
@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 
 import { join } from 'node:path';
 
-import { Harness, type HarnessProvider } from '../../harness.js';
+import { Harness } from '../../harness.js';
 
 import { ToolRegistry } from '../../tools/tool-registry.js';
 
@@ -42,8 +42,8 @@ describe('AH-UI-CODING-001 coding workspace (via Harness)', () => {
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const provider: HarnessProvider = { async resolve() { return { content: 'done', decision_summary: 'done' }; } };
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+    const gw = createScriptedGateway([{ content: 'done' }]);
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
     const c = new CodingWorkspaceController(h);
     const r = await c.runFix({ repo_path: '/workspace', bug_file: '/workspace/f.ts', test_command: ['/bin/echo', 'ok'] });
     expect(r.state).toBe('success');

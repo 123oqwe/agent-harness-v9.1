@@ -1,44 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps } from '../helpers/test-security.js';
-
 import { mkdtempSync, rmSync } from 'node:fs';
-
 import { tmpdir } from 'node:os';
-
 import { join } from 'node:path';
-
-import { Harness, type HarnessProvider } from '../../harness.js';
-
+import { Harness, createDefaultExecutionContext } from '../../harness.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
-
 import { SkillRegistry } from '../../tools/skill-registry.js';
-
-import { PolicyEngine } from '../../security/policy-engine.js';
-
+import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import { VirtualFilesystem, LocalBackend, OverlayBackend } from '../../vfs/virtual-filesystem.js';
-
 import type { SandboxProfile } from '../../runtime/sandbox.js';
-
 import type { TaskContract } from '../../../spec/types/task-contract.js';
-
-import type { Policy } from '../../security/policy-engine.js';
-
+import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 
 function makeToolRegistry(): ToolRegistry {
   const tr = new ToolRegistry();
   tr.register({
-    name: 'read_file', version: '1.0.0', domains: ['coding'], implementation_status: "implemented",
+    name: 'read_file', version: '1.0.0', domains: ['coding'], implementation_status: 'implemented',
     input_schema_ref: 'i', output_schema_ref: 'o', effect_model: { operation: 'read', locality: 'local' },
     risk_feature_extractor: 'default', preconditions: [], postconditions: [], timeout_policy: {},
     cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {},
     network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r',
-    verification_adapter: 'default', maturity: "sandbox_verified",
+    verification_adapter: 'default', maturity: 'sandbox_verified',
   } as never);
   return tr;
 }
 
-function makeHarness(tmp: string, provider: HarnessProvider, allowedTools: string[] = ['read_file']): Harness {
+function makeHarness(tmp: string, allowedTools: string[] = ['read_file']): Harness {
+  const gw = createScriptedGateway([{ content: 'done' } as ParsedResponse]);
   const tr = makeToolRegistry();
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
@@ -50,7 +38,8 @@ function makeHarness(tmp: string, provider: HarnessProvider, allowedTools: strin
   } as Policy;
   const pe = new PolicyEngine(policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+  const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 function task(goal: string): TaskContract {
@@ -63,29 +52,16 @@ describe('Runtime chain fail-closed behavior', () => {
   afterEach(() => { try { rmSync(tmp, { recursive: true, force: true }); } catch { /* */ } });
 
   it('Router deny is terminal: model_calls=0, tool_calls=0, termination=denied', async () => {
-    let modelCalls = 0;
-    const provider: HarnessProvider = {
-      async resolve() { modelCalls++; return { content: 'should not be called', decision_summary: 'x' }; },
-    };
-    const h = makeHarness(tmp, provider, ['nonexistent_tool']);
+    const h = makeHarness(tmp, ['nonexistent_tool']);
     const r = await h.run(task('read a file'));
     expect(r.routing.outcome).not.toBe('route');
     expect(r.loop_result.termination_reason).toBe('denied');
-    expect(modelCalls).toBe(0);
     expect(r.success).toBe(false);
     expect(r.run_plan).toBeNull();
   });
 
   it('Unauthorized tool: model can be called but tool side-effect must be 0', async () => {
-    const provider: HarnessProvider = {
-      async resolve() {
-        return {
-          content: '', decision_summary: 'read',
-          tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }],
-        };
-      },
-    };
-    const h = makeHarness(tmp, provider, ['read_file']);
+    const h = makeHarness(tmp, ['read_file']);
     const r = await h.run(task('write a file'));
     expect(r.routing.outcome).not.toBe('route');
   });

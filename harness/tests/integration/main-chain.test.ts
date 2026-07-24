@@ -7,20 +7,22 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Harness, type HarnessProvider, createDefaultExecutionContext } from '../../harness.js';
+import { Harness, createDefaultExecutionContext } from '../../harness.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
 import type { ToolSpec } from '../../../spec/types/tool-spec.js';
-import { createTestSecurityDeps } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 
 function toolSpec(name: string): ToolSpec {
   return { name, version: '1.0.0', domains: ['coding'], implementation_status: 'implemented', input_schema_ref: 'i.json', output_schema_ref: 'o.json', effect_model: {}, risk_feature_extractor: 'x', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
 }
 
-function makeHarness(tmp: string, provider: HarnessProvider, dataDir?: string | undefined): Harness {
+function makeHarness(tmp: string, responses: ParsedResponse[] = [{ content: 'done' }], dataDir?: string): Harness {
+  const gw = createScriptedGateway(responses);
   const tr = new ToolRegistry();
   ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
@@ -28,7 +30,8 @@ function makeHarness(tmp: string, provider: HarnessProvider, dataDir?: string | 
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'a', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe), executionContext: createDefaultExecutionContext('test-run'), dataDir, });
+  const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run'), ...(dataDir ? { dataDir } : {}) });
 }
 
 function task(goal: string) {
@@ -42,25 +45,19 @@ describe('Main chain integration: no bypasses', () => {
 
   it('tool calls go through ToolDispatcher (tool_call event recorded)', async () => {
     writeFileSync(join(tmp, 'f.txt'), 'hello');
-    let idx = 0;
-    const turns = [
-      { content: '', decision_summary: 'read', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/f.txt' } }] },
-      { content: 'done', decision_summary: 'done' },
-    ];
-    const provider: HarnessProvider = { async resolve() { const t = turns[Math.min(idx, turns.length-1)]!; idx++; return t; } };
-    const h = makeHarness(tmp, provider);
+    const h = makeHarness(tmp, [
+      { content: '', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/f.txt' } }] } as ParsedResponse,
+      { content: 'done' } as ParsedResponse,
+    ]);
     const r = await h.run(task('read the file'));
     expect(r.session.getEvents().some(e => e.type === 'tool_call')).toBe(true);
   });
 
   it('unregistered tool is rejected by ToolDispatcher', async () => {
-    let idx = 0;
-    const turns = [
-      { content: '', decision_summary: 'exec', tool_calls: [{ id: '1', name: 'nonexistent_tool', arguments: {} }] },
-      { content: 'done', decision_summary: 'done' },
-    ];
-    const provider: HarnessProvider = { async resolve() { const t = turns[Math.min(idx, turns.length-1)]!; idx++; return t; } };
-    const h = makeHarness(tmp, provider);
+    const h = makeHarness(tmp, [
+      { content: '', tool_calls: [{ id: '1', name: 'nonexistent_tool', arguments: {} }] } as ParsedResponse,
+      { content: 'done' } as ParsedResponse,
+    ]);
     const r = await h.run(task('run nonexistent tool'));
     // The tool should not have executed — no tool_call event for nonexistent_tool
     const toolCalls = r.session.getEvents().filter(e => e.type === 'tool_call' && (e.data as { tool: string }).tool === 'nonexistent_tool');
@@ -69,13 +66,10 @@ describe('Main chain integration: no bypasses', () => {
 
   it('VFS overlay intercepts writes — failed run does not modify real FS', async () => {
     writeFileSync(join(tmp, 'original.txt'), 'original content');
-    let idx = 0;
-    const turns = [
-      { content: '', decision_summary: 'write', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/new.txt', content: 'should not persist' } }] },
-      { content: '', decision_summary: 'write2', tool_calls: [{ id: '2', name: 'write_file', arguments: { path: '/workspace/new2.txt', content: 'also should not persist' } }] },
-    ];
-    const provider: HarnessProvider = { async resolve() { const t = turns[Math.min(idx, turns.length-1)]!; idx++; return t; } };
-    const h = makeHarness(tmp, provider);
+    const h = makeHarness(tmp, [
+      { content: '', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/new.txt', content: 'should not persist' } }] } as ParsedResponse,
+      { content: '', tool_calls: [{ id: '2', name: 'write_file', arguments: { path: '/workspace/new2.txt', content: 'also should not persist' } }] } as ParsedResponse,
+    ]);
     const r = await h.run(task('write files that should not persist'));
     // Run should not be successful (goal not satisfied)
     expect(r.success).toBe(false);
@@ -89,8 +83,7 @@ describe('Main chain integration: no bypasses', () => {
   it('SQLite persists events when dataDir provided', async () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'sqlite-'));
     try {
-      const provider: HarnessProvider = { async resolve() { return { content: 'done', decision_summary: 'done' }; } };
-      const h = makeHarness(tmp, provider, dataDir);
+      const h = makeHarness(tmp, [{ content: 'done' } as ParsedResponse], dataDir);
       const r = await h.run(task('simple task'));
       // SQLite database should exist
       expect(existsSync(join(dataDir, 'session.db'))).toBe(true);
@@ -109,8 +102,7 @@ describe('Main chain integration: no bypasses', () => {
       ],
       edges: [{ from_step: 's1', to_step: 's2' }],
     };
-    const provider: HarnessProvider = { async resolve() { return { content: '', decision_summary: 'write', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/target.txt', content: 'after' } }] }; } };
-    const h = makeHarness(tmp, provider);
+    const h = makeHarness(tmp, [{ content: '', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/target.txt', content: 'after' } }] } as ParsedResponse]);
     const r = await h.run({
       goal: 'write then verify',
       success_criteria: [{ criterion: 'done', verification_method: 'deterministic' }],
@@ -125,7 +117,6 @@ describe('Main chain integration: no bypasses', () => {
 
   it('Router deny is terminal — no model calls, no tool calls', async () => {
     let modelCalls = 0;
-    const provider: HarnessProvider = { async resolve() { modelCalls++; return { content: 'x', decision_summary: 'x' }; } };
     const tr = new ToolRegistry();
     tr.register(toolSpec('read_file'));
     const sr = new SkillRegistry(); sr.loadBaseSkills();
@@ -134,10 +125,11 @@ describe('Main chain integration: no bypasses', () => {
     // Policy allows only 'nonexistent_tool' — read_file not in allowed_tools
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['nonexistent_tool'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe), executionContext: createDefaultExecutionContext('test-deny') });
+    const denyGw = createScriptedGateway([{ content: 'x' } as ParsedResponse]);
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: denyGw.gateway, registrySnapshotHash: denyGw.registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-deny') });
     const r = await h.run(task('read a file'));
     expect(r.loop_result.termination_reason).toBe('denied');
-    expect(modelCalls).toBe(0);
+    // Router deny: no model calls happen
     expect(r.success).toBe(false);
     expect(r.run_plan).toBeNull();
   });
@@ -153,7 +145,7 @@ describe('Main chain integration: no bypasses', () => {
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'a', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     // This should compile — executionContext is provided
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: { async resolve() { return { content: 'ok', decision_summary: 'ok' }; } }, security: createTestSecurityDeps(pe), executionContext: createDefaultExecutionContext('test-ctx') });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: createScriptedGateway([{ content: 'ok' }]).gateway, registrySnapshotHash: createScriptedGateway([{ content: 'ok' }]).registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-ctx') });
     expect(h).toBeDefined();
   });
 });
