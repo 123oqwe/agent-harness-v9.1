@@ -78,6 +78,42 @@ export interface PostconditionVerifierPort {
   }): Promise<{ readonly valid: boolean; readonly reason?: string }>;
 }
 
+export type EffectState =
+  | 'PRE_DISPATCH'
+  | 'IN_FLIGHT'
+  | 'EFFECT_UNKNOWN'
+  | 'EFFECT_CONFIRMED'
+  | 'DEFINITELY_FAILED_NO_EFFECT';
+
+export interface EffectJournalRecord {
+  readonly operation_id: string;
+  readonly run_id: string;
+  readonly step_id: string;
+  readonly attempt_id: string;
+  readonly tool_name: string;
+  readonly idempotency_key: string;
+  readonly effect_state: EffectState;
+  readonly receipt_json: string | null;
+}
+
+export interface EffectJournalPort {
+  getOperationByIdempotencyKey(
+    key: string,
+  ): EffectJournalRecord | null;
+  recordOperation(record: EffectJournalRecord): void;
+  recordReceipt?(
+    operationId: string,
+    receipt: {
+      readonly tool_name: string;
+      readonly success: boolean;
+      readonly input_hash: string;
+      readonly output_hash: string | null;
+      readonly duration_ms: number;
+      readonly timestamp: string;
+    },
+  ): void;
+}
+
 export class ToolExecutorError extends Error {
   constructor(message: string) { super(message); this.name = 'ToolExecutorError'; Object.setPrototypeOf(this, ToolExecutorError.prototype); }
 }
@@ -196,6 +232,7 @@ export interface ToolExecutorInjectedDeps {
   consent?: ConsentService;
   credentialBroker?: ToolCredentialBrokerPort;
   postconditionVerifier?: PostconditionVerifierPort;
+  effectJournal?: EffectJournalPort;
   /** Execution context providing tenant_id, user_id, run_id, etc. */
   execCtx?: {
     tenant_id: string;
@@ -248,7 +285,10 @@ export class ToolExecutor {
   const planId = ctx.plan_id;
   const stepId = ctx.step_id;
   const thumbprint = ctx.confirmation_key_thumbprint;
+  const idempotencyKey = ctx.idempotency_key;
 
+   const existingEffect =
+     this.injected.effectJournal?.getOperationByIdempotencyKey(idempotencyKey);
    // 1. ToolSpec validation: tool must exist in frozen snapshot
    if (!this.deps.toolRegistry.inSnapshot(toolName, this.deps.snapshot)) {
       throw new ToolExecutorError(`tool not in frozen snapshot: ${toolName}`);
@@ -290,6 +330,8 @@ export class ToolExecutor {
     // 4. Issue a single-use capability token
     let token: CapabilityToken;
     let tier: number | undefined;
+    let effectPrepared = false;
+    let effectStarted = false;
     try {
       const decision = this.deps.policyEngine.evaluate({
         tool_name: toolName,
@@ -322,6 +364,52 @@ export class ToolExecutor {
           );
         }
       }
+      if (existingEffect?.effect_state === 'EFFECT_CONFIRMED') {
+        if (!existingEffect.receipt_json) {
+          throw new ToolExecutorError(
+            'confirmed effect is missing its stored outcome',
+          );
+        }
+        try {
+          const stored = JSON.parse(existingEffect.receipt_json) as {
+            result: T;
+            receipt: ToolReceipt;
+          };
+          if (
+            existingEffect.run_id !== ctx.run_id ||
+            existingEffect.operation_id !== operationId ||
+            existingEffect.tool_name !== toolName ||
+            !stored.receipt ||
+            stored.receipt.tool_name !== toolName ||
+            stored.receipt.input_hash !== hash(input).slice(0, 16) ||
+            stored.receipt.success !== true
+          ) {
+            throw new Error('stored outcome does not match action identity');
+          }
+          this.deps.session.append('tool_result', {
+            tool: toolName,
+            receipt: stored.receipt,
+            replayed: true,
+          });
+          return Object.freeze({
+            result: stored.result,
+            receipt: Object.freeze(stored.receipt),
+          });
+        } catch (error) {
+          if (error instanceof ToolExecutorError) throw error;
+          throw new ToolExecutorError(
+            `stored effect outcome is invalid: ${(error as Error).message}`,
+          );
+        }
+      }
+      if (
+        existingEffect?.effect_state === 'IN_FLIGHT' ||
+        existingEffect?.effect_state === 'EFFECT_UNKNOWN'
+      ) {
+        throw new ToolExecutorError(
+          `effect requires reconciliation: ${existingEffect.effect_state}`,
+        );
+      }
       const signedToken = await this.authz.issue({
         operation_id: operationId,
         attempt_id: attemptId,
@@ -341,6 +429,19 @@ export class ToolExecutor {
       });
       token = signedToken.claims;
       this._currentTokenHash = hashCapabilityValue(signedToken.claims);
+      if (this.injected.effectJournal) {
+        this.injected.effectJournal.recordOperation({
+          operation_id: operationId,
+          run_id: ctx.run_id,
+          step_id: stepId,
+          attempt_id: attemptId,
+          tool_name: toolName,
+          idempotency_key: idempotencyKey,
+          effect_state: 'PRE_DISPATCH',
+          receipt_json: null,
+        });
+        effectPrepared = true;
+      }
     } catch (e) {
       if (e instanceof ToolExecutorError) throw e;
       this.deps.session.append('error', { tool: toolName, reason: `capability issue failed: ${(e as Error).message}` });
@@ -375,6 +476,19 @@ export class ToolExecutor {
         },
         async () => {
           tokenId = token.token_id;
+          if (this.injected.effectJournal) {
+            this.injected.effectJournal.recordOperation({
+              operation_id: operationId,
+              run_id: ctx.run_id,
+              step_id: stepId,
+              attempt_id: attemptId,
+              tool_name: toolName,
+              idempotency_key: idempotencyKey,
+              effect_state: 'IN_FLIGHT',
+              receipt_json: null,
+            });
+          }
+          effectStarted = true;
           // 6. Execute the tool INSIDE the PEP authorization scope
           this.deps.session.append('tool_call', { tool: toolName, input_hash: hash(input).slice(0, 16), token_id: tokenId });
           const requirements = toolSpec?.credential_requirements ?? [];
@@ -411,6 +525,20 @@ export class ToolExecutor {
       await verifyResult?.(result);
     } catch (e) {
       error = (e as Error).message;
+      if (this.injected.effectJournal && effectPrepared) {
+        this.injected.effectJournal.recordOperation({
+          operation_id: operationId,
+          run_id: ctx.run_id,
+          step_id: stepId,
+          attempt_id: attemptId,
+          tool_name: toolName,
+          idempotency_key: idempotencyKey,
+          effect_state: effectStarted
+            ? 'EFFECT_UNKNOWN'
+            : 'DEFINITELY_FAILED_NO_EFFECT',
+          receipt_json: null,
+        });
+      }
       this.deps.session.append('error', { tool: toolName, error, token_id: tokenId });
       throw e;
     }
@@ -432,6 +560,26 @@ export class ToolExecutor {
 
     // 8. Evidence
     this.deps.session.append('tool_result', { tool: toolName, receipt });
+    if (this.injected.effectJournal) {
+      this.injected.effectJournal.recordOperation({
+        operation_id: operationId,
+        run_id: ctx.run_id,
+        step_id: stepId,
+        attempt_id: attemptId,
+        tool_name: toolName,
+        idempotency_key: idempotencyKey,
+        effect_state: 'EFFECT_CONFIRMED',
+        receipt_json: JSON.stringify({ result, receipt }),
+      });
+      this.injected.effectJournal.recordReceipt?.(operationId, {
+        tool_name: receipt.tool_name,
+        success: receipt.success,
+        input_hash: receipt.input_hash,
+        output_hash: receipt.output_hash ?? null,
+        duration_ms: receipt.duration_ms,
+        timestamp: receipt.timestamp,
+      });
+    }
 
     return { result, receipt };
   }

@@ -22,7 +22,12 @@ import type { PolicyEngine } from './security/policy-engine.js';
 import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
 import { OverlayBackend } from './vfs/virtual-filesystem.js';
-import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
+import {
+  LoopEngine,
+  type LoopResult,
+  type ModelTurn,
+  type ToolCallExecutionContext,
+} from './runtime/loop.js';
 import { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ActionExecutor } from './security/action-executor.js';
@@ -128,6 +133,19 @@ function deterministicRunId(task: TaskContract): string {
   return 'run-' + createHash('sha256').update(task.goal).digest('hex').slice(0, 12);
 }
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, canonicalize(record[key])]),
+    );
+  }
+  return value;
+}
+
 export class Harness {
   private readonly config: HarnessConfig;
   private readonly toolSnapshot: RegistrySnapshot;
@@ -152,40 +170,7 @@ export class Harness {
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
-  const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
-  this.execCtx = this.config.executionContext;
-  this._modelCallCount = 0;
-
- // 1. Create session (event log = source of truth)
- // Try to recover from SQLite if this run already exists (crash restore)
- const session = new DurableSession(actualRunId);
- session.acquireWriter();
-
-  // 1a. If dataDir provided, create SQLite store for immediate per-event persistence
-  let sqliteStore: SqliteSessionStore | null = null;
-  if (this.config.dataDir) {
-    sqliteStore = new SqliteSessionStore(join(this.config.dataDir, 'session.db'));
-    // Crash recovery: if this run already has events in SQLite, replay them
-    const existingEvents = sqliteStore.loadEvents(actualRunId);
-    if (existingEvents.length > 0) {
-      session.append('user', { text: `resuming run ${actualRunId} with ${existingEvents.length} prior events` });
-    }
-    sqliteStore.createRun(actualRunId, task.goal, undefined);
-    // Wrap session.append to persist each event to SQLite immediately
-    const origAppend = session.append.bind(session);
-    session.append = (type, data) => {
-      const ev = origAppend(type, data);
-      sqliteStore!.appendEvent(actualRunId, ev);
-      return ev;
-    };
-  }
-
-  // Create a per-Run overlay for write isolation
-    const overlayPrefix = '/workspace';
-    this.currentOverlay = new OverlayBackend(overlayPrefix);
-    this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
-
-    // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
+    this._modelCallCount = 0;
     const router = new StaticRouter({
       toolRegistry: this.config.toolRegistry,
       skillRegistry: this.config.skillRegistry,
@@ -195,12 +180,98 @@ export class Harness {
       policySnapshotRef: this.policySnapshotRef,
       gateway: this.config.gateway,
     });
-    const routing = router.route(task);
+    const routing = router.route(task, runId);
+    const actualRunId =
+      runId ?? routing.run_plan?.run_id ?? deterministicRunId(task);
+    this.execCtx = {
+      ...this.config.executionContext,
+      session_id: actualRunId,
+      run_id: actualRunId,
+      plan_id: routing.run_plan?.run_plan_hash ?? `plan-${actualRunId}`,
+    };
+
+    let sqliteStore: SqliteSessionStore | null = null;
+    if (this.config.dataDir) {
+      sqliteStore = new SqliteSessionStore(
+        join(this.config.dataDir, 'session.db'),
+      );
+      sqliteStore.createRun(
+        actualRunId,
+        task.goal,
+        routing.run_plan?.reasoning_strategy,
+      );
+    }
+    const existingEvents = sqliteStore?.loadEvents(actualRunId) ?? [];
+    const persistedRun = sqliteStore?.getRun(actualRunId) ?? null;
+    const session =
+      existingEvents.length === 0
+        ? new DurableSession(actualRunId, {
+            ...(sqliteStore === null ? {} : { persistence: sqliteStore }),
+            clock: () => this.now(),
+          })
+        : DurableSession.restore(
+            {
+              session_id: actualRunId,
+              events: existingEvents,
+              snapshot: null,
+            },
+            {
+              ...(sqliteStore === null ? {} : { persistence: sqliteStore }),
+              clock: () => this.now(),
+            },
+          );
+    session.acquireWriter();
+
+    try {
+      if (
+        existingEvents.length > 0 &&
+        persistedRun !== null &&
+        persistedRun.status !== 'running'
+      ) {
+        session.releaseWriter();
+        const termination = persistedRun.status as LoopResult['termination_reason'];
+        const iterations = existingEvents.filter(
+          (event) => event.type === 'assistant',
+        ).length;
+        return {
+          run_plan: routing.run_plan ?? null,
+          routing,
+          loop_result: {
+            strategy: routing.run_plan?.reasoning_strategy ?? 'direct',
+            iterations,
+            termination_reason: termination,
+            turns: [],
+            decision_summaries: existingEvents
+              .filter((event) => event.type === 'assistant')
+              .map(
+                (event) =>
+                  (event.data as { decision_summary?: string }).decision_summary ??
+                  '',
+              ),
+            progress_path: undefined,
+            context_reset_emitted: termination === 'context_reset',
+          },
+          session,
+          evidence: this.buildEvidence(
+            session,
+            routing.run_plan,
+            termination,
+            iterations,
+          ),
+          success:
+            termination === 'goal_satisfied' || termination === 'completed',
+        };
+      }
+      const overlayPrefix = '/workspace';
+      this.currentOverlay = new OverlayBackend(overlayPrefix);
+      this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
 
     if (routing.outcome !== 'route' || !routing.run_plan) {
       // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
       session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
       session.releaseWriter();
+      this.finalizeOverlay(false);
+      sqliteStore?.updateRunStatus(actualRunId, 'denied');
       return {
         run_plan: routing.run_plan ?? null,
         routing,
@@ -247,6 +318,7 @@ export class Harness {
         goal: goalWithSkill,
         data_dir: this.config.dataDir,
         run_plan: runPlan,
+        clock: () => this.now(),
       },
       {
         session,
@@ -303,8 +375,12 @@ export class Harness {
             usage: result.usage,
           } as ModelTurn;
         },
-        toolExecute: async (name: string, args: Record<string, unknown>) => {
-          return this.executeTool(name, args, session);
+        toolExecute: async (
+          name: string,
+          args: Record<string, unknown>,
+          context: ToolCallExecutionContext,
+        ) => {
+          return this.executeTool(name, args, context, session, sqliteStore);
         },
         goalSatisfied: (turns) => this.checkGoal(task, turns),
       },
@@ -323,6 +399,10 @@ export class Harness {
     // 5. Build evidence
     const evidence = this.buildEvidence(session, runPlan, loopResult.termination_reason, loopResult.iterations);
 
+    sqliteStore?.updateRunStatus(
+      actualRunId,
+      loopResult.termination_reason,
+    );
     return {
       run_plan: runPlan,
       routing,
@@ -331,6 +411,9 @@ export class Harness {
       evidence,
       success: loopResult.termination_reason === 'goal_satisfied' || loopResult.termination_reason === 'completed',
     };
+    } finally {
+      sqliteStore?.close();
+    }
   }
 
 /** Return the overlay as a VirtualFilesystem-compatible object for tool dispatch. */
@@ -344,17 +427,38 @@ private currentOverlayAsVfs(): VirtualFilesystem {
 }
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
-private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
+private async executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  call: ToolCallExecutionContext,
+  session: DurableSession,
+  effectJournal: SqliteSessionStore | null,
+): Promise<unknown> {
+  const identity = createHash('sha256')
+    .update(
+      JSON.stringify(canonicalize({
+        run_id: this.execCtx!.run_id,
+        step_id: call.step_id,
+        tool_call_id: call.tool_call_id,
+        tool_name: name,
+      })),
+    )
+    .digest('hex')
+    .slice(0, 24);
+  const inputIdentity = createHash('sha256')
+    .update(JSON.stringify(canonicalize(args)))
+    .digest('hex')
+    .slice(0, 24);
   // ExecutionContext is always set (required in HarnessConfig, set in run())
   const execCtxForTool = {
     tenant_id: this.execCtx!.tenant_id,
     user_id: this.execCtx!.user_id,
     run_id: this.execCtx!.run_id,
     plan_id: this.execCtx!.plan_id,
-    step_id: this.execCtx!.step_id,
-    attempt_id: this.execCtx!.attempt_id,
-    operation_id: this.execCtx!.operation_id,
-    idempotency_key: this.execCtx!.idempotency_key,
+    step_id: call.step_id,
+    attempt_id: `attempt-${identity}-${call.attempt_index}`,
+    operation_id: `operation-${identity}`,
+    idempotency_key: `idempotency-${identity}-${inputIdentity}`,
     confirmation_key_thumbprint: this.execCtx!.confirmation_key_thumbprint,
     run_phase: 'agent' as const,
     budget: {
@@ -377,6 +481,7 @@ private async executeTool(name: string, args: Record<string, unknown>, session: 
       ...(this.config.security.credentialBroker === undefined
         ? {}
         : { credentialBroker: this.config.security.credentialBroker }),
+      ...(effectJournal === null ? {} : { effectJournal }),
       execCtx: execCtxForTool,
     },
    );

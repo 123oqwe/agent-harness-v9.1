@@ -29,6 +29,15 @@ export interface SessionSnapshot {
   summary: unknown;
 }
 
+export interface SessionPersistencePort {
+  appendEvent(sessionId: string, event: SessionEvent): void;
+}
+
+export interface DurableSessionOptions {
+  persistence?: SessionPersistencePort;
+  clock?: () => string;
+}
+
 export class SessionError extends Error {
   constructor(message: string) { super(message); this.name = 'SessionError'; Object.setPrototypeOf(this, SessionError.prototype); }
 }
@@ -46,8 +55,14 @@ export class DurableSession {
   private writerLocked = false;
   private last_hash = '';
   private logPath: string | null = null;
+  private readonly persistence: SessionPersistencePort | undefined;
+  private readonly clock: () => string;
 
-  constructor(session_id: string) { this.session_id = session_id; }
+  constructor(session_id: string, options: DurableSessionOptions = {}) {
+    this.session_id = session_id;
+    this.persistence = options.persistence;
+    this.clock = options.clock ?? (() => new Date().toISOString());
+  }
 
   /** Set the file path for incremental event log persistence. */
   setLogPath(path: string): void { this.logPath = path; }
@@ -64,7 +79,7 @@ export class DurableSession {
     if (!ALL_TYPES.includes(type)) throw new SessionError(`invalid event type: ${type}`);
     if (!this.writerLocked) throw new SessionError('writer lock required to append');
     const seq = this.events.length + 1;
-    const timestamp = new Date().toISOString();
+    const timestamp = this.clock();
     const prev_hash = this.last_hash;
     const hash = hashEvent(seq, type, timestamp, data, prev_hash);
     const ev: SessionEvent = { seq, type, timestamp, data, hash, prev_hash };
@@ -74,6 +89,7 @@ export class DurableSession {
     if (this.logPath) {
       appendEvent(ev, this.logPath);
     }
+    this.persistence?.appendEvent(this.session_id, ev);
     return ev;
   }
 
@@ -83,7 +99,7 @@ export class DurableSession {
     this.snapshot = {
       session_id: this.session_id, version,
       last_seq: this.events.length, last_hash: this.last_hash,
-      created_at: new Date().toISOString(), summary,
+      created_at: this.clock(), summary,
     };
     return this.snapshot;
   }
@@ -94,11 +110,24 @@ export class DurableSession {
   }
 
   /** Import a previously exported session. Snapshot version verified on load. */
-  static import_(data: { session_id: string; events: SessionEvent[]; snapshot: SessionSnapshot | null }): DurableSession {
-    const s = new DurableSession(data.session_id);
+  static import_(
+    data: {
+      session_id: string;
+      events: SessionEvent[];
+      snapshot: SessionSnapshot | null;
+    },
+    options: DurableSessionOptions = {},
+  ): DurableSession {
+    const s = new DurableSession(data.session_id, options);
     // Replay event log (the authority); verify hash chain integrity
     let prev = '';
     for (const ev of data.events) {
+      if (ev.seq !== s.events.length + 1) {
+        throw new SessionError(`non-contiguous sequence at seq ${ev.seq}`);
+      }
+      if (!ALL_TYPES.includes(ev.type)) {
+        throw new SessionError(`invalid event type at seq ${ev.seq}`);
+      }
       const expected = hashEvent(ev.seq, ev.type, ev.timestamp, ev.data, ev.prev_hash);
       if (expected !== ev.hash) throw new SessionError(`hash chain broken at seq ${ev.seq}`);
       if (ev.prev_hash !== prev) throw new SessionError(`prev_hash mismatch at seq ${ev.seq}`);
@@ -116,8 +145,15 @@ export class DurableSession {
   }
 
   /** Crash recovery: rebuild from event log. Idempotent — replaying doesn't duplicate side effects. */
-  static restore(data: { session_id: string; events: SessionEvent[]; snapshot: SessionSnapshot | null }): DurableSession {
-    return DurableSession.import_(data);
+  static restore(
+    data: {
+      session_id: string;
+      events: SessionEvent[];
+      snapshot: SessionSnapshot | null;
+    },
+    options: DurableSessionOptions = {},
+  ): DurableSession {
+    return DurableSession.import_(data, options);
   }
 
   /** Resume from the first incomplete event (crash mid-task). */

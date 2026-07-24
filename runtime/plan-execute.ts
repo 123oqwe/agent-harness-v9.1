@@ -85,7 +85,11 @@ export async function runPlanExecute(ctx: StrategyContext, messages: unknown[]):
       if (turn.tool_calls && turn.tool_calls.length > 0 && ctx.deps.toolExecute) {
         for (const tc of turn.tool_calls) {
           try {
-            const result = await ctx.deps.toolExecute(tc.name, tc.arguments);
+            const result = await ctx.deps.toolExecute(tc.name, tc.arguments, {
+              tool_call_id: tc.id,
+              step_id: stepId,
+              attempt_index: 1,
+            });
             const lastTurn = ctx.turns[ctx.turns.length - 1]!;
             if (!lastTurn.tool_executed) lastTurn.tool_executed = { name: tc.name, arguments: tc.arguments, result };
             messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
@@ -104,7 +108,11 @@ export async function runPlanExecute(ctx: StrategyContext, messages: unknown[]):
       const tc = lastTurn?.model.tool_calls?.[0];
       if (tc) {
         try {
-          const result = await ctx.deps.toolExecute(tc.name, tc.arguments);
+          const result = await ctx.deps.toolExecute(tc.name, tc.arguments, {
+            tool_call_id: tc.id,
+            step_id: stepId,
+            attempt_index: 1,
+          });
           ctx.turns[ctx.turns.length - 1]!.tool_executed = { name: tc.name, arguments: tc.arguments, result };
           messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
           node.status = 'done';

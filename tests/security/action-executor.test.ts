@@ -15,6 +15,8 @@ import { DurableSession } from '../../session/durable-session.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 import {
   type ToolCredentialBrokerPort,
+  type EffectJournalPort,
+  type EffectJournalRecord,
   type ToolExecutorDeps,
 } from '../../tools/tool-executor.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
@@ -27,6 +29,7 @@ function build(options?: {
   consent?: ConsentService;
   tool?: ToolSpec;
   broker?: ToolCredentialBrokerPort;
+  journal?: EffectJournalPort;
   postconditionValid?: boolean;
 }) {
   const tool =
@@ -119,6 +122,9 @@ function build(options?: {
     ...(options?.broker === undefined
       ? {}
       : { credentialBroker: options.broker }),
+    ...(options?.journal === undefined
+      ? {}
+      : { effectJournal: options.journal }),
     execCtx: {
       tenant_id: 'tenant',
       user_id: 'user',
@@ -243,5 +249,62 @@ describe('ActionExecutor production authority', () => {
     ).rejects.toThrow('output schema validation failed');
     expect(auditSink.getAllowed()).toHaveLength(0);
     expect(auditSink.getDenied()).toHaveLength(1);
+  });
+
+  it('returns a confirmed stored outcome without a second effect', async () => {
+    const records = new Map<string, EffectJournalRecord>();
+    const journal: EffectJournalPort = {
+      getOperationByIdempotencyKey: (key) =>
+        [...records.values()].find(
+          (record) => record.idempotency_key === key,
+        ) ?? null,
+      recordOperation: (record) => {
+        records.set(record.operation_id, Object.freeze({ ...record }));
+      },
+    };
+    const { executor } = build({ journal });
+    const effect = vi.fn(async () => ({ bytes_written: 1 }));
+
+    const first = await executor.execute(
+      'write_file',
+      { path: '/workspace/a', content: 'x' },
+      effect,
+    );
+    const replayed = await executor.execute(
+      'write_file',
+      { path: '/workspace/a', content: 'x' },
+      effect,
+    );
+
+    expect(effect).toHaveBeenCalledTimes(1);
+    expect(replayed).toEqual(first);
+  });
+
+  it('refuses to replay an in-flight or unknown effect', async () => {
+    const state: EffectJournalRecord = {
+      operation_id: 'operation',
+      run_id: 'run',
+      step_id: 'step',
+      attempt_id: 'attempt',
+      tool_name: 'write_file',
+      idempotency_key: 'idempotency',
+      effect_state: 'EFFECT_UNKNOWN',
+      receipt_json: null,
+    };
+    const journal: EffectJournalPort = {
+      getOperationByIdempotencyKey: () => state,
+      recordOperation: () => undefined,
+    };
+    const { executor } = build({ journal });
+    const effect = vi.fn(async () => ({ bytes_written: 1 }));
+
+    await expect(
+      executor.execute(
+        'write_file',
+        { path: '/workspace/a', content: 'x' },
+        effect,
+      ),
+    ).rejects.toThrow('requires reconciliation');
+    expect(effect).not.toHaveBeenCalled();
   });
 });

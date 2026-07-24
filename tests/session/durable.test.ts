@@ -90,6 +90,40 @@ describe('AH-RUNTIME-SESSION-001 durable session', () => {
     expect(() => DurableSession.import_(exported)).toThrow(SessionError);
   });
 
+  it('restores an existing chain and persists only newly appended events', () => {
+    const original = new DurableSession('persisted', {
+      clock: () => '2026-01-01T00:00:00.000Z',
+    });
+    original.acquireWriter();
+    original.append('user', { text: 'before crash' });
+    const persisted: Array<{ sessionId: string; seq: number }> = [];
+    const restored = DurableSession.restore(original.export_(), {
+      clock: () => '2026-01-01T00:00:01.000Z',
+      persistence: {
+        appendEvent: (sessionId, event) => {
+          persisted.push({ sessionId, seq: event.seq });
+        },
+      },
+    });
+    restored.acquireWriter();
+    restored.append('assistant', { decision_summary: 'after crash' });
+
+    expect(restored.eventCount()).toBe(2);
+    expect(persisted).toEqual([{ sessionId: 'persisted', seq: 2 }]);
+    expect(restored.getEvent(2)?.prev_hash).toBe(restored.getEvent(1)?.hash);
+  });
+
+  it('rejects non-contiguous recovered event sequences', () => {
+    const session = new DurableSession('broken');
+    session.acquireWriter();
+    session.append('user', {});
+    const exported = session.export_();
+    exported.events[0] = { ...exported.events[0]!, seq: 2 };
+    expect(() => DurableSession.restore(exported)).toThrow(
+      'non-contiguous sequence',
+    );
+  });
+
   it('append requires writer lock', () => {
     expect(() => s.append('user', { x: 1 })).toThrow(SessionError);
   });

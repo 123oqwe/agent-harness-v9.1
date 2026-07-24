@@ -11,8 +11,8 @@
  * Truncation (stop_reason=length) never executes the truncated tool call.
  * No private CoT stored — only plan, decision summary, tool calls, evidence.
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeProgressAtomic } from '../session/progress-store.js';
 import type { DurableSession as _DurableSession } from '../session/durable-session.js';
 import type { RunPlan as _RunPlan } from '../contracts/index.js';
 import type { StrategyContext } from './reasoning-strategy.js';
@@ -36,6 +36,7 @@ export interface LoopConfig {
   run_id: string;
   goal: string;
   run_plan?: Readonly<_RunPlan> | undefined;
+  clock?: (() => string) | undefined;
 }
 
 export interface ModelTurn {
@@ -66,9 +67,19 @@ export interface LoopResult {
 export interface LoopDeps {
   session: _DurableSession;
   modelCall: (messages: unknown[], attempt: number) => Promise<ModelTurn>;
-  toolExecute?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+  toolExecute?: (
+    name: string,
+    args: Record<string, unknown>,
+    context: ToolCallExecutionContext,
+  ) => Promise<unknown>;
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
   signal?: AbortSignal;
+}
+
+export interface ToolCallExecutionContext {
+  readonly tool_call_id: string;
+  readonly step_id: string;
+  readonly attempt_index: number;
 }
 
 export class LoopError extends Error {
@@ -134,7 +145,9 @@ export class LoopEngine {
       termination_reason: this._termination_reason ?? 'completed',
       turns: this.turns,
       decision_summaries: this._decision_summaries,
-      progress_path: this.config.data_dir ? join(this.config.data_dir, 'progress.json') : undefined,
+      progress_path: this.config.data_dir
+        ? join(this.config.data_dir, 'progress.json')
+        : undefined,
       context_reset_emitted: this._context_reset_emitted,
     };
   }
@@ -183,7 +196,6 @@ private createContext(): StrategyContext {
 
   private writeProgress(): void {
     if (!this.config.data_dir) return;
-    mkdirSync(this.config.data_dir, { recursive: true });
     const progress = {
       run_id: this.config.run_id,
       current_step: this._iterations,
@@ -192,8 +204,8 @@ private createContext(): StrategyContext {
       open_tasks: this._terminated ? [] : [this.config.goal],
       last_error: this._termination_reason === 'malformed_response' ? 'malformed' : null,
       checkpoint_refs: this.turns.map(t => t.timestamp),
-      last_updated: new Date().toISOString(),
+      last_updated: this.config.clock?.() ?? new Date().toISOString(),
     };
-    writeFileSync(join(this.config.data_dir, 'progress.json'), JSON.stringify(progress, null, 2));
+    writeProgressAtomic(this.config.data_dir, progress);
   }
 }

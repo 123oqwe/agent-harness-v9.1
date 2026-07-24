@@ -17,6 +17,7 @@ import type { ToolSpec } from '../../contracts/index.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
+import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
 
 function toolSpec(name: string): ToolSpec {
   const spec = createPhase1ToolDefinitions().find((entry) => entry.name === name);
@@ -91,6 +92,84 @@ describe('Main chain integration: no bypasses', () => {
       // SQLite database should exist
       expect(existsSync(join(dataDir, 'session.db'))).toBe(true);
       expect(r.session.eventCount()).toBeGreaterThan(0);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('binds an explicit run ID across RunPlan, session and evidence', async () => {
+    const h = makeHarness(tmp, [{ content: 'done' } as ParsedResponse]);
+    const result = await h.run(task('rewrite this paragraph'), 'run-explicit');
+    expect(result.run_plan?.run_id).toBe('run-explicit');
+    expect(result.session.session_id).toBe('run-explicit');
+    expect(result.evidence.run_id).toBe('run-explicit');
+  });
+
+  it('restores a terminal run without a synthetic resume event or re-execution', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'terminal-resume-'));
+    try {
+      const h = makeHarness(
+        tmp,
+        [{ content: 'done' } as ParsedResponse],
+        dataDir,
+      );
+      const first = await h.run(task('rewrite this paragraph'), 'run-resume');
+      const originalEvents = first.session.export_().events;
+      const second = await h.run(task('rewrite this paragraph'), 'run-resume');
+      expect(second.session.export_().events).toEqual(originalEvents);
+      expect(
+        second.session
+          .getEvents()
+          .some((event) =>
+            JSON.stringify(event.data).includes('resuming run'),
+          ),
+      ).toBe(false);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('assigns distinct durable operation identities to distinct tool calls', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'operation-ids-'));
+    try {
+      writeFileSync(join(tmp, 'a.txt'), 'a');
+      writeFileSync(join(tmp, 'b.txt'), 'b');
+      const h = makeHarness(
+        tmp,
+        [
+          {
+            content: '',
+            tool_calls: [
+              {
+                id: 'call-a',
+                name: 'read_file',
+                arguments: { path: '/workspace/a.txt' },
+              },
+              {
+                id: 'call-b',
+                name: 'read_file',
+                arguments: { path: '/workspace/b.txt' },
+              },
+            ],
+          } as ParsedResponse,
+          { content: 'done' } as ParsedResponse,
+        ],
+        dataDir,
+      );
+      await h.run(task('read the files'), 'run-operations');
+      const store = new SqliteSessionStore(join(dataDir, 'session.db'));
+      try {
+        const operations = store.listOperations('run-operations');
+        expect(operations).toHaveLength(2);
+        expect(new Set(operations.map((entry) => entry.operation_id)).size).toBe(
+          2,
+        );
+        expect(new Set(operations.map((entry) => entry.idempotency_key)).size).toBe(
+          2,
+        );
+      } finally {
+        store.close();
+      }
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
     }

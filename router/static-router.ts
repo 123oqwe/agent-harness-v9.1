@@ -120,7 +120,7 @@ function canonicalHash(obj: unknown): string {
 export class StaticRouter {
   constructor(private readonly deps: RouterDeps) {}
 
-  route(task: TaskContract): RoutingResult {
+  route(task: TaskContract, runIdOverride?: string): RoutingResult {
     // 1. Intent profiling is deterministic and does not invoke a model.
     const intent = profileIntent(task);
 
@@ -187,6 +187,7 @@ export class StaticRouter {
       requiredTools,
       fullSkill ? { name: fullSkill.name, version: fullSkill.version } : undefined,
       provider,
+      runIdOverride,
     );
 
     // 8. Policy post-route veto.
@@ -256,10 +257,9 @@ export class StaticRouter {
       registry_snapshot_hash: this.deps.gateway.registrySnapshotHash,
       request: {
         messages: [{ role: 'user', content: task.goal }],
-        tools: requiredTools.map((name) => {
-          const spec = this.deps.toolRegistry.loadFull(name, this.deps.toolSnapshot);
-          return { ...spec };
-        }),
+        tools: requiredTools.map((name) =>
+          this.deps.toolRegistry.loadProviderTool(name, this.deps.toolSnapshot),
+        ),
       },
       estimated_input_tokens: Math.max(1, Math.ceil(task.goal.length / 4)),
       required_capabilities: capabilities,
@@ -288,8 +288,16 @@ export class StaticRouter {
     requiredTools: string[],
     skill: { name: string; version: string } | undefined,
     provider: ResolvedProviderDescription,
+    runIdOverride?: string,
   ): RunPlan {
-    const run_id = deterministicRunId(task, this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id, this.deps.gateway.registrySnapshotHash);
+    const run_id =
+      runIdOverride ??
+      deterministicRunId(
+        task,
+        this.deps.toolSnapshot.snapshot_id,
+        this.deps.skillSnapshot.snapshot_id,
+        this.deps.gateway.registrySnapshotHash,
+      );
 
     // Build workflow_graph with proper Contract field names
     const steps = intent.multi_step ? ['plan', 'execute', 'execute', 'execute', 'verify'] : [strategy];

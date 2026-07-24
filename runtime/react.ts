@@ -31,7 +31,11 @@ export async function runReact(ctx: StrategyContext, messages: unknown[]): Promi
         if (count >= 3) { ctx.terminate('tool_oscillation'); return; }
         if (!ctx.deps.toolExecute) { ctx.terminate('malformed_response'); return; }
         try {
-          const result = await ctx.deps.toolExecute(tc.name, tc.arguments);
+          const result = await ctx.deps.toolExecute(tc.name, tc.arguments, {
+            tool_call_id: tc.id,
+            step_id: `react-${ctx.iterations}`,
+            attempt_index: count,
+          });
           const lastTurn = ctx.turns[ctx.turns.length - 1]!;
           if (!lastTurn.tool_executed) lastTurn.tool_executed = { name: tc.name, arguments: tc.arguments, result };
           messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });

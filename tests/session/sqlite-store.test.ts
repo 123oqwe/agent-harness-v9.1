@@ -19,9 +19,23 @@ describe('SQLite Session Store', () => {
   });
 
   it('creates and retrieves a run', () => {
-    store.createRun('run-1', 'fix the bug', 'react');
-    // run record created without error
+    expect(store.createRun('run-1', 'fix the bug', 'react')).toBe(true);
+    expect(store.getRun('run-1')).toMatchObject({
+      run_id: 'run-1',
+      goal: 'fix the bug',
+      strategy: 'react',
+      status: 'running',
+    });
     expect(existsSync(join(dir, 'session.db'))).toBe(true);
+  });
+
+  it('never replaces an existing run identity', () => {
+    expect(store.createRun('run-stable', 'original goal', 'react')).toBe(true);
+    expect(store.createRun('run-stable', 'original goal', 'react')).toBe(false);
+    expect(() =>
+      store.createRun('run-stable', 'different goal', 'direct'),
+    ).toThrow('run identity conflict');
+    expect(store.getRun('run-stable')?.goal).toBe('original goal');
   });
 
   it('persists events immediately and loads them back', () => {
@@ -40,6 +54,26 @@ describe('SQLite Session Store', () => {
     store.appendEvent('run-3', ev);
     store.appendEvent('run-3', ev); // same seq, should be ignored
     expect(store.loadEvents('run-3')).toHaveLength(1);
+  });
+
+  it('rejects a conflicting event at an existing sequence', () => {
+    store.createRun('run-conflict', 'test');
+    const event = {
+      seq: 1,
+      type: 'user' as const,
+      timestamp: new Date().toISOString(),
+      data: { value: 1 },
+      hash: 'hash-1',
+      prev_hash: '',
+    };
+    store.appendEvent('run-conflict', event);
+    expect(() =>
+      store.appendEvent('run-conflict', {
+        ...event,
+        data: { value: 2 },
+        hash: 'hash-2',
+      }),
+    ).toThrow('event conflict');
   });
 
   it('records operations with idempotency key', () => {
@@ -77,13 +111,74 @@ describe('SQLite Session Store', () => {
       tool_name: 'execute_command', idempotency_key: 'idem-4', effect_state: 'PRE_DISPATCH',
       receipt_json: null,
     });
-    // Update to EFFECT_CONFIRMED
+    store.recordOperation({
+      operation_id: 'op-4', run_id: 'run-6', step_id: 'step-1', attempt_id: 'att-1',
+      tool_name: 'execute_command', idempotency_key: 'idem-4', effect_state: 'IN_FLIGHT',
+      receipt_json: null,
+    });
     store.recordOperation({
       operation_id: 'op-4', run_id: 'run-6', step_id: 'step-1', attempt_id: 'att-1',
       tool_name: 'execute_command', idempotency_key: 'idem-4', effect_state: 'EFFECT_CONFIRMED',
       receipt_json: '{"success":true}',
     });
     expect(store.isEffectConfirmed('idem-4')).toBe(true);
+  });
+
+  it('rejects impossible effect-state transitions', () => {
+    store.createRun('run-transition', 'test');
+    store.recordOperation({
+      operation_id: 'op-transition',
+      run_id: 'run-transition',
+      step_id: 'step',
+      attempt_id: 'attempt',
+      tool_name: 'write_file',
+      idempotency_key: 'idem-transition',
+      effect_state: 'PRE_DISPATCH',
+      receipt_json: null,
+    });
+    expect(() =>
+      store.recordOperation({
+        operation_id: 'op-transition',
+        run_id: 'run-transition',
+        step_id: 'step',
+        attempt_id: 'attempt',
+        tool_name: 'write_file',
+        idempotency_key: 'idem-transition',
+        effect_state: 'EFFECT_CONFIRMED',
+        receipt_json: '{}',
+      }),
+    ).toThrow('invalid effect transition');
+  });
+
+  it('allows a definitely-failed effect to start a new attempt', () => {
+    store.createRun('run-retry', 'test');
+    const base = {
+      operation_id: 'op-retry',
+      run_id: 'run-retry',
+      step_id: 'step',
+      tool_name: 'write_file',
+      idempotency_key: 'idem-retry',
+      receipt_json: null,
+    };
+    store.recordOperation({
+      ...base,
+      attempt_id: 'attempt-1',
+      effect_state: 'PRE_DISPATCH',
+    });
+    store.recordOperation({
+      ...base,
+      attempt_id: 'attempt-1',
+      effect_state: 'DEFINITELY_FAILED_NO_EFFECT',
+    });
+    store.recordOperation({
+      ...base,
+      attempt_id: 'attempt-2',
+      effect_state: 'PRE_DISPATCH',
+    });
+    expect(store.getOperation('op-retry')).toMatchObject({
+      attempt_id: 'attempt-2',
+      effect_state: 'PRE_DISPATCH',
+    });
   });
 
   it('isEffectConfirmed returns false for unknown key', () => {
