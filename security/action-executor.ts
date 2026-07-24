@@ -75,12 +75,12 @@ export class DeclaredPostconditionVerifier implements PostconditionVerifierPort 
 
 export class ActionExecutor extends ToolExecutor {
   readonly #auditSink: AuditSink;
-  readonly #operationId: string | undefined;
+  readonly #operationId: string;
 
   constructor(deps: ToolExecutorDeps, injected: ActionExecutorInjectedDeps) {
     super(deps, injected);
     this.#auditSink = injected.auditSink;
-    this.#operationId = injected.execCtx?.operation_id;
+    this.#operationId = injected.execCtx!.operation_id;
   }
 
   override async execute<T>(
@@ -106,9 +106,7 @@ export class ActionExecutor extends ToolExecutor {
         risk_tier: outcome.receipt.derived_risk_tier ?? 0,
         manifest_hash_match: true,
         reason: 'postconditions_verified',
-        ...(this.#operationId === undefined
-          ? {}
-          : { operation_id: this.#operationId }),
+        operation_id: this.#operationId,
         duration_ms: Math.max(1, Date.now() - started),
       });
       return outcome;
@@ -119,9 +117,7 @@ export class ActionExecutor extends ToolExecutor {
         risk_tier: 0,
         manifest_hash_match: false,
         reason: error instanceof Error ? error.message : String(error),
-        ...(this.#operationId === undefined
-          ? {}
-          : { operation_id: this.#operationId }),
+        operation_id: this.#operationId,
         duration_ms: Math.max(1, Date.now() - started),
       });
       throw error;

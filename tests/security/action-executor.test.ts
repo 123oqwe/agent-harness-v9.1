@@ -308,3 +308,115 @@ describe('ActionExecutor production authority', () => {
     expect(effect).not.toHaveBeenCalled();
   });
 });
+
+describe('DeclaredPostconditionVerifier fail-closed contracts', () => {
+  const verifier = new DeclaredPostconditionVerifier();
+  const base = createPhase1ToolDefinitions().find(
+    (entry) => entry.name === 'write_file',
+  )!;
+
+  function withPostconditions(postconditions: unknown[]): ToolSpec {
+    return {
+      ...base,
+      postconditions,
+    } as ToolSpec;
+  }
+
+  it('rejects undefined results before inspecting declarations', async () => {
+    await expect(
+      verifier.verify({ tool: withPostconditions([]), result: undefined }),
+    ).resolves.toEqual({
+      valid: false,
+      reason: 'tool returned undefined',
+    });
+  });
+
+  it('accepts a declared required field only when an object owns that field', async () => {
+    const tool = withPostconditions([
+      { type: 'required_field', field: 'bytes_written' },
+    ]);
+    await expect(
+      verifier.verify({ tool, result: { bytes_written: 0 } }),
+    ).resolves.toEqual({ valid: true });
+    for (const result of [{}, null, 'not-an-object']) {
+      await expect(verifier.verify({ tool, result })).resolves.toEqual({
+        valid: false,
+        reason: 'required postcondition field missing: bytes_written',
+      });
+    }
+  });
+
+  it('rejects malformed required fields and unsupported declarations', async () => {
+    await expect(
+      verifier.verify({
+        tool: withPostconditions([
+          { type: 'required_field', field: 42 },
+        ]),
+        result: { 42: true },
+      }),
+    ).resolves.toEqual({
+      valid: false,
+      reason: 'required postcondition field missing: 42',
+    });
+    await expect(
+      verifier.verify({
+        tool: withPostconditions([{ type: 'self_reported_success' }]),
+        result: { success: true },
+      }),
+    ).resolves.toEqual({
+      valid: false,
+      reason: 'unsupported postcondition: self_reported_success',
+    });
+  });
+});
+
+describe('ActionExecutor immutable audit envelope', () => {
+  it('records exact allow fields with the required operation identity', async () => {
+    const clock = vi.spyOn(Date, 'now');
+    clock.mockReturnValueOnce(100).mockReturnValue(107);
+    try {
+      const { executor, auditSink } = build();
+      const outcome = await executor.execute(
+        'write_file',
+        { path: '/workspace/a', content: 'x' },
+        async () => ({ bytes_written: 1 }),
+      );
+      expect(auditSink.all).toHaveLength(1);
+      expect(auditSink.all[0]).toMatchObject({
+        tool_name: 'write_file',
+        token_id: outcome.receipt.token_id,
+        verdict: 'allow',
+        risk_tier: outcome.receipt.derived_risk_tier,
+        manifest_hash_match: true,
+        reason: 'postconditions_verified',
+        operation_id: 'operation',
+        duration_ms: 7,
+      });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('normalizes non-Error failures into an exact deny audit', async () => {
+    const { executor, auditSink } = build();
+    await expect(
+      executor.execute(
+        'write_file',
+        { path: '/workspace/a', content: 'x' },
+        async () => {
+          throw 'opaque failure';
+        },
+      ),
+    ).rejects.toBe('opaque failure');
+    expect(auditSink.getDenied()).toHaveLength(1);
+    expect(auditSink.getDenied()[0]).toMatchObject({
+      tool_name: 'write_file',
+      verdict: 'deny',
+      risk_tier: 0,
+      manifest_hash_match: false,
+      reason: 'opaque failure',
+      operation_id: 'operation',
+    });
+    expect(auditSink.getDenied()[0]!.duration_ms).toBeGreaterThanOrEqual(1);
+  });
+});
