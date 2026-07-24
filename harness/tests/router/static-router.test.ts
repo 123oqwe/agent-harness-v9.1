@@ -30,11 +30,11 @@ function toolSpec(name: string): ToolSpec {
 
 function setupRouter() {
   const tr = new ToolRegistry();
-  ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
+  ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const tsnap = tr.freezeSnapshot();
   const ssnap = sr.freezeSnapshot();
-  const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file','write_file','edit_file','execute_command_sandboxed','list_directory','search_files','parse_document'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
+  const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file','write_file','edit_file','execute_command','list_directory','search_files','parse_document'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
   return new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tsnap, skillSnapshot: ssnap, policyEngine: pe, policySnapshotRef: 'policy-v1' });
 }
 
@@ -121,7 +121,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     it('abstains when a required tool is not in the frozen snapshot', () => {
       const tr = new ToolRegistry(); // empty registry
       const sr = new SkillRegistry();
-      const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
+      const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
       const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p' });
       const result = r.route(task('fix the bug then run the tests'));
       expect(result.outcome).toBe('abstain');
@@ -662,10 +662,10 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(tg.some(g => g.tool === 'edit_file')).toBe(true);
     });
 
-    it('requiredToolsFor returns execute_command_sandboxed for tests', () => {
+    it('requiredToolsFor returns execute_command for tests', () => {
       const r = router.route(task('fix the bug then run the tests'));
       const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
-      expect(tg.some(g => g.tool === 'execute_command_sandboxed')).toBe(true);
+      expect(tg.some(g => g.tool === 'execute_command')).toBe(true);
     });
 
     it('requiredToolsFor returns read_file for read-only tasks', () => {

@@ -30,11 +30,15 @@ export interface EphemeralCredentialLease {
   readonly lease_id: string;
   readonly audience: string;
   readonly expires_at: string;
+  readonly secret?: string;
 }
 
 export interface ProviderDispatchContext {
   readonly operation_id: string;
+  readonly attempt_id?: string;
   readonly credential?: EphemeralCredentialLease;
+  readonly signal?: AbortSignal;
+  readonly deadline_at?: string;
 }
 
 /** The operational method set derives from the verified ScriptedTestProvider. */
@@ -190,13 +194,15 @@ export class ProviderResolutionError extends Error {
 }
 
 export type ProviderDispatchErrorCode =
+  | 'cancelled'
   | 'credential_exchange_failed'
   | 'egress_denied'
   | 'egress_policy_failure'
   | 'metering_failed'
   | 'provider_failure'
   | 'provider_no_longer_compatible'
-  | 'provider_unhealthy';
+  | 'provider_unhealthy'
+  | 'timeout';
 
 export class ProviderDispatchError extends Error {
   readonly code: ProviderDispatchErrorCode;
@@ -776,6 +782,11 @@ export class ModelGateway {
     Object.freeze(this);
   }
 
+  /** The frozen registry snapshot hash owned by this gateway. */
+  get registrySnapshotHash(): string {
+    return this.registry.snapshot.hash;
+  }
+
   resolve(request: ProviderSelectionRequest): ResolvedProvider {
     return this.resolveExcluding(request, new Set());
   }
@@ -800,13 +811,22 @@ export class ModelGateway {
   async dispatch(
     resolved: ResolvedProvider,
     request: ProviderSelectionRequest,
-    context: { readonly operation_id: string },
+    context: {
+      readonly operation_id: string;
+      readonly attempt_id?: string;
+      readonly signal?: AbortSignal;
+      readonly deadline_at?: string;
+    },
   ): Promise<GatewayDispatchResult> {
     if (
       resolved.registry_snapshot_hash !== this.registry.snapshot.hash ||
       resolved.selection_request_hash !== selectionHash(request)
     ) {
       throw new ProviderDispatchError('provider_no_longer_compatible');
+    }
+    if (context.signal?.aborted) throw new ProviderDispatchError('cancelled');
+    if (context.deadline_at !== undefined && Date.now() > Date.parse(context.deadline_at)) {
+      throw new ProviderDispatchError('timeout');
     }
     const operationId = nonEmptyString(context.operation_id, 'dispatch.operation_id');
     const binding = bindingFor(this.registry, resolved.provider_id);
@@ -850,25 +870,43 @@ export class ModelGateway {
 
     let response: ParsedResponse;
     let usage: Usage;
-    try {
-      const raw = await binding.adapter.resolve(request.request, {
-        operation_id: operationId,
-        ...(credential === undefined ? {} : { credential }),
-      });
-      response = binding.adapter.parseResponse(raw);
-      usage = binding.adapter.meterUsage(response);
-    } catch (error) {
-      let mapped: ProviderError;
-      try {
-        mapped = binding.adapter.mapError(error);
-      } catch {
-        mapped = {
-          kind: 'unknown',
-          retryable: false,
-          detail: 'Provider error normalization failed',
-        };
+    const maxAttempts = 3;
+    for (let attempt = 0; ; attempt++) {
+      if (context.signal?.aborted) throw new ProviderDispatchError('cancelled');
+      if (context.deadline_at !== undefined && Date.now() > Date.parse(context.deadline_at)) {
+        throw new ProviderDispatchError('timeout');
       }
-      throw new ProviderDispatchError('provider_failure', mapped);
+      try {
+        const raw = await binding.adapter.resolve(request.request, {
+          operation_id: operationId,
+          ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
+          ...(credential === undefined ? {} : { credential }),
+          ...(context.signal === undefined ? {} : { signal: context.signal }),
+          ...(context.deadline_at === undefined ? {} : { deadline_at: context.deadline_at }),
+        });
+        response = binding.adapter.parseResponse(raw);
+        usage = binding.adapter.meterUsage(response);
+        break;
+      } catch (error) {
+        let mapped: ProviderError;
+        try {
+          mapped = binding.adapter.mapError(error);
+        } catch {
+          mapped = {
+            kind: 'unknown',
+            retryable: false,
+            detail: 'Provider error normalization failed',
+          };
+        }
+        if (
+          !mapped.retryable ||
+          mapped.kind === 'auth' ||
+          mapped.kind === 'invalid_request' ||
+          attempt >= maxAttempts - 1
+        ) {
+          throw new ProviderDispatchError('provider_failure', mapped);
+        }
+      }
     }
 
     try {

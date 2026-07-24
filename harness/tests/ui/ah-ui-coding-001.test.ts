@@ -37,13 +37,13 @@ describe('AH-UI-CODING-001 coding workspace (via Harness)', () => {
   it('runFix delegates to Harness', async () => {
     writeFileSync(join(tmp, 'f.ts'), 'BUG');
     const tr = new ToolRegistry();
-    ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'].forEach(n => tr.register(toolSpec(n)));
+    ['read_file', 'write_file', 'edit_file', 'execute_command'].forEach(n => tr.register(toolSpec(n)));
     const sr = new SkillRegistry(); sr.loadBaseSkills();
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
-    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     const gw = createScriptedGateway([{ content: 'done' }]);
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
     const c = new CodingWorkspaceController(h);
     const r = await c.runFix({ repo_path: '/workspace', bug_file: '/workspace/f.ts', test_command: ['/bin/echo', 'ok'] });
     expect(r.state).toBe('success');

@@ -10,7 +10,7 @@
   "required_tools": [
     "read_file",
     "write_file",
-    "execute_command_sandboxed"
+    "execute_command"
   ],
   "allowed_effect_classes": [
     "read",

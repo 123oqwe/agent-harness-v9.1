@@ -39,7 +39,7 @@ function makeHarness(tmp: string, allowedTools: string[] = ['read_file']): Harne
   const pe = new PolicyEngine(policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 function task(goal: string): TaskContract {

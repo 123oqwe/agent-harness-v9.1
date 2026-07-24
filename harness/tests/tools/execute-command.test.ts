@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeCommand } from '../../tools/execute-command.js';
 
-describe('AH-TOOL-EXEC-001 execute_command_sandboxed', () => {
+describe('AH-TOOL-EXEC-001 execute_command', () => {
   let tmp: string;
   beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'xec-')); });
   afterEach(() => rmSync(tmp, { recursive: true, force: true }));

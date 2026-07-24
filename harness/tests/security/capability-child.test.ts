@@ -266,7 +266,7 @@ describe('Authorization Service child capabilities', () => {
     });
 
     for (const childGrants of [
-      grants({ tools: ['execute_command_sandboxed'] }),
+      grants({ tools: ['execute_command'] }),
       grants({ resources: ['workspace://other/'] }),
       grants({ budget: { token_limit: 1001, usd_micros: 1000 } }),
     ]) {

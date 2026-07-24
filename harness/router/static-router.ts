@@ -149,7 +149,7 @@ export class StaticRouter {
     if (strategy === 'direct') return [];
     const tools: string[] = [];
     if (intent.requires_writes) tools.push('write_file', 'edit_file');
-    if (intent.requires_tests) tools.push('execute_command_sandboxed');
+    if (intent.requires_tests) tools.push('execute_command');
     if (intent.requires_tools && !intent.requires_writes) tools.push('read_file');
     return [...new Set(tools)];
   }
