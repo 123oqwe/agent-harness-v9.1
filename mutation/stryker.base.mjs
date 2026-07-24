@@ -6,7 +6,10 @@ export const strykerBase = {
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html', 'json'],
   timeoutMS: 30000,
-  concurrency: 4,
+  // @stryker-mutator/vitest-runner 9.6.1 still supplies Vitest's removed
+  // poolOptions shape. One isolated runner avoids native-addon/Vitest worker
+  // crashes while retaining complete mutant and behavioral-test coverage.
+  concurrency: 1,
   vitest: {
     configFile: 'vitest.mutation.config.ts',
   },

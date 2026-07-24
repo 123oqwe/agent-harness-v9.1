@@ -6,7 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 const {
@@ -25,6 +25,10 @@ const { mutationModules: rawMutationModules, phase1Minimum: rawPhase1Minimum } =
     // @ts-expect-error The mutation manifest is intentionally plain ESM for Node.
     '../../mutation/modules.mjs'
   );
+const { strykerBase } = await import(
+  // @ts-expect-error The Stryker configuration is intentionally plain ESM.
+  '../../mutation/stryker.base.mjs'
+);
 
 const harnessRoot = resolve(import.meta.dirname, '..', '..');
 const temporaryRoots: string[] = [];
@@ -117,6 +121,10 @@ describe('Phase 1 mutation manifest', () => {
     );
   });
 
+  it('uses one isolated Stryker runner to avoid Vitest/native worker crashes', () => {
+    expect(strykerBase.concurrency).toBe(1);
+  });
+
   it('owns every executable Phase 1 TypeScript source exactly once', () => {
     const assigned = new Map<string, string[]>();
     for (const [moduleName, module] of Object.entries(mutationModules)) {
@@ -178,7 +186,7 @@ describe('atomic mutation run ownership', () => {
     const lockPath = join(root, '.phase1.lock');
     const first = {
       run_id: 'first',
-      pid: 11,
+      pid: process.pid,
       commit_sha: 'a'.repeat(40),
       started_at: '2026-07-25T00:00:00.000Z',
     };
@@ -190,6 +198,30 @@ describe('atomic mutation run ownership', () => {
     expect(() => releaseRunLock(lockPath, 'second')).toThrow(/not own/u);
     releaseRunLock(lockPath, 'first');
     acquireRunLock(lockPath, { ...first, run_id: 'third' });
+  });
+
+  it('recovers a lock owned by a dead process on this host', () => {
+    const root = temporaryRoot();
+    const lockPath = join(root, '.phase1.lock');
+    mkdirSync(lockPath);
+    writeFileSync(
+      join(lockPath, 'owner.json'),
+      JSON.stringify({
+        run_id: 'dead',
+        pid: 2_147_483_647,
+        hostname: hostname(),
+      }),
+    );
+    const next = {
+      run_id: 'next',
+      pid: process.pid,
+      commit_sha: 'a'.repeat(40),
+      started_at: '2026-07-25T00:00:00.000Z',
+    };
+    acquireRunLock(lockPath, next);
+    expect(
+      JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).run_id,
+    ).toBe('next');
   });
 });
 

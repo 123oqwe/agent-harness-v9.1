@@ -122,19 +122,46 @@ function readLockMetadata(lockPath) {
   }
 }
 
+function processIsAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== 'ESRCH';
+  }
+}
+
 export function acquireRunLock(lockPath, owner) {
   mkdirSync(dirname(lockPath), { recursive: true });
-  try {
-    mkdirSync(lockPath, { mode: 0o700 });
-  } catch (error) {
-    if (error?.code !== 'EEXIST') throw error;
-    const existing = readLockMetadata(lockPath);
-    const detail = existing
-      ? `run_id=${existing.run_id} pid=${existing.pid}`
-      : 'owner metadata unavailable';
-    throw new Error(`mutation runner already running (${detail})`, {
-      cause: error,
-    });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      mkdirSync(lockPath, { mode: 0o700 });
+      break;
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const existing = readLockMetadata(lockPath);
+      const stale =
+        existing?.hostname === hostname() && !processIsAlive(existing.pid);
+      if (stale && attempt === 0) {
+        const stalePath = `${lockPath}.stale.${existing.run_id}.${randomUUID()}`;
+        try {
+          renameSync(lockPath, stalePath);
+          rmSync(stalePath, { force: true, recursive: true });
+          continue;
+        } catch (recoveryError) {
+          throw new Error('failed to recover stale mutation lock', {
+            cause: recoveryError,
+          });
+        }
+      }
+      const detail = existing
+        ? `run_id=${existing.run_id} pid=${existing.pid}`
+        : 'owner metadata unavailable';
+      throw new Error(`mutation runner already running (${detail})`, {
+        cause: error,
+      });
+    }
   }
   try {
     atomicWriteJson(join(lockPath, 'owner.json'), {
