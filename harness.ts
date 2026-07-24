@@ -253,7 +253,12 @@ export class Harness {
             estimated_input_tokens: Math.min(typedMessages.reduce((s, m) => s + m.content.length, 0), 100000),
             required_capabilities: ['text_reasoning'],
             requires_structured_output: false,
-            data_policy: { local_only: true, allowed_regions: ['local'], max_retention_days: 30, training_allowed: false },
+            data_policy: {
+              local_only: false,
+              allowed_regions: ['local', 'cn', 'us'],
+              max_retention_days: 30,
+              training_allowed: false,
+            },
             policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
             run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
           } as unknown as ProviderSelectionRequest;
