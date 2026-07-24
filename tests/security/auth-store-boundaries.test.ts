@@ -353,6 +353,24 @@ describe('Auth cookie parser boundaries', () => {
     ).resolves.toEqual({ status: 200, headers: {}, body: { user_id: 'user-1' } });
   });
 
+  it('rejects malformed login bodies and unknown authentication methods exactly', async () => {
+    const { api } = await fixture();
+    for (const body of [null, [], 'password', 1, { method: 'unknown' }]) {
+      await expect(
+        api.handle({
+          method: 'POST',
+          path: '/auth/login',
+          client_id: 'client',
+          body,
+        }),
+      ).resolves.toEqual({
+        status: 400,
+        headers: {},
+        body: { error: 'invalid_request' },
+      });
+    }
+  });
+
   it('rejects duplicate, truncated, extended, and invalid-alphabet session cookies', async () => {
     const { api, token } = await fixture();
     for (const cookie of [

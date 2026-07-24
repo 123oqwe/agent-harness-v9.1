@@ -1,4 +1,5 @@
 import type {
+  VerifiedAuthenticationResponse,
   VerifiedRegistrationResponse,
   WebAuthnCredential,
 } from '@simplewebauthn/server';
@@ -48,6 +49,24 @@ function registrationResult(
     },
     ...overrides,
   } as VerifiedRegistrationResponse;
+}
+
+function authenticationResult(
+  overrides: Partial<VerifiedAuthenticationResponse> = {},
+): VerifiedAuthenticationResponse {
+  return {
+    verified: true,
+    authenticationInfo: {
+      credentialID: 'credential-1',
+      newCounter: 8,
+      userVerified: true,
+      credentialDeviceType: 'singleDevice',
+      credentialBackedUp: false,
+      origin: ORIGIN,
+      rpID: 'localhost',
+    },
+    ...overrides,
+  } as VerifiedAuthenticationResponse;
 }
 
 function port(overrides: Partial<WebAuthnPort> = {}): WebAuthnPort {
@@ -102,6 +121,18 @@ function registrationChallenge(store: InMemoryAuthStore, token: string, userId: 
       kind: 'registration',
       ...(userId === undefined ? {} : { user_id: userId }),
       challenge: 'registration-challenge',
+      expires_at: '2026-01-01T00:05:00.000Z',
+    },
+    NOW,
+  );
+}
+
+function authenticationChallenge(store: InMemoryAuthStore, token: string): void {
+  store.createChallenge(
+    {
+      key_hash: hash(token),
+      kind: 'authentication',
+      challenge: 'authentication-challenge',
       expires_at: '2026-01-01T00:05:00.000Z',
     },
     NOW,
@@ -331,5 +362,124 @@ describe('AuthService WebAuthn ceremony boundaries', () => {
         reason_code: 'credential_registered',
       },
     ]);
+  });
+
+  it('authenticates an exact maximum-length credential through the complete verifier contract', async () => {
+    const store = new InMemoryAuthStore();
+    const credentialId = 'a'.repeat(1024);
+    await seedUser(store, [credential({ id: credentialId, counter: 7 })]);
+    const token = 'successful-authentication';
+    authenticationChallenge(store, token);
+    const verifyAuthenticationResponse = vi.fn(async () =>
+      authenticationResult({
+        authenticationInfo: {
+          ...authenticationResult().authenticationInfo,
+          credentialID: credentialId,
+        } as never,
+      }),
+    );
+    const auth = service(store, port({ verifyAuthenticationResponse }));
+    await expect(auth.verifyWebAuthnCeremony(token, { id: credentialId })).resolves.toMatchObject({
+      user_id: 'user-1',
+    });
+    expect(verifyAuthenticationResponse).toHaveBeenCalledWith({
+      response: { id: credentialId },
+      expectedChallenge: 'authentication-challenge',
+      expectedOrigin: ORIGIN,
+      expectedRPID: 'localhost',
+      credential: expect.objectContaining({ id: credentialId, counter: 7 }),
+      expectedType: 'webauthn.get',
+      requireUserVerification: true,
+    });
+    expect(store.findWebAuthnCredential(credentialId)?.credential.counter).toBe(8);
+    expect(auth.auditEvents).toEqual([
+      {
+        timestamp: NOW,
+        action: 'webauthn_verify',
+        outcome: 'allowed',
+        subject_ref: hash('user-1'),
+        reason_code: 'authenticated',
+      },
+    ]);
+  });
+
+  it('rejects malformed and unregistered authentication credential IDs before the adapter', async () => {
+    for (const credentialId of [undefined, 1, '', 'a'.repeat(1025), 'missing-credential']) {
+      const store = new InMemoryAuthStore();
+      await seedUser(store, [credential({ counter: 7 })]);
+      const token = `invalid-id-${String(credentialId).slice(0, 16)}`;
+      authenticationChallenge(store, token);
+      const verifyAuthenticationResponse = vi.fn(async () => authenticationResult());
+      const auth = service(store, port({ verifyAuthenticationResponse }));
+      await expectAuthError(auth.verifyWebAuthnCeremony(token, { id: credentialId }), 'authentication_failed', 401);
+      expect(verifyAuthenticationResponse).not.toHaveBeenCalled();
+      expect(auth.auditEvents).toEqual([
+        {
+          timestamp: NOW,
+          action: 'webauthn_verify',
+          outcome: 'denied',
+          subject_ref: hash('anonymous'),
+          reason_code: 'verification_failed',
+        },
+      ]);
+    }
+  });
+
+  it('rejects every authentication verifier invariant independently', async () => {
+    const invalidResults: Array<VerifiedAuthenticationResponse | Error> = [
+      authenticationResult({ verified: false }),
+      authenticationResult({
+        authenticationInfo: { ...authenticationResult().authenticationInfo, userVerified: false } as never,
+      }),
+      authenticationResult({
+        authenticationInfo: {
+          ...authenticationResult().authenticationInfo,
+          credentialID: 'different-credential',
+        } as never,
+      }),
+      authenticationResult({
+        authenticationInfo: {
+          ...authenticationResult().authenticationInfo,
+          origin: 'https://attacker.test',
+        } as never,
+      }),
+      authenticationResult({
+        authenticationInfo: { ...authenticationResult().authenticationInfo, rpID: 'attacker.test' } as never,
+      }),
+      authenticationResult({
+        authenticationInfo: { ...authenticationResult().authenticationInfo, newCounter: 7 } as never,
+      }),
+      new Error('adapter failure'),
+    ];
+    for (const result of invalidResults) {
+      const store = new InMemoryAuthStore();
+      await seedUser(store, [credential({ counter: 7 })]);
+      const token = `invalid-result-${invalidResults.indexOf(result)}`;
+      authenticationChallenge(store, token);
+      const auth = service(
+        store,
+        port({
+          verifyAuthenticationResponse: vi.fn(async () => {
+            if (result instanceof Error) throw result;
+            return result;
+          }),
+        }),
+      );
+      await expectAuthError(
+        auth.verifyWebAuthnCeremony(token, { id: 'credential-1' }),
+        'authentication_failed',
+        401,
+      );
+      expect(store.findWebAuthnCredential('credential-1')?.credential.counter).toBe(7);
+      expect(auth.auditEvents).toEqual([
+        {
+          timestamp: NOW,
+          action: 'webauthn_verify',
+          outcome: 'denied',
+          subject_ref: hash('anonymous'),
+          reason_code: 'verification_failed',
+        },
+      ]);
+    }
   });
 });
