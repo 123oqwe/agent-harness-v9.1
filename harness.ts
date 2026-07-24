@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
 import { OverlayBackend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
-import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
+import { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ToolExecutor } from './tools/tool-executor.js';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
@@ -271,11 +271,15 @@ export class Harness {
     };
   }
 
- /** Return the overlay as a VirtualFilesystem-compatible object for tool dispatch. */
- private currentOverlayAsVfs(): VirtualFilesystem {
-   // The overlay IS a Backend; wrap it so tool reads/writes go through it
-   return this.config.vfs;  // VFS already routes /workspace to the overlay via mount
- }
+/** Return the overlay as a VirtualFilesystem-compatible object for tool dispatch. */
+private currentOverlayAsVfs(): VirtualFilesystem {
+   // Create a VFS where /workspace routes through the overlay backend
+   // so tool writes are staged in the overlay, not written to the real FS directly.
+   // Reads fall through to the base backend via OverlayBackend.read-through.
+   const overlayVfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
+   overlayVfs.mount(this.currentOverlay!);
+   return overlayVfs;
+}
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
 private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
