@@ -28,7 +28,7 @@ import type { SandboxProfile } from './runtime/sandbox.js';
 import { ToolExecutor } from './tools/tool-executor.js';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import type { AuthorizationService } from './security/authorization-service.js';
-import type { InMemoryCapabilityStateStore } from './security/capability.js';
+import type { CapabilityStateStore } from './security/capability.js';
 import type { PolicyEnforcementPoint } from './security/pep.js';
 import { SkillLoader } from './skills/skill-loader.js';
 import { SqliteSessionStore } from './session/sqlite-session-store.js';
@@ -99,7 +99,7 @@ export function createDefaultExecutionContext(runId: string, clock?: () => strin
 export interface HarnessSecurityDeps {
   authz: AuthorizationService;
   pep: PolicyEnforcementPoint;
-  stateStore: InMemoryCapabilityStateStore;
+  stateStore: CapabilityStateStore;
 }
 
 /** Configuration for the Harness — only typed components, no callbacks. */
