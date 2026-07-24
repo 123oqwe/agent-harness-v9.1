@@ -9,7 +9,7 @@ import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import { VirtualFilesystem, LocalBackend, OverlayBackend } from '../../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
 import type { TaskContract } from '../../contracts/index.js';
-import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 
@@ -33,7 +33,7 @@ function makeHarness(tmp: string, allowedTools: string[] = ['read_file']): Harne
   const pe = new PolicyEngine(policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 function task(goal: string): TaskContract {

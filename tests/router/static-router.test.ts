@@ -129,9 +129,9 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(r.run_plan!.model_bindings[0]!.provider).toBe('scripted');
       expect(r.run_plan!.registry_snapshot_refs).toHaveProperty('provider_registry');
       expect(r.run_plan!.tool_grants.map((grant) => grant.tool)).toEqual([
+        'read_file',
         'edit_file',
         'execute_command',
-        'read_file',
       ]);
       expect(r.run_plan!.skill_bindings).toContainEqual(
         expect.objectContaining({ skill_name: 'bug-fix', version: '1.0.0' }),
@@ -218,9 +218,11 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const r = router.route(task('rewrite this text'));
       expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(1);
     });
-    it('react/plan_execute get max_iterations=3', () => {
+    it('plan_execute budgets one proposal per bound tool plus plan and synthesis', () => {
       const r = router.route(task('fix the bug then run the tests'));
-      expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(3);
+      expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(
+        r.run_plan!.tool_grants.length + 2,
+      );
     });
   });
 
@@ -644,10 +646,11 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(vg.nodes[0]!.verification_type).toBe('human_review');
     });
 
-    it('verification_graph for semantic criterion has verification_type schema_validation', () => {
+    it('verification_graph for semantic criterion requires an independent verifier', () => {
       const r = router.route(task('fix the bug', { success_criteria: [{ criterion: 'good writing', verification_method: 'semantic' }] }));
       const vg = r.run_plan!.verification_graph as { nodes: Record<string, unknown>[] };
-      expect(vg.nodes[0]!.verification_type).toBe('schema_validation');
+      expect(vg.nodes[0]!.verification_type).toBe('independent_verifier');
+      expect(vg.nodes[0]!.acceptance_criteria_refs).toEqual(['0']);
     });
 
     it('verification_graph step_id_ref points to last step', () => {
@@ -656,6 +659,25 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const wf = r.run_plan!.workflow_graph as { nodes: { step_id: string }[] };
       const lastStepId = wf.nodes[wf.nodes.length - 1]!.step_id;
       expect(vg.nodes[0]!.step_id_ref).toBe(lastStepId);
+    });
+
+    it('plan_execute binds each proposed tool to one preceding model proposal node', () => {
+      const r = router.route(task('fix the bug then run the tests'));
+      const wf = r.run_plan!.workflow_graph;
+      const toolNodes = wf.nodes.filter((node) => node.step_type === 'tool_call');
+      expect(toolNodes.map((node) => node.tool_name)).toEqual(
+        r.run_plan!.tool_grants.map((grant) => grant.tool),
+      );
+      for (const toolNode of toolNodes) {
+        const incoming = wf.edges.filter(
+          (edge) => edge.to_step === toolNode.step_id,
+        );
+        expect(incoming).toHaveLength(1);
+        expect(
+          wf.nodes.find((node) => node.step_id === incoming[0]!.from_step)!
+            .step_type,
+        ).toBe('model_call');
+      }
     });
 
     it('model_bindings has exact provider, model_id, modality_role, capability_match_score', () => {
@@ -725,9 +747,9 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const r = router.route(task('fix the bug then run the tests'));
       const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
       expect(tg.map((grant) => grant.tool)).toEqual([
+        'read_file',
         'edit_file',
         'execute_command',
-        'read_file',
       ]);
     });
 

@@ -41,6 +41,7 @@ export * from './runtime/notifications.js';
 // Verification
 export * from './verification/evidence.js';
 export * from './verification/eval-runner.js';
+export * from './verification/verification-engine.js';
 // Ingestion
 export * from './ingestion/parse-document.js';
 // Verticals (explicit re-exports to avoid ModelCallFn name conflicts)

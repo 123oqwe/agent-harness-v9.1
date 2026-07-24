@@ -31,6 +31,34 @@ import {
   scriptedProviderContract,
   type ParsedResponse,
 } from '../../gateway/scripted-provider.js';
+import {
+  CallbackVerificationAdapter,
+  VerificationEngine,
+  type VerificationMethod,
+} from '../../verification/verification-engine.js';
+
+/** Explicit test-only verifier. Product compositions must inject real adapters. */
+export function createTestVerificationEngine(): VerificationEngine {
+  const methods: readonly VerificationMethod[] = [
+    'deterministic',
+    'test',
+    'semantic',
+    'human_review',
+  ];
+  return new VerificationEngine([
+    new CallbackVerificationAdapter(
+      'scripted-test-verifier.v1',
+      methods,
+      async (request) => ({
+        passed: request.loopResult.termination_reason === 'completed',
+        evidence: {
+          fixture: 'scripted-test-verifier',
+          criterion_index: request.criterionIndex,
+        },
+      }),
+    ),
+  ]);
+}
 
 /** Create a shared fixed clock for deterministic testing. */
 export function createSharedClock(): () => string {

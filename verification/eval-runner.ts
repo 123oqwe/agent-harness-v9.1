@@ -10,7 +10,7 @@
  * when Router strategy, Runtime executor, termination reason, replay, or
  * Evidence reasoning_strategy disagree.
  */
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 export type EvalSuiteKind = 'unit' | 'integration' | 'adversarial' | 'vertical' | 'e2e';
@@ -19,7 +19,9 @@ export type Strategy = 'direct' | 'react' | 'plan_execute';
 export interface EvalCase {
   id: string;
   kind: EvalSuiteKind;
-  command: string;            // real command to run
+  argv: readonly string[];    // executable + literal arguments; never a shell string
+  cwd?: string;
+  timeout_ms?: number;
   expected_exit: number;      // expected exit code
   expected_strategy?: Strategy;
   fixture_version?: string | undefined;
@@ -60,7 +62,16 @@ const sha = (s: string | null | undefined): string | null => s ? createHash('sha
 export class EvalRunner {
   /** Execute all eval cases in a manifest. A failing/missing eval cannot be pass. */
   run(manifest: EvalManifest, cwd = process.cwd()): EvalReport {
-    const commit_sha = execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim();
+    EvalRunner.validateManifest(manifest);
+    const revision = spawnSync('git', ['rev-parse', 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      shell: false,
+    });
+    if (revision.status !== 0 || !/^[0-9a-f]{40}\s*$/u.test(revision.stdout)) {
+      throw new EvalRunnerError('cannot resolve an exact git revision');
+    }
+    const commit_sha = revision.stdout.trim();
     const results: EvalResult[] = [];
     let strategies_consistent = true;
 
@@ -89,19 +100,19 @@ export class EvalRunner {
   }
 
   private runCase(c: EvalCase, cwd: string): EvalResult {
-    let exit_code: number;
-    let stdout: string;
-    let stderr: string;
-    try {
-      stdout = execSync(c.command, { cwd, timeout: 120_000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-      stderr = '';
-      exit_code = 0;
-    } catch (e) {
-      const err = e as { status?: number; stdout?: string; stderr?: string };
-      exit_code = err.status ?? 1;
-      stdout = err.stdout ?? '';
-      stderr = err.stderr ?? '';
-    }
+    const [executable, ...args] = c.argv;
+    const execution = spawnSync(executable!, args, {
+      cwd: c.cwd ?? cwd,
+      timeout: c.timeout_ms ?? 120_000,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
+    const exit_code = execution.status ?? 1;
+    const stdout = execution.stdout ?? '';
+    const stderr =
+      execution.stderr ??
+      (execution.error instanceof Error ? execution.error.message : '');
     // Check expected_exit: passed only if actual exit matches expected
     const passed = exit_code === c.expected_exit;
     const reason = passed ? undefined : `expected exit ${c.expected_exit}, got ${exit_code}`;
@@ -114,8 +125,29 @@ export class EvalRunner {
     if (!m || m.manifest_version !== 'eval-manifest.v1') throw new EvalRunnerError('invalid manifest_version');
     if (!m.requirement_id) throw new EvalRunnerError('manifest requires requirement_id');
     if (!Array.isArray(m.suites) || m.suites.length === 0) throw new EvalRunnerError('manifest requires non-empty suites');
+    const ids = new Set<string>();
     for (const c of m.suites) {
-      if (!c.id || !c.command) throw new EvalRunnerError('each eval case requires id and command');
+      if (!c || typeof c.id !== 'string' || c.id.trim() === '') {
+        throw new EvalRunnerError('each eval case requires a non-empty id');
+      }
+      if (ids.has(c.id)) throw new EvalRunnerError(`duplicate eval id: ${c.id}`);
+      ids.add(c.id);
+      if (
+        !Array.isArray(c.argv) ||
+        c.argv.length === 0 ||
+        c.argv.some((argument) => typeof argument !== 'string' || argument === '')
+      ) {
+        throw new EvalRunnerError('each eval case requires non-empty argv');
+      }
+      if (!Number.isSafeInteger(c.expected_exit)) {
+        throw new EvalRunnerError('expected_exit must be an integer');
+      }
+      if (
+        c.timeout_ms !== undefined &&
+        (!Number.isSafeInteger(c.timeout_ms) || c.timeout_ms <= 0)
+      ) {
+        throw new EvalRunnerError('timeout_ms must be a positive integer');
+      }
     }
   }
 }

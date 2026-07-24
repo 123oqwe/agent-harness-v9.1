@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Harness, createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createTestVerificationEngine } from '../helpers/test-security.js';
 import { mkdtempSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,7 +71,7 @@ function makeHarness(tmp: string): Harness {
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 if (!SKIP) getGlmGateway();

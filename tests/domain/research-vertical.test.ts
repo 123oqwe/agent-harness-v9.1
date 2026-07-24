@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 
@@ -39,7 +39,7 @@ function makeHarness(tmp: string): Harness {
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const gw = createScriptedGateway([{ content: 'Research report' }]);
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 describe('AH-RESEARCH-VERTICAL-001 research vertical (thin adapter)', () => {

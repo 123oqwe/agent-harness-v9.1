@@ -1,127 +1,205 @@
-import { describe, it, expect } from 'vitest';
-import { EvalRunner, EvalRunnerError, type EvalManifest } from '../../verification/eval-runner.js';
+import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  EvalRunner,
+  EvalRunnerError,
+  type EvalManifest,
+} from '../../verification/eval-runner.js';
 
-describe('AH-EVAL-RUNNER-001 eval runner', () => {
-  it('executes unit, integration, adversarial and vertical eval suites from one manifest', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [
-        { id: 'u1', kind: 'unit', command: 'echo unit', expected_exit: 0 },
-        { id: 'i1', kind: 'integration', command: 'echo integ', expected_exit: 0 },
-        { id: 'a1', kind: 'adversarial', command: 'echo adv', expected_exit: 0 },
-        { id: 'v1', kind: 'vertical', command: 'echo vert', expected_exit: 0 },
-      ],
-    };
-    const report = new EvalRunner().run(manifest);
-    expect(report.results).toHaveLength(4);
+const node = process.execPath;
+
+function manifest(
+  suites: EvalManifest['suites'],
+): EvalManifest {
+  return {
+    manifest_version: 'eval-manifest.v1',
+    requirement_id: 'AH-EVAL-TEST',
+    suites,
+  };
+}
+
+describe('AH-EVAL-RUNNER-001 argv-only evaluation runner', () => {
+  let scratch: string | undefined;
+  afterEach(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+    scratch = undefined;
+  });
+
+  it('executes every suite kind and binds the exact git revision', () => {
+    const kinds = ['unit', 'integration', 'adversarial', 'vertical', 'e2e'] as const;
+    const report = new EvalRunner().run(
+      manifest(
+        kinds.map((kind) => ({
+          id: kind,
+          kind,
+          argv: [node, '-e', 'process.stdout.write("ok")'],
+          expected_exit: 0,
+          ...(kind === 'e2e' ? { expected_strategy: 'direct' as const } : {}),
+        })),
+      ),
+    );
+    expect(report.results).toHaveLength(5);
+    expect(report.results.every((result) => result.passed)).toBe(true);
     expect(report.all_passed).toBe(true);
+    expect(report.reasoning_strategy_consistent).toBe(true);
+    expect(report.commit_sha).toMatch(/^[0-9a-f]{40}$/u);
   });
 
-  it('uses ScriptedTestProvider and local fixtures only (no external model API)', () => {
-    // the eval commands are local shell commands; no external API is called
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [{ id: 'l1', kind: 'unit', command: 'echo local', expected_exit: 0 }],
-    };
-    const report = new EvalRunner().run(manifest);
-    expect(report.results[0]!.passed).toBe(true);
+  it('checks the declared exit code and hashes both output streams', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'exit-two',
+          kind: 'unit',
+          argv: [
+            node,
+            '-e',
+            'process.stdout.write("out");process.stderr.write("err");process.exit(2)',
+          ],
+          expected_exit: 2,
+          fixture_version: 'fixture-v1',
+        },
+      ]),
+    );
+    expect(report.results[0]).toMatchObject({
+      passed: true,
+      exit_code: 2,
+      fixture_version: 'fixture-v1',
+    });
+    expect(report.results[0]!.stdout_hash).toMatch(/^[0-9a-f]{16}$/u);
+    expect(report.results[0]!.stderr_hash).toMatch(/^[0-9a-f]{16}$/u);
   });
 
-  it('captures command, exit code, stdout/stderr hashes, fixture version and code revision', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [{ id: 'c1', kind: 'unit', command: 'echo cap', expected_exit: 0, fixture_version: 'v1' }],
-    };
-    const report = new EvalRunner().run(manifest);
-    const r = report.results[0]!;
-    expect(r.exit_code).toBe(0);
-    expect(r.stdout_hash).toMatch(/^[0-9a-f]{16}$/);
-    expect(r.fixture_version).toBe('v1');
-    expect(report.commit_sha).toMatch(/^[0-9a-f]{40}$/);
-  });
-
-  it('a failing or missing eval cannot be represented as pass', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [{ id: 'f1', kind: 'unit', command: 'exit 1', expected_exit: 0 }],
-    };
-    const report = new EvalRunner().run(manifest);
+  it('cannot represent an unexpected exit as pass', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'wrong-exit',
+          kind: 'adversarial',
+          argv: [node, '-e', 'process.exit(3)'],
+          expected_exit: 0,
+        },
+      ]),
+    );
     expect(report.results[0]!.passed).toBe(false);
+    expect(report.results[0]!.reason).toBe('expected exit 0, got 3');
     expect(report.all_passed).toBe(false);
   });
 
-  it('runs local e2e fixtures for direct, react, plan_execute and fails on strategy disagreement', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [
-        { id: 'd1', kind: 'e2e', command: 'echo direct', expected_exit: 0, expected_strategy: 'direct' },
-        { id: 'r1', kind: 'e2e', command: 'echo react', expected_exit: 0, expected_strategy: 'react' },
-        { id: 'p1', kind: 'e2e', command: 'echo plan', expected_exit: 0, expected_strategy: 'plan_execute' },
-      ],
-    };
-    const report = new EvalRunner().run(manifest);
-    expect(report.reasoning_strategy_consistent).toBe(true);
-    expect(report.all_passed).toBe(true);
-  });
-
-  it('fails when e2e strategy cases fail (reasoning_strategy disagreement)', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [
-        { id: 'd1', kind: 'e2e', command: 'exit 1', expected_exit: 0, expected_strategy: 'direct' },
-      ],
-    };
-    const report = new EvalRunner().run(manifest);
+  it('marks e2e strategy consistency false when its executable fails', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'react',
+          kind: 'e2e',
+          argv: [node, '-e', 'process.exit(1)'],
+          expected_exit: 0,
+          expected_strategy: 'react',
+        },
+      ]),
+    );
     expect(report.reasoning_strategy_consistent).toBe(false);
   });
 
-  it('EvalRunner.validateManifest rejects empty suites', () => {
-    expect(() => EvalRunner.validateManifest({ manifest_version: 'eval-manifest.v1', requirement_id: 'x', suites: [] })).toThrow(EvalRunnerError);
-  });
-
-  it('implementation agent cannot edit expected results during a run (commands are declarative)', () => {
-    // the manifest is an immutable input; the runner executes commands as-declared
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [{ id: 'x1', kind: 'unit', command: 'echo immutable', expected_exit: 0 }],
-    };
-    const r = new EvalRunner().run(manifest);
-    expect(r.results[0]!.passed).toBe(true);
-  });
-
-
-  it('expected_exit is actually checked: command exits 0 but expected_exit=1 must fail', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [{ id: 'ex1', kind: 'unit', command: 'echo ok', expected_exit: 1 }],
-    };
-    const report = new EvalRunner().run(manifest);
-    // Command exits 0, but expected_exit=1 — must be marked as failed
-    expect(report.results[0]!.passed).toBe(false);
-    expect(report.all_passed).toBe(false);
-  });
-
-  it('expected_exit=0 with command exit 0 passes, expected_exit=2 with exit 2 passes', () => {
-    const manifest: EvalManifest = {
-      manifest_version: 'eval-manifest.v1',
-      requirement_id: 'AH-TEST',
-      suites: [
-        { id: 'ex2', kind: 'unit', command: 'echo ok', expected_exit: 0 },
-        { id: 'ex3', kind: 'unit', command: 'exit 2', expected_exit: 2 },
-      ],
-    };
-    const report = new EvalRunner().run(manifest);
-    expect(report.results[0]!.passed).toBe(true);
-    expect(report.results[1]!.passed).toBe(true);
+  it('passes arguments literally and never interprets shell syntax', () => {
+    scratch = mkdtempSync(join(tmpdir(), 'eval-argv-'));
+    const target = join(scratch, 'must-not-exist');
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'literal',
+          kind: 'adversarial',
+          argv: ['/bin/echo', `$(touch ${target})`],
+          expected_exit: 0,
+        },
+      ]),
+    );
     expect(report.all_passed).toBe(true);
+    expect(existsSync(target)).toBe(false);
   });
 
+  it('honours per-case cwd and timeout without a shell', () => {
+    scratch = mkdtempSync(join(tmpdir(), 'eval-cwd-'));
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'cwd',
+          kind: 'unit',
+          argv: [
+            node,
+            '-e',
+            'process.exit(process.cwd()===process.argv[1]?0:7)',
+            realpathSync(scratch),
+          ],
+          cwd: scratch,
+          expected_exit: 0,
+        },
+        {
+          id: 'timeout',
+          kind: 'unit',
+          argv: [node, '-e', 'setTimeout(()=>{}, 5000)'],
+          timeout_ms: 20,
+          expected_exit: 1,
+        },
+      ]),
+    );
+    expect(report.results.map((result) => result.passed)).toEqual([true, true]);
+  });
+
+  it('fails closed when the executable does not exist', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'missing',
+          kind: 'unit',
+          argv: ['/definitely/not/an/executable'],
+          expected_exit: 0,
+        },
+      ]),
+    );
+    expect(report.results[0]!.exit_code).toBe(1);
+    expect(report.results[0]!.passed).toBe(false);
+    expect(report.results[0]!.stderr_hash).toMatch(/^[0-9a-f]{16}$/u);
+  });
+
+  it.each([
+    null,
+    undefined,
+    {},
+    { manifest_version: 'wrong', requirement_id: 'x', suites: [] },
+    { manifest_version: 'eval-manifest.v1', requirement_id: '', suites: [] },
+    { manifest_version: 'eval-manifest.v1', requirement_id: 'x', suites: [] },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [{ id: '', kind: 'unit', argv: [node], expected_exit: 0 }],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [{ id: 'x', kind: 'unit', argv: [], expected_exit: 0 }],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [{ id: 'x', kind: 'unit', argv: [node], expected_exit: 0.5 }],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [{ id: 'x', kind: 'unit', argv: [node], expected_exit: 0, timeout_ms: 0 }],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [
+        { id: 'x', kind: 'unit', argv: [node], expected_exit: 0 },
+        { id: 'x', kind: 'unit', argv: [node], expected_exit: 0 },
+      ],
+    },
+  ])('rejects malformed manifest %#', (candidate) => {
+    expect(() => EvalRunner.validateManifest(candidate)).toThrow(EvalRunnerError);
+  });
 });

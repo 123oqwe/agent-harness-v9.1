@@ -1,15 +1,22 @@
-/**
- * AH-RUNTIME-001: Reasoning Strategy Interface
- *
- * Shared interface for Direct, ReAct, and Plan+Execute strategies.
- * Each strategy is a standalone module that receives a StrategyContext
- * and executes without accessing LoopEngine internals directly.
- */
-import type { DurableSession as _DurableSession } from '../session/durable-session.js';
-import type { RunPlan as _RunPlan } from '../contracts/index.js';
-import type { TerminationReason, LoopConfig, LoopDeps, ModelTurn, LoopTurn } from './loop.js';
+import type {
+  LoopConfig,
+  LoopDeps,
+  LoopTurn,
+  ModelCallBudget,
+  ModelTurn,
+  RuntimeStepState,
+  TerminationReason,
+  ToolObservation,
+} from './loop.js';
 
-export type { TerminationReason, LoopConfig, LoopDeps, ModelTurn, LoopTurn };
+export type {
+  LoopConfig,
+  LoopDeps,
+  LoopTurn,
+  ModelCallBudget,
+  ModelTurn,
+  TerminationReason,
+};
 
 export interface StrategyContext {
   readonly config: LoopConfig;
@@ -18,11 +25,33 @@ export interface StrategyContext {
   iterations: number;
   readonly terminated: boolean;
   readonly decisionSummaries: string[];
-  startTime: number;
-  recordTurn(turn: ModelTurn): void;
+  readonly startTime: number;
+  preflight(): TerminationReason | null;
+  nextModelBudget(): ModelCallBudget;
+  budgetExceeded(): boolean;
+  recordTurn(turn: ModelTurn): LoopTurn;
+  recordToolCall(
+    turn: LoopTurn,
+    call: NonNullable<ModelTurn['tool_calls']>[number],
+    stepId: string,
+  ): void;
+  recordObservation(
+    turn: LoopTurn,
+    call: NonNullable<ModelTurn['tool_calls']>[number],
+    status: ToolObservation['status'],
+    payload: unknown,
+    stepId: string,
+  ): ToolObservation;
   terminate(reason: TerminationReason): void;
-  detectContextReset(): boolean;
+  setStepState(
+    stepId: string,
+    state: RuntimeStepState,
+    details?: Readonly<Record<string, unknown>>,
+  ): void;
   writeProgress(): void;
 }
 
-export type ReasoningStrategyHandler = (ctx: StrategyContext, messages: unknown[]) => Promise<void>;
+export type ReasoningStrategyHandler = (
+  context: StrategyContext,
+  messages: unknown[],
+) => Promise<void>;

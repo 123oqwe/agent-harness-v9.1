@@ -162,6 +162,7 @@ function extractResourceIds(args: Record<string, unknown>): string[] {
   const ids: string[] = [];
   if (typeof args.path === 'string') ids.push(args.path);
   if (typeof args.root === 'string') ids.push(args.root);
+  if (typeof args.cwd === 'string') ids.push(args.cwd);
   if (Array.isArray(args.sources)) for (const src of args.sources) if (typeof src === 'string') ids.push(src);
   return ids;
 }

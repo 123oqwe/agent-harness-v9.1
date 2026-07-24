@@ -15,7 +15,7 @@ import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js
 import type { SandboxProfile } from '../../runtime/sandbox.js';
 import type { ToolSpec } from '../../contracts/index.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
-import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
 
@@ -35,7 +35,7 @@ function makeHarness(tmp: string, responses: ParsedResponse[] = [{ content: 'don
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'a', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run'), ...(dataDir ? { dataDir } : {}) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run'), ...(dataDir ? { dataDir } : {}) });
 }
 
 function task(goal: string) {
@@ -63,9 +63,18 @@ describe('Main chain integration: no bypasses', () => {
       { content: 'done' } as ParsedResponse,
     ]);
     const r = await h.run(task('run nonexistent tool'));
-    // The tool should not have executed — no tool_call event for nonexistent_tool
+    // The model proposal is preserved, followed by an explicit rejected result.
     const toolCalls = r.session.getEvents().filter(e => e.type === 'tool_call' && (e.data as { tool: string }).tool === 'nonexistent_tool');
-    expect(toolCalls.length).toBe(0);
+    expect(toolCalls).toHaveLength(1);
+    const rejected = r.session.getEvents().filter(
+      (event) =>
+        event.type === 'tool_result' &&
+        (event.data as { tool?: string; status?: string }).tool ===
+          'nonexistent_tool' &&
+        (event.data as { status?: string }).status === 'rejected',
+    );
+    expect(rejected).toHaveLength(1);
+    expect(r.success).toBe(false);
   });
 
   it('VFS overlay intercepts writes — failed run does not modify real FS', async () => {
@@ -208,7 +217,7 @@ describe('Main chain integration: no bypasses', () => {
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['nonexistent_tool'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     const denyGw = createScriptedGateway([{ content: 'x' } as ParsedResponse]);
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: denyGw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-deny') });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: denyGw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-deny') });
     const r = await h.run(task('read a file'));
     expect(r.loop_result.termination_reason).toBe('denied');
     // Router deny: no model calls happen
@@ -227,7 +236,7 @@ describe('Main chain integration: no bypasses', () => {
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'a', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
     // This should compile — executionContext is provided
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: createScriptedGateway([{ content: 'ok' }]).gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-ctx') });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: createScriptedGateway([{ content: 'ok' }]).gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-ctx') });
     expect(h).toBeDefined();
   });
 });

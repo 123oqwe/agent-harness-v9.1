@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDefaultExecutionContext } from '../../harness.js';
-import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
+import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 
 import { Harness } from '../../harness.js';
 
@@ -36,7 +36,7 @@ function makeHarness(workspaceRoot: string): Harness {
   const sandbox: SandboxProfile = { workspaceRoot, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const gw = createScriptedGateway([{ content: 'Daily plan: T1, T3, T2, T5, T4' }]);
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
 
 describe('AH-PA-VERTICAL-001 personal assistant vertical (thin adapter)', () => {

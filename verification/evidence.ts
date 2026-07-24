@@ -8,13 +8,14 @@
  * evidence-package.schema.json.
  */
 import { createHash } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
 
 export interface CommandResult {
   command: string;
+  argv: string[];
   exit_code: number;
   stdout_hash: string | null;
   stderr_hash?: string | null;
@@ -42,15 +43,56 @@ export class EvidenceError extends Error {
 
 const sha = (s: string | null | undefined): string | null => s ? createHash('sha256').update(s).digest('hex').slice(0, 16) : null;
 
-/** Run a real command and capture exit code + output hashes. Never fabricates. */
-export function runCommand(command: string, cwd?: string, timeout = 180_000): CommandResult {
-  try {
-    const out = execSync(command, { cwd: cwd ?? process.cwd(), timeout, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    return { command, exit_code: 0, stdout_hash: sha(out) };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: string; stderr?: string };
-    return { command, exit_code: err.status ?? 1, stdout_hash: sha(err.stdout ?? ''), stderr_hash: sha(err.stderr ?? '') };
+export interface CommandSpec {
+  argv: readonly string[];
+  cwd?: string;
+  timeout_ms?: number;
+}
+
+function validateCommand(command: CommandSpec): void {
+  if (
+    !command ||
+    !Array.isArray(command.argv) ||
+    command.argv.length === 0 ||
+    command.argv.some(
+      (argument) => typeof argument !== 'string' || argument.length === 0,
+    )
+  ) {
+    throw new EvidenceError('command requires non-empty argv');
   }
+  if (
+    command.timeout_ms !== undefined &&
+    (!Number.isSafeInteger(command.timeout_ms) || command.timeout_ms <= 0)
+  ) {
+    throw new EvidenceError('command timeout_ms must be a positive integer');
+  }
+}
+
+/** Run a real command and capture exit code + output hashes. Never fabricates. */
+export function runCommand(
+  command: CommandSpec,
+  defaultCwd = process.cwd(),
+  defaultTimeout = 180_000,
+): CommandResult {
+  validateCommand(command);
+  const [executable, ...args] = command.argv;
+  const result = spawnSync(executable!, args, {
+    cwd: command.cwd ?? defaultCwd,
+    timeout: command.timeout_ms ?? defaultTimeout,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+  });
+  const stderr =
+    result.stderr ??
+    (result.error instanceof Error ? result.error.message : '');
+  return {
+    command: JSON.stringify(command.argv),
+    argv: [...command.argv],
+    exit_code: result.status ?? 1,
+    stdout_hash: sha(result.stdout ?? ''),
+    stderr_hash: sha(stderr || null),
+  };
 }
 
 /** Generate an EvidencePackage from actual command output at the current commit. */
@@ -58,14 +100,18 @@ export function generateEvidence(params: {
   requirement_id: string;
   source_files: string[];
   tests_added: string[];
-  commands: string[];
+  commands: CommandSpec[];
   cwd?: string;
   test_results: Record<string, unknown>;
   coverage: Record<string, unknown>;
   security_checks: Record<string, unknown>;
   verifier_model?: string;
 }): EvidencePackage {
-  const commit_sha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  const revision = spawnSync('git', ['rev-parse', 'HEAD'], {
+    encoding: 'utf8',
+    shell: false,
+  });
+  const commit_sha = revision.status === 0 ? revision.stdout.trim() : '';
   if (!/^[0-9a-f]{40}$/.test(commit_sha)) throw new EvidenceError(`invalid commit_sha: ${commit_sha}`);
 
   // verify source_files and tests_added exist — fail on missing, do not silently filter

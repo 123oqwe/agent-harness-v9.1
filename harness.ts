@@ -41,24 +41,46 @@ import type { AuditSink } from './security/audit-sink.js';
 import type { PostconditionVerifierPort, ToolCredentialBrokerPort } from './tools/tool-executor.js';
 import { SkillLoader } from './skills/skill-loader.js';
 import { SqliteSessionStore } from './session/sqlite-session-store.js';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import type { ModelGateway, ProviderSelectionRequest, GatewayDispatchResult } from './gateway/model-gateway.js';
+import type { Message } from './gateway/scripted-provider.js';
 import { join } from 'node:path';
+import {
+  type VerificationEngine,
+  type VerificationReport,
+} from './verification/verification-engine.js';
 
 /** Outcome returned to the caller (Vertical or user). */
 export interface HarnessOutcome {
   run_plan: RunPlan | null;
   routing: RoutingResult;
   loop_result: LoopResult;
+  verification_report: VerificationReport | null;
   session: DurableSession;
   evidence: {
     run_id: string;
     commit_sha: string;
+    plan_hash: string | null;
+    plan_revision: number | null;
+    reasoning_strategy: string | null;
+    registry_snapshot_refs: Readonly<Record<string, string>>;
     termination_reason: string;
     iterations: number;
     turns: number;
     decision_summaries: string[];
     session_events: number;
+    usage: LoopResult['usage'];
+    step_states: LoopResult['step_states'];
+    tool_calls: ReadonlyArray<{
+      tool_call_id: string;
+      step: string;
+      tool: string;
+      arguments_hash: string;
+    }>;
+    tool_receipts: readonly unknown[];
+    audit_entries: readonly unknown[];
+    verification_records: VerificationReport['records'];
+    session_head_hash: string | null;
   };
   success: boolean;
 }
@@ -126,6 +148,9 @@ export interface HarnessConfig {
   gateway: ModelGateway;
   security: HarnessSecurityDeps;
   executionContext: ExecutionContext;
+  /** Required independent success authority. Model text cannot replace it. */
+  verification: VerificationEngine;
+  signal?: AbortSignal;
   dataDir?: string | undefined;
   sessionLogPath?: string;
 }
@@ -237,33 +262,26 @@ export class Harness {
         const iterations = existingEvents.filter(
           (event) => event.type === 'assistant',
         ).length;
+        const restoredLoopResult = this.restoreLoopResult(
+          session,
+          routing.run_plan,
+          termination,
+          iterations,
+        );
+        const restoredVerification = this.restoreVerificationReport(session);
         return {
           run_plan: routing.run_plan ?? null,
           routing,
-          loop_result: {
-            strategy: routing.run_plan?.reasoning_strategy ?? 'direct',
-            iterations,
-            termination_reason: termination,
-            turns: [],
-            decision_summaries: existingEvents
-              .filter((event) => event.type === 'assistant')
-              .map(
-                (event) =>
-                  (event.data as { decision_summary?: string }).decision_summary ??
-                  '',
-              ),
-            progress_path: undefined,
-            context_reset_emitted: termination === 'context_reset',
-          },
+          loop_result: restoredLoopResult,
+          verification_report: restoredVerification,
           session,
           evidence: this.buildEvidence(
             session,
             routing.run_plan,
-            termination,
-            iterations,
+            restoredLoopResult,
+            restoredVerification,
           ),
-          success:
-            termination === 'goal_satisfied' || termination === 'completed',
+          success: termination === 'goal_satisfied',
         };
       }
     if (routing.outcome !== 'route' || !routing.run_plan) {
@@ -277,10 +295,27 @@ export class Harness {
         routing,
         loop_result: {
           strategy: 'direct', iterations: 0, termination_reason: 'denied',
-          turns: [], decision_summaries: [], progress_path: undefined, context_reset_emitted: false,
+          turns: [], decision_summaries: [], context_reset_emitted: false,
+          usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+          step_states: Object.freeze({}),
         },
+        verification_report: null,
         session,
-        evidence: this.buildEvidence(session, routing.run_plan, 'denied', 0),
+        evidence: this.buildEvidence(
+          session,
+          routing.run_plan,
+          {
+            strategy: 'direct',
+            iterations: 0,
+            termination_reason: 'denied',
+            turns: [],
+            decision_summaries: [],
+            context_reset_emitted: false,
+            usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+            step_states: Object.freeze({}),
+          },
+          null,
+        ),
         success: false,
       };
     }
@@ -330,14 +365,37 @@ export class Harness {
         max_iterations: (runPlan.budget_allocation as { max_iterations: number }).max_iterations,
         run_id: runPlan.run_id,
         goal: goalWithSkill,
-        data_dir: this.config.dataDir,
+        ...(this.config.dataDir === undefined
+          ? {}
+          : { data_dir: this.config.dataDir }),
+        budget_tokens: this.execCtx.budget.token_limit,
         run_plan: runPlan,
         clock: () => this.now(),
       },
       {
         session,
-        modelCall: async (messages: unknown[], _attempt: number) => {
-          const typedMessages = messages as Array<{ role: 'assistant' | 'system' | 'tool' | 'user'; content: string }>;
+        modelCall: async (messages: unknown[], _attempt: number, modelBudget) => {
+          // Strategy-local metadata such as decision_summary is evidence, not
+          // provider protocol. Rebuild the wire messages with only supported
+          // fields so a later turn cannot invalidate an otherwise valid plan.
+          const typedMessages: Message[] = messages.map((candidate) => {
+            const message = candidate as {
+              role: Message['role'];
+              content: string;
+              tool_call_id?: string;
+              tool_calls?: Message['tool_calls'];
+            };
+            return {
+              role: message.role,
+              content: message.content,
+              ...(message.tool_call_id === undefined
+                ? {}
+                : { tool_call_id: message.tool_call_id }),
+              ...(message.tool_calls === undefined
+                ? {}
+                : { tool_calls: message.tool_calls }),
+            };
+          });
           const modelCallCount = (this._modelCallCount++) + 1;
           const localOnly = task.constraints.some(
             (constraint) =>
@@ -361,6 +419,7 @@ export class Harness {
            request: {
               messages: typedMessages,
               ...(selectedTools.length > 0 ? { tools: selectedTools } : {}),
+              max_tokens: modelBudget.max_output_tokens,
             },
             estimated_input_tokens: Math.min(typedMessages.reduce((s, m) => s + m.content.length, 0), 100000),
             required_capabilities: requiredCaps,
@@ -380,6 +439,9 @@ export class Harness {
         const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, req, {
           operation_id: opId,
           attempt_id: attId,
+          ...(this.config.signal === undefined
+            ? {}
+            : { signal: this.config.signal }),
         });
           return {
             content: result.response.content,
@@ -396,14 +458,61 @@ export class Harness {
         ) => {
           return this.executeTool(name, args, context, session, sqliteStore);
         },
-        goalSatisfied: (turns) => this.checkGoal(task, turns),
+        ...(this.config.signal === undefined
+          ? {}
+          : { signal: this.config.signal }),
       },
     );
 
-    const loopResult = await loop.run();
+    const executionResult = await loop.run();
+    let verificationReport: VerificationReport | null = null;
+    let success = false;
+    let loopResult = executionResult;
+    if (executionResult.termination_reason === 'completed') {
+      try {
+        verificationReport = await this.config.verification.verify({
+          task,
+          runPlan,
+          loopResult: executionResult,
+          vfs: this.currentOverlayAsVfs(),
+          sandbox: this.currentTransactionSandbox!,
+          sessionEvents: session.getEvents(),
+          toolReceipts: session
+            .getEvents()
+            .filter((event) => event.type === 'tool_result')
+            .flatMap((event) => {
+              const receipt = (event.data as { receipt?: unknown }).receipt;
+              return receipt === undefined ? [] : [receipt];
+            }),
+        });
+        success = verificationReport.all_passed;
+      } catch (error) {
+        verificationReport = null;
+        success = false;
+        session.acquireWriter();
+        session.append('error', {
+          event: 'verification_engine_failed',
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+        session.releaseWriter();
+      }
+      loopResult = {
+        ...executionResult,
+        termination_reason: success
+          ? 'goal_satisfied'
+          : 'verification_failed',
+      };
+    }
+    session.acquireWriter();
+    session.append('system', {
+      event: 'run_finalized',
+      termination_reason: loopResult.termination_reason,
+      verification_report: verificationReport,
+    });
+    session.releaseWriter();
 
-    // 3a. Finalize overlay: commit on success, discard on failure
-    this.finalizeOverlay(loopResult.termination_reason === 'goal_satisfied' || loopResult.termination_reason === 'completed');
+    // VerificationGraph pass is the only commit authority.
+    this.finalizeOverlay(success);
 
     // 4. Persist session if path provided
     if (this.config.sessionLogPath) {
@@ -411,7 +520,12 @@ export class Harness {
     }
 
     // 5. Build evidence
-    const evidence = this.buildEvidence(session, runPlan, loopResult.termination_reason, loopResult.iterations);
+    const evidence = this.buildEvidence(
+      session,
+      runPlan,
+      loopResult,
+      verificationReport,
+    );
 
     sqliteStore?.updateRunStatus(
       actualRunId,
@@ -421,9 +535,10 @@ export class Harness {
       run_plan: runPlan,
       routing,
       loop_result: loopResult,
+      verification_report: verificationReport,
       session,
       evidence,
-      success: loopResult.termination_reason === 'goal_satisfied' || loopResult.termination_reason === 'completed',
+      success,
     };
     } finally {
       sqliteStore?.close();
@@ -588,28 +703,136 @@ private async executeTool(
     }
   }
 
-  /** Goal verification — checks success criteria against the loop turns. */
-  private checkGoal(task: TaskContract, turns: { model: { content: string; decision_summary: string } }[]): boolean {
-    if (turns.length === 0) return false;
-    const lastTurn = turns[turns.length - 1]!;
-    const output = lastTurn.model.content + ' ' + lastTurn.model.decision_summary;
-    for (const criterion of task.success_criteria ?? []) {
-      if (!output.toLowerCase().includes(criterion.criterion.toLowerCase())) return false;
+  private restoreVerificationReport(
+    session: DurableSession,
+  ): VerificationReport | null {
+    for (const event of [...session.getEvents()].reverse()) {
+      if (
+        event.type === 'system' &&
+        (event.data as { event?: string }).event === 'run_finalized'
+      ) {
+        return (
+          (event.data as { verification_report?: VerificationReport | null })
+            .verification_report ?? null
+        );
+      }
     }
-    return true;
+    return null;
   }
 
-  private buildEvidence(session: DurableSession, _runPlan: RunPlan | undefined, termination: string, iterations: number): HarnessOutcome['evidence'] {
+  private restoreLoopResult(
+    session: DurableSession,
+    runPlan: RunPlan | undefined,
+    termination: LoopResult['termination_reason'],
+    iterations: number,
+  ): LoopResult {
+    let usage: LoopResult['usage'] = {
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+    };
+    const stepStates: Record<string, LoopResult['step_states'][string]> = {};
+    for (const event of session.getEvents()) {
+      if (event.type !== 'system') continue;
+      const data = event.data as {
+        event?: string;
+        step?: string;
+        status?: LoopResult['step_states'][string];
+        usage?: LoopResult['usage'];
+      };
+      if (data.event === 'step_state' && data.step && data.status) {
+        stepStates[data.step] = data.status;
+      }
+      if (data.event === 'run_terminated' && data.usage) usage = data.usage;
+    }
+    return {
+      strategy: runPlan?.reasoning_strategy ?? 'direct',
+      iterations,
+      termination_reason: termination,
+      turns: [],
+      decision_summaries: session
+        .getEvents()
+        .filter((event) => event.type === 'assistant')
+        .map(
+          (event) =>
+            (event.data as { decision_summary?: string }).decision_summary ?? '',
+        ),
+      context_reset_emitted: termination === 'context_reset',
+      usage,
+      step_states: Object.freeze(stepStates),
+    };
+  }
+
+  private buildEvidence(
+    session: DurableSession,
+    runPlan: RunPlan | undefined,
+    loopResult: LoopResult,
+    verificationReport: VerificationReport | null,
+  ): HarnessOutcome['evidence'] {
     let commitSha = 'unknown';
-    try { commitSha = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim(); } catch { /* not in git */ }
+    const revision = spawnSync('git', ['rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      shell: false,
+    });
+    if (revision.status === 0 && /^[0-9a-f]{40}\s*$/u.test(revision.stdout)) {
+      commitSha = revision.stdout.trim();
+    }
+    const events = session.getEvents();
+    const toolCalls = events
+      .filter((event) => event.type === 'tool_call')
+      .flatMap((event) => {
+        const data = event.data as {
+          tool_call_id?: string;
+          step?: string;
+          tool?: string;
+          arguments?: Record<string, unknown>;
+        };
+        if (!data.tool_call_id || !data.step || !data.tool || !data.arguments) {
+          return [];
+        }
+        return [{
+          tool_call_id: data.tool_call_id,
+          step: data.step,
+          tool: data.tool,
+          arguments_hash: createHash('sha256')
+            .update(JSON.stringify(canonicalize(data.arguments)))
+            .digest('hex'),
+        }];
+      });
+    const toolReceipts = events
+      .filter((event) => event.type === 'tool_result')
+      .flatMap((event) => {
+        const receipt = (event.data as { receipt?: unknown }).receipt;
+        return receipt === undefined ? [] : [receipt];
+      });
     return {
       run_id: session.session_id,
       commit_sha: commitSha,
-      termination_reason: termination,
-      iterations,
-      turns: session.eventCount(),
-      decision_summaries: session.getEvents().filter(e => e.type === 'assistant').map(e => (e.data as { decision_summary?: string }).decision_summary ?? ''),
+      plan_hash: runPlan?.run_plan_hash ?? null,
+      plan_revision: runPlan?.revision ?? null,
+      reasoning_strategy: runPlan?.reasoning_strategy ?? null,
+      registry_snapshot_refs: Object.freeze(
+        Object.fromEntries(
+          Object.entries(runPlan?.registry_snapshot_refs ?? {}).filter(
+            (entry): entry is [string, string] =>
+              typeof entry[1] === 'string',
+          ),
+        ),
+      ),
+      termination_reason: loopResult.termination_reason,
+      iterations: loopResult.iterations,
+      turns: loopResult.turns.length,
+      decision_summaries: [...loopResult.decision_summaries],
       session_events: session.eventCount(),
+      usage: { ...loopResult.usage },
+      step_states: Object.freeze({ ...loopResult.step_states }),
+      tool_calls: Object.freeze(toolCalls),
+      tool_receipts: Object.freeze(toolReceipts),
+      audit_entries: Object.freeze([...this.config.security.auditSink.all]),
+      verification_records: Object.freeze([
+        ...(verificationReport?.records ?? []),
+      ]),
+      session_head_hash: events.at(-1)?.hash ?? null,
     };
   }
 }

@@ -161,7 +161,6 @@ export class StaticRouter {
       }
       requiredTools.push(name);
     }
-    requiredTools.sort();
     const prefilter = this.policyPrefilter(requiredTools);
     if (!prefilter.passed) {
       return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: ${prefilter.reason}` };
@@ -299,16 +298,50 @@ export class StaticRouter {
         this.deps.gateway.registrySnapshotHash,
       );
 
-    // Build workflow_graph with proper Contract field names
-    const steps = intent.multi_step ? ['plan', 'execute', 'execute', 'execute', 'verify'] : [strategy];
-    const workflow_nodes = steps.map((s, i) => ({
-      step_id: `step-${i}`,
-      step_type: s === 'verify' ? 'verification' as const : s === 'plan' || s === 'execute' ? 'model_call' as const : 'model_call' as const,
-      status: 'pending' as const,
-    }));
-    const workflow_edges = steps.slice(1).map((_, i) => ({
-      from_step: `step-${i}`,
-      to_step: `step-${i + 1}`,
+    // The plan_execute graph separates model proposals from tool execution.
+    // A tool call can therefore be consumed exactly once by its bound node.
+    const workflow_nodes: RunPlan['workflow_graph']['nodes'] =
+      strategy === 'plan_execute'
+        ? [
+            {
+              step_id: 'step-plan',
+              step_type: 'model_call',
+              status: 'pending',
+            },
+            ...requiredTools.flatMap((tool, index) => [
+              {
+                step_id: `step-propose-${index}`,
+                step_type: 'model_call' as const,
+                status: 'pending' as const,
+              },
+              {
+                step_id: `step-tool-${index}`,
+                step_type: 'tool_call' as const,
+                status: 'pending' as const,
+                tool_name: tool,
+              },
+            ]),
+            {
+              step_id: 'step-synthesize',
+              step_type: 'model_call',
+              status: 'pending',
+            },
+            {
+              step_id: 'step-verify',
+              step_type: 'verification',
+              status: 'pending',
+            },
+          ]
+        : [
+            {
+              step_id: 'step-0',
+              step_type: 'model_call',
+              status: 'pending',
+            },
+          ];
+    const workflow_edges = workflow_nodes.slice(1).map((node, index) => ({
+      from_step: workflow_nodes[index]!.step_id,
+      to_step: node.step_id,
       condition: null,
     }));
 
@@ -333,12 +366,13 @@ export class StaticRouter {
     // VerificationGraph: one per success criterion
     const verification_nodes = (task.success_criteria || []).map((c, i) => ({
       verification_id: `verify-${i}`,
-      step_id_ref: `step-${steps.length - 1}`,
+      step_id_ref: workflow_nodes[workflow_nodes.length - 1]!.step_id,
       verification_type: c.verification_method === 'test' ? 'test_execution' as const
         : c.verification_method === 'deterministic' ? 'deterministic' as const
         : c.verification_method === 'human_review' ? 'human_review' as const
-        : 'schema_validation' as const,
+        : 'independent_verifier' as const,
       strictness: 'standard' as const,
+      acceptance_criteria_refs: [String(i)],
     }));
 
     const plan: RunPlan = {
@@ -371,7 +405,14 @@ export class StaticRouter {
       },
       derived_risk_assessment: { risk_tier: intent.requires_writes ? 2 : 1, egress: 'none' },
       required_consent: { required: intent.requires_writes },
-      budget_allocation: { max_iterations: strategy === 'direct' ? 1 : 3 },
+      budget_allocation: {
+        max_iterations:
+          strategy === 'direct'
+            ? 1
+            : strategy === 'plan_execute'
+              ? Math.max(3, requiredTools.length + 2)
+              : 3,
+      },
       persistence_policy: { event_log: true, snapshot: true },
       cancellation_policy: { abortable: true },
       fallback_policy: { on_failure: 'abort' },
