@@ -45,13 +45,12 @@ export const mutationModules = {
     mutate: ['skills/skill-loader.ts'],
     minimum: 85,
   },
-  // NOTE: strategies currently live inside runtime/loop.ts. After splitting
-  // into runtime/direct.ts, runtime/react.ts, runtime/plan-execute.ts,
-  // this module will point to those files. For now they are covered by
-  // the runtime module to avoid an empty mutate list.
   strategies: {
     mutate: [
-      'runtime/loop.ts',
+      'runtime/direct.ts',
+      'runtime/react.ts',
+      'runtime/plan-execute.ts',
+      'runtime/reasoning-strategy.ts',
     ],
     minimum: 85,
   },
