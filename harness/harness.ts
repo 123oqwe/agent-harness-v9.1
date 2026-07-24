@@ -246,7 +246,7 @@ export class Harness {
           const typedMessages = messages as Array<{ role: 'assistant' | 'system' | 'tool' | 'user'; content: string }>;
           const modelCallCount = (this._modelCallCount++) + 1;
           // Derive data policy from authoritative task/user constraints
-          const constraints = (task.constraints ?? []) as Array<{ type: string; value: string }>;
+          // Task constraints are recorded in RunPlan but do not override provider data_policy
           // local_only is always false — provider data_policy enforces locality
           const localOnly = false;
           // Required capabilities derive from strategy + contract

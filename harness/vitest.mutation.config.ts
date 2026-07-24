@@ -22,6 +22,11 @@ export default defineConfig({
       'tests/coverage/**',
       // GLM acceptance tests require a live API key and are non-deterministic
       'tests/glm-acceptance/**',
+      // Sandbox OS-process tests crash Stryker's concurrent runner
+      'tests/sandbox/limits.test.ts',
+      'tests/sandbox/sandbox-mutation.test.ts',
+      'tests/tools/execute-command.test.ts',
+      'tests/tools/execute-command-security.test.ts',
     ],
   },
 });

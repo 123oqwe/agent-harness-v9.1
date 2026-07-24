@@ -80,6 +80,8 @@ function runModule(moduleName) {
     ...strykerBase,
     mutate: mutateFiles,
     tempDirName: `.stryker-tmp/${moduleName}`,
+    // Sandbox tests use real OS processes; reduce concurrency to avoid crashes
+    ...(moduleName === 'sandbox' ? { concurrency: 1, timeoutMS: 60000 } : {}),
     thresholds: {
       high: mod.minimum,
       low: mod.minimum - 5,

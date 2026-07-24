@@ -43,17 +43,17 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=400278cc2ce79918"
+      "detail": "exit_code=0, stdout_hash=108e069873f90eb3"
     },
     {
       "name": "lint",
-      "passed": true,
-      "detail": "exit_code=0"
+      "passed": false,
+      "detail": "exit_code=1"
     },
     {
       "name": "coverage",
-      "passed": true,
-      "detail": "exit_code=0, File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s "
+      "passed": false,
+      "detail": "exit_code=1, no data"
     },
     {
       "name": "npm_audit",
@@ -72,6 +72,6 @@
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-24T13:33:17.452697",
+  "timestamp": "2026-07-25T00:02:35.041521",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }
