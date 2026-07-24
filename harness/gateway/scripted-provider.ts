@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import type { ProviderAdapter as ProviderAdapterContract } from '../../spec/types/provider-adapter.js';
-import type { ToolSpec as ContractToolSpec } from '../../spec/types/tool-spec.js';
+import type { ProviderAdapter as ProviderAdapterContract } from '../contracts/index.js';
+import type { ToolSpec as ContractToolSpec } from '../contracts/index.js';
 
 type JsonPrimitive = boolean | null | number | string;
 type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };

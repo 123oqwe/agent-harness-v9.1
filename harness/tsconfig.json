@@ -11,6 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
     "rootDir": "..",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -32,8 +33,7 @@
     }
   },
   "include": [
-    "./**/*.ts",
-    "../spec/types/**/*.ts"
+    "./**/*.ts"
   ],
   "exclude": [
     "node_modules",

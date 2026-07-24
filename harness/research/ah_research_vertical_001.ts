@@ -1,5 +1,5 @@
 /** AH-RESEARCH-VERTICAL-001: thin adapter. Sources → evidence → report. */
-import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { TaskContract } from '../contracts/index.js';
 import type { Harness, HarnessOutcome } from '../harness.js';
 
 export interface ResearchVerticalInput { sources: string[]; query: string }

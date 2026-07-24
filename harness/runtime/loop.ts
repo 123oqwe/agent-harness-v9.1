@@ -14,7 +14,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DurableSession as _DurableSession } from '../session/durable-session.js';
-import type { RunPlan as _RunPlan } from "../../spec/types/run-plan.js";
+import type { RunPlan as _RunPlan } from '../contracts/index.js';
 import type { StrategyContext } from './reasoning-strategy.js';
 import { runDirect } from './direct.js';
 import { runReact } from './react.js';

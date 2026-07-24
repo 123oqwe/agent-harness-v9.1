@@ -6,7 +6,7 @@
  * and executes without accessing LoopEngine internals directly.
  */
 import type { DurableSession as _DurableSession } from '../session/durable-session.js';
-import type { RunPlan as _RunPlan } from '../../spec/types/run-plan.js';
+import type { RunPlan as _RunPlan } from '../contracts/index.js';
 import type { TerminationReason, LoopConfig, LoopDeps, ModelTurn, LoopTurn } from './loop.js';
 
 export type { TerminationReason, LoopConfig, LoopDeps, ModelTurn, LoopTurn };

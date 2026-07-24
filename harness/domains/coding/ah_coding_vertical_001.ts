@@ -5,7 +5,7 @@
  * unified Harness, converts the Outcome to domain output. Does NOT call
  * Provider, Tool, VFS or Sandbox directly.
  */
-import type { TaskContract } from '../../../spec/types/task-contract.js';
+import type { TaskContract } from '../../contracts/index.js';
 import type { Harness, HarnessOutcome } from '../../harness.js';
 
 export interface CodingVerticalInput {

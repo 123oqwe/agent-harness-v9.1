@@ -5,7 +5,7 @@
  * TaskContract, never raw strings. This ensures the Router always operates
  * on structured input with explicit goal, success criteria, and constraints.
  */
-import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { TaskContract } from '../contracts/index.js';
 
 export interface RawTaskInput {
   prompt: string;

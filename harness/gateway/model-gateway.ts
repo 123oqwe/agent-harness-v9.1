@@ -1,9 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import type {
-  ProviderAdapter as ProviderAdapterContract,
-  ProviderType,
-} from '../../spec/types/provider-adapter.js';
+import type { ProviderAdapter as ProviderAdapterContract,
+  ProviderType, } from '../contracts/index.js';
 import type {
   DataPolicyResult,
   HealthStatus,

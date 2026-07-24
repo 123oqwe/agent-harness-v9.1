@@ -1,7 +1,7 @@
 import { randomUUID, sign, verify, type KeyObject } from 'node:crypto';
 
-import type { CapabilityToken } from '../../spec/types/capability-token.js';
-import type { ChildCapabilityRequest } from '../../spec/types/child-capability-request.js';
+import type { CapabilityToken } from '../contracts/index.js';
+import type { ChildCapabilityRequest } from '../contracts/index.js';
 import { isStrictDateTime } from './policy-engine.js';
 import {
   CapabilityDelegationError,

@@ -2,7 +2,7 @@ import { createHash, sign, verify, type KeyObject } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, isAbsolute } from 'node:path';
 
-import type { CapabilityToken } from '../../spec/types/capability-token.js';
+import type { CapabilityToken } from '../contracts/index.js';
 
 export type CapabilityStatus = 'issued' | 'used' | 'revoked';
 

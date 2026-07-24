@@ -7,7 +7,7 @@
  *
  * Tool definitions are declarative data, not executable code.
  */
-import type { ToolSpec } from '../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../contracts/index.js';
 
 export function createPhase1ToolDefinitions(): Partial<ToolSpec>[] {
   return [

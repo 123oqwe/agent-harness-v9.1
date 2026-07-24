@@ -13,7 +13,7 @@
  * AuditSink, signing keys, clock) are injected by the caller. The Harness
  * does NOT generate keys or create default security instances.
  */
-import type { TaskContract } from '../spec/types/task-contract.js';
+import type { TaskContract } from './contracts/index.js';
 import type { RunPlan } from './router/static-router.js';
 import { StaticRouter, type RoutingResult } from './router/static-router.js';
 import type { ToolRegistry, RegistrySnapshot } from './tools/tool-registry.js';

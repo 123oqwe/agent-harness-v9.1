@@ -1,6 +1,6 @@
-import type { ActionManifest } from '../../spec/types/action-manifest.js';
-import type { CapabilityToken } from '../../spec/types/capability-token.js';
-import type { EffectRisk } from '../../spec/types/effect-risk.js';
+import type { ActionManifest } from '../contracts/index.js';
+import type { CapabilityToken } from '../contracts/index.js';
+import type { EffectRisk } from '../contracts/index.js';
 import {
   PolicyEngine,
   isStrictDateTime,

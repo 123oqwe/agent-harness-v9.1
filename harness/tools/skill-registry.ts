@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
-import type { SkillSpec } from '../../spec/types/skill-spec.js';
+import type { SkillSpec } from '../contracts/index.js';
 
 export class SkillValidationError extends Error {
   readonly file?: string | undefined;
