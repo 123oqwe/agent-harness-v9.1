@@ -14,7 +14,8 @@
     "session": 90,
     "runtime": 90,
     "verification": 85,
-    "verticals": 85
+    "verticals": 85,
+    "uiAdapters": 85
   },
   "perFileMinimums": {
     "toolsLeaf": 80,

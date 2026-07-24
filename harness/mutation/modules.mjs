@@ -4,17 +4,23 @@
 //
 // IMPORTANT: every file listed MUST exist on disk. The runner validates this
 // and will fail if a file is missing.
+// Every executable Phase 1 TypeScript file belongs to exactly one module.
 
 export const mutationModules = {
   gateway: {
     mutate: [
       'gateway/model-gateway.ts',
       'gateway/scripted-provider.ts',
+      'gateway/glm-provider.ts',
+      'gateway/glm-gateway-bridge.ts',
     ],
     minimum: 85,
   },
   router: {
-    mutate: ['router/static-router.ts'],
+    mutate: [
+      'router/static-router.ts',
+      'router/task-normalizer.ts',
+    ],
     minimum: 90,
   },
   toolsRegistry: {
@@ -42,7 +48,10 @@ export const mutationModules = {
     perFileMinimum: 80,
   },
   skills: {
-    mutate: ['skills/skill-loader.ts'],
+    mutate: [
+      'skills/skill-loader.ts',
+      'tools/skill-registry.ts',
+    ],
     minimum: 85,
   },
   strategies: {
@@ -82,11 +91,17 @@ export const mutationModules = {
     minimum: 90,
   },
   session: {
-    mutate: ['session/durable-session.ts'],
+    mutate: [
+      'session/durable-session.ts',
+      'session/sqlite-session-store.ts',
+      'session/session-store.ts',
+      'session/progress-store.ts',
+    ],
     minimum: 90,
   },
   runtime: {
     mutate: [
+      'harness.ts',
       'runtime/loop.ts',
       'runtime/retry.ts',
       'runtime/notifications.ts',
@@ -111,6 +126,20 @@ export const mutationModules = {
     ],
     minimum: 85,
     perFileMinimum: 80,
+  },
+  uiAdapters: {
+    mutate: [
+      'ui/ui-state.ts',
+      'ui/ah_ui_onboarding_001.ts',
+      'ui/ah_ui_settings_001.ts',
+      'ui/ah_ui_approval_001.ts',
+      'ui/ah_ui_chat_001.ts',
+      'ui/ah_ui_coding_001.ts',
+      'ui/ah_ui_evidence_001.ts',
+      'ui/ah_ui_privacy_001.ts',
+      'ui/ah_ui_task_001.ts',
+    ],
+    minimum: 85,
   },
 };
 
