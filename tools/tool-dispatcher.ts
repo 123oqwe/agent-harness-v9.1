@@ -15,6 +15,7 @@
  *   -> return structured ToolReceipt
  */
 import type { ToolRegistry, RegistrySnapshot } from './tool-registry.js';
+import Ajv from 'ajv/dist/2020.js';
 import type { ToolExecutor, ToolReceipt } from './tool-executor.js';
 
 export interface DispatchRequest {
@@ -55,9 +56,33 @@ export class ToolDispatcher {
       throw new ToolDispatcherError(`tool not found in registry: ${req.tool_name}`);
     }
 
-    // 2. Validate input is not undefined/null
+    // 2. Validate input: must not be null/undefined
     if (req.input === undefined || req.input === null) {
       throw new ToolDispatcherError(`invalid input for tool ${req.tool_name}: input is ${req.input}`);
+    }
+
+    // 2a. Schema validation: if the ToolSpec has an input schema, validate against it
+    const inputSchemaStr = (spec as unknown as Record<string, unknown>).input_schema_ref as string | undefined;
+    if (inputSchemaStr && inputSchemaStr.endsWith('.json')) {
+      try {
+        const schemaPath = inputSchemaStr;
+        // Try to load the schema file
+        const { readFileSync, existsSync } = await import('node:fs');
+        const { resolve: resolvePath } = await import('node:path');
+        const fullSchemaPath = resolvePath(process.cwd(), schemaPath);
+        if (existsSync(fullSchemaPath)) {
+          const schema = JSON.parse(readFileSync(fullSchemaPath, 'utf8'));
+          const ajv = new Ajv({ allErrors: true, strict: false });
+          const validate = ajv.compile(schema);
+          if (!validate(req.input)) {
+            const errors = validate.errors?.map((e: { instancePath: string; message?: string }) => `${e.instancePath}: ${e.message}`).join('; ') ?? 'unknown';
+            throw new ToolDispatcherError(`input schema validation failed for ${req.tool_name}: ${errors}`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof ToolDispatcherError) throw e;
+        // Schema file not found or invalid — skip validation (graceful degradation)
+      }
     }
 
     // 3. Call executor (which runs the full 12-step action control pipeline)
