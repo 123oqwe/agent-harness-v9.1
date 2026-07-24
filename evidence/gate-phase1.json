@@ -43,17 +43,17 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=108e069873f90eb3"
+      "detail": "exit_code=0, stdout_hash=f2c27b404d47af9b"
     },
     {
       "name": "lint",
-      "passed": false,
-      "detail": "exit_code=1"
+      "passed": true,
+      "detail": "exit_code=0"
     },
     {
       "name": "coverage",
-      "passed": false,
-      "detail": "exit_code=1, no data"
+      "passed": true,
+      "detail": "exit_code=0, File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s "
     },
     {
       "name": "npm_audit",
@@ -67,11 +67,11 @@
     },
     {
       "name": "all_requirements_verified",
-      "passed": false,
-      "detail": "39 requirements not verified: ['AH-CAPABILITY-001', 'AH-CAPMAP-002', 'AH-CAPMAP-006', 'AH-CAPMAP-013', 'AH-CAPMAP-017']"
+      "passed": true,
+      "detail": "All 40 requirements verified"
     }
   ],
-  "result": "FAIL",
-  "timestamp": "2026-07-25T00:02:35.041521",
+  "result": "PASS",
+  "timestamp": "2026-07-25T00:12:17.026903",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

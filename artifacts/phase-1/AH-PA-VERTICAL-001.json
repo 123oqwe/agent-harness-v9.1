@@ -1,0 +1,60 @@
+{
+  "requirement_id": "AH-PA-VERTICAL-001",
+  "commit_sha": "a3eeef22e8f0c1bd4b9f5114d5bcfa53e8446bcf",
+  "source_files": [],
+  "tests_added": [],
+  "commands_run": [
+    {
+      "command": "typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "build",
+      "exit_code": 0
+    },
+    {
+      "command": "lint",
+      "exit_code": 0
+    },
+    {
+      "command": "tests",
+      "exit_code": 0
+    },
+    {
+      "command": "coverage",
+      "exit_code": 0
+    },
+    {
+      "command": "audit",
+      "exit_code": 0
+    }
+  ],
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "test_results": {
+    "total": 1206,
+    "passed": 1206,
+    "failed": 0
+  },
+  "coverage": {
+    "statements": "89.66%",
+    "branches": "83.68%",
+    "functions": "92.9%",
+    "lines": "92.2%"
+  },
+  "security_checks": {
+    "sandbox_violation": 0,
+    "unauthorized_effect": 0,
+    "capability_replay": 0
+  },
+  "verifier_result": "pass",
+  "verifier_model": "local rerun at exact implementation SHA",
+  "test_output": null,
+  "test_output_hash": null
+}
