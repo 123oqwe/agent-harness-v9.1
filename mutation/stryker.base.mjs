@@ -6,10 +6,9 @@ export const strykerBase = {
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html', 'json'],
   timeoutMS: 30000,
-  // @stryker-mutator/vitest-runner 9.6.1 still supplies Vitest's removed
-  // poolOptions shape. One isolated runner avoids native-addon/Vitest worker
-  // crashes while retaining complete mutant and behavioral-test coverage.
-  concurrency: 1,
+  // The checked-in compatibility patch gives every Vitest run a process
+  // boundary, so Stryker can safely parallelize four mutant workers.
+  concurrency: 4,
   vitest: {
     configFile: 'vitest.mutation.config.ts',
   },

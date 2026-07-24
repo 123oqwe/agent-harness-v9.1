@@ -136,8 +136,19 @@ describe('Phase 1 mutation manifest', () => {
     );
   });
 
-  it('uses one isolated Stryker runner to avoid Vitest/native worker crashes', () => {
-    expect(strykerBase.concurrency).toBe(1);
+  it('patches Vitest mutation workers to use isolated forks', () => {
+    const patch = readFileSync(
+      join(
+        harnessRoot,
+        'patches',
+        '@stryker-mutator+vitest-runner+9.6.1.patch',
+      ),
+      'utf8',
+    );
+    expect(patch).toContain("+            pool: 'forks'");
+    expect(patch).toContain('+            fileParallelism: false');
+    expect(patch).toContain("-            pool: 'threads'");
+    expect(strykerBase.concurrency).toBe(4);
   });
 
   it('owns every executable Phase 1 TypeScript source exactly once', () => {
@@ -405,6 +416,12 @@ describe('Phase 1 mutation report integrity', () => {
     writeFileSync(join(root, 'mutation', 'stryker.base.mjs'), 'base');
     writeFileSync(join(root, 'mutation', 'equivalent-mutants.json'), '[]');
     writeFileSync(join(root, 'package.json'), '{}');
+    writeFileSync(join(root, 'package-lock.json'), '{}');
+    mkdirSync(join(root, 'patches'), { recursive: true });
+    writeFileSync(
+      join(root, 'patches', '@stryker-mutator+vitest-runner+9.6.1.patch'),
+      'fork-patch',
+    );
     writeFileSync(join(root, 'scripts', 'run-mutation.mjs'), 'runner');
     writeFileSync(
       join(root, 'scripts', 'check-mutation-thresholds.mjs'),

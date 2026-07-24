@@ -38,7 +38,8 @@
     "test:mutation:phase1": "node scripts/run-mutation.mjs phase1",
     "test:mutation:check": "node scripts/check-mutation-thresholds.mjs",
     "verify:phase1:local": "npm run typecheck && npm run build && npm run lint && npm test && npm run test:coverage && npm run test:mutation:phase1",
-    "generate:contracts": "node scripts/generate-contracts.mjs"
+    "generate:contracts": "node scripts/generate-contracts.mjs",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -51,6 +52,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.7.0",
     "json-schema-to-typescript": "^15.0.4",
+    "patch-package": "8.0.1",
     "prettier": "^3.9.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
