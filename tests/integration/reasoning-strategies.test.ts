@@ -41,16 +41,16 @@ function toolSpec(name: string): ToolSpec {
 function makeHarness(tmp: string, extraTools: string[] = [], responses: ParsedResponse[] = [{ content: 'done' }]): Harness {
   const gw = createScriptedGateway(responses);
   const tr = new ToolRegistry();
-  ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files'].forEach(n => tr.register(toolSpec(n)));
+  ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'].forEach(n => tr.register(toolSpec(n)));
   extraTools.forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry();
   sr.loadBaseSkills();
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
   vfs.mount(new LocalBackend('/workspace', tmp));
-  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
+  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, registrySnapshotHash: gw.registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 function task(goal: string, over: Partial<TaskContract> = {}): TaskContract {
@@ -75,7 +75,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     writeFileSync(join(tmp, 'f.txt'), 'hello world');
     const h = makeHarness(tmp, [], [
       { content: '', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/f.txt' } }] },
-      { content: 'The file contains: hello world' },
+      { content: 'The file contains: hello world. done' },
     ]);
     const r = await h.run(task('read the file and report its contents'));
     expect(r.routing.strategy).toBe('react');
@@ -118,7 +118,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     vfs.mount(new LocalBackend('/workspace', tmp));
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: createScriptedGateway([{ content: '', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] }, { content: 'done' }]).gateway, registrySnapshotHash: createScriptedGateway([{ content: '', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] }, { content: 'done' }]).registrySnapshotHash, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: createScriptedGateway([{ content: '', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] }, { content: 'done' }]).gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
     const r = await h.run(task('write a file'));
     // Router prefilter denies write_file (not in policy allowed_tools) → routing abstains
     expect(r.routing.outcome).toBe('abstain');

@@ -111,8 +111,6 @@ export interface HarnessConfig {
   sandbox: SandboxProfile;
   /** ModelGateway: all model calls go through gateway.resolve() + dispatch() */
   gateway: ModelGateway;
-  /** Registry snapshot hash for gateway resolution */
-  registrySnapshotHash: string;
   security: HarnessSecurityDeps;
   executionContext: ExecutionContext;
   dataDir?: string | undefined;
@@ -147,8 +145,8 @@ export class Harness {
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
-    const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
-  this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
+  const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
+  this.execCtx = this.config.executionContext;
   this._modelCallCount = 0;
 
  // 1. Create session (event log = source of truth)
@@ -244,27 +242,48 @@ export class Harness {
       },
       {
         session,
-        modelCall: async (messages: unknown[]) => {
-          const typedMessages = messages as Array<{ role: string; content: string }>;
+        modelCall: async (messages: unknown[], _attempt: number) => {
+          const typedMessages = messages as Array<{ role: 'assistant' | 'system' | 'tool' | 'user'; content: string }>;
           const modelCallCount = (this._modelCallCount++) + 1;
-          const req: ProviderSelectionRequest = {
-            registry_snapshot_hash: this.config.registrySnapshotHash,
-            request: { messages: typedMessages },
+          // Derive data policy from authoritative task/user constraints
+          const constraints = (task.constraints ?? []) as Array<{ type: string; value: string }>;
+          const localOnly = constraints.some((c) => c.type === 'privacy' && c.value === 'local_only');
+          // Required capabilities derive from strategy + contract
+          const requiredCaps = runPlan.reasoning_strategy === 'direct'
+            ? ['text_reasoning']
+            : ['text_reasoning', 'tool_calling'];
+          // Selected frozen tools — compact metadata, no permission granted
+          const selectedTools = this.toolSnapshot.tool_names
+            .filter((n) => this.config.policyEngine.snapshot.allowed_tools.includes(n))
+            .map((n) => {
+              const spec = this.config.toolRegistry.get(n);
+              return { name: n, ...(spec ? { description: spec.risk_feature_extractor, input_schema_ref: spec.input_schema_ref } : {}) };
+            });
+         const req: ProviderSelectionRequest = {
+            registry_snapshot_hash: this.config.gateway.registrySnapshotHash,
+           request: {
+              messages: typedMessages,
+              ...(selectedTools.length > 0 ? { tools: selectedTools } : {}),
+            },
             estimated_input_tokens: Math.min(typedMessages.reduce((s, m) => s + m.content.length, 0), 100000),
-            required_capabilities: ['text_reasoning'],
+            required_capabilities: requiredCaps,
             requires_structured_output: false,
             data_policy: {
-              local_only: false,
-              allowed_regions: ['local', 'cn', 'us'],
+              local_only: localOnly,
+              allowed_regions: ['local'],
               max_retention_days: 30,
               training_allowed: false,
             },
             policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
-            run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
-          } as unknown as ProviderSelectionRequest;
+            run_plan: { allowed_provider_ids: undefined, required_capabilities: requiredCaps },
+          };
           const resolved = this.config.gateway.resolve(req);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
-          const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, req, { operation_id: opId });
+          const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
+        const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, req, {
+          operation_id: opId,
+          attempt_id: attId,
+        });
           return {
             content: result.response.content,
             tool_calls: result.response.tool_calls,

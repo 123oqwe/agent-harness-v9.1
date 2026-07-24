@@ -120,13 +120,13 @@ describe('SkillLoader mutation-killing tests', () => {
   });
 
   it('can activate bug-fix skill with its required tools', async () => {
-    const loader = new SkillLoader(registry, snapshot, ['read_file', 'edit_file', 'execute_command_sandboxed']);
+    const loader = new SkillLoader(registry, snapshot, ['read_file', 'edit_file', 'execute_command']);
     const result = await loader.activate('bug-fix');
     expect(result.required_tools_available).toBe(true);
   });
 
   it('can activate feature-implementation skill', async () => {
-    const loader = new SkillLoader(registry, snapshot, ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed']);
+    const loader = new SkillLoader(registry, snapshot, ['read_file', 'write_file', 'edit_file', 'execute_command']);
     const result = await loader.activate('feature-implementation');
     expect(result.required_tools_available).toBe(true);
   });

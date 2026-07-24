@@ -90,9 +90,9 @@ export function baseSkills(): SkillSpec[] {
   // dependency-aware planning.
   return [
     mk('repository-exploration', ['list_directory', 'read_file', 'search_files'], 'low', 'coding', 'Explore a repository structure'),
-    mk('bug-fix', ['read_file', 'edit_file', 'execute_command_sandboxed'], 'medium', 'coding', 'Fix a bug in a repository'),
-    mk('feature-implementation', ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed'], 'medium', 'coding', 'Implement a new feature'),
-    mk('test-and-verify', ['read_file', 'write_file', 'execute_command_sandboxed'], 'medium', 'coding', 'Write and run tests'),
+    mk('bug-fix', ['read_file', 'edit_file', 'execute_command'], 'medium', 'coding', 'Fix a bug in a repository'),
+    mk('feature-implementation', ['read_file', 'write_file', 'edit_file', 'execute_command'], 'medium', 'coding', 'Implement a new feature'),
+    mk('test-and-verify', ['read_file', 'write_file', 'execute_command'], 'medium', 'coding', 'Write and run tests'),
     mk('research-with-citations', ['search_files', 'read_file', 'parse_document'], 'low', 'research', 'Research with source citations'),
     mk('document-summary', ['parse_document', 'read_file'], 'low', 'documents', 'Summarize a document with page references'),
     mk('writing-refinement', ['read_file', 'write_file'], 'low', 'writing', 'Refine writing through brief, draft, self-check'),

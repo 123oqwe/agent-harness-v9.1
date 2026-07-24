@@ -75,13 +75,27 @@ export function createTestSecurityDeps(
  * Build a real ModelGateway with a ScriptedTestProvider for deterministic tests.
  * Responses are repeated 10x to prevent queue exhaustion in multi-iteration strategies.
  */
-export function createScriptedGateway(responses: ParsedResponse[]): {
+export interface ScriptedGatewayOptions {
+  readonly responses: readonly ParsedResponse[];
+  readonly clock?: () => Date;
+  readonly onDispatch?: (request: unknown) => void;
+}
+
+/**
+ * Build a real ModelGateway with a ScriptedTestProvider for deterministic tests.
+ * Uses an exact finite queue — exhaustion is a real failure, not silently hidden.
+ */
+export function createScriptedGateway(options: ScriptedGatewayOptions | readonly ParsedResponse[]): {
   gateway: ModelGateway;
-  registrySnapshotHash: string;
   selectionRequest: ProviderSelectionRequest;
 } {
-  const repeated = [...responses, ...responses, ...responses, ...responses, ...responses, ...responses, ...responses, ...responses, ...responses, ...responses];
-  const provider = new ScriptedTestProvider({ queue: repeated });
+  const opts: ScriptedGatewayOptions = Array.isArray(options)
+    ? { responses: options as readonly ParsedResponse[] }
+    : (options as ScriptedGatewayOptions);
+  const provider = new ScriptedTestProvider({
+    queue: [...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses, ...opts.responses],
+    ...(opts.clock ? { now: opts.clock } : {}),
+  });
   const runtime: GatewayProviderRuntime = {
     provider_type: provider.provider_type,
     normalizeRequest: provider.normalizeRequest.bind(provider),
@@ -92,7 +106,10 @@ export function createScriptedGateway(responses: ParsedResponse[]): {
     meterUsage: provider.meterUsage.bind(provider),
     checkHealth: () => 'healthy' as const,
     validateDataPolicy: provider.validateDataPolicy.bind(provider),
-    resolve: provider.resolve.bind(provider),
+    resolve: (request) => {
+      opts.onDispatch?.(request);
+      return provider.resolve(request);
+    },
   };
   const metadata: GatewayProviderMetadata = {
     capabilities: ['text_reasoning', 'tool_calling', 'structured_output'],
@@ -141,9 +158,9 @@ export function createScriptedGateway(responses: ParsedResponse[]): {
     },
     policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
     run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
-  } as unknown as ProviderSelectionRequest;
+  };
 
-  return { gateway, registrySnapshotHash: registry.snapshot.hash, selectionRequest };
+  return { gateway, selectionRequest };
 }
 
 export type { ParsedResponse };

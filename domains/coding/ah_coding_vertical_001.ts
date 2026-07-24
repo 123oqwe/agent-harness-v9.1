@@ -37,7 +37,7 @@ export function codingTaskContract(input: CodingVerticalInput): TaskContract {
       { criterion: 'diff generated', verification_method: 'deterministic' },
     ],
     constraints: [
-      { type: 'tool_restriction', value: 'read_file,edit_file,execute_command_sandboxed' },
+      { type: 'tool_restriction', value: 'read_file,edit_file,execute_command' },
       { type: 'privacy', value: 'local_only' },
     ],
   };
@@ -61,7 +61,7 @@ export async function runCodingVertical(
 
   const readEvents = toolCalls.filter(e => (e.data as { tool: string }).tool === 'read_file');
   const editEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'edit_file');
-  const execResult = toolResults.find(e => (e.data as { tool: string }).tool === 'execute_command_sandboxed');
+  const execResult = toolResults.find(e => (e.data as { tool: string }).tool === 'execute_command');
 
   // Extract file content from read_file results (before and after edit)
   const readResults = readEvents.map(e => {
