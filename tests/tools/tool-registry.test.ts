@@ -3,7 +3,7 @@ import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ToolRegistry, ToolRegistryError } from '../../tools/tool-registry.js';
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../../contracts/index.js';
 
 function validSpec(name: string, over: Partial<ToolSpec> = {}): ToolSpec {
   return {

@@ -2,7 +2,7 @@ import { generateKeyPairSync } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import type { ChildCapabilityRequest } from '../../../spec/types/child-capability-request.js';
+import type { ChildCapabilityRequest } from '../../contracts/index.js';
 import {
   AuthorizationService,
   InMemoryCapabilityStateStore,

@@ -81,9 +81,11 @@ export class ToolDispatcher {
         }
       } catch (e) {
         if (e instanceof ToolDispatcherError) throw e;
-        // Schema file not found or invalid — skip validation (graceful degradation)
-      }
-    }
+       // Schema file not found or invalid — skip validation (graceful degradation)
+       // FAIL-CLOSED: if schema file is specified but missing, reject
+       throw new ToolDispatcherError(`input schema file not found for ${req.tool_name}: ${inputSchemaStr}`);
+     }
+   }
 
     // 3. Call executor (which runs the full 12-step action control pipeline)
     try {
@@ -93,10 +95,31 @@ export class ToolDispatcher {
         executeFn as (deps: unknown) => Promise<T>,
       );
 
-      // 4. Validate output exists
-      if (result === undefined) {
-        return { success: false, receipt, error: 'tool returned undefined result' };
-      }
+     // 4. Validate output exists
+     if (result === undefined) {
+       return { success: false, receipt, error: 'tool returned undefined result' };
+     }
+ 
+     // 4a. Output schema validation (if available)
+     const outputSchemaStr = (spec as unknown as Record<string, unknown>).output_schema_ref as string | undefined;
+     if (outputSchemaStr && outputSchemaStr.endsWith('.json')) {
+       try {
+         const { readFileSync, existsSync } = await import('node:fs');
+         const { resolve: resolvePath } = await import('node:path');
+         const fullSchemaPath = resolvePath(process.cwd(), outputSchemaStr);
+         if (existsSync(fullSchemaPath)) {
+           const schema = JSON.parse(readFileSync(fullSchemaPath, 'utf8'));
+           const ajv = new Ajv({ allErrors: true, strict: false });
+           const validate = ajv.compile(schema);
+           if (!validate(result)) {
+             const errors = validate.errors?.map((e: { instancePath: string; message?: string }) => `${e.instancePath}: ${e.message}`).join('; ') ?? 'unknown';
+             throw new ToolDispatcherError(`output schema validation failed for ${req.tool_name}: ${errors}`);
+           }
+         }
+       } catch (e) {
+         if (e instanceof ToolDispatcherError) throw e;
+       }
+     }
 
       return { success: true, result, receipt };
     } catch (err) {
@@ -109,7 +132,7 @@ export class ToolDispatcher {
           success: false,
           error,
           duration_ms: 0,
-          input_hash: '',
+          input_hash: (await import('node:crypto')).createHash('sha256').update(JSON.stringify(req.input)).digest('hex').slice(0, 16),
         },
         error,
       };

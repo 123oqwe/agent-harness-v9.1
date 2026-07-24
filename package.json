@@ -6,12 +6,12 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "./dist/harness/index.js",
-  "types": "./dist/harness/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/harness/index.d.ts",
-      "import": "./dist/harness/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [

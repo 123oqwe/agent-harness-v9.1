@@ -177,14 +177,16 @@ export class ToolExecutor {
  async execute<T>(toolName: string, input: unknown, fn: (deps: ToolExecutorDeps) => Promise<T>): Promise<{ result: T; receipt: ToolReceipt }> {
    const start = Date.now();
    this.callCount++;
-   const ctx = this.injected.execCtx;
-   const operationId = ctx?.operation_id ?? `op-${this.callCount}`;
-   const attemptId = ctx?.attempt_id ?? `att-${this.callCount}`;
-   const tenantId = ctx?.tenant_id ?? 'default-tenant';
-   const userId = ctx?.user_id ?? 'default-user';
-   const planId = ctx?.plan_id ?? `plan-${this.callCount}`;
-   const stepId = ctx?.step_id ?? `step-${this.callCount}`;
-   const thumbprint = ctx?.confirmation_key_thumbprint ?? 'runtime-thumbprint';
+  const ctx = this.injected.execCtx;
+  // ExecutionContext is required — no fallback to default identity in production path
+  if (!ctx) throw new ToolExecutorError('ExecutionContext is required — no default identity allowed');
+  const operationId = ctx.operation_id;
+  const attemptId = ctx.attempt_id;
+  const tenantId = ctx.tenant_id;
+  const userId = ctx.user_id;
+  const planId = ctx.plan_id;
+  const stepId = ctx.step_id;
+  const thumbprint = ctx.confirmation_key_thumbprint;
 
    // 1. ToolSpec validation: tool must exist in frozen snapshot
    if (!this.deps.toolRegistry.inSnapshot(toolName, this.deps.snapshot)) {

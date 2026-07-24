@@ -49,7 +49,7 @@ describe('AH-CONTRACT-RUNPLAN-001: run-plan schema', () => {
 
   it('keeps the generated RunPlan type in parity with the strategy enum', () => {
     const generatedTypePath = fileURLToPath(
-      new URL('../../../spec/types/run-plan.ts', import.meta.url),
+      new URL('../../contracts/generated/run_plan.ts', import.meta.url),
     );
     const generatedType = readFileSync(generatedTypePath, 'utf8');
 

@@ -101,8 +101,8 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     const result = runNpm(['run', 'build']);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
 
-    const jsEntry = path.join(harnessRoot, 'dist/harness/index.js');
-    const typeEntry = path.join(harnessRoot, 'dist/harness/index.d.ts');
+    const jsEntry = path.join(harnessRoot, 'dist/index.js');
+    const typeEntry = path.join(harnessRoot, 'dist/index.d.ts');
     expect(fs.existsSync(jsEntry)).toBe(true);
     expect(fs.existsSync(typeEntry)).toBe(true);
     const built = (await import(`${jsEntry}?test=${Date.now()}`)) as Record<string, unknown>;
@@ -132,8 +132,8 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     const paths = report[0]!.files.map((file) => file.path).sort();
 
     expect(paths).toContain('package.json');
-    expect(paths).toContain('dist/harness/index.js');
-    expect(paths).toContain('dist/harness/index.d.ts');
+    expect(paths).toContain('dist/index.js');
+    expect(paths).toContain('dist/index.d.ts');
     expect(paths.every((entry) => entry === 'package.json' || entry.startsWith('dist/'))).toBe(
       true,
     );

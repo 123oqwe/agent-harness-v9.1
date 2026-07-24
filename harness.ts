@@ -334,17 +334,18 @@ private currentOverlayAsVfs(): VirtualFilesystem {
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
 private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
-  const execCtxForTool = this.execCtx ? {
-    tenant_id: this.execCtx.tenant_id,
-    user_id: this.execCtx.user_id,
-    run_id: this.execCtx.run_id,
-    plan_id: this.execCtx.plan_id,
-    step_id: this.execCtx.step_id,
-    attempt_id: this.execCtx.attempt_id,
-    operation_id: this.execCtx.operation_id,
-    idempotency_key: this.execCtx.idempotency_key,
-    confirmation_key_thumbprint: this.execCtx.confirmation_key_thumbprint,
-  } : undefined;
+  // ExecutionContext is always set (required in HarnessConfig, set in run())
+  const execCtxForTool = {
+    tenant_id: this.execCtx!.tenant_id,
+    user_id: this.execCtx!.user_id,
+    run_id: this.execCtx!.run_id,
+    plan_id: this.execCtx!.plan_id,
+    step_id: this.execCtx!.step_id,
+    attempt_id: this.execCtx!.attempt_id,
+    operation_id: this.execCtx!.operation_id,
+    idempotency_key: this.execCtx!.idempotency_key,
+    confirmation_key_thumbprint: this.execCtx!.confirmation_key_thumbprint,
+  };
   // Pass overlay VFS (if active) so tool writes go through the overlay, not the real FS
   const activeVfs = this.currentOverlay ? this.currentOverlayAsVfs() : this.config.vfs;
   const executor = new ToolExecutor(
@@ -354,7 +355,7 @@ private async executeTool(name: string, args: Record<string, unknown>, session: 
       pep: this.config.security.pep,
       stateStore: this.config.security.stateStore,
       now: () => this.now(),
-      ...(execCtxForTool ? { execCtx: execCtxForTool } : {}),
+      execCtx: execCtxForTool,
     },
    );
    // Route through ToolDispatcher: frozen snapshot → schema validation → ToolExecutor → receipt

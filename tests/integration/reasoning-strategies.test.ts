@@ -28,9 +28,9 @@ import type { SandboxProfile } from '../../runtime/sandbox.js';
 
 import type { ModelTurn } from '../../runtime/loop.js';
 
-import type { TaskContract } from '../../../spec/types/task-contract.js';
+import type { TaskContract } from '../../contracts/index.js';
 
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../../contracts/index.js';
 
 
 function toolSpec(name: string): ToolSpec {

@@ -23,7 +23,7 @@ import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../../contracts/index.js';
 import { DurableSession } from '../../session/durable-session.js';
 import { LoopEngine } from '../../runtime/loop.js';
 
