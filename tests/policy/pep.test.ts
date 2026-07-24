@@ -5,9 +5,9 @@ import type { CapabilityToken } from '../../contracts/index.js';
 import type { EffectRisk } from '../../contracts/index.js';
 import { PolicyEngine, type Policy, type PolicyContext } from '../../security/policy-engine.js';
 import {
+  PepDeniedError,
   PolicyEnforcementPoint,
   type AuditEvent,
-  type PepDeniedError,
   type PepExecutionContext,
 } from '../../security/pep.js';
 
@@ -561,5 +561,399 @@ describe('AH-POLICY-ENGINE-001: every allow and deny is audit logged without sen
       reason_code: 'audit_failed',
     } satisfies Partial<PepDeniedError>);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe('PolicyEnforcementPoint fail-closed dependency and execution boundaries', () => {
+  const verify = async (): Promise<boolean> => true;
+  const consume = async (): Promise<boolean> => true;
+  const write = async (): Promise<void> => undefined;
+  const now = (): string => NOW;
+
+  it.each([
+    [
+      'policy_engine',
+      {
+        policy_engine: {},
+        capability_authority: { verify_signature: verify, consume },
+        audit_sink: { write },
+        now,
+      },
+      'policy_engine is required',
+    ],
+    [
+      'signature verifier',
+      {
+        policy_engine: new PolicyEngine(allowPolicy()),
+        capability_authority: { consume },
+        audit_sink: { write },
+        now,
+      },
+      'capability_authority is required',
+    ],
+    [
+      'capability consumer',
+      {
+        policy_engine: new PolicyEngine(allowPolicy()),
+        capability_authority: { verify_signature: verify },
+        audit_sink: { write },
+        now,
+      },
+      'capability_authority is required',
+    ],
+    [
+      'audit sink',
+      {
+        policy_engine: new PolicyEngine(allowPolicy()),
+        capability_authority: { verify_signature: verify, consume },
+        audit_sink: {},
+        now,
+      },
+      'audit_sink is required',
+    ],
+    [
+      'clock',
+      {
+        policy_engine: new PolicyEngine(allowPolicy()),
+        capability_authority: { verify_signature: verify, consume },
+        audit_sink: { write },
+        now: undefined,
+      },
+      'now is required',
+    ],
+  ])('rejects an invalid %s dependency with its exact contract error', (_name, options, message) => {
+    expect(() => new PolicyEnforcementPoint(options as never)).toThrow(new TypeError(message));
+  });
+
+  it('rejects a non-callable execution continuation before consulting policy', async () => {
+    const { engine, pep, verifySignature, consume, events } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const enforce = pep.enforce.bind(pep) as unknown as (
+      request: Parameters<PolicyEnforcementPoint['enforce']>[0],
+      execute: unknown,
+    ) => Promise<unknown>;
+
+    await expect(
+      enforce(
+        { manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx },
+        undefined,
+      ),
+    ).rejects.toThrow(new TypeError('execute must be a function'));
+    expect(verifySignature).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('normalizes policy input failures to a null-tier audited denial', async () => {
+    const { engine, pep, events, verifySignature } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const invalidRisk = { ...risk(), financial_impact_usd_micros: '-1' } as EffectRisk;
+
+    await expectDenied(
+      pep.enforce(
+        { manifest: action, risk: invalidRisk, token: tokenFor(engine, action, risk(), ctx), context: ctx },
+        vi.fn(),
+      ),
+      'invalid_policy_input',
+    );
+    expect(verifySignature).not.toHaveBeenCalled();
+    expect(events).toEqual([
+      {
+        timestamp: NOW,
+        outcome: 'deny',
+        reason_code: 'invalid_policy_input',
+        policy_hash: engine.policy_hash,
+        policy_version: 'policy-v1',
+        token_id: TOKEN_ID,
+        manifest_hash: HASH_B,
+        operation_id: 'operation-1',
+        attempt_id: 'attempt-1',
+        tool_name: 'read_file',
+        derived_risk_tier: null,
+      },
+    ]);
+  });
+
+  it('converts a throwing signature verifier into invalid_signature', async () => {
+    const { engine, pep, consume } = setup({
+      verify_signature: async () => {
+        throw new Error('authority unavailable');
+      },
+    });
+    const action = manifest();
+    const ctx = executionContext(engine);
+
+    await expectDenied(
+      pep.enforce({ manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx }, vi.fn()),
+      'invalid_signature',
+    );
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('converts a throwing capability consumer into capability_consume_failed', async () => {
+    const { engine, pep } = setup({
+      consume: async () => {
+        throw new Error('store unavailable');
+      },
+    });
+    const action = manifest();
+    const ctx = executionContext(engine);
+
+    await expectDenied(
+      pep.enforce({ manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx }, vi.fn()),
+      'capability_consume_failed',
+    );
+  });
+});
+
+describe('PolicyEnforcementPoint exact temporal boundaries', () => {
+  it('rejects a malformed enforcement clock at the policy boundary before token validation', async () => {
+    const { engine, pep, verifySignature } = setup({ now: () => 'not-a-clock' });
+    const action = manifest();
+    const ctx = executionContext(engine);
+
+    await expectDenied(
+      pep.enforce({ manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx }, vi.fn()),
+      'invalid_policy_input',
+    );
+    expect(verifySignature).not.toHaveBeenCalled();
+  });
+
+  it('allows exactly ten seconds of issued_at skew and rejects one millisecond more', async () => {
+    const action = manifest();
+    const allowed = setup();
+    const allowedContext = executionContext(allowed.engine);
+    await expect(
+      allowed.pep.enforce(
+        {
+          manifest: action,
+          risk: risk(),
+          token: tokenFor(allowed.engine, action, risk(), allowedContext, {
+            issued_at: '2026-01-01T00:00:10.000Z',
+          }),
+          context: allowedContext,
+        },
+        async () => 'allowed',
+      ),
+    ).resolves.toBe('allowed');
+
+    const denied = setup();
+    const deniedContext = executionContext(denied.engine);
+    await expectDenied(
+      denied.pep.enforce(
+        {
+          manifest: action,
+          risk: risk(),
+          token: tokenFor(denied.engine, action, risk(), deniedContext, {
+            issued_at: '2026-01-01T00:00:10.001Z',
+          }),
+          context: deniedContext,
+        },
+        vi.fn(),
+      ),
+      'invalid_time_order',
+    );
+  });
+
+  it('requires not_before to be strictly earlier than expires_at', async () => {
+    const { engine, pep } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const token = tokenFor(engine, action, risk(), ctx, {
+      issued_at: '2025-12-31T23:59:59.000Z',
+      not_before: '2026-01-01T00:01:00.000Z',
+      expires_at: '2026-01-01T00:01:00.000Z',
+    });
+
+    await expectDenied(
+      pep.enforce({ manifest: action, risk: risk(), token, context: ctx }, vi.fn()),
+      'invalid_time_order',
+    );
+  });
+
+  it('rejects a malformed manifest expiry independently of token validity', async () => {
+    const { engine, pep } = setup();
+    const action = manifest({ expires_at: 'not-a-date' });
+    const ctx = executionContext(engine);
+
+    await expectDenied(
+      pep.enforce({ manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx }, vi.fn()),
+      'invalid_manifest_time',
+    );
+  });
+});
+
+describe('PolicyEnforcementPoint egress authorization boundaries', () => {
+  function networkRisk(overrides: Partial<EffectRisk> = {}): EffectRisk {
+    return risk({
+      locality: 'remote',
+      network_access: true,
+      egress_policy: {
+        mode: 'allowlist',
+        domain_rules: [{ action: 'allow', host: 'api.example.com' }],
+      },
+      ...overrides,
+    });
+  }
+
+  it('requires a concrete egress target for every declared network effect', async () => {
+    const { engine, pep, consume } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const actionRisk = networkRisk();
+
+    await expectDenied(
+      pep.enforce(
+        { manifest: action, risk: actionRisk, token: tokenFor(engine, action, actionRisk, ctx), context: ctx },
+        vi.fn(),
+      ),
+      'egress_target_required',
+    );
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('rejects a network effect without policy-derived egress constraints before token validation', async () => {
+    const { engine, pep, consume, verifySignature } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const actionRisk = risk({ locality: 'remote', network_access: true });
+
+    await expectDenied(
+      pep.enforce(
+        {
+          manifest: action,
+          risk: actionRisk,
+          token: tokenFor(engine, action, risk(), ctx),
+          context: ctx,
+          egress: {
+            destination: 'https://api.example.com/data',
+            resolve_host: async () => ['203.0.113.10'],
+          },
+        },
+        vi.fn(),
+      ),
+      'policy_denied',
+    );
+    expect(verifySignature).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('authorizes an unpinned target and deeply freezes the complete authorization', async () => {
+    const { engine, pep } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const actionRisk = networkRisk();
+    let received: unknown;
+
+    await pep.enforce(
+      {
+        manifest: action,
+        risk: actionRisk,
+        token: tokenFor(engine, action, actionRisk, ctx),
+        context: ctx,
+        egress: {
+          destination: 'https://api.example.com/data',
+          resolve_host: async () => ['203.0.113.10'],
+        },
+      },
+      async (authorization) => {
+        received = authorization;
+        return 'ok';
+      },
+    );
+
+    expect(received).toEqual({
+      policy_decision_hash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      policy_hash: engine.policy_hash,
+      token_id: TOKEN_ID,
+      manifest_hash: HASH_B,
+      egress: {
+        destination: 'https://api.example.com/data',
+        canonical_host: 'api.example.com',
+        resolved_addresses: ['203.0.113.10'],
+      },
+    });
+    const authorization = received as {
+      egress: { resolved_addresses: string[] };
+    };
+    expect(Object.isFrozen(authorization)).toBe(true);
+    expect(Object.isFrozen(authorization.egress)).toBe(true);
+    expect(Object.isFrozen(authorization.egress.resolved_addresses)).toBe(true);
+  });
+
+  it('passes an allowed redirect origin into egress validation', async () => {
+    const { engine, pep } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    const actionRisk = networkRisk();
+
+    await expect(
+      pep.enforce(
+        {
+          manifest: action,
+          risk: actionRisk,
+          token: tokenFor(engine, action, actionRisk, ctx),
+          context: ctx,
+          egress: {
+            destination: 'https://api.example.com/data',
+            redirect_from: 'https://api.example.com/old',
+            resolve_host: async () => ['203.0.113.10'],
+          },
+        },
+        async () => 'ok',
+      ),
+    ).resolves.toBe('ok');
+  });
+});
+
+describe('PolicyEnforcementPoint immutable audit contract', () => {
+  it('writes every allow field exactly and returns an authorization without an egress property', async () => {
+    const { engine, events, pep } = setup();
+    const action = manifest();
+    const ctx = executionContext(engine);
+    let authorization: unknown;
+
+    await pep.enforce(
+      { manifest: action, risk: risk(), token: tokenFor(engine, action, risk(), ctx), context: ctx },
+      async (value) => {
+        authorization = value;
+        return 'ok';
+      },
+    );
+
+    expect(authorization).toEqual({
+      policy_decision_hash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      policy_hash: engine.policy_hash,
+      token_id: TOKEN_ID,
+      manifest_hash: HASH_B,
+    });
+    expect(authorization).not.toHaveProperty('egress');
+    expect(events).toEqual([
+      {
+        timestamp: NOW,
+        outcome: 'allow',
+        reason_code: 'authorized',
+        policy_hash: engine.policy_hash,
+        policy_version: 'policy-v1',
+        token_id: TOKEN_ID,
+        manifest_hash: HASH_B,
+        operation_id: 'operation-1',
+        attempt_id: 'attempt-1',
+        tool_name: 'read_file',
+        derived_risk_tier: 0,
+      },
+    ]);
+    expect(Object.isFrozen(events[0])).toBe(true);
+  });
+
+  it('exposes the exact denial message and reason code', () => {
+    const denied = new PepDeniedError('wrong_tenant');
+    expect(denied).toMatchObject({
+      name: 'PepDeniedError',
+      message: 'Policy enforcement denied: wrong_tenant',
+      reason_code: 'wrong_tenant',
+    });
   });
 });

@@ -160,15 +160,12 @@ export class PolicyEnforcementPoint {
     const issuedAt = strictTimestamp(request.token.issued_at);
     const notBefore = strictTimestamp(request.token.not_before);
     const expiresAt = strictTimestamp(request.token.expires_at);
-    const nowValue = strictTimestamp(now);
-    if (
-      issuedAt === undefined ||
-      notBefore === undefined ||
-      expiresAt === undefined ||
-      nowValue === undefined
-    ) {
+    if (issuedAt === undefined || notBefore === undefined || expiresAt === undefined) {
       return this.#deny(request, 'invalid_time', tier);
     }
+    // PolicyEngine already validated the same context.now value before returning
+    // an allow decision, so parsing it here cannot fail.
+    const nowValue = Date.parse(now);
    // Allow 10s clock skew tolerance for issued_at vs not_before
    if (issuedAt > notBefore + 10_000 || notBefore >= expiresAt) {
      return this.#deny(request, 'invalid_time_order', tier);
@@ -208,12 +205,13 @@ export class PolicyEnforcementPoint {
       | { destination: string; canonical_host: string; resolved_addresses: readonly string[] }
       | undefined;
     if (request.risk.network_access) {
-      if (request.egress === undefined || decision.egress_policy === undefined) {
+      // PolicyEngine cannot allow a network effect without an egress policy.
+      if (request.egress === undefined) {
         return this.#deny(request, 'egress_target_required', tier);
       }
       const egressDecision = await validateEgressTarget({
         destination: request.egress.destination,
-        policy: decision.egress_policy,
+        policy: decision.egress_policy!,
         resolve_host: request.egress.resolve_host,
         ...(request.egress.pinned_addresses === undefined
           ? {}
