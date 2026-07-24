@@ -196,7 +196,11 @@ function validateContext(context: PolicyContext): void {
 export function isStrictDateTime(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)$/u.test(value);
-  return match && Number.isFinite(Date.parse(value));
+  if (!match) return false;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return false;
+  const canonicalInput = value.includes('.') ? value : value.replace(/Z$/u, '.000Z');
+  return new Date(timestamp).toISOString() === canonicalInput;
 }
 
 function parseFinancialImpact(value: string): bigint {
@@ -437,14 +441,15 @@ function patternIntersection(left: string, right: string): string | undefined {
   if (left === '*') return right;
   if (right === '*') return left;
   if (left === right) return left;
-  if (left.startsWith('*.') && hostMatches(right, left)) return right;
-  if (right.startsWith('*.') && hostMatches(left, right)) return left;
   if (left.startsWith('*.') && right.startsWith('*.')) {
     const leftSuffix = left.slice(2);
     const rightSuffix = right.slice(2);
     if (leftSuffix.endsWith(`.${rightSuffix}`)) return left;
     if (rightSuffix.endsWith(`.${leftSuffix}`)) return right;
+    return undefined;
   }
+  if (left.startsWith('*.') && hostMatches(right, left)) return right;
+  if (right.startsWith('*.') && hostMatches(left, right)) return left;
   return undefined;
 }
 
