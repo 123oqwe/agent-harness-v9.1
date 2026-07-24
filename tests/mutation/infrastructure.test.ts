@@ -14,6 +14,8 @@ const {
   buildPhase1Report,
   computeMutationConfigurationHash,
   loadEquivalentMutants,
+  mergeChunkReports,
+  planMutationChunks,
   releaseRunLock,
   validatePhase1Report,
 } = await import(
@@ -87,6 +89,19 @@ function passingModuleResult(
     status: 'PASS',
     counts: zeroCounts(),
     per_file: perFile,
+    chunks: planMutationChunks(module.mutate, harnessRoot, 150).map(
+      (chunk: {
+        chunk_id: string;
+        source_file: string;
+        start_line: number;
+        end_line: number;
+      }) => ({
+        chunk_id: chunk.chunk_id,
+        source_file: chunk.source_file,
+        start_line: chunk.start_line,
+        end_line: chunk.end_line,
+      }),
+    ),
     raw_report_sha256: 'c'.repeat(64),
     started_at: '2026-07-25T00:00:00.000Z',
     completed_at: '2026-07-25T00:01:00.000Z',
@@ -291,6 +306,96 @@ describe('equivalent mutant governance', () => {
 });
 
 describe('Phase 1 mutation report integrity', () => {
+  it('partitions every source line into deterministic non-overlapping chunks', () => {
+    const root = temporaryRoot();
+    mkdirSync(join(root, 'gateway'), { recursive: true });
+    writeFileSync(join(root, 'gateway', 'provider.ts'), '1\n2\n3\n4\n5\n');
+
+    expect(planMutationChunks(['gateway/provider.ts'], root, 2)).toEqual([
+      {
+        chunk_id: 'gateway-provider-ts-1-2',
+        source_file: 'gateway/provider.ts',
+        start_line: 1,
+        end_line: 2,
+        mutate_pattern: 'gateway/provider.ts:1-2',
+      },
+      {
+        chunk_id: 'gateway-provider-ts-3-4',
+        source_file: 'gateway/provider.ts',
+        start_line: 3,
+        end_line: 4,
+        mutate_pattern: 'gateway/provider.ts:3-4',
+      },
+      {
+        chunk_id: 'gateway-provider-ts-5-5',
+        source_file: 'gateway/provider.ts',
+        start_line: 5,
+        end_line: 5,
+        mutate_pattern: 'gateway/provider.ts:5-5',
+      },
+    ]);
+  });
+
+  it('merges chunk reports without dropping or double-counting mutants', () => {
+    const chunks = [
+      {
+        chunk_id: 'chunk-a',
+        source_file: 'gateway/provider.ts',
+        start_line: 1,
+        end_line: 2,
+        mutate_pattern: 'gateway/provider.ts:1-2',
+      },
+      {
+        chunk_id: 'chunk-b',
+        source_file: 'gateway/provider.ts',
+        start_line: 3,
+        end_line: 4,
+        mutate_pattern: 'gateway/provider.ts:3-4',
+      },
+    ];
+    const firstMutant = {
+      id: '0',
+      mutatorName: 'StringLiteral',
+      replacement: '""',
+      status: 'Killed',
+      location: {
+        start: { line: 1, column: 1 },
+        end: { line: 1, column: 4 },
+      },
+    };
+    const secondMutant = {
+      id: '0',
+      mutatorName: 'BooleanLiteral',
+      replacement: 'false',
+      status: 'Survived',
+      location: {
+        start: { line: 3, column: 1 },
+        end: { line: 3, column: 5 },
+      },
+    };
+    const report = (mutants: unknown[]) => ({
+      schemaVersion: '1.0',
+      files: {
+        'gateway/provider.ts': {
+          language: 'typescript',
+          source: 'const one = true;\nconst two = true;',
+          mutants,
+        },
+      },
+    });
+
+    const merged = mergeChunkReports(chunks, [
+      report([firstMutant]),
+      report([secondMutant, secondMutant]),
+    ]);
+    const mutants = merged.files['gateway/provider.ts']!.mutants;
+    expect(mutants).toHaveLength(2);
+    expect(mutants.map((mutant: { id: string }) => mutant.id)).toEqual([
+      'chunk-a:0',
+      'chunk-b:0',
+    ]);
+  });
+
   it('hashes every mutation authority and changes if one changes', () => {
     const root = temporaryRoot();
     mkdirSync(join(root, 'mutation'), { recursive: true });

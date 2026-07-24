@@ -273,6 +273,111 @@ function resolveMutationFiles(patterns, root = harnessRoot) {
   return [...files].sort();
 }
 
+function sourceLineCount(source) {
+  if (source.length === 0) return 1;
+  const lines = source.split('\n');
+  return lines.at(-1) === '' ? Math.max(1, lines.length - 1) : lines.length;
+}
+
+function chunkId(sourceFile, startLine, endLine) {
+  const slug = sourceFile
+    .replaceAll(/[^a-zA-Z0-9]+/gu, '-')
+    .replaceAll(/^-|-$/gu, '')
+    .toLowerCase();
+  return `${slug}-${startLine}-${endLine}`;
+}
+
+export function planMutationChunks(
+  sourceFiles,
+  root = harnessRoot,
+  linesPerChunk = 250,
+) {
+  if (!Number.isSafeInteger(linesPerChunk) || linesPerChunk <= 0) {
+    throw new Error('linesPerChunk must be a positive safe integer');
+  }
+  const chunks = [];
+  for (const sourceFile of [...sourceFiles].sort()) {
+    const absolutePath = join(root, sourceFile);
+    if (!existsSync(absolutePath)) {
+      throw new Error(`mutation source missing: ${sourceFile}`);
+    }
+    const lineCount = sourceLineCount(readFileSync(absolutePath, 'utf8'));
+    for (
+      let startLine = 1;
+      startLine <= lineCount;
+      startLine += linesPerChunk
+    ) {
+      const endLine = Math.min(lineCount, startLine + linesPerChunk - 1);
+      chunks.push({
+        chunk_id: chunkId(sourceFile, startLine, endLine),
+        source_file: sourceFile,
+        start_line: startLine,
+        end_line: endLine,
+        mutate_pattern: `${sourceFile}:${startLine}-${endLine}`,
+      });
+    }
+  }
+  return chunks;
+}
+
+function mutantIdentity(sourceFile, mutant) {
+  return canonicalJson({
+    source_file: sourceFile,
+    mutator_name: mutant.mutatorName,
+    replacement: mutant.replacement,
+    location: mutant.location,
+  });
+}
+
+export function mergeChunkReports(chunks, reports) {
+  if (chunks.length === 0 || chunks.length !== reports.length) {
+    throw new Error('chunk/report cardinality mismatch');
+  }
+  const merged = {
+    ...reports[0],
+    files: {},
+    phase1_chunked: true,
+    chunks: chunks.map((chunk) => ({ ...chunk })),
+  };
+  const identities = new Set();
+  for (const [index, report] of reports.entries()) {
+    const chunk = chunks[index];
+    if (!report?.files || typeof report.files !== 'object') {
+      throw new Error(`chunk ${chunk.chunk_id} has no files object`);
+    }
+    const entries = Object.entries(report.files);
+    if (entries.length !== 1 || entries[0][0] !== chunk.source_file) {
+      throw new Error(`chunk ${chunk.chunk_id} source file mismatch`);
+    }
+    const [sourceFile, file] = entries[0];
+    const target = merged.files[sourceFile] ?? {
+      ...file,
+      mutants: [],
+    };
+    if (target.source !== file.source || target.language !== file.language) {
+      throw new Error(`chunk ${chunk.chunk_id} source content mismatch`);
+    }
+    for (const mutant of file.mutants ?? []) {
+      const identity = mutantIdentity(sourceFile, mutant);
+      if (identities.has(identity)) continue;
+      identities.add(identity);
+      target.mutants.push({
+        ...mutant,
+        id: `${chunk.chunk_id}:${String(mutant.id)}`,
+        stryker_chunk_id: chunk.chunk_id,
+        stryker_original_id: String(mutant.id),
+      });
+    }
+    merged.files[sourceFile] = target;
+  }
+  exactSet(
+    Object.keys(merged.files),
+    [...new Set(chunks.map((chunk) => chunk.source_file))],
+    'merged chunk source files',
+  );
+  return merged;
+}
+
 function reportFiles(report) {
   if (!report?.files || typeof report.files !== 'object') {
     throw new Error('Stryker report has no files object');
@@ -356,7 +461,13 @@ function exactSet(actual, expected, label) {
   }
 }
 
-function moduleResultFromReport(moduleName, report, context, rawReportText) {
+function moduleResultFromReport(
+  moduleName,
+  report,
+  context,
+  rawReportText,
+  chunks,
+) {
   const module = mutationModules[moduleName];
   if (!module) throw new Error(`unknown mutation module: ${moduleName}`);
   const expectedFiles = resolveMutationFiles(module.mutate);
@@ -396,6 +507,12 @@ function moduleResultFromReport(moduleName, report, context, rawReportText) {
     status: passed ? 'PASS' : 'FAIL',
     counts,
     per_file: perFile,
+    chunks: chunks.map((chunk) => ({
+      chunk_id: chunk.chunk_id,
+      source_file: chunk.source_file,
+      start_line: chunk.start_line,
+      end_line: chunk.end_line,
+    })),
     raw_report_sha256: sha256(rawReportText),
     started_at: context.moduleStartedAt,
     completed_at: new Date().toISOString(),
@@ -415,6 +532,7 @@ function failedModuleResult(moduleName, context, error) {
     status: 'FAIL',
     counts: emptyCounts(),
     per_file: {},
+    chunks: [],
     raw_report_sha256: null,
     started_at: context.moduleStartedAt,
     completed_at: new Date().toISOString(),
@@ -494,6 +612,19 @@ export function validatePhase1Report(report, expected) {
       result.source_files,
       `module ${result.module} per-file results`,
     );
+    const expectedChunks = planMutationChunks(
+      result.source_files,
+      harnessRoot,
+      150,
+    ).map((chunk) => ({
+      chunk_id: chunk.chunk_id,
+      source_file: chunk.source_file,
+      start_line: chunk.start_line,
+      end_line: chunk.end_line,
+    }));
+    if (canonicalJson(result.chunks) !== canonicalJson(expectedChunks)) {
+      throw new Error(`module ${result.module} chunk coverage mismatch`);
+    }
     const perFilePassed = Object.values(result.per_file).every(
       (file) =>
         file.status === 'PASS' && file.score >= (module.perFileMinimum ?? 0),
@@ -599,66 +730,84 @@ function runModule(moduleName, context) {
   const moduleRoot = join(context.runRoot, moduleName);
   mkdirSync(moduleRoot, { recursive: true });
   const rawReportPath = join(moduleRoot, 'mutation.json');
-  const htmlReportPath = join(moduleRoot, 'mutation.html');
-  const configPath = join(moduleRoot, 'stryker.config.json');
-  const tempPath = join('.stryker-tmp', context.runId, moduleName);
-  const config = {
-    ...strykerBase,
-    mutate: sourceFiles,
-    tempDirName: tempPath,
-    jsonReporter: {
-      fileName: relative(harnessRoot, rawReportPath),
-    },
-    htmlReporter: {
-      fileName: relative(harnessRoot, htmlReportPath),
-    },
-    ...(moduleName === 'sandbox' ? { concurrency: 1, timeoutMS: 60_000 } : {}),
-    thresholds: {
-      high: module.minimum,
-      low: Math.max(0, module.minimum - 5),
-      break: null,
-    },
-  };
-  atomicWriteJson(configPath, config);
+  const chunks = planMutationChunks(sourceFiles, harnessRoot, 150);
 
   console.log(`\n=== Mutation: ${moduleName} ===`);
   console.log(`Run: ${context.runId}`);
   console.log(`Files: ${sourceFiles.join(', ')}`);
+  console.log(`Chunks: ${chunks.length} (complete 150-line ranges)`);
   const stryker = join(harnessRoot, 'node_modules', '.bin', 'stryker');
-  const run = spawnSync(stryker, ['run', configPath], {
-    cwd: harnessRoot,
-    stdio: 'inherit',
-    shell: false,
-    timeout: 15 * 60 * 1000,
-    env: {
-      ...process.env,
-      STRYKER: 'true',
-      HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
-    },
-  });
-  if (run.error) {
-    throw new Error(
-      `Stryker failed to start for ${moduleName}: ${run.error.message}`,
-    );
+  const chunkReports = [];
+  for (const [index, chunk] of chunks.entries()) {
+    const chunkRoot = join(moduleRoot, 'chunks', chunk.chunk_id);
+    const chunkReportPath = join(chunkRoot, 'mutation.json');
+    const chunkHtmlPath = join(chunkRoot, 'mutation.html');
+    const configPath = join(chunkRoot, 'stryker.config.json');
+    const config = {
+      ...strykerBase,
+      mutate: [chunk.mutate_pattern],
+      tempDirName: join(
+        '.stryker-tmp',
+        context.runId,
+        moduleName,
+        chunk.chunk_id,
+      ),
+      jsonReporter: {
+        fileName: relative(harnessRoot, chunkReportPath),
+      },
+      htmlReporter: {
+        fileName: relative(harnessRoot, chunkHtmlPath),
+      },
+      ...(moduleName === 'sandbox'
+        ? { concurrency: 1, timeoutMS: 60_000 }
+        : {}),
+      thresholds: {
+        high: module.minimum,
+        low: Math.max(0, module.minimum - 5),
+        break: null,
+      },
+    };
+    atomicWriteJson(configPath, config);
+    console.log(`\n[${index + 1}/${chunks.length}] ${chunk.mutate_pattern}`);
+    const run = spawnSync(stryker, ['run', configPath], {
+      cwd: harnessRoot,
+      stdio: 'inherit',
+      shell: false,
+      timeout: 15 * 60 * 1000,
+      env: {
+        ...process.env,
+        STRYKER: 'true',
+        HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
+      },
+    });
+    if (run.error) {
+      throw new Error(
+        `Stryker failed to start for ${moduleName}/${chunk.chunk_id}: ` +
+          run.error.message,
+      );
+    }
+    if (run.status !== 0) {
+      throw new Error(
+        `Stryker exited ${run.status} for ` +
+          `${moduleName}/${chunk.chunk_id}; no report is accepted`,
+      );
+    }
+    if (!existsSync(chunkReportPath)) {
+      throw new Error(`Stryker did not produce ${chunkReportPath}`);
+    }
+    try {
+      chunkReports.push(JSON.parse(readFileSync(chunkReportPath, 'utf8')));
+    } catch (error) {
+      throw new Error(
+        `invalid Stryker report for ${moduleName}/${chunk.chunk_id}: ` +
+          error.message,
+        { cause: error },
+      );
+    }
   }
-  if (run.status !== 0) {
-    throw new Error(
-      `Stryker exited ${run.status} for ${moduleName}; no report is accepted`,
-    );
-  }
-  if (!existsSync(rawReportPath)) {
-    throw new Error(`Stryker did not produce ${rawReportPath}`);
-  }
+  const rawReport = mergeChunkReports(chunks, chunkReports);
+  atomicWriteJson(rawReportPath, rawReport);
   const rawReportText = readFileSync(rawReportPath, 'utf8');
-  let rawReport;
-  try {
-    rawReport = JSON.parse(rawReportText);
-  } catch (error) {
-    throw new Error(
-      `invalid Stryker report for ${moduleName}: ${error.message}`,
-      { cause: error },
-    );
-  }
   const result = moduleResultFromReport(
     moduleName,
     rawReport,
@@ -667,6 +816,7 @@ function runModule(moduleName, context) {
       moduleStartedAt: context.moduleStartedAt,
     },
     rawReportText,
+    chunks,
   );
   atomicWriteJson(join(moduleRoot, 'result.json'), result);
   printModuleResult(result);
