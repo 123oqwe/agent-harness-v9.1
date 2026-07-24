@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -49,7 +50,7 @@ function makeHarness(tmp: string, provider: HarnessProvider, allowedTools: strin
   } as Policy;
   const pe = new PolicyEngine(policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 function task(goal: string): TaskContract {

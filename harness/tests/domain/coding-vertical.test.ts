@@ -3,6 +3,7 @@
  * the unified Harness, not its own mini agent loop.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -42,7 +43,7 @@ function makeHarness(tmp: string, provider: HarnessProvider): Harness {
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 describe('AH-CODING-VERTICAL-001 coding vertical (thin adapter)', () => {

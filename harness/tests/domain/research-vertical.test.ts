@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -34,7 +35,7 @@ function makeHarness(tmp: string): Harness {
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const provider: HarnessProvider = { async resolve() { return { content: 'Research report', decision_summary: 'I analyzed sources' }; } };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 describe('AH-RESEARCH-VERTICAL-001 research vertical (thin adapter)', () => {
