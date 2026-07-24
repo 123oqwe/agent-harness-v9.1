@@ -11,7 +11,72 @@ export interface PlanningVerticalOutput {
   outcome: HarnessOutcome;
 }
 
+export class PlanningInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PlanningInputError';
+  }
+}
+
+function unknownDependencies(
+  input: PlanningVerticalInput,
+): Array<{ task: string; dependency: string }> {
+  const ids = new Set(input.tasks.map((task) => task.id));
+  return input.tasks.flatMap((task) =>
+    task.depends_on
+      .filter((dependency) => !ids.has(dependency))
+      .map((dependency) => ({ task: task.id, dependency })),
+  );
+}
+
+function findCycles(
+  tasks: PlanningVerticalInput['tasks'],
+): string[][] {
+  const dependencies = new Map(
+    tasks.map((task) => [task.id, [...task.depends_on]]),
+  );
+  const state = new Map<string, 'visiting' | 'done'>();
+  const stack: string[] = [];
+  const cycles: string[][] = [];
+  const seen = new Set<string>();
+  const visit = (id: string): void => {
+    if (state.get(id) === 'done') return;
+    state.set(id, 'visiting');
+    stack.push(id);
+    for (const dependency of dependencies.get(id) ?? []) {
+      if (state.get(dependency) === 'visiting') {
+        const start = stack.indexOf(dependency);
+        const cycle = [...stack.slice(start), dependency];
+        const members = [...new Set(cycle.slice(0, -1))].sort();
+        const key = members.join('\0');
+        if (!seen.has(key)) {
+          seen.add(key);
+          cycles.push(cycle);
+        }
+      } else if (state.get(dependency) !== 'done') {
+        visit(dependency);
+      }
+    }
+    stack.pop();
+    state.set(id, 'done');
+  };
+  for (const task of tasks) visit(task.id);
+  return cycles;
+}
+
 export function planningTaskContract(input: PlanningVerticalInput): TaskContract {
+  const ids = input.tasks.map((task) => task.id);
+  if (ids.some((id) => id.trim() === '') || new Set(ids).size !== ids.length) {
+    throw new PlanningInputError('task IDs must be non-empty and unique');
+  }
+  const unknown = unknownDependencies(input);
+  if (unknown.length > 0) {
+    throw new PlanningInputError(
+      `unknown dependencies: ${unknown
+        .map((entry) => `${entry.task}->${entry.dependency}`)
+        .join(', ')}`,
+    );
+  }
   return {
     goal: `Create a plan for: ${input.goal}. Tasks: ${input.tasks.map(t => `${t.id} (depends: ${t.depends_on.join(',') || 'none'})`).join('; ')}`,
     success_criteria: [
@@ -26,10 +91,6 @@ export function planningTaskContract(input: PlanningVerticalInput): TaskContract
 export async function runPlanningVertical(harness: Harness, input: PlanningVerticalInput): Promise<PlanningVerticalOutput> {
   const outcome = await harness.run(planningTaskContract(input), `planning-${Date.now()}`);
 
-  // Extract plan from model output
-  const modelOutput = outcome.loop_result.turns.at(-1)?.model.content ?? '';
-  const plan = modelOutput.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
-
   // Real DAG validation: topological sort with cycle detection
   const inDegree = new Map<string, number>();
   const graph = new Map<string, string[]>();
@@ -42,10 +103,11 @@ export async function runPlanningVertical(harness: Harness, input: PlanningVerti
     sorted.push(id);
     for (const next of graph.get(id) ?? []) { inDegree.set(next, (inDegree.get(next) ?? 0) - 1); if (inDegree.get(next) === 0) queue.push(next); }
   }
-  const valid = sorted.length === input.tasks.length;
-  const cycles = valid ? [] : [input.tasks.filter(t => !sorted.includes(t.id)).map(t => t.id)];
+  const cycles = findCycles(input.tasks);
+  const valid = sorted.length === input.tasks.length && cycles.length === 0;
   // feasible = no cycles AND all tasks in plan
-  const feasible = valid && input.tasks.every(t => plan.some(p => p.includes(t.id)));
+  const plan = valid ? sorted : [];
+  const feasible = valid && outcome.success;
 
   return {
     plan: valid ? sorted : plan,

@@ -12,8 +12,7 @@
     "search_files"
   ],
   "allowed_effect_classes": [
-    "read",
-    "write"
+    "read"
   ],
   "workflow_template_ref": "workflows/dependency-aware-planning.yaml",
   "verification_template_ref": "verifications/dependency-aware-planning.yaml",

@@ -49,5 +49,9 @@ describe('AH-WRITING-VERTICAL-001 writing vertical (thin adapter)', () => {
     const r = await runWritingVertical(h, { brief: 'Explain Agent Harness architecture', requirements: ['title', '14 modules'] });
     expect(['direct','react','plan_execute']).toContain(r.outcome.routing.strategy);
     expect(r.draft.length).toBeGreaterThan(0);
+    expect(r.self_check).toEqual([
+      { requirement: 'title', met: true },
+      { requirement: '14 modules', met: true },
+    ]);
   });
 });

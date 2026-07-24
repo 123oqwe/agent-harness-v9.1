@@ -35,9 +35,12 @@ function makeHarness(tmp: string): Harness {
   const tr = new ToolRegistry(); ['read_file', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
-  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'parse_document'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'parse_document'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'read', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  const gw = createScriptedGateway([{ content: 'Summary of the document' }]);
+  const gw = createScriptedGateway([
+    { content: '', tool_calls: [{ id: 'parse', name: 'parse_document', arguments: { path: '/workspace/doc.txt' } }] },
+    { content: 'Summary of the observed document' },
+  ]);
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
   return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
@@ -52,5 +55,9 @@ describe('AH-DOC-VERTICAL-001 documents vertical (thin adapter)', () => {
     const r = await runDocVertical(h, { path: '/workspace/doc.txt' });
     expect(r.outcome.routing.strategy).toBeDefined();
     expect(r.outcome.session.eventCount()).toBeGreaterThan(0);
+    expect(r.citations).toEqual([
+      { page: 1, excerpt: 'Page 1 content' },
+      { page: 2, excerpt: 'Page 2 content' },
+    ]);
   });
 });

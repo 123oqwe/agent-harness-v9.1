@@ -43,9 +43,15 @@ describe('AH-UI-CODING-001 coding workspace (via Harness)', () => {
     ['read_file', 'write_file', 'edit_file', 'execute_command'].forEach(n => tr.register(toolSpec(n)));
     const sr = new SkillRegistry(); sr.loadBaseSkills();
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
-    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+    const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'workspace', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const gw = createScriptedGateway([{ content: 'done' }]);
+    const gw = createScriptedGateway([
+      { content: 'plan' },
+      { content: '', tool_calls: [{ id: 'read', name: 'read_file', arguments: { path: '/workspace/f.ts' } }] },
+      { content: '', tool_calls: [{ id: 'edit', name: 'edit_file', arguments: { path: '/workspace/f.ts', find: 'BUG', replace: 'FIXED' } }] },
+      { content: '', tool_calls: [{ id: 'test', name: 'execute_command', arguments: { argv: ['/usr/bin/true'], cwd: '/workspace' } }] },
+      { content: 'ready for independent verification' },
+    ]);
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run') });
     const c = new CodingWorkspaceController(h);
     const r = await c.runFix({ repo_path: '/workspace', bug_file: '/workspace/f.ts', test_command: ['/bin/echo', 'ok'] });

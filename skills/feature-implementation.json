@@ -15,7 +15,8 @@
   ],
   "allowed_effect_classes": [
     "read",
-    "write"
+    "write",
+    "execute"
   ],
   "workflow_template_ref": "workflows/feature-implementation.yaml",
   "verification_template_ref": "verifications/feature-implementation.yaml",

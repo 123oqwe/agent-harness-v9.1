@@ -112,6 +112,12 @@ describe('Main chain integration: no bypasses', () => {
     expect(result.run_plan?.run_id).toBe('run-explicit');
     expect(result.session.session_id).toBe('run-explicit');
     expect(result.evidence.run_id).toBe('run-explicit');
+    expect(result.evidence.plan_hash).toBe(result.run_plan?.run_plan_hash);
+    expect(result.evidence.plan_revision).toBe(1);
+    expect(result.evidence.reasoning_strategy).toBe('direct');
+    expect(result.evidence.termination_reason).toBe('goal_satisfied');
+    expect(result.evidence.verification_records).toHaveLength(1);
+    expect(result.evidence.session_head_hash).toMatch(/^[0-9a-f]{64}$/u);
   });
 
   it('restores a terminal run without a synthetic resume event or re-execution', async () => {

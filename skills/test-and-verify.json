@@ -14,7 +14,8 @@
   ],
   "allowed_effect_classes": [
     "read",
-    "write"
+    "write",
+    "execute"
   ],
   "workflow_template_ref": "workflows/test-and-verify.yaml",
   "verification_template_ref": "verifications/test-and-verify.yaml",

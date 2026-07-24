@@ -12,8 +12,7 @@
     "read_file"
   ],
   "allowed_effect_classes": [
-    "read",
-    "write"
+    "read"
   ],
   "workflow_template_ref": "workflows/document-summary.yaml",
   "verification_template_ref": "verifications/document-summary.yaml",

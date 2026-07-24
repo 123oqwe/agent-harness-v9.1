@@ -7,7 +7,7 @@ import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 import { tmpdir } from 'node:os';
 
@@ -59,12 +59,23 @@ describe('AH-CODING-VERTICAL-001 coding vertical (thin adapter)', () => {
 
   it('delegates to Harness: reads, fixes, tests via unified pipeline', async () => {
     writeFileSync(join(tmp, 'bug.ts'), 'function add(a, b) { return a - b; }');
-    const gw = createScriptedGateway([{ content: '', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/bug.ts' } }] }]);
-    const h = makeHarness(tmp, [{ content: '', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/bug.ts' } }] }]);
-    const r = await runCodingVertical(h, { repo_path: '/workspace', bug_file: '/workspace/bug.ts', test_command: ['/bin/echo', 'ok'] });
+    const h = makeHarness(tmp, [
+      { content: 'inspect, edit, test' },
+      { content: '', tool_calls: [{ id: 'read', name: 'read_file', arguments: { path: '/workspace/bug.ts' } }] },
+      { content: '', tool_calls: [{ id: 'edit', name: 'edit_file', arguments: { path: '/workspace/bug.ts', find: 'a - b', replace: 'a + b' } }] },
+      { content: '', tool_calls: [{ id: 'test', name: 'execute_command', arguments: { argv: ['/usr/bin/true'], cwd: '/workspace' } }] },
+      { content: 'ready for independent verification' },
+    ]);
+    const r = await runCodingVertical(h, { repo_path: '/workspace', bug_file: '/workspace/bug.ts', test_command: ['/usr/bin/true'] });
     expect(r.outcome.routing.strategy).toBe('plan_execute');
     expect(r.read_ok).toBe(true);
-    expect(r.outcome.session.getEvents().some(e => e.type === 'tool_call')).toBe(true);
+    expect(r.bug_located).toBe(true);
+    expect(r.fix_applied).toBe(true);
+    expect(r.test_exit_code).toBe(0);
+    expect(r.diff_before).toMatch(/^[0-9a-f]{64}$/u);
+    expect(r.diff_after).toMatch(/^[0-9a-f]{64}$/u);
+    expect(r.diff_after).not.toBe(r.diff_before);
+    expect(readFileSync(join(tmp, 'bug.ts'), 'utf8')).toContain('a + b');
   });
 
   it('does not call Provider/Tool/VFS directly — all through Harness', async () => {
@@ -75,5 +86,6 @@ describe('AH-CODING-VERTICAL-001 coding vertical (thin adapter)', () => {
     expect(r.outcome.loop_result.strategy).toBeDefined();
     // All session events come from the Harness, not the vertical
     expect(r.outcome.session.eventCount()).toBeGreaterThan(0);
+    expect(r.fix_applied).toBe(false);
   });
 });

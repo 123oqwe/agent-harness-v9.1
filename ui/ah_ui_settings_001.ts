@@ -2,13 +2,24 @@
 import type { UiResult } from './ui-state.js';
 
 export interface Settings { provider: string; risk_ceiling: string; max_budget_usd: number; local_only: boolean }
+export interface SettingsStorePort {
+  read(): Settings;
+  write(settings: Settings): Settings;
+  reset(): Settings;
+}
+
 export class SettingsController {
-  private settings: Settings = { provider: 'scripted_test', risk_ceiling: 'medium', max_budget_usd: 5, local_only: true };
-  get(): UiResult<Settings> { return { state: 'success', data: { ...this.settings } }; }
+  constructor(private readonly store: SettingsStorePort) {}
+
+  get(): UiResult<Settings> {
+    return { state: 'success', data: { ...this.store.read() } };
+  }
   update(patch: Partial<Settings>): UiResult<Settings> {
     if (patch.max_budget_usd !== undefined && patch.max_budget_usd < 0) return { state: 'error', error: 'budget must be >= 0' };
-    this.settings = { ...this.settings, ...patch };
-    return { state: 'success', data: { ...this.settings } };
+    const settings = this.store.write({ ...this.store.read(), ...patch });
+    return { state: 'success', data: { ...settings } };
   }
-  reset(): UiResult<Settings> { this.settings = { provider: 'scripted_test', risk_ceiling: 'medium', max_budget_usd: 5, local_only: true }; return this.get(); }
+  reset(): UiResult<Settings> {
+    return { state: 'success', data: { ...this.store.reset() } };
+  }
 }

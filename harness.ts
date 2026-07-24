@@ -22,7 +22,10 @@ import type { PolicyEngine } from './security/policy-engine.js';
 import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
 import { OverlayBackend } from './vfs/virtual-filesystem.js';
-import { WorkspaceTransaction } from './vfs/workspace-transaction.js';
+import {
+  WorkspaceTransaction,
+  type WorkspaceChange,
+} from './vfs/workspace-transaction.js';
 import {
   LoopEngine,
   type LoopResult,
@@ -80,6 +83,7 @@ export interface HarnessOutcome {
     tool_receipts: readonly unknown[];
     audit_entries: readonly unknown[];
     verification_records: VerificationReport['records'];
+    workspace_changes: readonly WorkspaceChange[];
     session_head_hash: string | null;
   };
   success: boolean;
@@ -280,6 +284,7 @@ export class Harness {
             routing.run_plan,
             restoredLoopResult,
             restoredVerification,
+            this.restoreWorkspaceChanges(session),
           ),
           success: termination === 'goal_satisfied',
         };
@@ -315,6 +320,7 @@ export class Harness {
             step_states: Object.freeze({}),
           },
           null,
+          [],
         ),
         success: false,
       };
@@ -342,18 +348,77 @@ export class Harness {
       this.config.skillRegistry,
       this.skillSnapshot,
       allowedTools,
+      2,
+      undefined,
+      Object.fromEntries(
+        this.toolSnapshot.tool_names.map((toolName) => [
+          toolName,
+          String(
+            (
+              this.config.toolRegistry.get(toolName)?.effect_model as
+                | { operation?: unknown }
+                | undefined
+            )?.operation ?? 'read',
+          ),
+        ]),
+      ),
     );
     const skillBindings = (runPlan.skill_bindings ?? []) as Array<{ skill_name?: string }>;
     let skillInstructions = '';
     if (skillBindings.length > 0 && skillBindings[0]!.skill_name) {
       try {
         const activation = await skillLoader.activate(skillBindings[0]!.skill_name);
-        // Return instructions for context injection (not discarded)
         skillInstructions = activation.instructions || `Skill: ${activation.skill.name} v${activation.frozen_version}`;
         session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: activation.frozen_version });
       } catch (e) {
-        // Skill activation failure: log but continue (skill context is optional)
-        session.append('error', { reason: 'skill_activation_failed', skill: skillBindings[0]!.skill_name, error: (e as Error).message });
+        const failure: LoopResult = {
+          strategy: runPlan.reasoning_strategy,
+          iterations: 0,
+          termination_reason: 'denied',
+          turns: [],
+          decision_summaries: [],
+          context_reset_emitted: false,
+          usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+          step_states: Object.freeze({}),
+        };
+        session.append('error', {
+          reason: 'skill_activation_failed',
+          skill: skillBindings[0]!.skill_name,
+          error: e instanceof Error ? e.message : 'skill activation failed',
+        });
+        session.append('system', {
+          event: 'run_terminated',
+          termination_reason: 'denied',
+          iterations: 0,
+          usage: failure.usage,
+        });
+        session.append('system', {
+          event: 'run_finalized',
+          termination_reason: 'denied',
+          verification_report: null,
+          workspace_changes: [],
+        });
+        session.releaseWriter();
+        this.finalizeOverlay(false);
+        if (this.config.sessionLogPath) {
+          persistSession(session, this.config.sessionLogPath);
+        }
+        sqliteStore?.updateRunStatus(actualRunId, 'denied');
+        return {
+          run_plan: runPlan,
+          routing,
+          loop_result: failure,
+          verification_report: null,
+          session,
+          evidence: this.buildEvidence(
+            session,
+            runPlan,
+            failure,
+            null,
+            [],
+          ),
+          success: false,
+        };
       }
     }
 
@@ -504,10 +569,13 @@ export class Harness {
       };
     }
     session.acquireWriter();
+    const workspaceChanges =
+      this.currentWorkspaceTransaction?.describeChanges() ?? [];
     session.append('system', {
       event: 'run_finalized',
       termination_reason: loopResult.termination_reason,
       verification_report: verificationReport,
+      workspace_changes: workspaceChanges,
     });
     session.releaseWriter();
 
@@ -525,6 +593,7 @@ export class Harness {
       runPlan,
       loopResult,
       verificationReport,
+      workspaceChanges,
     );
 
     sqliteStore?.updateRunStatus(
@@ -720,6 +789,23 @@ private async executeTool(
     return null;
   }
 
+  private restoreWorkspaceChanges(
+    session: DurableSession,
+  ): readonly WorkspaceChange[] {
+    for (const event of [...session.getEvents()].reverse()) {
+      if (
+        event.type === 'system' &&
+        (event.data as { event?: string }).event === 'run_finalized'
+      ) {
+        const changes = (event.data as {
+          workspace_changes?: WorkspaceChange[];
+        }).workspace_changes;
+        return Object.freeze([...(changes ?? [])]);
+      }
+    }
+    return Object.freeze([]);
+  }
+
   private restoreLoopResult(
     session: DurableSession,
     runPlan: RunPlan | undefined,
@@ -768,6 +854,7 @@ private async executeTool(
     runPlan: RunPlan | undefined,
     loopResult: LoopResult,
     verificationReport: VerificationReport | null,
+    workspaceChanges: readonly WorkspaceChange[],
   ): HarnessOutcome['evidence'] {
     let commitSha = 'unknown';
     const revision = spawnSync('git', ['rev-parse', 'HEAD'], {
@@ -832,6 +919,7 @@ private async executeTool(
       verification_records: Object.freeze([
         ...(verificationReport?.records ?? []),
       ]),
+      workspace_changes: Object.freeze([...workspaceChanges]),
       session_head_hash: events.at(-1)?.hash ?? null,
     };
   }

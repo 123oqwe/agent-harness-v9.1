@@ -15,7 +15,7 @@ export interface PAVerticalOutput {
 
 export function paTaskContract(input: PAVerticalInput): TaskContract {
   return {
-    goal: `Schedule tasks for ${input.available_minutes} minutes. Tasks: ${input.tasks.map(t => `${t.id}: ${t.title} (${t.priority}, ${t.duration_min}min)`).join('; ')}`,
+    goal: `Schedule tasks for ${input.available_minutes} minutes. Tasks: ${input.tasks.map(t => `${t.id}: ${t.title} (${t.priority}, ${t.duration_min}min)`).join(', ')}`,
     success_criteria: [
       { criterion: 'all tasks scheduled or unallocated with reason', verification_method: 'deterministic' },
       { criterion: 'no external actions (no email/calendar/push/sms)', verification_method: 'deterministic' },
@@ -27,27 +27,46 @@ export function paTaskContract(input: PAVerticalInput): TaskContract {
 
 export async function runPAVertical(harness: Harness, input: PAVerticalInput): Promise<PAVerticalOutput> {
   const outcome = await harness.run(paTaskContract(input), `pa-${Date.now()}`);
-
-  // Extract plan from model output — parse task IDs from the response
-  const modelOutput = outcome.loop_result.turns.at(-1)?.model.content ?? '';
+  const priority = { high: 0, normal: 1, low: 2 } as const;
+  const ordered = input.tasks
+    .map((task, index) => ({ task, index }))
+    .sort(
+      (left, right) =>
+        priority[left.task.priority] - priority[right.task.priority] ||
+        left.index - right.index,
+    );
   const plan: { task_id: string; title: string; slot: number }[] = [];
   const unallocated: string[] = [];
-  for (const task of input.tasks) {
-    if (modelOutput.includes(task.id)) {
-      plan.push({ task_id: task.id, title: task.title, slot: task.duration_min });
+  let allocatedMinutes = 0;
+  for (const { task } of ordered) {
+    if (
+      task.duration_min >= 0 &&
+      allocatedMinutes + task.duration_min <= input.available_minutes
+    ) {
+      plan.push({
+        task_id: task.id,
+        title: task.title,
+        slot: allocatedMinutes,
+      });
+      allocatedMinutes += task.duration_min;
     } else {
       unallocated.push(task.id);
     }
   }
 
-  // no_external_actions proven by: no external-write tools in the frozen snapshot,
-  // no external-write tool_calls in the session event log, Policy denies external_write.
-  const events = outcome.session.getEvents();
-  const hasExternalAction = events.some(e => {
-    if (e.type !== 'tool_call') return false;
-    const tool = (e.data as { tool: string }).tool;
-    return tool.includes('email') || tool.includes('calendar') || tool.includes('push') || tool.includes('sms');
-  });
+  const externalPattern = /email|calendar|push|sms|message|publish/iu;
+  const hasExternalAction =
+    outcome.evidence.tool_calls.some((call) =>
+      externalPattern.test(call.tool),
+    ) ||
+    outcome.evidence.audit_entries.some((entry) => {
+      const audit = entry as { tool_name?: unknown; verdict?: unknown };
+      return (
+        audit.verdict === 'allow' &&
+        typeof audit.tool_name === 'string' &&
+        externalPattern.test(audit.tool_name)
+      );
+    });
 
   return {
     plan,

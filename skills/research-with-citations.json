@@ -13,8 +13,7 @@
     "parse_document"
   ],
   "allowed_effect_classes": [
-    "read",
-    "write"
+    "read"
   ],
   "workflow_template_ref": "workflows/research-with-citations.yaml",
   "verification_template_ref": "verifications/research-with-citations.yaml",

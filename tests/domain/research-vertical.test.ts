@@ -32,12 +32,15 @@ function toolSpec(name: string): ToolSpec {
   return spec;
 }
 function makeHarness(tmp: string): Harness {
-  const tr = new ToolRegistry(); ['read_file', 'search_files'].forEach(n => tr.register(toolSpec(n)));
+  const tr = new ToolRegistry(); ['read_file', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
-  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
+  const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'search_files', 'parse_document'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'read', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  const gw = createScriptedGateway([{ content: 'Research report' }]);
+  const gw = createScriptedGateway([
+    { content: '', tool_calls: [{ id: 'read', name: 'read_file', arguments: { path: '/workspace/a.txt' } }] },
+    { content: 'Research report citing only the observed source' },
+  ]);
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
   return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: _sec, verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run', _sec.clock) });
 }
@@ -50,7 +53,8 @@ describe('AH-RESEARCH-VERTICAL-001 research vertical (thin adapter)', () => {
     writeFileSync(join(tmp, 'a.txt'), 'The sky is blue');
     const h = makeHarness(tmp);
     const r = await runResearchVertical(h, { sources: ['/workspace/a.txt'], query: 'sky' });
-    expect(r.outcome.routing.strategy).toBeDefined();
-    expect(r.outcome.routing.strategy).toBeDefined();
+    expect(r.evidence).toHaveLength(1);
+    expect(r.citations).toEqual(['/workspace/a.txt']);
+    expect(r.evidence[0]!.excerpt).toContain('sky');
   });
 });

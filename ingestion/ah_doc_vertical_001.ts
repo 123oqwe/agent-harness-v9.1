@@ -23,19 +23,29 @@ export function docTaskContract(input: DocVerticalInput): TaskContract {
 
 export async function runDocVertical(harness: Harness, input: DocVerticalInput): Promise<DocVerticalOutput> {
   const outcome = await harness.run(docTaskContract(input), `doc-${Date.now()}`);
-  const events = outcome.session.getEvents();
-  const toolResults = events.filter(e => e.type === 'tool_result');
-  const parseResult = toolResults.find(e => (e.data as { tool: string }).tool === 'parse_document');
-  let citations: { page: number; excerpt: string }[] = [];
-  if (parseResult) {
-    try {
-      const parseData = JSON.parse((parseResult.data as { result?: string }).result ?? '') as { pages?: Array<{ page: number; text: string }> };
-      citations = (parseData.pages ?? []).map(p => ({
-        page: p.page,
-        excerpt: (p.text.split(/[.!?]/)[0] ?? '').trim().slice(0, 120),
-      }));
-    } catch { /* empty citations on parse failure */ }
-  }
+  const parseObservation = outcome.loop_result.turns
+    .flatMap((turn) => turn.tool_observations)
+    .find(
+      (observation) =>
+        observation.name === 'parse_document' &&
+        observation.status === 'ok' &&
+        (observation.result as { path?: unknown } | undefined)?.path ===
+          input.path,
+    );
+  const parsed = parseObservation?.result as
+    | { pages?: Array<{ page: number; text: string }> }
+    | undefined;
+  const citations = (parsed?.pages ?? [])
+    .filter(
+      (page) =>
+        Number.isSafeInteger(page.page) &&
+        page.page > 0 &&
+        typeof page.text === 'string',
+    )
+    .map((page) => ({
+      page: page.page,
+      excerpt: page.text.trim().slice(0, 120),
+    }));
   return {
     summary: outcome.loop_result.turns.at(-1)?.model.content ?? '',
     citations,

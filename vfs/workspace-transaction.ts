@@ -60,6 +60,15 @@ export interface WorkspaceTransactionOptions {
   stateRoot?: string;
 }
 
+export interface WorkspaceChange {
+  path: string;
+  kind: 'created' | 'deleted' | 'modified';
+  before_sha256: string | null;
+  after_sha256: string | null;
+  before_mode: number | null;
+  after_mode: number | null;
+}
+
 const PROTECTED_TOP_LEVEL = new Set([
   '.git',
   'node_modules',
@@ -327,6 +336,41 @@ export class WorkspaceTransaction {
     const mapped = resolve(this.workspaceRoot, rel);
     safeRelative(this.workspaceRoot, mapped);
     return mapped;
+  }
+
+  describeChanges(): readonly WorkspaceChange[] {
+    this.checkActive();
+    const current = scanWorkspace(
+      this.workspaceRoot,
+      this.metadata.protected_links,
+    );
+    const paths = new Set([
+      ...Object.keys(this.metadata.initial),
+      ...Object.keys(current),
+    ]);
+    return Object.freeze(
+      [...paths]
+        .sort()
+        .flatMap((rel): WorkspaceChange[] => {
+          const before = this.metadata.initial[rel] ?? null;
+          const after = current[rel] ?? null;
+          if (equalEntry(before, after)) return [];
+          return [{
+            path: `/workspace/${normalizeRelative(rel)}`,
+            kind:
+              before === null
+                ? 'created'
+                : after === null
+                  ? 'deleted'
+                  : 'modified',
+            before_sha256:
+              before?.kind === 'file' ? before.sha256 : null,
+            after_sha256: after?.kind === 'file' ? after.sha256 : null,
+            before_mode: before?.kind === 'file' ? before.mode : null,
+            after_mode: after?.kind === 'file' ? after.mode : null,
+          }];
+        }),
+    );
   }
 
   capture(overlay: OverlayBackend): void {

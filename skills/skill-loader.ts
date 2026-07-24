@@ -39,6 +39,9 @@ export class SkillLoader {
     private readonly availableTools: string[],
     private readonly maxRiskTier: number = 2,
     private readonly skillsDir?: string,
+    private readonly availableToolEffects: Readonly<
+      Record<string, string>
+    > = {},
   ) {}
 
   private resourceRoot(): string {
@@ -84,7 +87,16 @@ export class SkillLoader {
 
     // Check risk ceiling
     const riskCeiling = frozenSkill.risk_ceiling ?? 'tier_1';
-    const ceilingTier = parseInt(riskCeiling.replace('tier_', ''), 10) || 1;
+    const namedTiers: Readonly<Record<string, number>> = {
+      low: 1,
+      medium: 2,
+      high: 3,
+      critical: 4,
+    };
+    const parsedTier = parseInt(riskCeiling.replace('tier_', ''), 10);
+    const ceilingTier =
+      namedTiers[riskCeiling] ??
+      (Number.isSafeInteger(parsedTier) ? parsedTier : 1);
     if (ceilingTier > this.maxRiskTier) {
       throw new SkillLoaderError(
         `skill '${skillName}' risk ceiling ${riskCeiling} exceeds max tier ${this.maxRiskTier}`,
@@ -97,6 +109,26 @@ export class SkillLoader {
     for (const e of allowedEffects) {
       if (!validEffects.includes(e)) {
         throw new SkillLoaderError(`skill '${skillName}' has invalid allowed_effect_class: ${e}`);
+      }
+    }
+    const normalizedAllowedEffects = new Set(
+      allowedEffects.flatMap((effect) => {
+        if (effect === 'read_only') return ['read'];
+        if (
+          effect === 'idempotent_write' ||
+          effect === 'non_idempotent_write'
+        ) {
+          return ['write', 'create', 'delete'];
+        }
+        return [effect];
+      }),
+    );
+    for (const tool of requiredTools) {
+      const effect = this.availableToolEffects[tool];
+      if (effect && !normalizedAllowedEffects.has(effect)) {
+        throw new SkillLoaderError(
+          `skill '${skillName}' cannot activate ${tool}: effect ${effect} exceeds allowed effects`,
+        );
       }
     }
 

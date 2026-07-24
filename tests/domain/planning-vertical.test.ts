@@ -20,7 +20,7 @@ import type { SandboxProfile } from '../../runtime/sandbox.js';
 import type { ToolSpec } from '../../contracts/index.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 
-import { runPlanningVertical } from '../../planning/ah_planning_vertical_001.js';
+import { PlanningInputError, runPlanningVertical } from '../../planning/ah_planning_vertical_001.js';
 
 
 function toolSpec(name: string): ToolSpec {
@@ -53,5 +53,27 @@ describe('AH-PLANNING-VERTICAL-001 planning vertical (thin adapter)', () => {
     const h = makeHarness(workspaceRoot);
     const r = await runPlanningVertical(h, { goal: 'plan step by step', tasks: [{ id: 'a', depends_on: [] }, { id: 'b', depends_on: ['a'] }] });
     expect(r.outcome.routing.strategy).toBe('plan_execute');
+  });
+  it('rejects unknown dependencies before dispatching Harness', async () => {
+    const h = makeHarness(workspaceRoot);
+    await expect(
+      runPlanningVertical(h, {
+        goal: 'plan',
+        tasks: [{ id: 'a', depends_on: ['missing'] }],
+      }),
+    ).rejects.toThrow(PlanningInputError);
+  });
+  it('reports actual cycle members and never marks the plan feasible', async () => {
+    const h = makeHarness(workspaceRoot);
+    const result = await runPlanningVertical(h, {
+      goal: 'plan dependency cycle',
+      tasks: [
+        { id: 'a', depends_on: ['b'] },
+        { id: 'b', depends_on: ['a'] },
+      ],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.feasible).toBe(false);
+    expect(result.cycles.flat()).toEqual(expect.arrayContaining(['a', 'b']));
   });
 });

@@ -41,8 +41,16 @@ function toolSpec(name: string): ToolSpec {
 }
 
 
-function makeHarness(tmp: string, extraTools: string[] = [], responses: ParsedResponse[] = [{ content: 'done' }]): Harness {
-  const gw = createScriptedGateway(responses);
+function makeHarness(
+  tmp: string,
+  extraTools: string[] = [],
+  responses: ParsedResponse[] = [{ content: 'done' }],
+  onDispatch?: (request: unknown) => void,
+): Harness {
+  const gw = createScriptedGateway({
+    responses,
+    ...(onDispatch === undefined ? {} : { onDispatch }),
+  });
   const tr = new ToolRegistry();
   ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'].forEach(n => tr.register(toolSpec(n)));
   extraTools.forEach(n => tr.register(toolSpec(n)));
@@ -72,6 +80,27 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     expect(r.routing.strategy).toBe('direct');
     expect(r.loop_result.iterations).toBe(1);
     expect(r.success).toBe(true);
+  });
+
+  it('injects the selected full skill instructions into the first model request', async () => {
+    const requests: unknown[] = [];
+    const h = makeHarness(
+      tmp,
+      [],
+      [{ content: 'concise rewrite' }],
+      (request) => requests.push(request),
+    );
+    await h.run(task('rewrite this paragraph more concisely'));
+    const first = requests[0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(first.messages[0]).toMatchObject({ role: 'user' });
+    expect(first.messages[0]!.content).toContain(
+      "Preserve the author's intent",
+    );
+    expect(first.messages[0]!.content).toContain(
+      'rewrite this paragraph more concisely',
+    );
   });
 
   it('react: tool observation then answer', async () => {

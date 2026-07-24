@@ -53,39 +53,55 @@ export async function runCodingVertical(
 ): Promise<CodingVerticalOutput> {
   const task = codingTaskContract(input);
   const outcome = await harness.run(task, `coding-${Date.now()}`);
-
-  // Extract domain-specific results from the session event log
-  const events = outcome.session.getEvents();
-  const toolCalls = events.filter(e => e.type === 'tool_call');
-  const toolResults = events.filter(e => e.type === 'tool_result');
-
-  const readEvents = toolCalls.filter(e => (e.data as { tool: string }).tool === 'read_file');
-  const editEvent = toolCalls.find(e => (e.data as { tool: string }).tool === 'edit_file');
-  const execResult = toolResults.find(e => (e.data as { tool: string }).tool === 'execute_command');
-
-  // Extract file content from read_file results (before and after edit)
-  const readResults = readEvents.map(e => {
-    
-    const resultEvent = toolResults.find(r => r.seq > e.seq);
-    return resultEvent ? (resultEvent.data as { tool: string; result?: string }).result ?? '' : '';
-  });
-  const diff_before = readResults[0] ?? '';
-  const diff_after = readResults.length > 1 ? readResults[readResults.length - 1]! : (editEvent ? diff_before : '');
-
-  // Extract test exit code from execute_command result
-  const execData = execResult?.data as { tool: string; result?: string } | undefined;
-  let test_exit_code: number | null = null;
-  if (execData?.result) {
-    try { test_exit_code = JSON.parse(execData.result).exit_code ?? 0; } catch { test_exit_code = 0; }
-  }
+  const observations = outcome.loop_result.turns.flatMap(
+    (turn) => turn.tool_observations,
+  );
+  const read = observations.find(
+    (observation) =>
+      observation.name === 'read_file' &&
+      observation.status === 'ok' &&
+      (observation.result as { path?: unknown } | undefined)?.path ===
+        input.bug_file,
+  );
+  const edit = observations.find(
+    (observation) =>
+      observation.name === 'edit_file' &&
+      observation.status === 'ok' &&
+      (observation.result as { path?: unknown } | undefined)?.path ===
+        input.bug_file,
+  );
+  const test = observations.find(
+    (observation) =>
+      observation.name === 'execute_command' &&
+      observation.status === 'ok' &&
+      JSON.stringify(observation.arguments.argv) ===
+        JSON.stringify(input.test_command) &&
+      observation.arguments.cwd === input.repo_path,
+  );
+  const readResult = read?.result as
+    | { content?: string; truncated?: boolean }
+    | undefined;
+  const editResult = edit?.result as { replacements?: number } | undefined;
+  const testResult = test?.result as
+    | { exit_code?: number | null; timed_out?: boolean }
+    | undefined;
+  const fileChange = outcome.evidence.workspace_changes.find(
+    (change) => change.path === input.bug_file,
+  );
 
   return {
-    read_ok: readEvents.length > 0,
-    fix_applied: !!editEvent,
-    test_exit_code,
-    diff_before,
-    diff_after,
-    bug_located: !!editEvent,
+    read_ok: read !== undefined && readResult?.truncated !== true,
+    fix_applied:
+      edit !== undefined &&
+      (editResult?.replacements ?? 0) > 0 &&
+      fileChange?.after_sha256 !== fileChange?.before_sha256,
+    test_exit_code: testResult?.exit_code ?? null,
+    diff_before: fileChange?.before_sha256 ?? '',
+    diff_after: fileChange?.after_sha256 ?? '',
+    bug_located:
+      typeof readResult?.content === 'string' &&
+      readResult.content.length > 0 &&
+      (editResult?.replacements ?? 0) > 0,
     outcome,
   };
 }

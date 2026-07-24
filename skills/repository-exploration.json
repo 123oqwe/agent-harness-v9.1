@@ -13,8 +13,7 @@
     "search_files"
   ],
   "allowed_effect_classes": [
-    "read",
-    "write"
+    "read"
   ],
   "workflow_template_ref": "workflows/repository-exploration.yaml",
   "verification_template_ref": "verifications/repository-exploration.yaml",

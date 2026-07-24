@@ -8,7 +8,13 @@ export class CodingWorkspaceController {
   async runFix(input: CodingVerticalInput): Promise<UiResult<CodingVerticalOutput>> {
     try {
       const result = await runCodingVertical(this.harness, input);
-      return { state: 'success', data: result };
+      return result.outcome.success
+        ? { state: 'success', data: result }
+        : {
+            state: 'error',
+            data: result,
+            error: `Harness run failed: ${result.outcome.loop_result.termination_reason}`,
+          };
     } catch (e) { return { state: 'error', error: (e as Error).message }; }
   }
 }

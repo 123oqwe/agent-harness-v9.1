@@ -207,6 +207,36 @@ describe('SkillLoader mutation-killing tests', () => {
     expect(result.risk_ceiling_satisfied).toBe(true);
   });
 
+  it('maps named risk tiers instead of treating medium as tier 1', async () => {
+    const loader = new SkillLoader(
+      registry,
+      snapshot,
+      ['read_file', 'edit_file', 'execute_command'],
+      1,
+    );
+    await expect(loader.activate('bug-fix')).rejects.toThrow('risk ceiling');
+  });
+
+  it('prevents a read-only skill from activating a write-effect tool', async () => {
+    const spec = structuredClone(baseSkills()[0]!);
+    spec.name = 'read-only-with-write-tool';
+    spec.required_tools = ['edit_file'];
+    spec.allowed_effect_classes = ['read'];
+    const customRegistry = new SkillRegistry();
+    customRegistry.register(spec);
+    const loader = new SkillLoader(
+      customRegistry,
+      customRegistry.freezeSnapshot(),
+      ['edit_file'],
+      2,
+      undefined,
+      { edit_file: 'write' },
+    );
+    await expect(loader.activate(spec.name)).rejects.toThrow(
+      'effect write exceeds allowed effects',
+    );
+  });
+
   it('handles skill with missing risk_ceiling (defaults to tier_1)', async () => {
     // Register a skill without risk_ceiling
     const customSpec = {

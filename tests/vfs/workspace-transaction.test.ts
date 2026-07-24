@@ -71,6 +71,36 @@ describe('Phase 1 workspace transaction', () => {
     expect(existsSync(transaction.workspaceRoot)).toBe(false);
   });
 
+  it('describes staged changes with before/after hashes without exposing content', () => {
+    const transaction = WorkspaceTransaction.open({
+      runId: 'run-describe',
+      baseRoot: root,
+      stateRoot,
+    });
+    const staged = transaction.createVfs(baseVfs());
+    staged.writeText('/workspace/existing.txt', 'after');
+    staged.writeText('/workspace/new.txt', 'new');
+
+    const changes = transaction.describeChanges();
+    expect(changes).toEqual([
+      expect.objectContaining({
+        path: '/workspace/existing.txt',
+        kind: 'modified',
+        before_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        after_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      }),
+      expect.objectContaining({
+        path: '/workspace/new.txt',
+        kind: 'created',
+        before_sha256: null,
+        after_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      }),
+    ]);
+    expect(JSON.stringify(changes)).not.toContain('"after"');
+    expect(Object.isFrozen(changes)).toBe(true);
+    transaction.discard();
+  });
+
   it('discards staged edits without changing the real workspace', () => {
     const transaction = WorkspaceTransaction.open({
       runId: 'run-discard',

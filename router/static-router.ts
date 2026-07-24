@@ -75,7 +75,7 @@ export function profileIntent(task: TaskContract): IntentProfile {
   const requires_writes = explicitFileWrite || mutationVerb && (codeOrFileTarget || !pureWriting);
   const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(goal);
   const explicit_plan = /\b(plan|step by step|multi.?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
-  const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析/u.test(goal);
+  const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze|research|cite|source|reference)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析|研究|引用|来源|参考/u.test(goal);
   const requires_tools = requires_writes || requires_tests || observationTools;
   const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);

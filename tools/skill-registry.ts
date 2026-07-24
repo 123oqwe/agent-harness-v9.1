@@ -102,14 +102,21 @@ function findBaseSkillsDir(): string {
 
 /** The 8 declarative base skills shipped with Phase 1. */
 export function baseSkills(): SkillSpec[] {
-  const mk = (name: string, tools: string[], risk: string, _domain: string, _summary: string): SkillSpec => ({
+  const mk = (
+    name: string,
+    tools: string[],
+    effects: string[],
+    risk: string,
+    _domain: string,
+    _summary: string,
+  ): SkillSpec => ({
     name, version: '1.0.0',
     supported_experience_profiles: ['default'],
     input_schema_ref: `schemas/skills/${name}-input.json`,
     output_schema_ref: `schemas/skills/${name}-output.json`,
     required_context: [],
     required_tools: tools,
-    allowed_effect_classes: ['read', 'write'],
+    allowed_effect_classes: effects,
     workflow_template_ref: `workflows/${name}.yaml`,
     verification_template_ref: `verifications/${name}.yaml`,
     failure_policy: { on_failure: 'abort', max_retries: 0 },
@@ -123,14 +130,14 @@ export function baseSkills(): SkillSpec[] {
   // test and verify, research with citations, document summary, writing refinement,
   // dependency-aware planning.
   return [
-    mk('repository-exploration', ['list_directory', 'read_file', 'search_files'], 'low', 'coding', 'Explore a repository structure'),
-    mk('bug-fix', ['read_file', 'edit_file', 'execute_command'], 'medium', 'coding', 'Fix a bug in a repository'),
-    mk('feature-implementation', ['read_file', 'write_file', 'edit_file', 'execute_command'], 'medium', 'coding', 'Implement a new feature'),
-    mk('test-and-verify', ['read_file', 'write_file', 'execute_command'], 'medium', 'coding', 'Write and run tests'),
-    mk('research-with-citations', ['search_files', 'read_file', 'parse_document'], 'low', 'research', 'Research with source citations'),
-    mk('document-summary', ['parse_document', 'read_file'], 'low', 'documents', 'Summarize a document with page references'),
-    mk('writing-refinement', ['read_file', 'write_file'], 'low', 'writing', 'Refine writing through brief, draft, self-check'),
-    mk('dependency-aware-planning', ['read_file', 'search_files'], 'low', 'planning', 'Build a dependency-aware plan with DAG validation'),
+    mk('repository-exploration', ['list_directory', 'read_file', 'search_files'], ['read'], 'low', 'coding', 'Explore a repository structure'),
+    mk('bug-fix', ['read_file', 'edit_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Fix a bug in a repository'),
+    mk('feature-implementation', ['read_file', 'write_file', 'edit_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Implement a new feature'),
+    mk('test-and-verify', ['read_file', 'write_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Write and run tests'),
+    mk('research-with-citations', ['search_files', 'read_file', 'parse_document'], ['read'], 'low', 'research', 'Research with source citations'),
+    mk('document-summary', ['parse_document', 'read_file'], ['read'], 'low', 'documents', 'Summarize a document with page references'),
+    mk('writing-refinement', ['read_file', 'write_file'], ['read', 'write'], 'low', 'writing', 'Refine writing through brief, draft, self-check'),
+    mk('dependency-aware-planning', ['read_file', 'search_files'], ['read'], 'low', 'planning', 'Build a dependency-aware plan with DAG validation'),
   ];
 }
 

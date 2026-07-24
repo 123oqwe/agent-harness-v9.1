@@ -50,4 +50,22 @@ describe('AH-PA-VERTICAL-001 personal assistant vertical (thin adapter)', () => 
     expect(r.no_external_actions).toBe(true);
     expect(r.outcome.session.eventCount()).toBeGreaterThan(0);
   });
+  it('fits high-priority tasks first without exceeding available minutes', async () => {
+    const h = makeHarness(workspaceRoot);
+    const result = await runPAVertical(h, {
+      tasks: [
+        { id: 'L', title: 'low', priority: 'low', duration_min: 40 },
+        { id: 'H', title: 'high', priority: 'high', duration_min: 30 },
+        { id: 'N', title: 'normal', priority: 'normal', duration_min: 20 },
+      ],
+      available_minutes: 50,
+    });
+    expect(result.plan.map((entry) => entry.task_id)).toEqual(['H', 'N']);
+    expect(result.plan).toEqual([
+      { task_id: 'H', title: 'high', slot: 0 },
+      { task_id: 'N', title: 'normal', slot: 30 },
+    ]);
+    expect(result.unallocated).toEqual(['L']);
+    expect(result.no_external_actions).toBe(true);
+  });
 });
