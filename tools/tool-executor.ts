@@ -26,7 +26,7 @@ import type { ActionManifest } from '../contracts/index.js';
 import type { CapabilityToken } from '../contracts/index.js';
 import type { DurableSession } from '../session/durable-session.js';
 import type { AuthorizationService } from '../security/authorization-service.js';
-import type { InMemoryCapabilityStateStore} from '../security/capability.js';
+import type { CapabilityStateStore } from '../security/capability.js';
 import { hashCapabilityValue } from '../security/capability.js';
 import type { PolicyEnforcementPoint} from '../security/pep.js';
 import { type AuditEvent } from '../security/pep.js';
@@ -140,7 +140,7 @@ function buildManifest(toolName: string, input: unknown, policyVersion: string, 
 export interface ToolExecutorInjectedDeps {
   authz: AuthorizationService;
   pep: PolicyEnforcementPoint;
-  stateStore: InMemoryCapabilityStateStore;
+  stateStore: CapabilityStateStore;
   now: () => string;
   /** Execution context providing tenant_id, user_id, run_id, etc. */
   execCtx?: {
@@ -159,7 +159,7 @@ export interface ToolExecutorInjectedDeps {
 export class ToolExecutor {
   private readonly authz: AuthorizationService;
   private readonly pep: PolicyEnforcementPoint;
-  private readonly stateStore: InMemoryCapabilityStateStore;
+  private readonly stateStore: CapabilityStateStore;
   private readonly injectedNow: () => string;
   private readonly auditLog: AuditEvent[] = [];
   private callCount = 0;
