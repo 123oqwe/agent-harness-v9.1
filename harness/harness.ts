@@ -26,11 +26,14 @@ import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ToolExecutor } from './tools/tool-executor.js';
+import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import type { AuthorizationService } from './security/authorization-service.js';
 import type { InMemoryCapabilityStateStore } from './security/capability.js';
 import type { PolicyEnforcementPoint } from './security/pep.js';
 import { SkillLoader } from './skills/skill-loader.js';
+import { SqliteSessionStore } from './session/sqlite-session-store.js';
 import { execSync } from 'node:child_process';
+import { join } from 'node:path';
 
 /** A provider port that can be called by the Runtime — typed, not a raw callback. */
 export interface HarnessProvider {
@@ -144,13 +147,27 @@ export class Harness {
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
   async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
     const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
-    this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
+  this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
 
-    // 1. Create session (event log = source of truth)
-    const session = new DurableSession(actualRunId);
-    session.acquireWriter();
+  // 1. Create session (event log = source of truth)
+  const session = new DurableSession(actualRunId);
+  session.acquireWriter();
 
-    // Create a per-Run overlay for write isolation
+   // 1a. If dataDir provided, create SQLite store for immediate per-event persistence
+   let sqliteStore: SqliteSessionStore | null = null;
+   if (this.config.dataDir) {
+     sqliteStore = new SqliteSessionStore(join(this.config.dataDir, 'session.db'));
+     sqliteStore.createRun(actualRunId, task.goal, undefined);
+     // Wrap session.append to persist each event to SQLite immediately
+     const origAppend = session.append.bind(session);
+     session.append = (type, data) => {
+       const ev = origAppend(type, data);
+       sqliteStore!.appendEvent(actualRunId, ev);
+       return ev;
+     };
+   }
+
+  // Create a per-Run overlay for write isolation
     const overlayPrefix = '/workspace';
     this.currentOverlay = new OverlayBackend(overlayPrefix);
     this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
@@ -255,33 +272,39 @@ export class Harness {
   }
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
- private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
-   const execCtxForTool = this.execCtx ? {
-     tenant_id: this.execCtx.tenant_id,
-     user_id: this.execCtx.user_id,
-     run_id: this.execCtx.run_id,
-     plan_id: this.execCtx.plan_id,
-     step_id: this.execCtx.step_id,
-     attempt_id: this.execCtx.attempt_id,
-     operation_id: this.execCtx.operation_id,
-     idempotency_key: this.execCtx.idempotency_key,
-     confirmation_key_thumbprint: this.execCtx.confirmation_key_thumbprint,
-   } : undefined;
-   const executor = new ToolExecutor(
-     { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
-     {
-       authz: this.config.security.authz,
-       pep: this.config.security.pep,
-       stateStore: this.config.security.stateStore,
-       now: () => this.now(),
-       ...(execCtxForTool ? { execCtx: execCtxForTool } : {}),
-     },
-    );
-    const { result } = await executor.execute(name, args, async (deps) => {
-      return this.dispatchToolViaDeps(name, args, deps.vfs);
-    });
-    return result;
-  }
+private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
+  const execCtxForTool = this.execCtx ? {
+    tenant_id: this.execCtx.tenant_id,
+    user_id: this.execCtx.user_id,
+    run_id: this.execCtx.run_id,
+    plan_id: this.execCtx.plan_id,
+    step_id: this.execCtx.step_id,
+    attempt_id: this.execCtx.attempt_id,
+    operation_id: this.execCtx.operation_id,
+    idempotency_key: this.execCtx.idempotency_key,
+    confirmation_key_thumbprint: this.execCtx.confirmation_key_thumbprint,
+  } : undefined;
+  const executor = new ToolExecutor(
+    { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
+    {
+      authz: this.config.security.authz,
+      pep: this.config.security.pep,
+      stateStore: this.config.security.stateStore,
+      now: () => this.now(),
+      ...(execCtxForTool ? { execCtx: execCtxForTool } : {}),
+    },
+   );
+   // Route through ToolDispatcher: frozen snapshot → schema validation → ToolExecutor → receipt
+   const dispatcher = new ToolDispatcher(this.config.toolRegistry, this.toolSnapshot, executor);
+   const dispatchResult = await dispatcher.dispatch(
+     { tool_name: name, input: args },
+     async (deps) => this.dispatchToolViaDeps(name, args, (deps as { vfs: VirtualFilesystem }).vfs),
+   );
+   if (!dispatchResult.success) {
+     throw new Error(dispatchResult.error ?? 'tool dispatch failed');
+   }
+   return dispatchResult.result;
+ }
 
   private async dispatchToolViaDeps(name: string, args: Record<string, unknown>, vfs: VirtualFilesystem): Promise<unknown> {
     const { readFile } = await import('./tools/read-file.js');
