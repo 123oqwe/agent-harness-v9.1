@@ -25,25 +25,6 @@ import {
 
 export { FileCapabilityStateStore, InMemoryCapabilityStateStore };
 
-const HASH_PATTERN = /^[0-9a-f]{64}$/u;
-const ISSUE_FIELDS = new Set([
-  'operation_id',
-  'attempt_id',
-  'manifest_hash',
-  'policy_decision_hash',
-  'tool_effect_contract_hash',
-  'subject_workload',
-  'tenant_id',
-  'audience',
-  'tool_grant_hash',
-  'resource_grant_hash',
-  'budget_ceiling_hash',
-  'execution_epoch',
-  'confirmation_key_thumbprint',
-  'not_before',
-  'expires_at',
-]);
-
 export interface CapabilityIssueRequest {
   operation_id: string;
   attempt_id: string;
@@ -107,7 +88,7 @@ function requireNonEmpty(value: unknown, label: string): asserts value is string
 }
 
 function requireHash(value: unknown, label: string): asserts value is string {
-  if (typeof value !== 'string' || !HASH_PATTERN.test(value)) {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) {
     throw new CapabilityInvalidError(`${label} must be a lowercase SHA-256 hash`);
   }
 }
@@ -119,8 +100,25 @@ function strictTimestamp(value: unknown, label: string): number {
 
 function validateIssueRequest(request: CapabilityIssueRequest): void {
   if (!isRecord(request)) throw new CapabilityInvalidError('capability request must be an object');
-  const unknown = Object.keys(request).filter((key) => !ISSUE_FIELDS.has(key));
-  if (unknown.length > 0 || Object.keys(request).length !== ISSUE_FIELDS.size) {
+  const issueFields = new Set([
+    'operation_id',
+    'attempt_id',
+    'manifest_hash',
+    'policy_decision_hash',
+    'tool_effect_contract_hash',
+    'subject_workload',
+    'tenant_id',
+    'audience',
+    'tool_grant_hash',
+    'resource_grant_hash',
+    'budget_ceiling_hash',
+    'execution_epoch',
+    'confirmation_key_thumbprint',
+    'not_before',
+    'expires_at',
+  ]);
+  const unknown = Object.keys(request).filter((key) => !issueFields.has(key));
+  if (unknown.length > 0 || Object.keys(request).length !== issueFields.size) {
     throw new CapabilityInvalidError('capability request contains unknown or missing fields');
   }
   for (const field of [
@@ -401,7 +399,10 @@ export class AuthorizationService {
     options: { confirmation_key_thumbprint?: string } = {},
   ): Promise<CapabilityToken | boolean> {
     if (typeof capabilityOrTokenId === 'string') {
-      return (await this.#state.consume(capabilityOrTokenId, (await this.#state.read(capabilityOrTokenId))?.token_hash ?? '')) === 'consumed';
+      if (!isUuid(capabilityOrTokenId)) return false;
+      const record = await this.#state.read(capabilityOrTokenId);
+      if (record === undefined) return false;
+      return (await this.#state.consume(capabilityOrTokenId, record.token_hash)) === 'consumed';
     }
     const claims = await this.verify(capabilityOrTokenId, options);
     const outcome = await this.#state.consume(claims.token_id, hashCapabilityValue(claims));
@@ -502,16 +503,17 @@ export class AuthorizationService {
     }
     let credential: DisposableCredential | undefined;
     try {
-      credential = await request.exchange({
+      const exchanged = await request.exchange({
         token_id: claims.token_id,
         operation_id: claims.operation_id,
         attempt_id: claims.attempt_id,
         run_phase: 'agent',
         single_use: true,
       });
-      if (!(credential.value instanceof Uint8Array) || typeof credential.dispose !== 'function') {
+      if (!(exchanged.value instanceof Uint8Array) || typeof exchanged.dispose !== 'function') {
         throw new CredentialDispatchError('credential exchange returned an invalid disposable credential');
       }
+      credential = exchanged;
       return await request.dispatch(credential.value);
     } finally {
       if (credential !== undefined) {

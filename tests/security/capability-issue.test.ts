@@ -314,10 +314,19 @@ describe('credential reachability boundary', () => {
   it('exchanges once at dispatch, passes credential explicitly, and disposes it without env leakage', async () => {
     const { service } = setup();
     const signed = await service.issue(request());
-    const exchange = vi.fn(async () => ({
-      value: Buffer.from('dispatch-only-secret'),
-      dispose: vi.fn(),
-    }));
+    const exchange = vi.fn(async (context) => {
+      expect(context).toEqual({
+        token_id: signed.claims.token_id,
+        operation_id: 'operation-1',
+        attempt_id: 'attempt-1',
+        run_phase: 'agent',
+        single_use: true,
+      });
+      return {
+        value: Buffer.from('dispatch-only-secret'),
+        dispose: vi.fn(),
+      };
+    });
     const dispatch = vi.fn(async (credential: Uint8Array) => {
       expect(Buffer.from(credential).toString()).toBe('dispatch-only-secret');
       expect(Object.values(process.env)).not.toContain('dispatch-only-secret');
@@ -396,6 +405,22 @@ describe('credential reachability boundary', () => {
         dispatch: async () => 'must not run',
       }),
     ).rejects.toBeInstanceOf(CredentialDispatchError);
+
+    const { service: missingDisposeService } = setup();
+    const missingDispose = await missingDisposeService.issue({
+      ...request(),
+      operation_id: 'operation-missing-dispose',
+    });
+    await expect(
+      missingDisposeService.dispatchWithExchangedCredential({
+        capability: missingDispose,
+        confirmation_key_thumbprint: 'key-thumbprint-1',
+        exchange: async () => ({ value: Buffer.from('secret') }) as never,
+        dispatch: async () => 'must not run',
+      }),
+    ).rejects.toEqual(
+      new CredentialDispatchError('credential exchange returned an invalid disposable credential'),
+    );
 
     const { service: secondService } = setup();
     const second = await secondService.issue({ ...request(), operation_id: 'operation-2' });
