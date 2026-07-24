@@ -545,7 +545,7 @@ describe('ModelGateway mutation-killing edge cases', () => {
 });
 
 describe('ModelGateway validation mutation kills', () => {
-  function makeRuntime() {
+  function makeRuntime(): GatewayProviderRuntime {
     const provider = new ScriptedTestProvider({ queue: [{ content: 'ok', model: 's', stop_reason: 'stop', usage: { input_tokens: 1, output_tokens: 1 } }] });
     return {
       provider_type: provider.provider_type,
@@ -561,7 +561,9 @@ describe('ModelGateway validation mutation kills', () => {
     };
   }
 
-  function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}) {
+  function makeReg(
+    overrides: Partial<GatewayProviderRegistration['metadata']> = {},
+  ): GatewayProviderRegistration {
     return {
       provider_id: 'p1',
       contract: scriptedProviderContract,
@@ -583,13 +585,13 @@ describe('ModelGateway validation mutation kills', () => {
 
   it('rejects provider_id that is empty string', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).provider_id = '';
+    (reg as unknown as Record<string, unknown>).provider_id = '';
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects provider_id that is whitespace only', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).provider_id = '   ';
+    (reg as unknown as Record<string, unknown>).provider_id = '   ';
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -629,7 +631,9 @@ describe('ModelGateway validation mutation kills', () => {
   });
 
   it('rejects health that is not a valid enum', () => {
-    const reg = makeReg({ health: 'unknown' as unknown as string });
+    const reg = makeReg({
+      health: 'unknown' as unknown as GatewayProviderRegistration['metadata']['health'],
+    });
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -654,7 +658,13 @@ describe('ModelGateway validation mutation kills', () => {
   });
 
   it('rejects pricing with non-USD currency', () => {
-    const reg = makeReg({ pricing: { currency: 'EUR', input_per_million: 1, output_per_million: 2 } });
+    const reg = makeReg({
+      pricing: {
+        currency: 'EUR' as unknown as 'USD',
+        input_per_million: 1,
+        output_per_million: 2,
+      },
+    });
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -735,13 +745,13 @@ describe('ModelGateway validation mutation kills', () => {
 
   it('rejects adapter that is null', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).adapter = null;
+    (reg as unknown as Record<string, unknown>).adapter = null;
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects adapter that is an array', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).adapter = [];
+    (reg as unknown as Record<string, unknown>).adapter = [];
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -767,37 +777,37 @@ describe('ModelGateway validation mutation kills', () => {
 
   it('rejects metadata that is not an object', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).metadata = null;
+    (reg as unknown as Record<string, unknown>).metadata = null;
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects metadata with unknown field', () => {
     const reg = makeReg();
-    (reg.metadata as Record<string, unknown>).unknown_field = true;
+    (reg.metadata as unknown as Record<string, unknown>).unknown_field = true;
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects contract with unknown field', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, unknown_field: true };
+    (reg as unknown as Record<string, unknown>).contract = { ...scriptedProviderContract, unknown_field: true };
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects contract.provider_type that is not in enum', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, provider_type: 'invalid' };
+    (reg as unknown as Record<string, unknown>).contract = { ...scriptedProviderContract, provider_type: 'invalid' };
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects contract.normalize_request that is not true', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, normalize_request: false };
+    (reg as unknown as Record<string, unknown>).contract = { ...scriptedProviderContract, normalize_request: false };
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
   it('rejects contract with optional field that is not boolean', () => {
     const reg = makeReg();
-    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, rate_limiter: 'yes' };
+    (reg as unknown as Record<string, unknown>).contract = { ...scriptedProviderContract, rate_limiter: 'yes' };
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 });
