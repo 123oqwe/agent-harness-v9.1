@@ -331,7 +331,7 @@ function mutantIdentity(sourceFile, mutant) {
   });
 }
 
-export function mergeChunkReports(chunks, reports) {
+export function mergeChunkReports(chunks, reports, sourceRoot = harnessRoot) {
   if (chunks.length === 0 || chunks.length !== reports.length) {
     throw new Error('chunk/report cardinality mismatch');
   }
@@ -348,6 +348,9 @@ export function mergeChunkReports(chunks, reports) {
       throw new Error(`chunk ${chunk.chunk_id} has no files object`);
     }
     const entries = Object.entries(report.files);
+    if (entries.length === 0) {
+      continue;
+    }
     if (entries.length !== 1 || entries[0][0] !== chunk.source_file) {
       throw new Error(`chunk ${chunk.chunk_id} source file mismatch`);
     }
@@ -371,6 +374,20 @@ export function mergeChunkReports(chunks, reports) {
       });
     }
     merged.files[sourceFile] = target;
+  }
+  for (const sourceFile of new Set(
+    chunks.map((chunk) => chunk.source_file),
+  )) {
+    if (merged.files[sourceFile]) continue;
+    const sourcePath = join(sourceRoot, sourceFile);
+    if (!existsSync(sourcePath)) {
+      throw new Error(`all-empty chunk source missing: ${sourceFile}`);
+    }
+    merged.files[sourceFile] = {
+      language: 'typescript',
+      source: readFileSync(sourcePath, 'utf8'),
+      mutants: [],
+    };
   }
   exactSet(
     Object.keys(merged.files),

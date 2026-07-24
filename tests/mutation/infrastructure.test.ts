@@ -407,6 +407,81 @@ describe('Phase 1 mutation report integrity', () => {
     ]);
   });
 
+  it('accepts an empty chunk report when another chunk covers the source', () => {
+    const chunks = [
+      {
+        chunk_id: 'chunk-empty',
+        source_file: 'gateway/provider.ts',
+        start_line: 1,
+        end_line: 2,
+        mutate_pattern: 'gateway/provider.ts:1-2',
+      },
+      {
+        chunk_id: 'chunk-mutants',
+        source_file: 'gateway/provider.ts',
+        start_line: 3,
+        end_line: 4,
+        mutate_pattern: 'gateway/provider.ts:3-4',
+      },
+    ];
+    const reportWithMutant = {
+      schemaVersion: '1.0',
+      files: {
+        'gateway/provider.ts': {
+          language: 'typescript',
+          source: 'const one = true;\nconst two = true;',
+          mutants: [
+            {
+              id: '0',
+              mutatorName: 'BooleanLiteral',
+              replacement: 'false',
+              status: 'Killed',
+              location: {
+                start: { line: 3, column: 1 },
+                end: { line: 3, column: 5 },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const merged = mergeChunkReports(chunks, [
+      { schemaVersion: '1.0', files: {} },
+      reportWithMutant,
+    ]);
+
+    expect(Object.keys(merged.files)).toEqual(['gateway/provider.ts']);
+    expect(merged.files['gateway/provider.ts']!.mutants).toHaveLength(1);
+  });
+
+  it('records an all-empty source file instead of dropping it', () => {
+    const root = temporaryRoot();
+    mkdirSync(join(root, 'gateway'), { recursive: true });
+    writeFileSync(join(root, 'gateway', 'empty.ts'), 'export {};\n');
+    const chunks = [
+      {
+        chunk_id: 'chunk-empty',
+        source_file: 'gateway/empty.ts',
+        start_line: 1,
+        end_line: 1,
+        mutate_pattern: 'gateway/empty.ts:1-1',
+      },
+    ];
+
+    const merged = mergeChunkReports(
+      chunks,
+      [{ schemaVersion: '1.0', files: {} }],
+      root,
+    );
+
+    expect(merged.files['gateway/empty.ts']).toEqual({
+      language: 'typescript',
+      source: 'export {};\n',
+      mutants: [],
+    });
+  });
+
   it('hashes every mutation authority and changes if one changes', () => {
     const root = temporaryRoot();
     mkdirSync(join(root, 'mutation'), { recursive: true });
