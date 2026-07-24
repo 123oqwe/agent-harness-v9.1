@@ -39,6 +39,13 @@ export interface RegistrySnapshot {
   snapshot_id: string;          // SHA-256 of canonical spec set
   created_at: string;
   tool_names: readonly string[];
+  entries: readonly RegistrySnapshotEntry[];
+}
+
+export interface RegistrySnapshotEntry {
+  name: string;
+  version: string;
+  content_hash: string;
 }
 
 function findSchemaPath(filename: string): string {
@@ -57,11 +64,31 @@ function loadSchema(): object {
   }
 }
 
-function canonical(spec: ToolSpec): string {
-  return JSON.stringify(spec, Object.keys(spec).sort());
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`)
+    .join(',')}}`;
 }
 
 function sha(s: string): string { return createHash('sha256').update(s).digest('hex'); }
+
+function contentHash(value: unknown): string { return sha(canonical(value)); }
+
+function cloneAndFreeze<T>(value: T): T {
+  const cloned = structuredClone(value);
+  const freeze = (item: unknown): void => {
+    if (item === null || typeof item !== 'object' || Object.isFrozen(item)) return;
+    for (const child of Object.values(item as Record<string, unknown>)) freeze(child);
+    Object.freeze(item);
+  };
+  freeze(cloned);
+  return cloned;
+}
 
 export class ToolRegistry {
   private readonly tools = new Map<string, ToolSpec>();
@@ -93,7 +120,7 @@ export class ToolRegistry {
     ) {
       throw new ToolRegistryError(`uncertified production tool: ${spec.name} (maturity=${spec.maturity})`);
     }
-    this.tools.set(spec.name, Object.freeze({ ...spec }));
+    this.tools.set(spec.name, cloneAndFreeze(spec));
     this.snapshot = null; // invalidate snapshot on mutation
   }
 
@@ -110,7 +137,10 @@ export class ToolRegistry {
   get(name: string): ToolSpec | undefined { return this.tools.get(name); }
 
   /** Full ToolSpec loaded only after selection (progressive disclosure). */
-  loadFull(name: string): ToolSpec {
+  loadFull(name: string, snap: RegistrySnapshot): ToolSpec {
+    if (!this.inSnapshot(name, snap)) {
+      throw new ToolRegistryError(`tool does not match frozen snapshot: ${name}`);
+    }
     const t = this.tools.get(name);
     if (!t) throw new ToolRegistryError(`tool not found: ${name}`);
     return t;
@@ -155,19 +185,33 @@ export class ToolRegistry {
   /** Freeze an immutable, content-addressed snapshot for a RunPlan. */
   freezeSnapshot(): RegistrySnapshot {
     if (this.snapshot) return this.snapshot;
-    const canonicalSet = [...this.tools.values()].map(canonical).sort().join('\n');
-    const id = sha(canonicalSet);
-    this.snapshot = Object.freeze({
+    const entries = [...this.tools.values()]
+      .map((spec) => cloneAndFreeze({
+        name: spec.name,
+        version: spec.version,
+        content_hash: contentHash(spec),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const id = contentHash(entries);
+    this.snapshot = cloneAndFreeze({
       snapshot_id: id,
       created_at: new Date().toISOString(),
-      tool_names: Object.freeze([...this.tools.keys()].sort()),
+      tool_names: entries.map((entry) => entry.name),
+      entries,
     });
     return this.snapshot;
   }
 
   /** Verify a tool is present in a frozen snapshot (Runtime guard). */
   inSnapshot(name: string, snap: RegistrySnapshot): boolean {
-    return snap.tool_names.includes(name) && this.tools.has(name);
+    const spec = this.tools.get(name);
+    const entry = snap.entries.find((candidate) => candidate.name === name);
+    return (
+      spec !== undefined &&
+      entry !== undefined &&
+      entry.version === spec.version &&
+      entry.content_hash === contentHash(spec)
+    );
   }
 
   size(): number { return this.tools.size; }

@@ -55,7 +55,8 @@ describe('AH-TOOL-REGISTRY-001 Tool Registry', () => {
     const compact = reg.search('read_file')[0]!;
     expect(compact).toBeDefined();
     // compact result should NOT contain full schema fields like input_schema_ref
-    const full = reg.loadFull('read_file');
+    expect(compact).not.toHaveProperty('input_schema_ref');
+    const full = reg.loadFull('read_file', reg.freezeSnapshot());
     expect(full.input_schema_ref).toBe('in.json');
   });
 
@@ -73,10 +74,51 @@ describe('AH-TOOL-REGISTRY-001 Tool Registry', () => {
     const s2 = reg.freezeSnapshot();
     expect(s1.snapshot_id).toBe(s2.snapshot_id);
     expect(s1.tool_names).toEqual(['read_file']);
+    expect(s1.entries).toEqual([
+      expect.objectContaining({ name: 'read_file', version: '1.0.0' }),
+    ]);
     // mutating invalidates snapshot
     reg.register(validSpec('write_file'));
     const s3 = reg.freezeSnapshot();
     expect(s3.snapshot_id).not.toBe(s1.snapshot_id);
+  });
+
+  it('hashes nested ToolSpec content recursively', () => {
+    const first = new ToolRegistry();
+    first.register(validSpec('read_file', {
+      effect_model: { summary: 'read', tags: ['filesystem'] },
+    }));
+    const second = new ToolRegistry();
+    second.register(validSpec('read_file', {
+      effect_model: { summary: 'read', tags: ['filesystem', 'local'] },
+    }));
+
+    expect(first.freezeSnapshot().snapshot_id).not.toBe(second.freezeSnapshot().snapshot_id);
+  });
+
+  it('clones and deep-freezes nested registered ToolSpecs', () => {
+    const source = validSpec('read_file', {
+      effect_model: { summary: 'before', tags: ['filesystem'] },
+    });
+    reg.register(source);
+    const registered = reg.get('read_file')!;
+
+    (source.effect_model as { summary: string }).summary = 'after';
+    expect((registered.effect_model as { summary: string }).summary).toBe('before');
+    expect(Object.isFrozen(registered.effect_model)).toBe(true);
+    expect(() => {
+      (registered.effect_model as { summary: string }).summary = 'mutated';
+    }).toThrow();
+  });
+
+  it('rejects a same-name record that does not match the frozen version and hash', () => {
+    reg.register(validSpec('read_file'));
+    const snapshot = reg.freezeSnapshot();
+    const replacement = new ToolRegistry();
+    replacement.register(validSpec('read_file', { version: '2.0.0' }));
+
+    expect(replacement.inSnapshot('read_file', snapshot)).toBe(false);
+    expect(() => replacement.loadFull('read_file', snapshot)).toThrow('frozen snapshot');
   });
 
   it('inSnapshot guards Runtime execution', () => {

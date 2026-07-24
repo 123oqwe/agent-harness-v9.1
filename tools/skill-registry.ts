@@ -37,6 +37,13 @@ export interface SkillRegistrySnapshot {
   snapshot_id: string;
   created_at: string;
   skill_names: readonly string[];
+  entries: readonly SkillRegistrySnapshotEntry[];
+}
+
+export interface SkillRegistrySnapshotEntry {
+  name: string;
+  version: string;
+  content_hash: string;
 }
 
 function findSchemaPath(filename: string): string {
@@ -57,6 +64,30 @@ function loadSchema(): object {
 }
 
 function sha(s: string): string { return createHash('sha256').update(s).digest('hex'); }
+
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`)
+    .join(',')}}`;
+}
+
+function contentHash(value: unknown): string { return sha(canonical(value)); }
+
+function cloneAndFreeze<T>(value: T): T {
+  const cloned = structuredClone(value);
+  const freeze = (item: unknown): void => {
+    if (item === null || typeof item !== 'object' || Object.isFrozen(item)) return;
+    for (const child of Object.values(item as Record<string, unknown>)) freeze(child);
+    Object.freeze(item);
+  };
+  freeze(cloned);
+  return cloned;
+}
 
 function findBaseSkillsDir(): string {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -127,8 +158,12 @@ export class SkillRegistry {
   register(spec: SkillSpec, meta?: { summary?: string | undefined; tags?: string[] | undefined; domain?: string | undefined }): void {
     this.validate(spec);
     if (this.skills.has(spec.name)) throw new SkillValidationError(`duplicate skill name: ${spec.name}`);
-    this.skills.set(spec.name, Object.freeze({ ...spec }));
-    this.summaries.set(spec.name, { summary: meta?.summary ?? '', tags: meta?.tags ?? [], domain: meta?.domain ?? 'general' });
+    this.skills.set(spec.name, cloneAndFreeze(spec));
+    this.summaries.set(spec.name, cloneAndFreeze({
+      summary: meta?.summary ?? '',
+      tags: meta?.tags ?? [],
+      domain: meta?.domain ?? 'general',
+    }));
     this.snapshot = null;
   }
 
@@ -150,6 +185,24 @@ export class SkillRegistry {
   loadBaseSkills(): void { this.loadSkills(findBaseSkillsDir()); }
 
   getSkill(name: string): SkillSpec | undefined { return this.skills.get(name); }
+
+  loadFull(name: string, snap: SkillRegistrySnapshot): SkillSpec {
+    if (!this.inSnapshot(name, snap)) {
+      throw new SkillValidationError(`skill does not match frozen snapshot: ${name}`);
+    }
+    return this.skills.get(name)!;
+  }
+
+  inSnapshot(name: string, snap: SkillRegistrySnapshot): boolean {
+    const spec = this.skills.get(name);
+    const entry = snap.entries.find((candidate) => candidate.name === name);
+    return (
+      spec !== undefined &&
+      entry !== undefined &&
+      entry.version === spec.version &&
+      entry.content_hash === contentHash(spec)
+    );
+  }
   listSkills(): string[] { return [...this.skills.keys()].sort(); }
 
   /** reloadSkills re-reads directory and updates cache. */
@@ -183,9 +236,20 @@ export class SkillRegistry {
 
   freezeSnapshot(): SkillRegistrySnapshot {
     if (this.snapshot) return this.snapshot;
-    const set = [...this.skills.values()].map(s => JSON.stringify(s, Object.keys(s).sort())).sort().join('\n');
-    const id = sha(set);
-    this.snapshot = Object.freeze({ snapshot_id: id, created_at: new Date().toISOString(), skill_names: Object.freeze([...this.skills.keys()].sort()) });
+    const entries = [...this.skills.values()]
+      .map((spec) => cloneAndFreeze({
+        name: spec.name,
+        version: spec.version,
+        content_hash: contentHash(spec),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const id = contentHash(entries);
+    this.snapshot = cloneAndFreeze({
+      snapshot_id: id,
+      created_at: new Date().toISOString(),
+      skill_names: entries.map((entry) => entry.name),
+      entries,
+    });
     return this.snapshot;
   }
 

@@ -44,6 +44,47 @@ describe('Skill Loader', () => {
   });
 });
 
+describe('Skill Registry snapshot authority', () => {
+  it('hashes nested SkillSpec content recursively', () => {
+    const firstSpec = structuredClone(baseSkills()[0]!);
+    const secondSpec = structuredClone(firstSpec);
+    secondSpec.failure_policy = { on_failure: 'abort', max_retries: 1 };
+    const first = new SkillRegistry();
+    const second = new SkillRegistry();
+    first.register(firstSpec);
+    second.register(secondSpec);
+
+    expect(first.freezeSnapshot().snapshot_id).not.toBe(second.freezeSnapshot().snapshot_id);
+  });
+
+  it('clones and deep-freezes nested SkillSpecs', () => {
+    const source = structuredClone(baseSkills()[0]!);
+    const registry = new SkillRegistry();
+    registry.register(source);
+    const registered = registry.getSkill(source.name)!;
+
+    (source.required_tools as string[]).push('execute_command');
+    expect(registered.required_tools).not.toContain('execute_command');
+    expect(Object.isFrozen(registered.required_tools)).toBe(true);
+    expect(() => {
+      (registered.required_tools as string[]).push('write_file');
+    }).toThrow();
+  });
+
+  it('rejects a same-name skill that differs from the frozen version and hash', () => {
+    const original = new SkillRegistry();
+    original.register(baseSkills()[0]!);
+    const snapshot = original.freezeSnapshot();
+    const replacement = new SkillRegistry();
+    replacement.register({ ...baseSkills()[0]!, version: '2.0.0' });
+
+    expect(replacement.inSnapshot('repository-exploration', snapshot)).toBe(false);
+    expect(() => replacement.loadFull('repository-exploration', snapshot)).toThrow(
+      'frozen snapshot',
+    );
+  });
+});
+
 describe('SkillLoader mutation-killing tests', () => {
   let registry: SkillRegistry;
   let snapshot: ReturnType<SkillRegistry['freezeSnapshot']>;

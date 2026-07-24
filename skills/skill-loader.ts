@@ -68,14 +68,13 @@ export class SkillLoader {
     if (!skill) {
       throw new SkillLoaderError(`skill not found: ${skillName}`);
     }
-
-    // Verify skill is in frozen snapshot
-    if (!this.snapshot.skill_names.includes(skillName)) {
+    if (!this.registry.inSnapshot(skillName, this.snapshot)) {
       throw new SkillLoaderError(`skill not in frozen snapshot: ${skillName}`);
     }
+    const frozenSkill = this.registry.loadFull(skillName, this.snapshot);
 
     // Check required tools are available
-    const requiredTools = (skill.required_tools as string[]) ?? [];
+    const requiredTools = (frozenSkill.required_tools as string[]) ?? [];
     const missingTools = requiredTools.filter((t) => !this.availableTools.includes(t));
     if (missingTools.length > 0) {
       throw new SkillLoaderError(
@@ -84,7 +83,7 @@ export class SkillLoader {
     }
 
     // Check risk ceiling
-    const riskCeiling = skill.risk_ceiling ?? 'tier_1';
+    const riskCeiling = frozenSkill.risk_ceiling ?? 'tier_1';
     const ceilingTier = parseInt(riskCeiling.replace('tier_', ''), 10) || 1;
     if (ceilingTier > this.maxRiskTier) {
       throw new SkillLoaderError(
@@ -93,7 +92,7 @@ export class SkillLoader {
     }
 
     // Verify allowed effects
-    const allowedEffects = (skill.allowed_effect_classes as string[]) ?? ['read_only'];
+    const allowedEffects = (frozenSkill.allowed_effect_classes as string[]) ?? ['read_only'];
     const validEffects = ['pure', 'read_only', 'idempotent_write', 'non_idempotent_write', 'irreversible', 'read', 'write', 'create', 'delete', 'execute', 'publish', 'communicate'];
     for (const e of allowedEffects) {
       if (!validEffects.includes(e)) {
@@ -101,12 +100,12 @@ export class SkillLoader {
       }
     }
 
-    const instructions = this.readAsset(skill.workflow_template_ref, 'workflow');
-    const verification = this.readAsset(skill.verification_template_ref, 'verification');
+    const instructions = this.readAsset(frozenSkill.workflow_template_ref, 'workflow');
+    const verification = this.readAsset(frozenSkill.verification_template_ref, 'verification');
 
     return {
-      skill,
-      frozen_version: skill.version,
+      skill: frozenSkill,
+      frozen_version: frozenSkill.version,
       required_tools_available: true,
       missing_tools: [],
       risk_ceiling_satisfied: true,
