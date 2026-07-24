@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SkillRegistry, SkillValidationError } from '../../tools/skill-registry.js';
-import type { SkillSpec } from '../../../spec/types/skill-spec.js';
+import type { SkillSpec } from '../../contracts/index.js';
 
 function validSkill(name: string): SkillSpec {
   return {

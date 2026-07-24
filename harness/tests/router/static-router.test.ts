@@ -6,8 +6,8 @@ import { StaticRouter, profileIntent, selectStrategy } from '../../router/static
 import { ToolRegistry } from '../../tools/tool-registry.js';
 import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
-import type { TaskContract } from '../../../spec/types/task-contract.js';
+import type { ToolSpec } from '../../contracts/index.js';
+import type { TaskContract } from '../../contracts/index.js';
 
 function task(goal: string, over: Partial<TaskContract> = {}): TaskContract {
   return {

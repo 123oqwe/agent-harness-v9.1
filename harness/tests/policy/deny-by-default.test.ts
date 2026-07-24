@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EffectRisk } from '../../../spec/types/effect-risk.js';
+import type { EffectRisk } from '../../contracts/index.js';
 import {
   PolicyConfigurationError,
   PolicyEngine,

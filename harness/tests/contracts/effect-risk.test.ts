@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateFixture, loadFixture } from '../helpers/schema-validator';
-import type { EffectRisk } from '../../../spec/types/effect-risk';
+import type { EffectRisk } from '../../contracts/index.js';
 
 describe('AH-CONTRACT-EFFECTRISK-001: effect-risk schema', () => {
   it('valid fixture passes full schema validation', () => {

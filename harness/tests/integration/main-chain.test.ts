@@ -13,7 +13,7 @@ import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../../contracts/index.js';
 import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 

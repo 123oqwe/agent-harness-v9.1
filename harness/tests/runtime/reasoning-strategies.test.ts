@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { profileIntent, selectStrategy, type ReasoningStrategy } from '../../router/static-router.js';
-import type { TaskContract } from '../../../spec/types/task-contract.js';
+import type { TaskContract } from '../../contracts/index.js';
 
 function task(goal: string): TaskContract {
   return { goal, success_criteria: [{ criterion: 'done', verification_method: 'deterministic' }], constraints: [] } as TaskContract;

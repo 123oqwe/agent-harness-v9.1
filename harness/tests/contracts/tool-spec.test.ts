@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateFixture, loadFixture } from '../helpers/schema-validator';
-import type { ToolSpec } from '../../../spec/types/tool-spec';
+import type { ToolSpec } from '../../contracts/index.js';
 
 describe('AH-CONTRACT-TOOLSPEC-001: tool-spec schema', () => {
   it('valid fixture passes full schema validation', () => {

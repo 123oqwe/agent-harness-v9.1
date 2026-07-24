@@ -12,7 +12,7 @@ import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import { DurableSession } from '../../session/durable-session.js';
 import { readFile } from '../../tools/read-file.js';
-import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../../contracts/index.js';
 
 function toolSpec(name: string): ToolSpec {
   return { name, version: '1.0.0', domains: ['coding'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
@@ -48,7 +48,7 @@ describe('ToolExecutor unified pipeline', () => {
       audit_sink: { write: async () => {} },
       now: () => fixedNow,
     });
-    executor = new ToolExecutor({ toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session }, { authz, pep, stateStore, now: () => fixedNow });
+    executor = new ToolExecutor({ toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session }, { authz, pep, stateStore, now: () => fixedNow, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
   });
   afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
@@ -157,7 +157,7 @@ describe('ToolExecutor unified pipeline', () => {
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
     const executor2 = new ToolExecutor(
       { toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session },
-      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } },
     );
     writeFileSync(join(tmp, 'f2.txt'), 'content');
     const { receipt } = await executor2.execute('read_file', { path: '/workspace/f2.txt' }, async (deps) => {
@@ -192,7 +192,7 @@ describe('ToolExecutor unified pipeline', () => {
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe2, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
     const executor2 = new ToolExecutor(
       { toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe2, session },
-      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } },
     );
     await expect(executor2.execute('read_file', { path: '/denied/x' }, async () => 'x')).rejects.toThrow();
   });
@@ -237,7 +237,7 @@ describe('ToolExecutor unified pipeline', () => {
     });
     const exec2 = new ToolExecutor(
       { toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session },
-      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } },
     );
     await expect(exec2.execute('read_file', { path: '/workspace/f.txt' }, async () => 'x')).rejects.toThrow();
   });
@@ -256,7 +256,7 @@ describe('ToolExecutor unified pipeline', () => {
     });
     const exec2 = new ToolExecutor(
       { toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session },
-      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn },
+      { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } },
     );
     await expect(exec2.execute('read_file', { path: '/workspace/f.txt' }, async () => 'x')).rejects.toThrow();
   });
@@ -273,7 +273,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'wf.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/wf.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/wf.txt' }));
     expect(receipt.success).toBe(true);
@@ -291,7 +291,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'ef.txt'), 'exec');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/ef.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/ef.txt' }));
     expect(receipt.success).toBe(true);
@@ -374,7 +374,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier2.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier2.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier2.txt' }));
     expect(receipt.derived_risk_tier).toBe(3);
@@ -392,7 +392,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_exec.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_exec.txt' }));
     expect(receipt.derived_risk_tier).toBe(4);
@@ -410,7 +410,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_remote.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_remote.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_remote.txt' }));
     expect(receipt.derived_risk_tier).toBe(1);
@@ -428,7 +428,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_cred.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_cred.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_cred.txt' }));
     expect(receipt.derived_risk_tier).toBe(2);
@@ -446,7 +446,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_egress.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_egress.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_egress.txt' }));
     expect(receipt.derived_risk_tier).toBe(2);
@@ -461,7 +461,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn, max_ttl_ms: 1000 });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr, snapshot: snap, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     await expect(exec2.execute('read_file', { path: '/workspace/ttl.txt' }, async () => 'x')).rejects.toThrow(/capability issue failed/);
     const events = session.getEvents();
     expect(events.some(e => e.type === 'error' && (e.data as { reason: string }).reason.includes('capability issue failed'))).toBe(true);
@@ -479,7 +479,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'del.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/del.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/del.txt' }));
     expect(receipt.derived_risk_tier).toBe(5); // delete (+3) + none (+2) = 5
@@ -497,7 +497,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'ext.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/ext.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/ext.txt' }));
     expect(receipt.derived_risk_tier).toBe(2); // external (+2)
@@ -515,7 +515,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'unb.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/unb.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/unb.txt' }));
     expect(receipt.derived_risk_tier).toBe(4); // unbounded (+4)
@@ -533,7 +533,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'pub.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/pub.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/pub.txt' }));
     expect(receipt.derived_risk_tier).toBe(2); // public visibility (+2)
@@ -551,7 +551,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'reg.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/reg.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/reg.txt' }));
     expect(receipt.derived_risk_tier).toBe(1); // regulatory_sensitivity (+1)
@@ -569,7 +569,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'fin.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/fin.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/fin.txt' }));
     expect(receipt.derived_risk_tier).toBe(1); // financial_impact >= 10000 (+1)
@@ -587,7 +587,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'hum.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/hum.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/hum.txt' }));
     expect(receipt.derived_risk_tier).toBe(1); // human_impact self (+1)
@@ -611,7 +611,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_write.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_write.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_write.txt' }));
     expect(receipt.side_effect_class).toBe('idempotent_write');
@@ -629,7 +629,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_del.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_del.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_del.txt' }));
     expect(receipt.side_effect_class).toBe('idempotent_write');
@@ -650,7 +650,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_create.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_create.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_create.txt' }));
     expect(receipt.side_effect_class).toBe('idempotent_write');
@@ -668,7 +668,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_exec.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_exec.txt' }));
     expect(receipt.side_effect_class).toBe('read_only');
@@ -686,7 +686,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_pub.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_pub.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_pub.txt' }));
     expect(receipt.side_effect_class).toBe('read_only');
@@ -705,7 +705,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'em_empty.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_empty.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_empty.txt' }));
     expect(receipt.derived_risk_tier).toBe(0);
@@ -727,7 +727,7 @@ describe('ToolExecutor unified pipeline', () => {
     const ss2 = new InMemoryCapabilityStateStore();
     const az2 = new AuthorizationService({ private_key: pk2, public_key: pub2, state_store: ss2, now: () => fn });
     const pp2 = new PolicyEnforcementPoint({ policy_engine: pe, capability_authority: { verify_signature: async () => true, consume: async () => true }, audit_sink: { write: async () => {} }, now: () => fn });
-    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn });
+    const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'em_nonstr.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_nonstr.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_nonstr.txt' }));
     expect(receipt.derived_risk_tier).toBe(0);
