@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: intent-preserving-revision
+    require: [intent_preserved, unsupported_facts_zero, style_match]

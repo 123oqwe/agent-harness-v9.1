@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - original_intent_preserved
+  - unsupported_facts_not_added
+  - requested_style_satisfied

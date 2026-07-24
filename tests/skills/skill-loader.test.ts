@@ -107,10 +107,10 @@ describe('SkillLoader mutation-killing tests', () => {
     expect(result.allowed_effects_verified).toBe(true);
   });
 
-  it('instructions field is empty string when no skillsDir', async () => {
+  it('loads packaged instructions when no skillsDir is supplied', async () => {
     const loader = new SkillLoader(registry, snapshot, ['list_directory', 'read_file', 'search_files']);
     const result = await loader.activate('repository-exploration');
-    expect(result.instructions).toBe('');
+    expect(result.instructions).toContain('Inspect the repository');
   });
 
   it('frozen_version matches skill version', async () => {

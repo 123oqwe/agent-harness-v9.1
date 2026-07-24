@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["workspace","problem"],"properties":{"workspace":{"type":"string","minLength":1},"problem":{"type":"string","minLength":1}},"additionalProperties":false}

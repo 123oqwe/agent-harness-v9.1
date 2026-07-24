@@ -116,10 +116,13 @@ describe('AH-TOOL-REGISTRY-001 Tool Registry', () => {
       // The source must NOT contain an inline schema object
       expect(source).not.toMatch(/TOOL_SPEC_SCHEMA\s*=\s*\{/);
       expect(source).not.toMatch(/as object/);
+      expect(source).not.toContain('HARNESS_SPEC_ROOT');
+      expect(source).not.toContain('process.cwd()');
+      expect(source).not.toMatch(/['"]spec['"], ['"]contracts['"]/);
     });
 
-    it('loads the schema from spec/contracts/tool-spec.schema.json at construction', () => {
-      const contractPath = join(process.env.HARNESS_SPEC_ROOT ?? join(__dirname, '../../../spec'), 'contracts', 'tool-spec.schema.json');
+    it('loads the packaged runtime contract at construction', () => {
+      const contractPath = join(__dirname, '../../resources/contracts/tool-spec.schema.json');
       const contractSchema = JSON.parse(readFileSync(contractPath, 'utf8'));
       expect(contractSchema.title).toBe('ToolSpec');
       // The registry validates using the authoritative contract schema

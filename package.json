@@ -22,7 +22,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
     "lint": "eslint gateway security runtime router session tools ui verification vfs domains ingestion research writing planning personal_assistant harness.ts index.ts scripts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -49,8 +49,6 @@
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
     "eslint": "^10.7.0",
     "json-schema-to-typescript": "^15.0.4",
     "prettier": "^3.9.5",
@@ -60,6 +58,8 @@
   },
   "dependencies": {
     "@simplewebauthn/server": "13.3.2",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "bcrypt": "6.0.0",
     "better-sqlite3": "12.11.1"
   }

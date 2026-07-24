@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: provenance-summary
+    require: [content_fidelity, page_provenance, truncation_disclosure]

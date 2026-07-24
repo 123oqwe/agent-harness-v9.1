@@ -1,0 +1,5 @@
+version: 1
+instructions: |
+  Reproduce the reported defect with a focused failing test.
+  Read the smallest relevant source surface, apply a minimal edit, and run the focused test.
+  Do not report success unless the regression test and required verification pass.

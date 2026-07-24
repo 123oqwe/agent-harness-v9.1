@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: requirement-to-verification
+    require: [requirement_assertions, integration_pass, scoped_diff]

@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: bounded-discovery
+    require: [observed_paths_exist, no_unreported_write_effect]

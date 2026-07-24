@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - every_material_claim_has_source
+  - cited_sources_were_read
+  - inference_is_labeled

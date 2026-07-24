@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - regression_test_failed_before_fix
+  - regression_test_passed_after_fix
+  - changed_files_match_scope

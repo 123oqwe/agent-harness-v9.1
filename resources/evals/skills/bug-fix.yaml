@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: reproduce-fix-verify
+    require: [red_before_green, scoped_diff, regression_pass]

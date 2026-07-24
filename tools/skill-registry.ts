@@ -10,7 +10,8 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv/dist/2020.js';
 import type { SkillSpec } from '../contracts/index.js';
 
@@ -39,32 +40,34 @@ export interface SkillRegistrySnapshot {
 }
 
 function findSchemaPath(filename: string): string {
-  const specRoot = process.env.HARNESS_SPEC_ROOT;
-  if (specRoot) {
-    const p = join(specRoot, 'contracts', filename);
-    if (existsSync(p)) return p;
-  }
-  const dirs = [
-    join(resolve(__dirname, '..', '..', 'spec', 'contracts')),
-    join(resolve(__dirname, '..', '..', '..', 'spec', 'contracts')),
-    join(resolve(__dirname, '..', '..', '..', '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', '..', '..', 'spec', 'contracts')),
-  ];
-  for (const dir of dirs) {
-    const p = join(dir, filename);
-    try { if (existsSync(p)) return p; } catch { /* */ }
-  }
-  return join(dirs[0]!, filename);
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return resolve(moduleDir, '..', 'resources', 'contracts', filename);
 }
 const SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
 
 function loadSchema(): object {
-  return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
+  try {
+    return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
+  } catch (error) {
+    throw new SkillValidationError(
+      `packaged SkillSpec schema unavailable: ${(error as Error).message}`,
+      SKILL_SPEC_SCHEMA_PATH,
+    );
+  }
 }
 
 function sha(s: string): string { return createHash('sha256').update(s).digest('hex'); }
+
+function findBaseSkillsDir(): string {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const dirs = [
+    resolve(moduleDir, '..', 'resources', 'skills'),
+    resolve(moduleDir, '..', 'skills'),
+  ];
+  const found = dirs.find((dir) => existsSync(dir));
+  if (!found) throw new SkillValidationError('packaged base skills directory not found', dirs[0]);
+  return found;
+}
 
 /** The 8 declarative base skills shipped with Phase 1. */
 export function baseSkills(): SkillSpec[] {
@@ -143,8 +146,8 @@ export class SkillRegistry {
     }
   }
 
-  /** Load the 8 Phase 1 base skills from declarative JSON files in skills/. */
-  loadBaseSkills(): void { this.loadSkills('skills/'); }
+  /** Load the 8 Phase 1 base skills from package-relative declarative JSON. */
+  loadBaseSkills(): void { this.loadSkills(findBaseSkillsDir()); }
 
   getSkill(name: string): SkillSpec | undefined { return this.skills.get(name); }
   listSkills(): string[] { return [...this.skills.keys()].sort(); }

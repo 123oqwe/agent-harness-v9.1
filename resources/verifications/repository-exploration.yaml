@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - observed_paths_exist
+  - claims_reference_observations
+  - no_unreported_write_effect

@@ -26,6 +26,15 @@ function runNpm(args: string[]) {
   });
 }
 
+function runNpmIn(cwd: string, args: string[], timeout = 120_000) {
+  return spawnSync(npmCommand, args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, NO_COLOR: '1', HARNESS_SPEC_ROOT: '' },
+    timeout,
+  });
+}
+
 describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
   it('defines real, separate build, typecheck and test gate scripts', () => {
     const pkg = readJson('package.json') as {
@@ -123,6 +132,29 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     );
   });
 
+  it('imports the built public entrypoint in a plain Node ESM process', { timeout: 30_000 }, () => {
+    const build = runNpm(['run', 'build']);
+    expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
+
+    const imported = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "import('./dist/index.js').then(() => process.stdout.write('IMPORT_OK'))",
+      ],
+      {
+        cwd: harnessRoot,
+        encoding: 'utf8',
+        env: { ...process.env, HARNESS_SPEC_ROOT: '' },
+        timeout: 10_000,
+      },
+    );
+
+    expect(imported.status, `${imported.stdout}\n${imported.stderr}`).toBe(0);
+    expect(imported.stdout).toBe('IMPORT_OK');
+  });
+
   it('packs only the manifest and necessary dist artifacts', { timeout: 30_000 }, () => {
     const build = runNpm(['run', 'build']);
     expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
@@ -134,6 +166,29 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(paths).toContain('package.json');
     expect(paths).toContain('dist/index.js');
     expect(paths).toContain('dist/index.d.ts');
+    expect(paths).toContain('dist/resources/contracts/tool-spec.schema.json');
+    expect(paths).toContain('dist/resources/contracts/skill-spec.schema.json');
+    expect(paths).toContain('dist/resources/schemas/receipt.json');
+    for (const filename of fs.readdirSync(path.join(harnessRoot, 'skills'))) {
+      if (!filename.endsWith('.json')) continue;
+      const skill = readJson(path.join('skills', filename)) as {
+        input_schema_ref: string;
+        output_schema_ref: string;
+        workflow_template_ref: string;
+        verification_template_ref: string;
+        eval_suite_ref: string;
+      };
+      expect(paths).toContain(`dist/resources/skills/${filename}`);
+      for (const reference of [
+        skill.input_schema_ref,
+        skill.output_schema_ref,
+        skill.workflow_template_ref,
+        skill.verification_template_ref,
+        skill.eval_suite_ref,
+      ]) {
+        expect(paths).toContain(`dist/resources/${reference}`);
+      }
+    }
     expect(paths.every((entry) => entry === 'package.json' || entry.startsWith('dist/'))).toBe(
       true,
     );
@@ -145,6 +200,67 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
       ),
     ).toBe(false);
   });
+
+  it(
+    'installs as a self-contained ESM package with all base registries',
+    { timeout: 180_000 },
+    () => {
+      const installRoot = mkdtempSync(join(tmpdir(), 'agent-harness-install-'));
+      try {
+        const build = runNpm(['run', 'build']);
+        expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
+
+        const packed = runNpm(['pack', '--json', '--ignore-scripts']);
+        expect(packed.status, `${packed.stdout}\n${packed.stderr}`).toBe(0);
+        const report = JSON.parse(packed.stdout) as Array<{ filename: string }>;
+        const tarball = join(harnessRoot, report[0]!.filename);
+
+        writeFileSync(
+          join(installRoot, 'package.json'),
+          JSON.stringify({ name: 'harness-install-smoke', private: true, type: 'module' }),
+        );
+        const installed = runNpmIn(installRoot, [
+          'install',
+          '--ignore-scripts',
+          '--no-audit',
+          '--no-fund',
+          tarball,
+        ]);
+        expect(installed.status, `${installed.stdout}\n${installed.stderr}`).toBe(0);
+
+        const smoke = spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            [
+              "import { ToolRegistry, SkillRegistry, SkillLoader, createPhase1ToolDefinitions } from 'agent-harness';",
+              'const tools = new ToolRegistry();',
+              'for (const spec of createPhase1ToolDefinitions()) tools.register(spec);',
+              'const skills = new SkillRegistry();',
+              'skills.loadBaseSkills();',
+              'const snapshot = skills.freezeSnapshot();',
+              'const loader = new SkillLoader(skills, snapshot, tools.listNames());',
+              "const activated = await loader.activate('repository-exploration');",
+              "process.stdout.write(JSON.stringify({ tools: tools.size(), skills: skills.size(), instructions: activated.instructions.length > 0 }));",
+            ].join(''),
+          ],
+          {
+            cwd: installRoot,
+            encoding: 'utf8',
+            env: { ...process.env, HARNESS_SPEC_ROOT: '' },
+            timeout: 10_000,
+          },
+        );
+        expect(smoke.status, `${smoke.stdout}\n${smoke.stderr}`).toBe(0);
+        expect(JSON.parse(smoke.stdout)).toEqual({ tools: 9, skills: 8, instructions: true });
+
+        rmSync(tarball, { force: true });
+      } finally {
+        rmSync(installRoot, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('run-stryker.mjs uses spawnSync with argv array, not shell string concatenation', () => {
     const script = fs.readFileSync(path.join(harnessRoot, 'scripts/run-stryker.mjs'), 'utf8');

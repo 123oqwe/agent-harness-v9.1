@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createPhase1ToolDefinitions, PHASE1_TOOL_NAMES } from '../../tools/tool-definitions.js';
+import { ToolRegistry } from '../../tools/tool-registry.js';
 
 describe('Phase 1 Tool Definitions', () => {
   it('defines exactly 9 tools', () => {
@@ -42,5 +43,15 @@ describe('Phase 1 Tool Definitions', () => {
     const defs = createPhase1ToolDefinitions();
     const read = defs.find(d => d.name === 'read_file');
     expect((read!.effect_model as { operation: string }).operation).toBe('read');
+  });
+
+  it('registers every built-in definition in the production ToolRegistry', () => {
+    const registry = new ToolRegistry();
+
+    for (const definition of createPhase1ToolDefinitions()) {
+      registry.register(definition);
+    }
+
+    expect(registry.listNames()).toEqual([...PHASE1_TOOL_NAMES].sort());
   });
 });

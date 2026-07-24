@@ -1,0 +1,5 @@
+version: 1
+instructions: |
+  Locate the existing extension point and preserve current public behavior.
+  Add a failing behavior test, implement the smallest coherent change, and verify integration.
+  Keep the plan immutable and expose any unmet requirement.

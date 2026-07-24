@@ -12,7 +12,8 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv/dist/2020.js';
 import type { ToolSpec } from '../contracts/index.js';
 
@@ -41,30 +42,19 @@ export interface RegistrySnapshot {
 }
 
 function findSchemaPath(filename: string): string {
-  // Try env var first (set by Stryker run script), then relative paths
-  const specRoot = process.env.HARNESS_SPEC_ROOT;
-  if (specRoot) {
-    const p = join(specRoot, 'contracts', filename);
-    if (existsSync(p)) return p;
-  }
-  const dirs = [
-    join(resolve(__dirname, '..', '..', 'spec', 'contracts')),
-    join(resolve(__dirname, '..', '..', '..', 'spec', 'contracts')),
-    join(resolve(__dirname, '..', '..', '..', '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', '..', 'spec', 'contracts')),
-    join(resolve(process.cwd(), '..', '..', '..', 'spec', 'contracts')),
-  ];
-  for (const dir of dirs) {
-    const p = join(dir, filename);
-    try { if (existsSync(p)) return p; } catch { /* */ }
-  }
-  return join(dirs[0]!, filename);
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return resolve(moduleDir, '..', 'resources', 'contracts', filename);
 }
 const TOOL_SPEC_SCHEMA_PATH = findSchemaPath('tool-spec.schema.json');
 
 function loadSchema(): object {
-  return JSON.parse(readFileSync(TOOL_SPEC_SCHEMA_PATH, 'utf8'));
+  try {
+    return JSON.parse(readFileSync(TOOL_SPEC_SCHEMA_PATH, 'utf8'));
+  } catch (error) {
+    throw new ToolRegistryError(
+      `packaged ToolSpec schema unavailable: ${(error as Error).message}`,
+    );
+  }
 }
 
 function canonical(spec: ToolSpec): string {
@@ -97,7 +87,10 @@ export class ToolRegistry {
   register(spec: ToolSpec): void {
     this.validate(spec);
     if (this.tools.has(spec.name)) throw new ToolRegistryError(`duplicate tool name: ${spec.name}`);
-    if (spec.implementation_status === 'production_certified' && (spec.maturity as string) !== 'verified') {
+    if (
+      spec.implementation_status === 'production_certified' &&
+      spec.maturity !== 'production_certified'
+    ) {
       throw new ToolRegistryError(`uncertified production tool: ${spec.name} (maturity=${spec.maturity})`);
     }
     this.tools.set(spec.name, Object.freeze({ ...spec }));

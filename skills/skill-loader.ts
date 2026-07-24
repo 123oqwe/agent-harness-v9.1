@@ -8,7 +8,8 @@
  * A skill cannot add grants. It can only suggest tools; Policy decides.
  */
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
 import type { SkillSpec } from '../contracts/index.js';
 
@@ -20,6 +21,7 @@ export interface SkillActivationResult {
   risk_ceiling_satisfied: boolean;
   allowed_effects_verified: boolean;
   instructions: string;
+  verification: string;
 }
 
 export class SkillLoaderError extends Error {
@@ -38,6 +40,27 @@ export class SkillLoader {
     private readonly maxRiskTier: number = 2,
     private readonly skillsDir?: string,
   ) {}
+
+  private resourceRoot(): string {
+    return this.skillsDir ?? resolve(dirname(fileURLToPath(import.meta.url)), '..', 'resources');
+  }
+
+  private readAsset(reference: string, kind: string): string {
+    const root = this.resourceRoot();
+    const assetPath = resolve(root, reference);
+    const relativePath = relative(root, assetPath);
+    if (
+      relativePath === '..' ||
+      relativePath.startsWith(`..${sep}`) ||
+      isAbsolute(relativePath)
+    ) {
+      throw new SkillLoaderError(`${kind} path escapes packaged resource root: ${reference}`);
+    }
+    if (!existsSync(assetPath)) {
+      throw new SkillLoaderError(`${kind} asset not found: ${reference}`);
+    }
+    return readFileSync(assetPath, 'utf8');
+  }
 
   /** Activate a skill by name: load full spec, check tools, effects, risk. */
   async activate(skillName: string): Promise<SkillActivationResult> {
@@ -78,14 +101,8 @@ export class SkillLoader {
       }
     }
 
-    // Load full instructions if a path is specified
-    let instructions = '';
-    if (this.skillsDir && skill.workflow_template_ref) {
-      const instrPath = resolve(this.skillsDir, skill.workflow_template_ref);
-      if (existsSync(instrPath)) {
-        instructions = readFileSync(instrPath, 'utf8');
-      }
-    }
+    const instructions = this.readAsset(skill.workflow_template_ref, 'workflow');
+    const verification = this.readAsset(skill.verification_template_ref, 'verification');
 
     return {
       skill,
@@ -95,6 +112,7 @@ export class SkillLoader {
       risk_ceiling_satisfied: true,
       allowed_effects_verified: true,
       instructions,
+      verification,
     };
   }
 }

@@ -16,7 +16,9 @@ export * from './vfs/virtual-filesystem.js';
 export * from './runtime/sandbox.js';
 // Tools
 export * from './tools/tool-registry.js';
+export * from './tools/tool-definitions.js';
 export * from './tools/skill-registry.js';
+export * from './skills/skill-loader.js';
 export * from './tools/list-directory.js';
 export * from './tools/read-file.js';
 export * from './tools/search-files.js';

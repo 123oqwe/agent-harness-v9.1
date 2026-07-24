@@ -1,0 +1,5 @@
+version: 1
+instructions: |
+  Inspect the repository before proposing changes.
+  Start with a bounded directory listing, search for relevant symbols, then read only selected files.
+  Report paths and observed facts; do not claim execution or modification.

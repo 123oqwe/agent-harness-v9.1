@@ -9,7 +9,7 @@
  */
 import type { ToolSpec } from '../contracts/index.js';
 
-export function createPhase1ToolDefinitions(): Partial<ToolSpec>[] {
+export function createPhase1ToolDefinitions(): ToolSpec[] {
   return [
     {
       name: 'read_file',

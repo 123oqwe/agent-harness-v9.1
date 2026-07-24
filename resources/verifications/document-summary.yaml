@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - summary_matches_parsed_pages
+  - page_provenance_preserved
+  - truncation_disclosed

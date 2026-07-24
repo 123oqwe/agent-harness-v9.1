@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["changed_paths","verification"],"properties":{"changed_paths":{"type":"array","items":{"type":"string"}},"verification":{"type":"array","items":{"type":"string"}},"verified":{"type":"boolean"}},"additionalProperties":false}

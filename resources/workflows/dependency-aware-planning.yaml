@@ -1,0 +1,4 @@
+version: 1
+instructions: |
+  Build a dependency graph from observed constraints.
+  Reject cycles, name blockers explicitly, and define a measurable completion condition for each step.

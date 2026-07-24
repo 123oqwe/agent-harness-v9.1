@@ -1,0 +1,4 @@
+version: 1
+instructions: |
+  Parse the selected document, preserve page or section provenance, and summarize its actual contents.
+  Separate source statements from interpretation and flag unreadable or truncated portions.

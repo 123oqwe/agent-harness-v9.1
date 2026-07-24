@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["exit_code","passed"],"properties":{"exit_code":{"type":["integer","null"]},"passed":{"type":"boolean"},"summary":{"type":"string"}},"additionalProperties":false}

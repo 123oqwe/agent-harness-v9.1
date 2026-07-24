@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["changed_paths","regression_test"],"properties":{"changed_paths":{"type":"array","items":{"type":"string"}},"regression_test":{"type":"string"},"verified":{"type":"boolean"}},"additionalProperties":false}

@@ -1,0 +1,5 @@
+version: 1
+instructions: |
+  Derive assertions from observable requirements.
+  Run the focused test first, then the relevant deterministic suite.
+  Treat skipped, filtered, timed-out, or fabricated results as failures.

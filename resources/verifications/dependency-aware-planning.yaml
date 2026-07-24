@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - dependency_graph_is_acyclic
+  - every_step_has_exit_criterion
+  - blockers_are_explicit

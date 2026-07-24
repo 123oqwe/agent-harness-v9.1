@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: valid-dag
+    require: [acyclic, explicit_dependencies, measurable_exits]

@@ -1,0 +1,5 @@
+version: 1
+checks:
+  - selected_tests_executed
+  - zero_failed_tests
+  - zero_skipped_required_tests

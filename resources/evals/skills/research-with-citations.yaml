@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: grounded-answer
+    require: [source_traceability, citation_integrity, inference_labels]

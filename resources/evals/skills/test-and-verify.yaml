@@ -1,0 +1,4 @@
+version: 1
+tasks:
+  - id: real-test-execution
+    require: [command_receipt, zero_failures, zero_required_skips]
