@@ -84,6 +84,9 @@ describe('GlmProvider dispatch adapter', () => {
     await expect(provider.resolve(request, { operation_id: 'missing-secret' })).rejects.toThrow(
       'dispatch credential',
     );
+    await expect(provider.resolve(request)).rejects.toThrow(
+      'dispatch credential secret is required',
+    );
   });
 
   it('sends an exact JSON POST request and rejects HTTP failures', async () => {
@@ -272,6 +275,42 @@ describe('GlmProvider dispatch adapter', () => {
       },
       { type: 'message_stop', stop_reason: 'tool_use' },
     ]);
+  });
+
+  it('marks streaming requests explicitly and requests terminal usage', async () => {
+    const encoder = new TextEncoder();
+    const fetchImpl = vi.fn(async (_url: URL | RequestInfo, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        stream: true,
+        stream_options: { include_usage: true },
+      });
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+              ),
+            );
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      );
+    });
+    const provider = new GlmProvider({
+      model: 'glm-5.2',
+      endpoint: 'https://provider.invalid/chat/completions',
+      fetch: fetchImpl,
+    });
+    const events = [];
+
+    for await (const event of provider.streamEvents(request, context())) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([{ type: 'message_stop', stop_reason: 'stop' }]);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it('fails closed for missing stream bodies and non-terminal streams', async () => {

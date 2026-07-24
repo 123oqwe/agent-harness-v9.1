@@ -17,6 +17,7 @@ import {
   ScriptedTestProvider,
   scriptedProviderContract,
   type ParsedResponse,
+  type StreamEvent,
 } from '../../gateway/scripted-provider.js';
 
 function makeRuntime(response?: ParsedResponse): GatewayProviderRuntime {
@@ -813,6 +814,55 @@ describe('ModelGateway validation mutation kills', () => {
 });
 
 describe('ModelGateway externally observable boundary contracts', () => {
+  it('exposes stable typed error identity without fabricating provider detail', () => {
+    const configuration = new ProviderConfigurationError('bad config');
+    expect({
+      name: configuration.name,
+      message: configuration.message,
+    }).toEqual({
+      name: 'ProviderConfigurationError',
+      message: 'bad config',
+    });
+
+    const resolution = new ProviderResolutionError(
+      'stale_registry_snapshot',
+      'stale',
+    );
+    expect({
+      name: resolution.name,
+      message: resolution.message,
+      code: resolution.code,
+    }).toEqual({
+      name: 'ProviderResolutionError',
+      message: 'stale',
+      code: 'stale_registry_snapshot',
+    });
+
+    const dispatch = new ProviderDispatchError('cancelled');
+    expect({
+      name: dispatch.name,
+      message: dispatch.message,
+      code: dispatch.code,
+      providerError: dispatch.provider_error,
+    }).toEqual({
+      name: 'ProviderDispatchError',
+      message: 'ModelGateway dispatch failed: cancelled',
+      code: 'cancelled',
+      providerError: undefined,
+    });
+  });
+
+  it('rejects non-record registry entries with their exact location', () => {
+    for (const value of [null, [], 1, 'provider']) {
+      expect(
+        () =>
+          new FrozenProviderRegistry([
+            value as unknown as GatewayProviderRegistration,
+          ]),
+      ).toThrow('providers[0] must be an object');
+    }
+  });
+
   it('accepts exact context and retention boundaries without requiring tools', () => {
     const registration = makeReg({
       max_context_tokens: 74,
@@ -1083,6 +1133,177 @@ describe('ModelGateway externally observable boundary contracts', () => {
     ).rejects.toMatchObject({ code: 'provider_unhealthy' });
     expect(ports.egressPolicy.authorize).not.toHaveBeenCalled();
     expect(runtime.resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [401, 'auth'],
+    [400, 'invalid_request'],
+  ] as const)(
+    'never falls back after a non-retryable %s provider failure',
+    async (status, kind) => {
+      const failing = makeRuntime();
+      failing.resolve = vi.fn().mockRejectedValue(new ProviderHttpError(status));
+      const backup = makeRuntime();
+      backup.resolve = vi.fn(backup.resolve);
+      const firstRegistration = makeReg(
+        {
+          pricing: {
+            currency: 'USD',
+            input_per_million: 0,
+            output_per_million: 0,
+          },
+        },
+        failing,
+      );
+      firstRegistration.provider_id = 'a-failing';
+      const backupRegistration = makeReg({}, backup);
+      backupRegistration.provider_id = 'z-backup';
+      const { gateway } = makeGateway([
+        firstRegistration,
+        backupRegistration,
+      ]);
+      const selection = makeSelection(gateway.registrySnapshotHash);
+
+      await expect(
+        gateway.dispatch(gateway.resolve(selection), selection, {
+          operation_id: `non-retryable-${status}`,
+        }),
+      ).rejects.toMatchObject({
+        code: 'provider_failure',
+        provider_error: { kind, retryable: false },
+      });
+      expect(failing.resolve).toHaveBeenCalledOnce();
+      expect(backup.resolve).not.toHaveBeenCalled();
+    },
+  );
+
+  it('orders compatible candidates by price even when identity order conflicts', () => {
+    const expensive = makeReg({
+      pricing: {
+        currency: 'USD',
+        input_per_million: 100,
+        output_per_million: 200,
+      },
+    });
+    expensive.provider_id = 'a-expensive';
+    const cheap = makeReg({
+      pricing: {
+        currency: 'USD',
+        input_per_million: 1,
+        output_per_million: 2,
+      },
+    });
+    cheap.provider_id = 'z-cheap';
+    const { gateway } = makeGateway([expensive, cheap]);
+    const selection = makeSelection(gateway.registrySnapshotHash, {
+      estimated_input_tokens: 1000,
+      request: { messages: [], max_tokens: 500 },
+    });
+
+    expect(gateway.resolve(selection).provider_id).toBe('z-cheap');
+  });
+
+  it('passes exact stream authority context and meters terminal usage', async () => {
+    const seenContexts: unknown[] = [];
+    const runtime = makeRuntime();
+    runtime.streamEvents = vi.fn(async function* (
+      _request,
+      streamContext,
+    ): AsyncGenerator<StreamEvent> {
+      seenContexts.push(streamContext);
+      yield { type: 'text_delta', text: 'ok' };
+      yield {
+        type: 'message_stop',
+        stop_reason: 'stop',
+        usage: { input_tokens: 7, output_tokens: 3 },
+      };
+    });
+    const ports = makePorts();
+    const { gateway } = makeGateway(
+      [
+        makeReg(
+          {
+            credentials: {
+              required: true,
+              audience: 'test-audience',
+            },
+          },
+          runtime,
+        ),
+      ],
+      ports,
+    );
+    const selection = makeSelection(gateway.registrySnapshotHash);
+    const deadline_at = new Date(Date.now() + 60_000).toISOString();
+    const events = [];
+
+    for await (const event of gateway.stream(
+      gateway.resolve(selection),
+      selection,
+      {
+        operation_id: 'stream-authority',
+        attempt_id: 'attempt-authority',
+        deadline_at,
+      },
+    )) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { type: 'text_delta', text: 'ok' },
+      {
+        type: 'message_stop',
+        stop_reason: 'stop',
+        usage: { input_tokens: 7, output_tokens: 3 },
+      },
+    ]);
+    expect(seenContexts).toEqual([
+      expect.objectContaining({
+        operation_id: 'stream-authority',
+        attempt_id: 'attempt-authority',
+        deadline_at,
+        credential: {
+          lease_id: 'lease-1',
+          audience: 'test-audience',
+          expires_at: '2030-01-01T00:00:00.000Z',
+        },
+        signal: expect.any(AbortSignal),
+      }),
+    ]);
+    expect(ports.usageMeter.record).toHaveBeenCalledWith({
+      provider_id: 'p1',
+      operation_id: 'stream-authority',
+      attempt_id: 'attempt-authority',
+      usage: { input_tokens: 7, output_tokens: 3 },
+    });
+  });
+
+  it('stops a stream immediately after caller cancellation', async () => {
+    const runtime = makeRuntime();
+    runtime.streamEvents = async function* () {
+      yield { type: 'text_delta', text: 'first' };
+      yield { type: 'text_delta', text: 'must-not-escape' };
+      yield { type: 'message_stop', stop_reason: 'stop' };
+    };
+    const { gateway } = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(gateway.registrySnapshotHash);
+    const controller = new AbortController();
+    const observed: StreamEvent[] = [];
+
+    await expect(async () => {
+      for await (const event of gateway.stream(
+        gateway.resolve(selection),
+        selection,
+        {
+          operation_id: 'cancel-stream',
+          signal: controller.signal,
+        },
+      )) {
+        observed.push(event);
+        controller.abort();
+      }
+    }).rejects.toMatchObject({ code: 'cancelled' });
+    expect(observed).toEqual([{ type: 'text_delta', text: 'first' }]);
   });
 
   it('rejects a credential expiring exactly now and empty lease identity', async () => {

@@ -53,6 +53,11 @@ describe('GlmProvider mutation-killing tests', () => {
     );
     expect(provider().checkHealth()).toBe('healthy');
     expect(provider().provider_type).toBe('openai');
+    const error = new GlmProviderError('typed failure');
+    expect({ name: error.name, message: error.message }).toEqual({
+      name: 'GlmProviderError',
+      message: 'typed failure',
+    });
   });
 
   it('rejects a non-HTTPS endpoint', () => {
