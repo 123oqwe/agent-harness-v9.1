@@ -17,9 +17,117 @@
  *   11. Postcondition verification
  *   12. Audit (immutable audit event)
  *
- * This module delegates to ToolExecutor which implements the core pipeline.
- * ActionExecutor adds the consent and credential exchange steps.
+ * ToolExecutor remains the low-level compatibility implementation. The
+ * product composition root uses this concrete authority, which requires
+ * consent, postcondition verification and final immutable audit.
  */
-export { ToolExecutor as ActionExecutor } from '../tools/tool-executor.js';
-export type { ToolReceipt, ToolExecutorDeps, ToolExecutorInjectedDeps } from '../tools/tool-executor.js';
-export { ToolExecutorError as ActionExecutorError } from '../tools/tool-executor.js';
+import {
+  ToolExecutor,
+  ToolExecutorError,
+  type ToolExecutorDeps,
+  type ToolExecutorInjectedDeps,
+  type ToolReceipt,
+} from '../tools/tool-executor.js';
+import type { ConsentService } from './consent.js';
+import type { AuditSink } from './audit-sink.js';
+import type { ToolSpec } from '../contracts/index.js';
+import type { PostconditionVerifierPort } from '../tools/tool-executor.js';
+
+export interface ActionExecutorInjectedDeps extends ToolExecutorInjectedDeps {
+  consent: ConsentService;
+  auditSink: AuditSink;
+  postconditionVerifier: NonNullable<ToolExecutorInjectedDeps['postconditionVerifier']>;
+}
+
+export class DeclaredPostconditionVerifier implements PostconditionVerifierPort {
+  async verify(input: {
+    readonly tool: ToolSpec;
+    readonly result: unknown;
+  }): Promise<{ readonly valid: boolean; readonly reason?: string }> {
+    if (input.result === undefined) {
+      return { valid: false, reason: 'tool returned undefined' };
+    }
+    for (const condition of input.tool.postconditions) {
+      const kind = condition.type;
+      if (kind === 'required_field') {
+        const field = condition.field;
+        if (
+          typeof field !== 'string' ||
+          typeof input.result !== 'object' ||
+          input.result === null ||
+          !(field in input.result)
+        ) {
+          return {
+            valid: false,
+            reason: `required postcondition field missing: ${String(field)}`,
+          };
+        }
+      } else {
+        return {
+          valid: false,
+          reason: `unsupported postcondition: ${String(kind)}`,
+        };
+      }
+    }
+    return { valid: true };
+  }
+}
+
+export class ActionExecutor extends ToolExecutor {
+  readonly #auditSink: AuditSink;
+  readonly #operationId: string | undefined;
+
+  constructor(deps: ToolExecutorDeps, injected: ActionExecutorInjectedDeps) {
+    super(deps, injected);
+    this.#auditSink = injected.auditSink;
+    this.#operationId = injected.execCtx?.operation_id;
+  }
+
+  override async execute<T>(
+    toolName: string,
+    input: unknown,
+    effect: (deps: ToolExecutorDeps) => Promise<T>,
+    verifyResult?: (result: T) => Promise<void> | void,
+  ): Promise<{ result: T; receipt: ToolReceipt }> {
+    const started = Date.now();
+    try {
+      const outcome = await super.execute<T>(
+        toolName,
+        input,
+        effect,
+        verifyResult,
+      );
+      this.#auditSink.record({
+        tool_name: toolName,
+        ...(outcome.receipt.token_id === undefined
+          ? {}
+          : { token_id: outcome.receipt.token_id }),
+        verdict: 'allow',
+        risk_tier: outcome.receipt.derived_risk_tier ?? 0,
+        manifest_hash_match: true,
+        reason: 'postconditions_verified',
+        ...(this.#operationId === undefined
+          ? {}
+          : { operation_id: this.#operationId }),
+        duration_ms: Math.max(1, Date.now() - started),
+      });
+      return outcome;
+    } catch (error) {
+      this.#auditSink.record({
+        tool_name: toolName,
+        verdict: 'deny',
+        risk_tier: 0,
+        manifest_hash_match: false,
+        reason: error instanceof Error ? error.message : String(error),
+        ...(this.#operationId === undefined
+          ? {}
+          : { operation_id: this.#operationId }),
+        duration_ms: Math.max(1, Date.now() - started),
+      });
+      throw error;
+    }
+  }
+}
+
+export type { ToolReceipt, ToolExecutorDeps } from '../tools/tool-executor.js';
+export { ToolExecutorError as ActionExecutorError };

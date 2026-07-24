@@ -15,12 +15,15 @@ import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import type { SandboxProfile } from '../../runtime/sandbox.js';
 
 import type { ToolSpec } from '../../contracts/index.js';
+import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 
 import { runPAVertical } from '../../personal_assistant/ah_pa_vertical_001.js';
 
 
 function toolSpec(name: string): ToolSpec {
-  return { name, version: '1.0.0', domains: ['planning'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
+  const spec = createPhase1ToolDefinitions().find((entry) => entry.name === name);
+  if (!spec) throw new Error(`unknown Phase 1 tool fixture: ${name}`);
+  return spec;
 }
 function makeHarness(): Harness {
   const tr = new ToolRegistry(); ['read_file', 'search_files'].forEach(n => tr.register(toolSpec(n)));

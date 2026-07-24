@@ -11,6 +11,9 @@ export * from './security/capability.js';
 export * from './security/authorization-service.js';
 export * from './security/auth.js';
 export * from './security/secrets-broker.js';
+export * from './security/consent.js';
+export * from './security/audit-sink.js';
+export * from './security/action-executor.js';
 // VFS + Sandbox
 export * from './vfs/virtual-filesystem.js';
 export * from './runtime/sandbox.js';

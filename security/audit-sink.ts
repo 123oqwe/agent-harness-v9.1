@@ -24,35 +24,31 @@ export class AuditSink {
   private readonly entries: AuditEntry[] = [];
 
   record(entry: Omit<AuditEntry, 'timestamp'> & { timestamp?: string }): AuditEntry {
-    const full: AuditEntry = {
+    const full: AuditEntry = Object.freeze({
       ...entry,
       timestamp: entry.timestamp ?? new Date().toISOString(),
-    };
+    });
     this.entries.push(full);
     return full;
   }
 
   get all(): readonly AuditEntry[] {
-    return [...this.entries];
+    return Object.freeze([...this.entries]);
   }
 
   get count(): number {
     return this.entries.length;
   }
 
-  getAllowed(): AuditEntry[] {
-    return this.entries.filter((e) => e.verdict === 'allow');
+  getAllowed(): readonly AuditEntry[] {
+    return Object.freeze(this.entries.filter((e) => e.verdict === 'allow'));
   }
 
-  getDenied(): AuditEntry[] {
-    return this.entries.filter((e) => e.verdict === 'deny');
+  getDenied(): readonly AuditEntry[] {
+    return Object.freeze(this.entries.filter((e) => e.verdict === 'deny'));
   }
 
-  getByTool(toolName: string): AuditEntry[] {
-    return this.entries.filter((e) => e.tool_name === toolName);
-  }
-
-  clear(): void {
-    this.entries.length = 0;
+  getByTool(toolName: string): readonly AuditEntry[] {
+    return Object.freeze(this.entries.filter((e) => e.tool_name === toolName));
   }
 }

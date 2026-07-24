@@ -25,11 +25,14 @@ import { OverlayBackend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
-import { ToolExecutor } from './tools/tool-executor.js';
-import { ToolDispatcher } from './tools/tool-dispatcher.js';
+import { ActionExecutor } from './security/action-executor.js';
+import { ToolDispatcher, type ToolImplementation } from './tools/tool-dispatcher.js';
 import type { AuthorizationService } from './security/authorization-service.js';
 import type { CapabilityStateStore } from './security/capability.js';
 import type { PolicyEnforcementPoint } from './security/pep.js';
+import type { ConsentService } from './security/consent.js';
+import type { AuditSink } from './security/audit-sink.js';
+import type { PostconditionVerifierPort, ToolCredentialBrokerPort } from './tools/tool-executor.js';
 import { SkillLoader } from './skills/skill-loader.js';
 import { SqliteSessionStore } from './session/sqlite-session-store.js';
 import { execSync } from 'node:child_process';
@@ -100,6 +103,10 @@ export interface HarnessSecurityDeps {
   authz: AuthorizationService;
   pep: PolicyEnforcementPoint;
   stateStore: CapabilityStateStore;
+  consent: ConsentService;
+  auditSink: AuditSink;
+  postconditionVerifier: PostconditionVerifierPort;
+  credentialBroker?: ToolCredentialBrokerPort;
 }
 
 /** Configuration for the Harness — only typed components, no callbacks. */
@@ -261,10 +268,7 @@ export class Harness {
           const selectedTools = this.toolSnapshot.tool_names
             .filter((name) => plannedToolNames.has(name))
             .filter((n) => this.config.policyEngine.snapshot.allowed_tools.includes(n))
-            .map((n) => {
-              const spec = this.config.toolRegistry.loadFull(n, this.toolSnapshot);
-              return { ...spec };
-            });
+            .map((n) => this.config.toolRegistry.loadProviderTool(n, this.toolSnapshot));
           const providerId = runPlan.model_bindings[0]!.provider;
          const req: ProviderSelectionRequest = {
             registry_snapshot_hash: this.config.gateway.registrySnapshotHash,
@@ -352,25 +356,48 @@ private async executeTool(name: string, args: Record<string, unknown>, session: 
     operation_id: this.execCtx!.operation_id,
     idempotency_key: this.execCtx!.idempotency_key,
     confirmation_key_thumbprint: this.execCtx!.confirmation_key_thumbprint,
+    run_phase: 'agent' as const,
+    budget: {
+      token_limit: this.execCtx!.budget.token_limit,
+      usd_micros: this.execCtx!.budget.usd_micros,
+    },
   };
   // Pass overlay VFS (if active) so tool writes go through the overlay, not the real FS
   const activeVfs = this.currentOverlay ? this.currentOverlayAsVfs() : this.config.vfs;
-  const executor = new ToolExecutor(
+  const executor = new ActionExecutor(
    { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: activeVfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
     {
       authz: this.config.security.authz,
       pep: this.config.security.pep,
       stateStore: this.config.security.stateStore,
       now: () => this.now(),
+      consent: this.config.security.consent,
+      auditSink: this.config.security.auditSink,
+      postconditionVerifier: this.config.security.postconditionVerifier,
+      ...(this.config.security.credentialBroker === undefined
+        ? {}
+        : { credentialBroker: this.config.security.credentialBroker }),
       execCtx: execCtxForTool,
     },
    );
-   // Route through ToolDispatcher: frozen snapshot → schema validation → ToolExecutor → receipt
-   const dispatcher = new ToolDispatcher(this.config.toolRegistry, this.toolSnapshot, executor);
-   const dispatchResult = await dispatcher.dispatch(
-     { tool_name: name, input: args },
-     async (deps) => this.dispatchToolViaDeps(name, args, (deps as { vfs: VirtualFilesystem }).vfs),
+   const implementations = new Map<string, ToolImplementation>(
+     this.toolSnapshot.tool_names.map((toolName) => [
+       toolName,
+       async (dependencies, input) =>
+         this.dispatchToolViaDeps(
+           toolName,
+           input as Record<string, unknown>,
+           dependencies.vfs,
+         ),
+     ]),
    );
+   const dispatcher = new ToolDispatcher(
+     this.config.toolRegistry,
+     this.toolSnapshot,
+     executor,
+     implementations,
+   );
+   const dispatchResult = await dispatcher.dispatch({ tool_name: name, input: args });
    if (!dispatchResult.success) {
      throw new Error(dispatchResult.error ?? 'tool dispatch failed');
    }

@@ -356,13 +356,13 @@ describe('ToolExecutor unified pipeline', () => {
 
 
 
-  it('receipt derived_risk_tier is 0 for default read-only local tool', async () => {
+  it('receipt risk includes untrusted model-originated input', async () => {
     writeFileSync(join(tmp, 'tier0.txt'), 'data');
     const { receipt } = await executor.execute('read_file', { path: '/workspace/tier0.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier0.txt' }));
-    expect(receipt.derived_risk_tier).toBe(0);
+    expect(receipt.derived_risk_tier).toBe(1);
   });
 
-  it('receipt derived_risk_tier is 3 for write operation tool', async () => {
+  it('receipt derived_risk_tier is 4 for untrusted write input', async () => {
     const tr2 = new ToolRegistry();
     tr2.register({
       ...toolSpec('read_file'),
@@ -377,10 +377,10 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier2.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier2.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier2.txt' }));
-    expect(receipt.derived_risk_tier).toBe(3);
+    expect(receipt.derived_risk_tier).toBe(4);
   });
 
-  it('receipt derived_risk_tier is 4 for execute operation tool', async () => {
+  it('receipt derived_risk_tier is 5 for untrusted execute input', async () => {
     const tr2 = new ToolRegistry();
     tr2.register({
       ...toolSpec('read_file'),
@@ -395,10 +395,10 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_exec.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_exec.txt' }));
-    expect(receipt.derived_risk_tier).toBe(4);
+    expect(receipt.derived_risk_tier).toBe(5);
   });
 
-  it('receipt derived_risk_tier is 1 for remote locality tool', async () => {
+  it('receipt derived_risk_tier is 2 for untrusted remote input', async () => {
     const tr2 = new ToolRegistry();
     tr2.register({
       ...toolSpec('read_file'),
@@ -413,7 +413,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_remote.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_remote.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_remote.txt' }));
-    expect(receipt.derived_risk_tier).toBe(1);
+    expect(receipt.derived_risk_tier).toBe(2);
   });
 
   it('receipt derived_risk_tier reflects credential_access', async () => {
@@ -431,7 +431,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_cred.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_cred.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_cred.txt' }));
-    expect(receipt.derived_risk_tier).toBe(2);
+    expect(receipt.derived_risk_tier).toBe(3);
   });
 
   it('receipt derived_risk_tier reflects data_egress', async () => {
@@ -449,7 +449,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'tier_egress.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/tier_egress.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/tier_egress.txt' }));
-    expect(receipt.derived_risk_tier).toBe(2);
+    expect(receipt.derived_risk_tier).toBe(3);
   });
 
 
@@ -500,7 +500,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'ext.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/ext.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/ext.txt' }));
-    expect(receipt.derived_risk_tier).toBe(2); // external (+2)
+    expect(receipt.derived_risk_tier).toBe(3); // external (+2), untrusted (+1)
   });
 
   it('tool with unbounded blast_radius has correct tier', async () => {
@@ -518,7 +518,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'unb.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/unb.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/unb.txt' }));
-    expect(receipt.derived_risk_tier).toBe(4); // unbounded (+4)
+    expect(receipt.derived_risk_tier).toBe(5); // unbounded (+4), untrusted (+1)
   });
 
   it('tool with public external_visibility has correct tier', async () => {
@@ -536,7 +536,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'pub.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/pub.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/pub.txt' }));
-    expect(receipt.derived_risk_tier).toBe(2); // public visibility (+2)
+    expect(receipt.derived_risk_tier).toBe(3); // public visibility (+2), untrusted (+1)
   });
 
   it('tool with regulatory_sensitivity has correct tier', async () => {
@@ -554,7 +554,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'reg.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/reg.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/reg.txt' }));
-    expect(receipt.derived_risk_tier).toBe(1); // regulatory_sensitivity (+1)
+    expect(receipt.derived_risk_tier).toBe(2); // regulatory (+1), untrusted (+1)
   });
 
   it('tool with financial_impact has correct tier', async () => {
@@ -572,7 +572,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'fin.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/fin.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/fin.txt' }));
-    expect(receipt.derived_risk_tier).toBe(1); // financial_impact >= 10000 (+1)
+    expect(receipt.derived_risk_tier).toBe(2); // financial (+1), untrusted (+1)
   });
 
   it('tool with human_impact self has correct tier', async () => {
@@ -590,7 +590,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'hum.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/hum.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/hum.txt' }));
-    expect(receipt.derived_risk_tier).toBe(1); // human_impact self (+1)
+    expect(receipt.derived_risk_tier).toBe(2); // human impact (+1), untrusted (+1)
   });
 
   it('receipt side_effect_class is read_only for default read tool', async () => {
@@ -656,7 +656,7 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.side_effect_class).toBe('idempotent_write');
   });
 
-  it('receipt side_effect_class is read_only for execute operation tool', async () => {
+  it('receipt side_effect_class is non_idempotent_write for execute operation tool', async () => {
     const tr2 = new ToolRegistry();
     tr2.register({
       ...toolSpec('read_file'),
@@ -671,10 +671,10 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_exec.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_exec.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_exec.txt' }));
-    expect(receipt.side_effect_class).toBe('read_only');
+    expect(receipt.side_effect_class).toBe('non_idempotent_write');
   });
 
-  it('receipt side_effect_class is read_only for publish operation tool', async () => {
+  it('receipt side_effect_class is non_idempotent_write for publish operation tool', async () => {
     const tr2 = new ToolRegistry();
     tr2.register({
       ...toolSpec('read_file'),
@@ -689,7 +689,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'sec_pub.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/sec_pub.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/sec_pub.txt' }));
-    expect(receipt.side_effect_class).toBe('read_only');
+    expect(receipt.side_effect_class).toBe('non_idempotent_write');
   });
 
   it('extractRisk with no effect_model falls back to safe defaults', async () => {
@@ -708,7 +708,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'em_empty.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_empty.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_empty.txt' }));
-    expect(receipt.derived_risk_tier).toBe(0);
+    expect(receipt.derived_risk_tier).toBe(1);
     expect(receipt.side_effect_class).toBe('read_only');
   });
 
@@ -730,7 +730,7 @@ describe('ToolExecutor unified pipeline', () => {
     const exec2 = new ToolExecutor({ toolRegistry: tr2, snapshot: snap2, vfs, policyEngine: pe, session }, { authz: az2, pep: pp2, stateStore: ss2, now: () => fn, execCtx: { tenant_id: 'default-tenant', user_id: 'default-user', run_id: 'test-run', plan_id: 'plan-1', step_id: 'step-1', attempt_id: 'att-1', operation_id: 'op-1', idempotency_key: 'idem-1', confirmation_key_thumbprint: 'test-thumbprint' } });
     writeFileSync(join(tmp, 'em_nonstr.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_nonstr.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_nonstr.txt' }));
-    expect(receipt.derived_risk_tier).toBe(0);
+    expect(receipt.derived_risk_tier).toBe(1);
   });
 
   it('getAuditLog returns empty array when no PEP audit events recorded', async () => {

@@ -11,17 +11,11 @@ import type { SandboxProfile } from '../../runtime/sandbox.js';
 import type { TaskContract } from '../../contracts/index.js';
 import { createTestSecurityDeps, createScriptedGateway } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
+import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 
 function makeToolRegistry(): ToolRegistry {
   const tr = new ToolRegistry();
-  tr.register({
-    name: 'read_file', version: '1.0.0', domains: ['coding'], implementation_status: 'implemented',
-    input_schema_ref: 'i', output_schema_ref: 'o', effect_model: { operation: 'read', locality: 'local' },
-    risk_feature_extractor: 'default', preconditions: [], postconditions: [], timeout_policy: {},
-    cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {},
-    network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r',
-    verification_adapter: 'default', maturity: 'sandbox_verified',
-  } as never);
+  tr.register(createPhase1ToolDefinitions().find((entry) => entry.name === 'read_file')!);
   return tr;
 }
 

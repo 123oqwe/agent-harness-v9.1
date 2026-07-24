@@ -12,6 +12,9 @@ import { InMemoryCapabilityStateStore } from '../../security/capability.js';
 import { PolicyEnforcementPoint } from '../../security/pep.js';
 import type { PolicyEngine } from '../../security/policy-engine.js';
 import type { HarnessSecurityDeps } from '../../harness.js';
+import { ConsentService } from '../../security/consent.js';
+import { AuditSink } from '../../security/audit-sink.js';
+import { DeclaredPostconditionVerifier } from '../../security/action-executor.js';
 import {
   FrozenProviderRegistry,
   ModelGateway,
@@ -68,7 +71,19 @@ export function createTestSecurityDeps(
     now,
   });
 
-  return { authz, pep, stateStore, clock: now };
+  const consent = new ConsentService();
+  for (const toolName of policyEngine.snapshot.allowed_tools) {
+    consent.allowAutoApprove(toolName);
+  }
+  return {
+    authz,
+    pep,
+    stateStore,
+    consent,
+    auditSink: new AuditSink(),
+    postconditionVerifier: new DeclaredPostconditionVerifier(),
+    clock: now,
+  };
 }
 
 /**

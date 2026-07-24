@@ -30,6 +30,7 @@ import type { CapabilityStateStore } from '../security/capability.js';
 import { hashCapabilityValue } from '../security/capability.js';
 import type { PolicyEnforcementPoint} from '../security/pep.js';
 import { type AuditEvent } from '../security/pep.js';
+import type { ConsentService } from '../security/consent.js';
 
 export interface ToolReceipt {
   tool_name: string;
@@ -52,6 +53,29 @@ export interface ToolExecutorDeps {
   sandbox?: SandboxProfile;
   policyEngine: PolicyEngine;
   session: DurableSession;
+  /** Dispatch-scoped credentials. Present only inside an authorized effect. */
+  credentials?: Readonly<Record<string, Uint8Array>>;
+}
+
+export interface ToolCredentialLease {
+  readonly values: Readonly<Record<string, Uint8Array>>;
+  clear(): void;
+}
+
+export interface ToolCredentialBrokerPort {
+  exchange(input: {
+    readonly tool_name: string;
+    readonly requirements: readonly Readonly<Record<string, unknown>>[];
+    readonly operation_id: string;
+    readonly token_id: string;
+  }): Promise<ToolCredentialLease>;
+}
+
+export interface PostconditionVerifierPort {
+  verify(input: {
+    readonly tool: ToolSpec;
+    readonly result: unknown;
+  }): Promise<{ readonly valid: boolean; readonly reason?: string }>;
 }
 
 export class ToolExecutorError extends Error {
@@ -107,8 +131,19 @@ function extractResourceIds(args: Record<string, unknown>): string[] {
 }
 
 /** Build a minimal ActionManifest for a tool call. */
-function buildManifest(toolName: string, input: unknown, policyVersion: string, taskId: string, planId: string, stepId: string, risk: EffectRisk): ActionManifest {
+function buildManifest(
+  toolSpec: ToolSpec,
+  input: unknown,
+  policyVersion: string,
+  taskId: string,
+  planId: string,
+  stepId: string,
+  risk: EffectRisk,
+  issuedAt: string,
+): ActionManifest {
+  const toolName = toolSpec.name;
   const isWrite = ['write', 'delete', 'create'].includes(risk.operation);
+  const hasExternalEffect = !['read'].includes(risk.operation);
   const canonicalArgs = input as Record<string, unknown>;
   const manifestHash = hash({ toolName, input, policyVersion });
   return {
@@ -116,21 +151,37 @@ function buildManifest(toolName: string, input: unknown, policyVersion: string, 
     plan_id: planId,
     step_id: stepId,
     tool_name: toolName,
-    tool_version: '1.0.0',
+    tool_version: toolSpec.version,
     schema_hash: manifestHash,
     canonical_args: canonicalArgs,
     resource_ids: extractResourceIds(canonicalArgs),
     resource_versions: {},
-    preconditions: {},
-    expected_postconditions: {},
+    preconditions: Object.fromEntries(
+      toolSpec.preconditions.map((condition, index) => [
+        String(condition.id ?? index),
+        condition,
+      ]),
+    ),
+    expected_postconditions: Object.fromEntries(
+      toolSpec.postconditions.map((condition, index) => [
+        String(condition.id ?? index),
+        condition,
+      ]),
+    ),
     reads: isWrite ? [] : Object.keys(canonicalArgs),
     writes: isWrite ? Object.keys(canonicalArgs) : [],
     external_effects: [],
-    side_effect_class: isWrite ? 'idempotent_write' : 'read_only',
-    credential_scope: [],
+    side_effect_class: isWrite
+      ? 'idempotent_write'
+      : hasExternalEffect
+        ? 'non_idempotent_write'
+        : 'read_only',
+    credential_scope: toolSpec.credential_requirements.map((requirement) =>
+      String(requirement.name ?? requirement.scope ?? 'credential'),
+    ),
     max_attempts: 1,
     max_cost: {},
-    expires_at: new Date(Date.now() + 300_000).toISOString(),
+    expires_at: new Date(Date.parse(issuedAt) + 300_000).toISOString(),
     compensation_plan: null,
     policy_version: policyVersion,
     manifest_hash: manifestHash,
@@ -142,6 +193,9 @@ export interface ToolExecutorInjectedDeps {
   pep: PolicyEnforcementPoint;
   stateStore: CapabilityStateStore;
   now: () => string;
+  consent?: ConsentService;
+  credentialBroker?: ToolCredentialBrokerPort;
+  postconditionVerifier?: PostconditionVerifierPort;
   /** Execution context providing tenant_id, user_id, run_id, etc. */
   execCtx?: {
     tenant_id: string;
@@ -153,6 +207,8 @@ export interface ToolExecutorInjectedDeps {
     operation_id: string;
     idempotency_key: string;
     confirmation_key_thumbprint: string;
+    run_phase?: 'setup' | 'agent';
+    budget?: Readonly<Record<string, number>>;
   };
 }
 
@@ -174,7 +230,12 @@ export class ToolExecutor {
  }
  private readonly injected: ToolExecutorInjectedDeps;
 
- async execute<T>(toolName: string, input: unknown, fn: (deps: ToolExecutorDeps) => Promise<T>): Promise<{ result: T; receipt: ToolReceipt }> {
+ async execute<T>(
+  toolName: string,
+  input: unknown,
+  fn: (deps: ToolExecutorDeps) => Promise<T>,
+  verifyResult?: (result: T) => Promise<void> | void,
+ ): Promise<{ result: T; receipt: ToolReceipt }> {
    const start = Date.now();
    this.callCount++;
   const ctx = this.injected.execCtx;
@@ -202,20 +263,33 @@ export class ToolExecutor {
 
     // 3. Build manifest and evaluate risk
     const toolSpec = this.deps.toolRegistry.get(toolName);
+    if (!toolSpec) {
+      throw new ToolExecutorError(`tool not found in registry: ${toolName}`);
+    }
     const risk = extractRisk(toolSpec);
-   const manifest = buildManifest(toolName, input, policy.version, ctx?.run_id ?? `task-${this.callCount}`, planId, stepId, risk);
+   const issueTime = this.injectedNow();
+   const budget = ctx.budget ?? { max_iterations: 3 };
+   const manifest = buildManifest(
+     toolSpec,
+     input,
+     policy.version,
+     ctx.run_id,
+     planId,
+     stepId,
+     risk,
+     issueTime,
+   );
    const policyContext: PolicyContext = {
      tenant_id: tenantId,
      user_id: userId,
-     run_phase: 'agent',
-     trust_level: 'trusted',
-     now: new Date().toISOString(),
+     run_phase: ctx.run_phase ?? 'agent',
+     trust_level: 'untrusted',
+     now: issueTime,
     };
 
     // 4. Issue a single-use capability token
     let token: CapabilityToken;
     let tier: number | undefined;
-    const issueTime = this.injectedNow();
     try {
       const decision = this.deps.policyEngine.evaluate({
         tool_name: toolName,
@@ -228,6 +302,26 @@ export class ToolExecutor {
         this.deps.session.append('error', { tool: toolName, reason: `policy denied: ${decision.reason_code}` });
         throw new ToolExecutorError(`policy denied: ${decision.reason_code}`);
       }
+      if (this.injected.consent) {
+        const consent = await this.injected.consent.request({
+          tool_name: toolName,
+          risk_tier: decision.derived_risk_tier,
+          manifest_preview: JSON.stringify({
+            tool_name: toolName,
+            resource_ids: manifest.resource_ids,
+            side_effect_class: manifest.side_effect_class,
+          }),
+        });
+        if (!consent.granted) {
+          this.deps.session.append('error', {
+            tool: toolName,
+            reason: `consent denied: ${consent.reason ?? consent.level}`,
+          });
+          throw new ToolExecutorError(
+            `consent denied: ${consent.reason ?? consent.level}`,
+          );
+        }
+      }
       const signedToken = await this.authz.issue({
         operation_id: operationId,
         attempt_id: attemptId,
@@ -239,7 +333,7 @@ export class ToolExecutor {
        audience: 'tool-host',
        tool_grant_hash: hash(toolName),
        resource_grant_hash: hash(manifest.resource_ids),
-       budget_ceiling_hash: hash({ max_iterations: 3 }),
+       budget_ceiling_hash: hash(budget),
        execution_epoch: issueTime,
        confirmation_key_thumbprint: thumbprint,
        not_before: issueTime,
@@ -275,7 +369,7 @@ export class ToolExecutor {
             tool_effect_contract_hash: hash(risk),
             tool_grant_hash: hash(toolName),
             resource_grant_hash: hash(manifest.resource_ids),
-           budget_ceiling_hash: hash({ max_iterations: 3 }),
+           budget_ceiling_hash: hash(budget),
            confirmation_key_thumbprint: thumbprint,
          },
         },
@@ -283,9 +377,38 @@ export class ToolExecutor {
           tokenId = token.token_id;
           // 6. Execute the tool INSIDE the PEP authorization scope
           this.deps.session.append('tool_call', { tool: toolName, input_hash: hash(input).slice(0, 16), token_id: tokenId });
-          return fn(this.deps);
+          const requirements = toolSpec?.credential_requirements ?? [];
+          if (requirements.length === 0) return fn(this.deps);
+          if (!this.injected.credentialBroker) {
+            throw new ToolExecutorError(
+              `credential broker required for tool: ${toolName}`,
+            );
+          }
+          const lease = await this.injected.credentialBroker.exchange({
+            tool_name: toolName,
+            requirements,
+            operation_id: operationId,
+            token_id: token.token_id,
+          });
+          try {
+            return await fn({ ...this.deps, credentials: lease.values });
+          } finally {
+            lease.clear();
+          }
         },
       );
+      if (this.injected.postconditionVerifier && toolSpec) {
+        const verification = await this.injected.postconditionVerifier.verify({
+          tool: toolSpec,
+          result,
+        });
+        if (!verification.valid) {
+          throw new ToolExecutorError(
+            `postcondition verification failed: ${verification.reason ?? 'unspecified'}`,
+          );
+        }
+      }
+      await verifyResult?.(result);
     } catch (e) {
       error = (e as Error).message;
       this.deps.session.append('error', { tool: toolName, error, token_id: tokenId });
@@ -293,19 +416,19 @@ export class ToolExecutor {
     }
 
     // 7. Receipt
-    const receipt: ToolReceipt = {
+    const receipt: ToolReceipt = Object.freeze({
       tool_name: toolName,
       timestamp: new Date().toISOString(),
       success: error === undefined,
       error,
-      duration_ms: Date.now() - start,
+      duration_ms: Math.max(1, Date.now() - start),
       input_hash: hash(input).slice(0, 16),
       output_hash: error === undefined ? hash(result).slice(0, 16) : undefined,
       token_id: tokenId,
       policy_decision: 'allow',
       derived_risk_tier: tier,
       side_effect_class: manifest.side_effect_class,
-    };
+    });
 
     // 8. Evidence
     this.deps.session.append('tool_result', { tool: toolName, receipt });

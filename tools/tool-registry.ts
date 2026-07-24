@@ -12,7 +12,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv/dist/2020.js';
 import type { ToolSpec } from '../contracts/index.js';
@@ -47,6 +47,10 @@ export interface RegistrySnapshotEntry {
   version: string;
   content_hash: string;
 }
+
+export type ProviderToolSpec = ToolSpec & {
+  readonly input_schema: Readonly<Record<string, unknown>>;
+};
 
 function findSchemaPath(filename: string): string {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -136,6 +140,29 @@ export class ToolRegistry {
 
   get(name: string): ToolSpec | undefined { return this.tools.get(name); }
 
+  loadJsonResource(reference: string): object {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'resources');
+    const resourcePath = resolve(root, reference);
+    const relativePath = relative(root, resourcePath);
+    if (
+      relativePath === '..' ||
+      relativePath.startsWith(`..${sep}`) ||
+      isAbsolute(relativePath)
+    ) {
+      throw new ToolRegistryError(`tool resource escapes packaged root: ${reference}`);
+    }
+    if (!reference.endsWith('.json') || !existsSync(resourcePath)) {
+      throw new ToolRegistryError(`packaged tool resource not found: ${reference}`);
+    }
+    try {
+      return JSON.parse(readFileSync(resourcePath, 'utf8'));
+    } catch (error) {
+      throw new ToolRegistryError(
+        `invalid packaged tool resource ${reference}: ${(error as Error).message}`,
+      );
+    }
+  }
+
   /** Full ToolSpec loaded only after selection (progressive disclosure). */
   loadFull(name: string, snap: RegistrySnapshot): ToolSpec {
     if (!this.inSnapshot(name, snap)) {
@@ -144,6 +171,16 @@ export class ToolRegistry {
     const t = this.tools.get(name);
     if (!t) throw new ToolRegistryError(`tool not found: ${name}`);
     return t;
+  }
+
+  /** Load the selected frozen tool plus its actual packaged input schema. */
+  loadProviderTool(name: string, snap: RegistrySnapshot): ProviderToolSpec {
+    const spec = this.loadFull(name, snap);
+    const schema = this.loadJsonResource(spec.input_schema_ref);
+    return cloneAndFreeze({
+      ...spec,
+      input_schema: schema as Record<string, unknown>,
+    });
   }
 
   listNames(): string[] { return [...this.tools.keys()].sort(); }

@@ -31,5 +31,11 @@ describe('Audit Sink', () => {
     const entries = sink.all;
     expect(entries).toHaveLength(1);
     expect(entries[0]!.tool_name).toBe('read_file');
+    expect(Object.isFrozen(entries)).toBe(true);
+    expect(Object.isFrozen(entries[0])).toBe(true);
+    expect(() => {
+      (entries[0] as { tool_name: string }).tool_name = 'tampered';
+    }).toThrow();
+    expect(sink.all[0]!.tool_name).toBe('read_file');
   });
 });
