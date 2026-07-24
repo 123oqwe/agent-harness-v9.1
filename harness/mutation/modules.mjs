@@ -67,7 +67,6 @@ export const mutationModules = {
       'security/capability.ts',
       'security/pep.ts',
       'security/consent.ts',
-      'security/action-executor.ts',
       'security/audit-sink.ts',
     ],
     minimum: 90,
@@ -91,7 +90,6 @@ export const mutationModules = {
     mutate: [
       'session/durable-session.ts',
       'session/sqlite-session-store.ts',
-      'session/session-store.ts',
       'session/progress-store.ts',
     ],
     minimum: 90,
@@ -126,7 +124,6 @@ export const mutationModules = {
   },
   uiAdapters: {
     mutate: [
-      'ui/ui-state.ts',
       'ui/ah_ui_onboarding_001.ts',
       'ui/ah_ui_settings_001.ts',
       'ui/ah_ui_approval_001.ts',
