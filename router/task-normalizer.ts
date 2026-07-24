@@ -41,12 +41,12 @@ export class TaskNormalizer {
     }
 
     // Extract risk ceiling constraint
-    if (/\b(safe|read[- ]?only|no[- ]?write|local[- ]?only)\b/i.test(prompt)) {
+    if (/\b(safe|read[- ]?only|no[- ]?write|local[- ]?only)\b|只读|安全模式|禁止写入/u.test(prompt)) {
       constraints.push({ type: 'risk_ceiling', value: 'read_only' });
     }
 
    // Extract privacy constraint
-   if (/(private|no[- ]?network|offline|local)/i.test(prompt)) {
+   if (/(private|no[- ]?network|offline|local)|只在本地|本地运行|离线|不联网|禁止联网|隐私/iu.test(prompt)) {
      constraints.push({ type: 'privacy', value: 'local_only' });
    }
 
@@ -54,12 +54,12 @@ export class TaskNormalizer {
    const successCriteria: TaskContract['success_criteria'] = [];
 
    // If the task mentions tests, add a test-based criterion
-   if (/\b(tests?|spec|verify|assert)\b/i.test(prompt)) {
+   if (/\b(tests?|spec|verify|assert)\b|测试|验证|断言|检查/iu.test(prompt)) {
      successCriteria.push({ criterion: 'tests pass', verification_method: 'test' });
     }
 
     // If the task mentions a document or file, add a deterministic criterion
-    if (/\b(file|document|pdf|code|diff|artifact)\b/i.test(prompt)) {
+    if (/\b(file|document|pdf|code|diff|artifact)\b|文件|文档|代码|差异|产物/iu.test(prompt)) {
       successCriteria.push({ criterion: 'output artifact produced', verification_method: 'deterministic' });
     }
 
@@ -70,11 +70,11 @@ export class TaskNormalizer {
 
     // Derive priority
     let priority: TaskContract['priority'];
-    if (/\b(urgent|asap|critical|immediately)\b/i.test(prompt)) {
+    if (/\b(urgent|asap|critical|immediately)\b|紧急|马上|立即/iu.test(prompt)) {
       priority = 'urgent';
-    } else if (/\b(important|high priority)\b/i.test(prompt)) {
+    } else if (/\b(important|high priority)\b|重要|高优先级/iu.test(prompt)) {
       priority = 'high';
-    } else if (/\b(low priority|whenever|no rush)\b/i.test(prompt)) {
+    } else if (/\b(low priority|whenever|no rush)\b|低优先级|不着急|不急/iu.test(prompt)) {
       priority = 'low';
     } else {
       priority = 'normal';

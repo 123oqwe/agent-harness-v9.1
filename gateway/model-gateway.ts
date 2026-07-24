@@ -142,6 +142,13 @@ export interface ResolvedProvider {
   readonly selection_request_hash: string;
 }
 
+export interface ResolvedProviderDescription {
+  readonly provider_id: string;
+  readonly provider_type: ProviderType;
+  readonly execution: 'local' | 'remote';
+  readonly metadata_hash: string;
+}
+
 export interface SecretsBrokerPort {
   exchangeCredential(input: {
     readonly provider_id: string;
@@ -805,6 +812,28 @@ export class ModelGateway {
 
   resolve(request: ProviderSelectionRequest): ResolvedProvider {
     return this.resolveExcluding(request, new Set());
+  }
+
+  describeResolved(resolved: ResolvedProvider): ResolvedProviderDescription {
+    if (resolved.registry_snapshot_hash !== this.registry.snapshot.hash) {
+      throw new ProviderResolutionError(
+        'stale_registry_snapshot',
+        'Resolved provider does not belong to this frozen registry',
+      );
+    }
+    const binding = bindingFor(this.registry, resolved.provider_id);
+    if (binding.entry.metadata_hash !== resolved.provider_metadata_hash) {
+      throw new ProviderResolutionError(
+        'stale_registry_snapshot',
+        'Resolved provider metadata does not match the frozen registry',
+      );
+    }
+    return deepFreeze({
+      provider_id: binding.entry.provider_id,
+      provider_type: binding.entry.provider_type,
+      execution: binding.entry.data_policy.execution,
+      metadata_hash: binding.entry.metadata_hash,
+    });
   }
 
   switchProvider(

@@ -8,6 +8,9 @@ import { SkillRegistry } from '../../tools/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import type { ToolSpec } from '../../contracts/index.js';
 import type { TaskContract } from '../../contracts/index.js';
+import { createScriptedGateway } from '../helpers/test-security.js';
+import { createGlmGateway } from '../../gateway/glm-gateway-bridge.js';
+import type { ModelGateway } from '../../gateway/model-gateway.js';
 
 function task(goal: string, over: Partial<TaskContract> = {}): TaskContract {
   return {
@@ -28,14 +31,16 @@ function toolSpec(name: string): ToolSpec {
   } as ToolSpec;
 }
 
-function setupRouter() {
+function setupRouter(gatewayOverride?: ModelGateway) {
   const tr = new ToolRegistry();
   ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const tsnap = tr.freezeSnapshot();
   const ssnap = sr.freezeSnapshot();
   const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file','write_file','edit_file','execute_command','list_directory','search_files','parse_document'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
-  return new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tsnap, skillSnapshot: ssnap, policyEngine: pe, policySnapshotRef: 'policy-v1' });
+  const gateway =
+    gatewayOverride ?? createScriptedGateway([{ content: 'unused' }]).gateway;
+  return new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tsnap, skillSnapshot: ssnap, policyEngine: pe, policySnapshotRef: 'policy-v1', gateway });
 }
 
 describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
@@ -50,6 +55,20 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(i.requires_writes).toBe(false);
       expect(i.ambiguity).toBe('none');
     });
+    it('profiles Chinese coding and document requests', () => {
+      const coding = profileIntent(task('修复这个 TypeScript bug，然后运行测试'));
+      expect(coding).toMatchObject({
+        requires_writes: true,
+        requires_tests: true,
+        multi_step: true,
+      });
+      expect(coding.domains).toContain('coding');
+
+      const document = profileIntent(task('读取这个文档并总结重点'));
+      expect(document.requires_tools).toBe(true);
+      expect(document.requires_writes).toBe(false);
+      expect(document.domains).toContain('documents');
+    });
     it('detects writes and tests', () => {
       const i = profileIntent(task('fix the bug and run the tests'));
       expect(i.requires_writes).toBe(true);
@@ -61,6 +80,13 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
   describe('selectStrategy', () => {
     it('selects direct for a tool-free single-call task', () => {
       expect(selectStrategy(profileIntent(task('rewrite this paragraph more concisely')))).toBe('direct');
+    });
+    it('selects the same strategies for equivalent Chinese tasks', () => {
+      expect(selectStrategy(profileIntent(task('修复这个 TypeScript bug，然后运行测试')))).toBe(
+        'plan_execute',
+      );
+      expect(selectStrategy(profileIntent(task('读取这个文档并总结重点')))).toBe('react');
+      expect(selectStrategy(profileIntent(task('把这段文字润色得更简洁')))).toBe('direct');
     });
     it('selects react when a tool is required and next action depends on observation', () => {
       expect(selectStrategy(profileIntent(task('list the directory and read the matching file')))).toBe('react');
@@ -101,6 +127,19 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(refs.tool_registry).toMatch(/^[0-9a-f]{64}$/);
       expect(refs.skill_registry).toMatch(/^[0-9a-f]{64}$/);
     });
+    it('binds the actually selected provider, tools and matching skill', () => {
+      const r = router.route(task('修复这个 TypeScript bug，然后运行测试'));
+      expect(r.run_plan!.model_bindings[0]!.provider).toBe('scripted');
+      expect(r.run_plan!.registry_snapshot_refs).toHaveProperty('provider_registry');
+      expect(r.run_plan!.tool_grants.map((grant) => grant.tool)).toEqual([
+        'edit_file',
+        'execute_command',
+        'read_file',
+      ]);
+      expect(r.run_plan!.skill_bindings).toContainEqual(
+        expect.objectContaining({ skill_name: 'bug-fix', version: '1.0.0' }),
+      );
+    });
     it('single-agent RunPlan (agent_count=1)', () => {
       const r = router.route(task('fix the bug'));
       expect((r.run_plan!.agent_graph as { nodes: unknown[] }).nodes.length).toBe(1);
@@ -122,7 +161,8 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const tr = new ToolRegistry(); // empty registry
       const sr = new SkillRegistry();
       const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
-      const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p' });
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p', gateway });
       const result = r.route(task('fix the bug then run the tests'));
       expect(result.outcome).toBe('abstain');
       expect(result.abstain_reason).toContain('not in frozen snapshot');
@@ -145,6 +185,34 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     it('policy post-route veto is not triggered for normal routes', () => {
       const r = router.route(task('fix the bug'));
       expect(r.policy_post_route_vetoed).toBe(false);
+    });
+    it('rejects local_only when the frozen Gateway contains only a remote provider', () => {
+      const fetchImpl = (() =>
+        Promise.reject(new Error('must not dispatch'))) as typeof fetch;
+      const { gateway } = createGlmGateway({
+        model: 'glm-5.2',
+        fetch: fetchImpl,
+        secretsBroker: {
+          async exchangeCredential(input) {
+            return {
+              lease_id: 'unused',
+              audience: input.audience,
+              expires_at: '2030-01-01T00:00:00.000Z',
+              secret: 'unused',
+            };
+          },
+        },
+        egressPolicy: { async authorize() { return { allowed: true }; } },
+      });
+      const remoteRouter = setupRouter(gateway);
+      const result = remoteRouter.route(
+        task('读取这个文档并总结', {
+          constraints: [{ type: 'privacy', value: 'local_only' }],
+        }),
+      );
+
+      expect(result.outcome).toBe('abstain');
+      expect(result.abstain_reason).toContain('provider policy veto');
     });
   });
 
@@ -437,11 +505,11 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(ag.nodes[0]!.isolation).toBe('none');
     });
 
-    it('model_binding has provider scripted_test and model_id scripted-test', () => {
+    it('model_binding has the selected frozen provider identity', () => {
       const r = router.route(task('fix the bug'));
       const mb = r.run_plan!.model_bindings[0]!;
-      expect(mb.provider).toBe('scripted_test');
-      expect(mb.model_id).toBe('scripted-test');
+      expect(mb.provider).toBe('scripted');
+      expect(mb.model_id).toBe('scripted');
       expect(mb.modality_role).toBe('reasoning');
       expect(mb.capability_match_score).toBe(1.0);
     });
@@ -596,8 +664,8 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     it('model_bindings has exact provider, model_id, modality_role, capability_match_score', () => {
       const r = router.route(task('fix the bug'));
       const mb = r.run_plan!.model_bindings[0]!;
-      expect(mb.provider).toBe('scripted_test');
-      expect(mb.model_id).toBe('scripted-test');
+      expect(mb.provider).toBe('scripted');
+      expect(mb.model_id).toBe('scripted');
       expect(mb.modality_role).toBe('reasoning');
       expect(mb.capability_match_score).toBe(1.0);
     });
@@ -641,7 +709,8 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const tr = new ToolRegistry();
       const sr = new SkillRegistry();
       const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
-      const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p' });
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const r = new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tr.freezeSnapshot(), skillSnapshot: sr.freezeSnapshot(), policyEngine: pe, policySnapshotRef: 'p', gateway });
       const result = r.route(task('fix the bug then run the tests'));
       expect(result.outcome).toBe('abstain');
       expect(result.intent.goal).toBe('fix the bug then run the tests');
@@ -655,11 +724,14 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(result.ask_user_message).toContain('success criteria');
     });
 
-    it('requiredToolsFor returns write_file, edit_file for writes', () => {
+    it('bug-fix skill proposes only its required read, edit and test tools', () => {
       const r = router.route(task('fix the bug then run the tests'));
       const tg = (r.run_plan as unknown as { tool_grants: { tool: string }[] }).tool_grants;
-      expect(tg.some(g => g.tool === 'write_file')).toBe(true);
-      expect(tg.some(g => g.tool === 'edit_file')).toBe(true);
+      expect(tg.map((grant) => grant.tool)).toEqual([
+        'edit_file',
+        'execute_command',
+        'read_file',
+      ]);
     });
 
     it('requiredToolsFor returns execute_command for tests', () => {

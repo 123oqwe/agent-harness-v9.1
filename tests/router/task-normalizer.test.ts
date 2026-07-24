@@ -57,4 +57,14 @@ describe('Task Normalizer', () => {
     expect(() => norm.normalize({ prompt: '' })).toThrow();
     expect(() => norm.normalize({ prompt: '   ' })).toThrow();
   });
+
+  it('extracts Chinese privacy, test and priority intent', () => {
+    const result = norm.normalize({ prompt: '紧急：只在本地修复这个代码问题，然后运行测试验证' });
+    expect(result.constraints).toContainEqual({ type: 'privacy', value: 'local_only' });
+    expect(result.success_criteria).toContainEqual({
+      criterion: 'tests pass',
+      verification_method: 'test',
+    });
+    expect(result.priority).toBe('urgent');
+  });
 });

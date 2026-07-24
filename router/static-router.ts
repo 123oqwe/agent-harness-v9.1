@@ -16,6 +16,13 @@ export type { RunPlan };
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
+import {
+  ProviderResolutionError,
+  type ModelGateway,
+  type ProviderSelectionRequest,
+  type ResolvedProvider,
+  type ResolvedProviderDescription,
+} from '../gateway/model-gateway.js';
 
 export type ReasoningStrategy = 'direct' | 'react' | 'plan_execute';
 export type RoutingOutcome = 'route' | 'ask_user' | 'abstain';
@@ -55,26 +62,32 @@ export interface RouterDeps {
   skillSnapshot: SkillRegistrySnapshot;
   policyEngine: PolicyEngine;
   policySnapshotRef: string;
+  gateway: ModelGateway;
 }
 
 /** Deterministic intent profiler. No LLM in Phase 1 — rules only. */
 export function profileIntent(task: TaskContract): IntentProfile {
   const goal = task.goal.toLowerCase();
-  const requires_writes = /\b(write|edit|create|modify|update|fix|implement|refactor|delete|remove|patch)\b/.test(goal);
-  const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b/.test(goal);
-  const explicit_plan = /\b(plan|step by step|multi.?step|pipeline|workflow|sequence)\b/.test(goal);
-  const requires_tools = requires_writes || requires_tests || /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze)\b/.test(goal);
-  const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s/g) || []).length;
+  const pureWriting = /\b(rewrite|polish|draft|essay|article|copyedit)\b|润色|改写|优化文案|写作|文章|草稿/u.test(goal);
+  const codeOrFileTarget = /\b(code|bug|function|repo|repository|typescript|javascript|python|file|module|config)\b|代码|缺陷|文件|函数|仓库|模块|配置/u.test(goal);
+  const mutationVerb = /\b(edit|create|modify|update|fix|implement|refactor|delete|remove|patch)\b|修复|修改|编辑|创建|更新|实现|重构|删除|移除|打补丁/u.test(goal);
+  const explicitFileWrite = /\b(?:write|create)\s+(?:(?:a|the)\s+)?(?:file|code|function|module)\b|写入(?:文件|代码)|新建(?:文件|模块)/u.test(goal);
+  const requires_writes = explicitFileWrite || mutationVerb && (codeOrFileTarget || !pureWriting);
+  const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(goal);
+  const explicit_plan = /\b(plan|step by step|multi.?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
+  const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析/u.test(goal);
+  const requires_tools = requires_writes || requires_tests || observationTools;
+  const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);
   const missing_info: string[] = [];
   if (!task.success_criteria || task.success_criteria.length === 0) missing_info.push('success_criteria_empty');
   const ambiguity: 'none' | 'low' | 'high' = missing_info.length > 0 ? 'high' : (goal.length < 15 ? 'low' : 'none');
   const domains: string[] = [];
-  if (/\b(code|bug|function|repo|typescript|javascript|python|build)\b/.test(goal)) domains.push('coding');
-  if (/\b(document|pdf|page|summari?z|summar)/.test(goal)) domains.push('documents');
-  if (/\b(research|cite|source|reference)\b/.test(goal)) domains.push('research');
-  if (/\b(write|draft|brief|essay|article)\b/.test(goal)) domains.push('writing');
-  if (/\b(plan|schedule|dependency|dag|task)\b/.test(goal)) domains.push('planning');
+  if (/\b(code|bug|function|repo|typescript|javascript|python|build)\b|代码|缺陷|函数|仓库|构建|编译/u.test(goal)) domains.push('coding');
+  if (/\b(document|pdf|page|file|summary|summarize|summarise)\b|文档|文件|页面|总结|摘要/u.test(goal)) domains.push('documents');
+  if (/\b(research|cite|source|reference)\b|研究|引用|来源|参考/u.test(goal)) domains.push('research');
+  if (pureWriting) domains.push('writing');
+  if (/\b(plan|schedule|dependency|dag|task)\b|计划|排期|依赖|任务/u.test(goal)) domains.push('planning');
   if (domains.length === 0) domains.push('general');
   return { goal: task.goal, domains, requires_tools, requires_writes, requires_tests, multi_step, explicit_plan, ambiguity, missing_info, success_criteria_count: task.success_criteria?.length ?? 0 };
 }
@@ -86,8 +99,8 @@ export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
 }
 
 /** Deterministic run_id: UUID v5-style (deterministic from task + snapshots, no Date.now()). */
-function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string): string {
-  const hash = createHash('sha256').update(JSON.stringify(task) + toolSnapId + skillSnapId).digest('hex');
+function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string, providerSnapId: string): string {
+  const hash = createHash('sha256').update(JSON.stringify(task) + toolSnapId + skillSnapId + providerSnapId).digest('hex');
   // Format as UUID: 8-4-4-4-12 hex chars from the hash
   return `${hash.slice(0,8)}-${hash.slice(8,12)}-${hash.slice(12,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
 }
@@ -108,35 +121,75 @@ export class StaticRouter {
   constructor(private readonly deps: RouterDeps) {}
 
   route(task: TaskContract): RoutingResult {
-    // 1. Policy prefilter: check the real PolicyEngine allowed_tools
-    const prefilter = this.policyPrefilter(task);
-    if (!prefilter.passed) {
-      return { outcome: 'abstain', intent: profileIntent(task), policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: ${prefilter.reason}` };
-    }
-
-    // 2. Intent profiling (deterministic)
+    // 1. Intent profiling is deterministic and does not invoke a model.
     const intent = profileIntent(task);
 
-    // 3. Missing required info -> ask_user
+    // 2. Missing required info -> ask_user
     if (intent.ambiguity === 'high' && intent.missing_info.includes('success_criteria_empty')) {
       return { outcome: 'ask_user', intent, policy_prefilter_passed: true, policy_post_route_vetoed: false, ask_user_message: 'Task success criteria are empty. Please describe what a successful outcome looks like.' };
     }
 
-    // 4. Strategy selection
+    // 3. Strategy selection
     const strategy = selectStrategy(intent);
 
-    // 5. Verify required tools exist in the frozen snapshot
-    const requiredTools = this.requiredToolsFor(strategy, intent);
-    for (const t of requiredTools) {
-      if (!this.deps.toolRegistry.inSnapshot(t, this.deps.toolSnapshot)) {
-        return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: false, abstain_reason: `required tool not in frozen snapshot: ${t}` };
+    // 4. Search compact skill metadata, then load only the selected frozen skill.
+    const skillName = this.skillFor(intent);
+    const selectedSkill = skillName
+      ? this.deps.skillRegistry
+          .skill_search(skillName)
+          .find((candidate) => candidate.name === skillName)
+      : undefined;
+    if (skillName && (!selectedSkill || !this.deps.skillRegistry.inSnapshot(skillName, this.deps.skillSnapshot))) {
+      return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `required skill not in frozen snapshot: ${skillName}` };
+    }
+    const fullSkill = selectedSkill
+      ? this.deps.skillRegistry.loadFull(selectedSkill.name, this.deps.skillSnapshot)
+      : undefined;
+
+    // 5. Search compact tool metadata; selected tools must match snapshot and Policy.
+    const proposedTools = this.proposedTools(strategy, intent, fullSkill?.required_tools as string[] | undefined);
+    const requiredTools: string[] = [];
+    for (const name of proposedTools) {
+      if (!this.deps.policyEngine.snapshot.allowed_tools.includes(name)) {
+        return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: tool ${name} not in policy allowed_tools` };
       }
+      const compact = this.deps.toolRegistry
+        .search(name, { availableOnly: true })
+        .find((candidate) => candidate.name === name);
+      if (!compact || !this.deps.toolRegistry.inSnapshot(name, this.deps.toolSnapshot)) {
+        return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `required tool not in frozen snapshot: ${name}` };
+      }
+      requiredTools.push(name);
+    }
+    requiredTools.sort();
+    const prefilter = this.policyPrefilter(requiredTools);
+    if (!prefilter.passed) {
+      return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: ${prefilter.reason}` };
     }
 
-    // 6. Build the RunPlan (deterministic, no Date.now())
-    const runPlan = this.buildRunPlan(task, intent, strategy);
+    // 6. Resolve the actual provider from the frozen Gateway snapshot.
+    let resolved: ResolvedProvider;
+    let provider: ResolvedProviderDescription;
+    try {
+      const selection = this.providerSelection(task, strategy, requiredTools);
+      resolved = this.deps.gateway.resolve(selection);
+      provider = this.deps.gateway.describeResolved(resolved);
+    } catch (error) {
+      const reason = error instanceof ProviderResolutionError ? error.code : 'provider_resolution_failed';
+      return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `provider policy veto: ${reason}` };
+    }
 
-    // 7. Policy post-route veto: check if route violates privacy constraints
+    // 7. Build the RunPlan (deterministic, no Date.now())
+    const runPlan = this.buildRunPlan(
+      task,
+      intent,
+      strategy,
+      requiredTools,
+      fullSkill ? { name: fullSkill.name, version: fullSkill.version } : undefined,
+      provider,
+    );
+
+    // 8. Policy post-route veto.
     const vetoed = this.policyPostRouteVeto(task, strategy, intent);
     if (vetoed.vetoed) {
       return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `policy post-route veto: ${vetoed.reason}` };
@@ -145,30 +198,22 @@ export class StaticRouter {
     return { outcome: 'route', strategy, intent, run_plan: runPlan, policy_prefilter_passed: true, policy_post_route_vetoed: false };
   }
 
-  private requiredToolsFor(strategy: ReasoningStrategy, intent: IntentProfile): string[] {
+  private proposedTools(strategy: ReasoningStrategy, intent: IntentProfile, skillTools?: string[]): string[] {
     if (strategy === 'direct') return [];
-    const tools: string[] = [];
+    if (skillTools && skillTools.length > 0) return [...new Set(skillTools)];
+    const tools: string[] = ['read_file'];
     if (intent.requires_writes) tools.push('write_file', 'edit_file');
     if (intent.requires_tests) tools.push('execute_command');
-    if (intent.requires_tools && !intent.requires_writes) tools.push('read_file');
     return [...new Set(tools)];
   }
 
-  private policyPrefilter(task: TaskContract): { passed: boolean; reason?: string } {
-    // Check real Policy constraints from the PolicyEngine
+  private policyPrefilter(requiredTools: readonly string[]): { passed: boolean; reason?: string } {
     const policy = this.deps.policyEngine.snapshot;
-    // If task requires tools but none are in the allowed list, abstain
-    const intent = profileIntent(task);
-    if (intent.requires_tools) {
-      const requiredTools = this.requiredToolsFor(selectStrategy(intent), intent);
-      for (const t of requiredTools) {
-        if (!policy.allowed_tools.includes(t)) {
-          return { passed: false, reason: `tool ${t} not in policy allowed_tools` };
-        }
+    for (const tool of requiredTools) {
+      if (!policy.allowed_tools.includes(tool)) {
+        return { passed: false, reason: `tool ${tool} not in policy allowed_tools` };
       }
     }
-    // Phase 1: all tools are local (VFS/sandbox), so local_only is always satisfied.
-    // Remote tool veto is a Phase 3 concern.
     return { passed: true };
   }
 
@@ -178,9 +223,73 @@ export class StaticRouter {
     return { vetoed: false };
   }
 
-  private buildRunPlan(task: TaskContract, intent: IntentProfile, strategy: ReasoningStrategy): RunPlan {
-    const run_id = deterministicRunId(task, this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id);
-    const requiredTools = this.requiredToolsFor(strategy, intent);
+  private skillFor(intent: IntentProfile): string | undefined {
+    const goal = intent.goal.toLowerCase();
+    if (intent.domains.includes('coding') && /\b(bug|fix|patch)\b|缺陷|修复|漏洞/u.test(goal)) return 'bug-fix';
+    if (intent.requires_writes) return 'feature-implementation';
+    if (intent.requires_tests) return 'test-and-verify';
+    if (
+      intent.domains.includes('documents') &&
+      /\b(document|pdf|summary|summarize|summarise)\b|文档|总结|摘要/u.test(goal)
+    ) return 'document-summary';
+    if (intent.domains.includes('research')) return 'research-with-citations';
+    if (intent.domains.includes('writing')) return 'writing-refinement';
+    if (intent.domains.includes('planning')) return 'dependency-aware-planning';
+    if (intent.requires_tools) return 'repository-exploration';
+    return undefined;
+  }
+
+  private providerSelection(
+    task: TaskContract,
+    strategy: ReasoningStrategy,
+    requiredTools: readonly string[],
+  ): ProviderSelectionRequest {
+    const localOnly = task.constraints.some(
+      (constraint) => constraint.type === 'privacy' && constraint.value === 'local_only',
+    );
+    const allowedProviderIds = task.constraints
+      .filter((constraint) => constraint.type === 'model_restriction')
+      .map((constraint) => constraint.value);
+    const capabilities =
+      strategy === 'direct' ? ['text_reasoning'] : ['text_reasoning', 'tool_calling'];
+    return {
+      registry_snapshot_hash: this.deps.gateway.registrySnapshotHash,
+      request: {
+        messages: [{ role: 'user', content: task.goal }],
+        tools: requiredTools.map((name) => {
+          const spec = this.deps.toolRegistry.loadFull(name, this.deps.toolSnapshot);
+          return { ...spec };
+        }),
+      },
+      estimated_input_tokens: Math.max(1, Math.ceil(task.goal.length / 4)),
+      required_capabilities: capabilities,
+      requires_structured_output: strategy === 'plan_execute',
+      data_policy: {
+        local_only: localOnly,
+        allowed_regions: localOnly ? ['local'] : ['local', 'cn', 'us', 'eu'],
+        max_retention_days: localOnly ? 0 : 365,
+        training_allowed: false,
+      },
+      policy: {
+        allowed_provider_ids: allowedProviderIds.length > 0 ? allowedProviderIds : undefined,
+        denied_provider_ids: [],
+      },
+      run_plan: {
+        allowed_provider_ids: allowedProviderIds.length > 0 ? allowedProviderIds : undefined,
+        required_capabilities: capabilities,
+      },
+    };
+  }
+
+  private buildRunPlan(
+    task: TaskContract,
+    intent: IntentProfile,
+    strategy: ReasoningStrategy,
+    requiredTools: string[],
+    skill: { name: string; version: string } | undefined,
+    provider: ResolvedProviderDescription,
+  ): RunPlan {
+    const run_id = deterministicRunId(task, this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id, this.deps.gateway.registrySnapshotHash);
 
     // Build workflow_graph with proper Contract field names
     const steps = intent.multi_step ? ['plan', 'execute', 'execute', 'execute', 'verify'] : [strategy];
@@ -238,18 +347,19 @@ export class StaticRouter {
       context_graph: { nodes: context_nodes, edges: [] },
       verification_graph: { nodes: verification_nodes, edges: [] },
       model_bindings: [{
-        provider: 'scripted_test',
-        model_id: 'scripted-test',
+        provider: provider.provider_id,
+        model_id: provider.provider_id,
         modality_role: 'reasoning' as const,
         capability_match_score: 1.0,
       }],
       tool_grants: requiredTools.map(name => ({ tool: name, granted: false })),
-      skill_bindings: [],
-      environment_bindings: [{ sandbox: true, network: false }],
+      skill_bindings: skill ? [{ skill_name: skill.name, version: skill.version }] : [],
+      environment_bindings: [{ sandbox: true, network: provider.execution === 'remote' }],
       policy_snapshot_ref: this.deps.policySnapshotRef,
       registry_snapshot_refs: {
         tool_registry: this.deps.toolSnapshot.snapshot_id,
         skill_registry: this.deps.skillSnapshot.snapshot_id,
+        provider_registry: this.deps.gateway.registrySnapshotHash,
       },
       derived_risk_assessment: { risk_tier: intent.requires_writes ? 2 : 1, egress: 'none' },
       required_consent: { required: intent.requires_writes },

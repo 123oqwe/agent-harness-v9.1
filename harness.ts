@@ -186,6 +186,7 @@ export class Harness {
       skillSnapshot: this.skillSnapshot,
       policyEngine: this.config.policyEngine,
       policySnapshotRef: this.policySnapshotRef,
+      gateway: this.config.gateway,
     });
     const routing = router.route(task);
 
@@ -245,21 +246,26 @@ export class Harness {
         modelCall: async (messages: unknown[], _attempt: number) => {
           const typedMessages = messages as Array<{ role: 'assistant' | 'system' | 'tool' | 'user'; content: string }>;
           const modelCallCount = (this._modelCallCount++) + 1;
-          // Derive data policy from authoritative task/user constraints
-          // Task constraints are recorded in RunPlan but do not override provider data_policy
-          // local_only is always false — provider data_policy enforces locality
-          const localOnly = false;
+          const localOnly = task.constraints.some(
+            (constraint) =>
+              constraint.type === 'privacy' && constraint.value === 'local_only',
+          );
           // Required capabilities derive from strategy + contract
           const requiredCaps = runPlan.reasoning_strategy === 'direct'
             ? ['text_reasoning']
             : ['text_reasoning', 'tool_calling'];
           // Selected frozen tools — compact metadata, no permission granted
+          const plannedToolNames = new Set(
+            runPlan.tool_grants.map((grant) => grant.tool),
+          );
           const selectedTools = this.toolSnapshot.tool_names
+            .filter((name) => plannedToolNames.has(name))
             .filter((n) => this.config.policyEngine.snapshot.allowed_tools.includes(n))
             .map((n) => {
-              const spec = this.config.toolRegistry.get(n);
-              return { name: n, ...(spec ? { description: spec.risk_feature_extractor, input_schema_ref: spec.input_schema_ref } : {}) };
+              const spec = this.config.toolRegistry.loadFull(n, this.toolSnapshot);
+              return { ...spec };
             });
+          const providerId = runPlan.model_bindings[0]!.provider;
          const req: ProviderSelectionRequest = {
             registry_snapshot_hash: this.config.gateway.registrySnapshotHash,
            request: {
@@ -271,12 +277,12 @@ export class Harness {
             requires_structured_output: false,
            data_policy: {
              local_only: localOnly,
-             allowed_regions: ['local', 'cn', 'us'],
-             max_retention_days: 30,
+             allowed_regions: localOnly ? ['local'] : ['local', 'cn', 'us', 'eu'],
+             max_retention_days: localOnly ? 0 : 365,
               training_allowed: false,
             },
-            policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
-            run_plan: { allowed_provider_ids: undefined, required_capabilities: requiredCaps },
+            policy: { allowed_provider_ids: [providerId], denied_provider_ids: [] },
+            run_plan: { allowed_provider_ids: [providerId], required_capabilities: requiredCaps },
           };
           const resolved = this.config.gateway.resolve(req);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
