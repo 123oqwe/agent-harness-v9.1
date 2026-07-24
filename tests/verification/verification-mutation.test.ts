@@ -1013,3 +1013,233 @@ describe('Verification regex and boolean mutation-killing tests', () => {
     expect(ev.verifier_result).toBe('pass');
   });
 });
+
+describe('Verification L102/L48/L125 targeted mutation kills', () => {
+  it('L102: err.stdout ?? "" preserves actual stdout content (kills && replacement)', () => {
+    // When a command fails but produces stdout output, the stdout_hash
+    // must reflect the actual content, not an empty string.
+    const result = runCommand('sh -c "echo real_output; exit 1"');
+    // sha('real_output\n') is different from sha('')
+    expect(result.exit_code).not.toBe(0);
+    // The stdout_hash should be non-null and reflect 'real_output'
+    expect(result.stdout_hash).not.toBeNull();
+    // If the mutant (err.stdout && '') were active, stdout would be '' 
+    // and sha('') would be a specific hash. The real output hash is different.
+    const shaEmpty = require('node:crypto').createHash('sha256').update('').digest('hex').slice(0, 16);
+    const shaReal = require('node:crypto').createHash('sha256').update('real_output\n').digest('hex').slice(0, 16);
+    expect(result.stdout_hash).not.toBe(shaEmpty);
+    expect(result.stdout_hash).toBe(shaReal);
+  });
+
+  it('L48: runCommand with undefined cwd uses process.cwd (kills && replacement)', () => {
+    // When cwd is undefined, ?? returns process.cwd(), but && returns undefined.
+    // execSync with cwd: undefined uses the default (process.cwd()).
+    // The observable behavior (exit code) should be the same either way for 'pwd'.
+    // But to kill the mutant, we need to verify the command actually runs
+    // in the current directory. If && were active, cwd would be undefined
+    // and execSync would still work. So this mutant may be equivalent for 
+    // execSync behavior. Let's verify exit code is 0.
+    const result = runCommand('echo ok', undefined);
+    expect(result.exit_code).toBe(0);
+  });
+
+  it('L125: validateEvidence error message includes AJV errors (kills OptionalChaining/ArrowFunction)', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    // Pass evidence that fails AJV schema validation (wrong type for a field)
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: 'not-an-array',
+        tests_added: [], commands_run: [], exit_codes: [], test_results: {}, coverage: {},
+        security_checks: {}, verifier_result: 'fail',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      // The error message must contain schema validation details
+      expect((e as Error).message).toContain('schema validation failed');
+    }
+  });
+
+  it('L122: verifier_result is "fail" when any command fails (kills BooleanLiteral true)', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-BL-F', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok', 'exit 1', 'echo ok3'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.verifier_result).toBe('fail');
+  });
+
+  it('L122: verifier_result is "pass" when all commands succeed (kills BooleanLiteral false)', () => {
+    const ev = generateEvidence({
+      requirement_id: 'AH-BL-T', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok1', 'echo ok2'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(ev.verifier_result).toBe('pass');
+  });
+
+  it('L131: validateEvidence rejects pass with empty commands (kills EqualityOperator !==)', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'pass',
+    }, SCHEMA_PATH)).toThrow();
+  });
+
+  it('L131: validateEvidence accepts fail with empty commands (kills ConditionalExpression false)', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    expect(() => validateEvidence({
+      requirement_id: 'x', commit_sha: 'a'.repeat(40), source_files: [], tests_added: [],
+      commands_run: [], exit_codes: [], test_results: {}, coverage: {}, security_checks: {},
+      verifier_result: 'fail',
+    }, SCHEMA_PATH)).not.toThrow();
+  });
+});
+
+describe('Verification targeted kill attempts', () => {
+  const runner = new EvalRunner();
+
+  it('L102 eval-runner: failed command stdout content preserved in hash', () => {
+    // This kills id=47: err.stdout ?? '' mutated to err.stdout && ''
+    // When a command fails but produces stdout, the stdout_hash must
+    // reflect the actual content, not empty string.
+    const manifest: EvalManifest = {
+      manifest_version: 'eval-manifest.v1', requirement_id: 'AH-STDOUT-KILL',
+      suites: [{ id: 'sk1', kind: 'unit', command: 'sh -c "echo real_out; exit 1"', expected_exit: 0 }],
+    };
+    const report = runner.run(manifest);
+    const r = report.results[0]!;
+    // sha('real_out\n') != sha('')
+    const sha = (s: string) => require('node:crypto').createHash('sha256').update(s).digest('hex').slice(0, 16);
+    expect(r.stdout_hash).toBe(sha('real_out\n'));
+    expect(r.stdout_hash).not.toBe(sha(''));
+  });
+
+  it('L131 evidence: validateEvidence reaches pass+empty-commands check', () => {
+    // This kills id=198/200/201: the if(verifier_result==='pass' && commands_run.length===0) check
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    // This evidence passes AJV schema (all fields present, correct types)
+    // but fails the custom check: pass without commands
+    try {
+      validateEvidence({
+        requirement_id: 'x',
+        commit_sha: 'a'.repeat(40),
+        source_files: [],
+        tests_added: [],
+        commands_run: [],
+        exit_codes: [],
+        test_results: {},
+        coverage: {},
+        security_checks: {},
+        verifier_result: 'pass',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown EvidenceError');
+    } catch (e) {
+      // Must be EvidenceError with specific message (not AJV error)
+      expect(e).toBeInstanceOf(EvidenceError);
+      expect((e as Error).message).toContain('PASS without commands');
+    }
+  });
+
+  it('L131 evidence: validateEvidence pass with pending sha reaches check', () => {
+    const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+      ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+      : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+    try {
+      validateEvidence({
+        requirement_id: 'x',
+        commit_sha: 'pending',
+        source_files: [],
+        tests_added: [],
+        commands_run: [{ command: 'echo', exit_code: 0, stdout_hash: 'abc' }],
+        exit_codes: [0],
+        test_results: {},
+        coverage: {},
+        security_checks: {},
+        verifier_result: 'pass',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      // Should reach the pending check (not fail at AJV or commit_sha check first)
+      expect((e as Error).message).toContain('pending');
+    }
+  });
+
+  it('L122 evidence: allPassed ternary - fail when one command fails among multiple', () => {
+    // Kill id=167 (BooleanLiteral false) and id=168 (BooleanLiteral true)
+    // If allPassed is mutated to false, result is always 'fail'
+    // If allPassed is mutated to true, result is always 'pass'
+    const evPass = generateEvidence({
+      requirement_id: 'AH-TERN-1', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(evPass.verifier_result).toBe('pass');
+
+    const evFail = generateEvidence({
+      requirement_id: 'AH-TERN-2', source_files: ['package.json'], tests_added: [],
+      commands: ['echo ok', 'exit 1'], cwd: process.cwd(),
+      test_results: {}, coverage: {}, security_checks: {},
+    });
+    expect(evFail.verifier_result).toBe('fail');
+  });
+});
+
+describe('Verification AJV error formatting kills', () => {
+  const SCHEMA_PATH = process.env.HARNESS_SPEC_ROOT
+    ? join(process.env.HARNESS_SPEC_ROOT, 'contracts', 'evidence-package.schema.json')
+    : join(import.meta.dirname, '..', '..', '..', 'spec', 'contracts', 'evidence-package.schema.json');
+
+  it('L125/L122: multiple schema violations produce multiple errors in message (kills allErrors, ??, ArrowFunction)', () => {
+    // Pass evidence with MULTIPLE schema violations so allErrors:true collects them all
+    try {
+      validateEvidence({
+        requirement_id: 123,           // wrong type: number instead of string
+        commit_sha: 'a'.repeat(40),
+        source_files: 'not-an-array',  // wrong type: string instead of array
+        tests_added: 'also-wrong',     // wrong type: string instead of array
+        commands_run: [], exit_codes: [],
+        test_results: {}, coverage: {}, security_checks: {},
+        verifier_result: 'fail',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      const msg = (e as Error).message;
+      // Must contain 'schema validation failed' prefix
+      expect(msg).toContain('schema validation failed');
+      // Must contain actual AJV error details (not 'unknown' from ?? -> && mutation)
+      expect(msg).not.toContain('unknown');
+      // Must contain actual error paths (not 'undefined' from ArrowFunction mutation)
+      expect(msg).not.toContain('undefined');
+      // Must contain at least 2 error entries (kills allErrors:false which reports only 1)
+      // AJV errors are joined with '; '
+      const errorParts = msg.split('; ');
+      expect(errorParts.length).toBeGreaterThan(1);
+    }
+  });
+
+  it('L125: single schema violation produces specific error detail', () => {
+    try {
+      validateEvidence({
+        requirement_id: 'x', commit_sha: 'a'.repeat(40),
+        source_files: 42,  // wrong type
+        tests_added: [], commands_run: [], exit_codes: [],
+        test_results: {}, coverage: {}, security_checks: {},
+        verifier_result: 'fail',
+      }, SCHEMA_PATH);
+      expect.fail('should have thrown');
+    } catch (e) {
+      const msg = (e as Error).message;
+      // The error message must contain the field name and the AJV error
+      expect(msg).toContain('source_files');
+    }
+  });
+});

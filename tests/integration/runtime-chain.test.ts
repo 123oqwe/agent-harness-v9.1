@@ -1,15 +1,28 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSecurityDeps } from '../helpers/test-security.js';
+
 import { mkdtempSync, rmSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
+
 import { Harness, type HarnessProvider } from '../../harness.js';
+
 import { ToolRegistry } from '../../tools/tool-registry.js';
+
 import { SkillRegistry } from '../../tools/skill-registry.js';
+
 import { PolicyEngine } from '../../security/policy-engine.js';
+
 import { VirtualFilesystem, LocalBackend, OverlayBackend } from '../../vfs/virtual-filesystem.js';
+
 import type { SandboxProfile } from '../../runtime/sandbox.js';
+
 import type { TaskContract } from '../../../spec/types/task-contract.js';
+
 import type { Policy } from '../../security/policy-engine.js';
+
 
 function makeToolRegistry(): ToolRegistry {
   const tr = new ToolRegistry();
@@ -36,7 +49,7 @@ function makeHarness(tmp: string, provider: HarnessProvider, allowedTools: strin
   } as Policy;
   const pe = new PolicyEngine(policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
 }
 
 function task(goal: string): TaskContract {

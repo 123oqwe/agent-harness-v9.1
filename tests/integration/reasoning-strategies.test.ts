@@ -4,18 +4,32 @@
  * StaticRouter, Runtime, Session, ToolExecutor, VFS and Evidence.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSecurityDeps } from '../helpers/test-security.js';
+
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
+
 import { Harness, type HarnessProvider } from '../../harness.js';
+
 import { ToolRegistry } from '../../tools/tool-registry.js';
+
 import { SkillRegistry } from '../../tools/skill-registry.js';
+
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
+
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
+
 import type { SandboxProfile } from '../../runtime/sandbox.js';
+
 import type { ModelTurn } from '../../runtime/loop.js';
+
 import type { TaskContract } from '../../../spec/types/task-contract.js';
+
 import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+
 
 function toolSpec(name: string): ToolSpec {
   return { name, version: '1.0.0', domains: ['coding'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
@@ -43,7 +57,7 @@ function makeHarness(tmp: string, extraTools: string[] = []): Harness {
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([]) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([]), security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
 }
 
 function task(goal: string, over: Partial<TaskContract> = {}): TaskContract {
@@ -126,7 +140,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([
       { content: '', decision_summary: 'write', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] },
       { content: 'done', decision_summary: 'done' },
-    ]) });
+    ]), security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
     const r = await h.run(task('write a file'));
     // Router prefilter denies write_file (not in policy allowed_tools) → routing abstains
     expect(r.routing.outcome).toBe('abstain');
@@ -143,7 +157,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
     await h.run(task('rewrite text'));
     expect(calls.length).toBe(1); // exactly one provider call
   });

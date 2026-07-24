@@ -8,6 +8,10 @@
  * Verticals call this entry point; they do NOT call Provider, Tool, VFS or
  * Sandbox directly. This root accepts only typed component instances — never
  * raw callbacks.
+ *
+ * Security components (AuthorizationService, PEP, CapabilityStateStore,
+ * AuditSink, signing keys, clock) are injected by the caller. The Harness
+ * does NOT generate keys or create default security instances.
  */
 import type { TaskContract } from '../spec/types/task-contract.js';
 import type { RunPlan } from './router/static-router.js';
@@ -22,11 +26,10 @@ import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ToolExecutor } from './tools/tool-executor.js';
-import { AuthorizationService } from './security/authorization-service.js';
-import { SkillLoader, type SkillActivationResult } from './skills/skill-loader.js';
-import { InMemoryCapabilityStateStore } from './security/capability.js';
-import { PolicyEnforcementPoint } from './security/pep.js';
-import { generateKeyPairSync } from 'node:crypto';
+import type { AuthorizationService } from './security/authorization-service.js';
+import type { InMemoryCapabilityStateStore } from './security/capability.js';
+import type { PolicyEnforcementPoint } from './security/pep.js';
+import { SkillLoader } from './skills/skill-loader.js';
 import { execSync } from 'node:child_process';
 
 /** A provider port that can be called by the Runtime — typed, not a raw callback. */
@@ -36,7 +39,7 @@ export interface HarnessProvider {
 
 /** Outcome returned to the caller (Vertical or user). */
 export interface HarnessOutcome {
- run_plan: RunPlan | null;
+  run_plan: RunPlan | null;
   routing: RoutingResult;
   loop_result: LoopResult;
   session: DurableSession;
@@ -52,7 +55,6 @@ export interface HarnessOutcome {
   success: boolean;
 }
 
-/** Configuration for the Harness — only typed components, no callbacks. */
 /** Execution context: replaces all hardcoded identity values. */
 export interface ExecutionContext {
   tenant_id: string;
@@ -68,6 +70,7 @@ export interface ExecutionContext {
   tool_snapshot: string;
   budget: { token_limit: number; usd_micros: number };
   risk_level: number;
+  confirmation_key_thumbprint: string;
   clock: () => string;
 }
 
@@ -86,11 +89,20 @@ export function createDefaultExecutionContext(runId: string): ExecutionContext {
     policy_snapshot: 'policy-v1',
     tool_snapshot: 'tool-v1',
     budget: { token_limit: 100000, usd_micros: 5000000 },
-   risk_level: 2,
-   clock: (() => { const t = new Date().toISOString(); return () => t; })(),
+    risk_level: 2,
+    confirmation_key_thumbprint: 'test-thumbprint',
+    clock: () => new Date().toISOString(),
  };
 }
 
+/** Injected security components — must be provided by the caller. */
+export interface HarnessSecurityDeps {
+  authz: AuthorizationService;
+  pep: PolicyEnforcementPoint;
+  stateStore: InMemoryCapabilityStateStore;
+}
+
+/** Configuration for the Harness — only typed components, no callbacks. */
 export interface HarnessConfig {
   toolRegistry: ToolRegistry;
   skillRegistry: SkillRegistry;
@@ -98,6 +110,7 @@ export interface HarnessConfig {
   vfs: VirtualFilesystem;
   sandbox: SandboxProfile;
   provider: HarnessProvider;
+  security: HarnessSecurityDeps;
   executionContext?: ExecutionContext;
   dataDir?: string;
   sessionLogPath?: string;
@@ -113,52 +126,34 @@ export class Harness {
   private readonly skillSnapshot: SkillRegistrySnapshot;
   private readonly policySnapshotRef: string;
   private currentOverlay: OverlayBackend | null = null;
-  private currentTarget: unknown = null;
+  private readonly auditLog: unknown[] = [];
+  private execCtx: ExecutionContext | null = null;
 
- constructor(config: HarnessConfig) {
-   this.config = config;
-   this.execCtx = config.executionContext ?? null;
-   this.toolSnapshot = config.toolRegistry.freezeSnapshot();
-   this.skillSnapshot = config.skillRegistry.freezeSnapshot();
-   this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
-   // Composition root: inject deps into ToolExecutor (not self-generated)
-   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
-   this.injectedStateStore = new InMemoryCapabilityStateStore();
-   this.injectedAuthz = new AuthorizationService({ private_key: privateKey, public_key: publicKey, state_store: this.injectedStateStore, now: () => this.now() });
-   this.injectedPep = new PolicyEnforcementPoint({
-     policy_engine: config.policyEngine,
-     capability_authority: {
-       verify_signature: async (token) => { try { const r = await this.injectedStateStore.read(token.token_id); return !!r; } catch { return false; } },
-       consume: async (tokenId) => { if (this.consumedTokens.has(tokenId)) return false; this.consumedTokens.add(tokenId); return true; },
-     },
-     audit_sink: { write: async (entry) => { this.auditLog.push(entry); } },
-     now: () => this.now(),
-   });
- }
- private readonly injectedAuthz: AuthorizationService;
- private readonly injectedPep: PolicyEnforcementPoint;
- private readonly injectedStateStore: InMemoryCapabilityStateStore;
- private readonly consumedTokens = new Set<string>();
- private readonly auditLog: unknown[] = [];
- private execCtx: ExecutionContext | null = null;
+  constructor(config: HarnessConfig) {
+    this.config = config;
+    this.execCtx = config.executionContext ?? null;
+    this.toolSnapshot = config.toolRegistry.freezeSnapshot();
+    this.skillSnapshot = config.skillRegistry.freezeSnapshot();
+    this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;
+  }
 
- private now(): string {
-   return this.execCtx?.clock() ?? new Date().toISOString();
- }
+  private now(): string {
+    return this.execCtx?.clock() ?? new Date().toISOString();
+  }
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
- async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
-   const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
-   this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
-   // 1. Create session (event log = source of truth)
-   const session = new DurableSession(actualRunId);
-   session.acquireWriter();
-   // Create a per-Run overlay for write isolation (stages writes, not committed until verification)
+  async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
+    const actualRunId = runId ?? `run-${deterministicRunId(task)}`;
+    this.execCtx = this.config.executionContext ?? createDefaultExecutionContext(actualRunId);
+
+    // 1. Create session (event log = source of truth)
+    const session = new DurableSession(actualRunId);
+    session.acquireWriter();
+
+    // Create a per-Run overlay for write isolation
     const overlayPrefix = '/workspace';
     this.currentOverlay = new OverlayBackend(overlayPrefix);
-    // Use VFS public API instead of accessing private backends array
     this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
-    this.currentTarget = null;
 
     // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
     const router = new StaticRouter({
@@ -171,52 +166,54 @@ export class Harness {
     });
     const routing = router.route(task);
 
-   if (routing.outcome !== 'route' || !routing.run_plan) {
-     // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
-     session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
-     session.releaseWriter();
-     return {
-       run_plan: routing.run_plan ?? null,
-       routing,
-       loop_result: {
-         strategy: 'direct', iterations: 0, termination_reason: 'denied',
-         turns: [], decision_summaries: [], progress_path: undefined, context_reset_emitted: false,
-       },
-       session,
-       evidence: this.buildEvidence(session, routing.run_plan, 'denied', 0),
-       success: false,
-     };
-   }
+    if (routing.outcome !== 'route' || !routing.run_plan) {
+      // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
+      session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
+      session.releaseWriter();
+      return {
+        run_plan: routing.run_plan ?? null,
+        routing,
+        loop_result: {
+          strategy: 'direct', iterations: 0, termination_reason: 'denied',
+          turns: [], decision_summaries: [], progress_path: undefined, context_reset_emitted: false,
+        },
+        session,
+        evidence: this.buildEvidence(session, routing.run_plan, 'denied', 0),
+        success: false,
+      };
+    }
 
-   const runPlan = routing.run_plan;
+    const runPlan = routing.run_plan;
 
-   // 2a. Skill activation: check if any required skills can activate
-   const allowedTools = (this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools;
-   const skillLoader = new SkillLoader(
-     this.config.skillRegistry,
-     this.skillSnapshot,
-     allowedTools,
-   );
-   let skillActivation: SkillActivationResult | null = null;
-   // If the RunPlan has skill_bindings, try to activate the first one
-   const skillBindings = (runPlan.skill_bindings ?? []) as Array<{ skill_name?: string }>;
-   if (skillBindings.length > 0 && skillBindings[0]!.skill_name) {
-     try {
-       skillActivation = await skillLoader.activate(skillBindings[0]!.skill_name);
-       session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: skillActivation.frozen_version });
-     } catch {
-       // Skill activation failure is non-fatal: continue without skill context
-       session.append('error', { reason: 'skill_activation_failed', skill: skillBindings[0]!.skill_name });
-     }
-   }
+    // 2a. Skill activation: check if any required skills can activate
+    const allowedTools = (this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools;
+    const skillLoader = new SkillLoader(
+      this.config.skillRegistry,
+      this.skillSnapshot,
+      allowedTools,
+    );
+    const skillBindings = (runPlan.skill_bindings ?? []) as Array<{ skill_name?: string }>;
+    let skillInstructions = '';
+    if (skillBindings.length > 0 && skillBindings[0]!.skill_name) {
+      try {
+        const activation = await skillLoader.activate(skillBindings[0]!.skill_name);
+        // Return instructions for context injection (not discarded)
+        skillInstructions = `Skill: ${activation.skill.name} v${activation.frozen_version}`;
+        session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: activation.frozen_version });
+      } catch (e) {
+        // Skill activation failure: log but continue (skill context is optional)
+        session.append('error', { reason: 'skill_activation_failed', skill: skillBindings[0]!.skill_name, error: (e as Error).message });
+      }
+    }
 
-   // 3. Runtime: execute the frozen RunPlan.reasoning_strategy
+    // 3. Runtime: execute the frozen RunPlan.reasoning_strategy
+    const goalWithSkill = skillInstructions ? `${skillInstructions}\n\n${task.goal}` : task.goal;
     const loop = new LoopEngine(
       {
         strategy: runPlan.reasoning_strategy,
         max_iterations: (runPlan.budget_allocation as { max_iterations: number }).max_iterations,
         run_id: runPlan.run_id,
-        goal: task.goal,
+        goal: goalWithSkill,
         data_dir: this.config.dataDir,
         run_plan: runPlan,
       },
@@ -259,15 +256,32 @@ export class Harness {
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
  private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
+   const execCtxForTool = this.execCtx ? {
+     tenant_id: this.execCtx.tenant_id,
+     user_id: this.execCtx.user_id,
+     run_id: this.execCtx.run_id,
+     plan_id: this.execCtx.plan_id,
+     step_id: this.execCtx.step_id,
+     attempt_id: this.execCtx.attempt_id,
+     operation_id: this.execCtx.operation_id,
+     idempotency_key: this.execCtx.idempotency_key,
+     confirmation_key_thumbprint: this.execCtx.confirmation_key_thumbprint,
+   } : undefined;
    const executor = new ToolExecutor(
      { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
-     { authz: this.injectedAuthz, pep: this.injectedPep, stateStore: this.injectedStateStore, now: () => this.now() },
-   );
-   const { result } = await executor.execute(name, args, async (deps) => {
-     return this.dispatchToolViaDeps(name, args, deps.vfs);
-   });
-   return result;
- }
+     {
+       authz: this.config.security.authz,
+       pep: this.config.security.pep,
+       stateStore: this.config.security.stateStore,
+       now: () => this.now(),
+       ...(execCtxForTool ? { execCtx: execCtxForTool } : {}),
+     },
+    );
+    const { result } = await executor.execute(name, args, async (deps) => {
+      return this.dispatchToolViaDeps(name, args, deps.vfs);
+    });
+    return result;
+  }
 
   private async dispatchToolViaDeps(name: string, args: Record<string, unknown>, vfs: VirtualFilesystem): Promise<unknown> {
     const { readFile } = await import('./tools/read-file.js');
@@ -297,7 +311,6 @@ export class Harness {
   finalizeOverlay(success: boolean): void {
     if (!this.currentOverlay) return;
     if (success) {
-      // Commit overlay to real VFS
       this.config.vfs.commitOverlay(this.currentOverlay);
     } else {
       this.config.vfs.discardOverlay(this.currentOverlay);
@@ -310,7 +323,6 @@ export class Harness {
     if (turns.length === 0) return false;
     const lastTurn = turns[turns.length - 1]!;
     const output = lastTurn.model.content + ' ' + lastTurn.model.decision_summary;
-    // Check each success criterion: criterion text must appear in the output
     for (const criterion of task.success_criteria ?? []) {
       if (!output.toLowerCase().includes(criterion.criterion.toLowerCase())) return false;
     }

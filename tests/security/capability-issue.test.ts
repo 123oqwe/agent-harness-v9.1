@@ -197,9 +197,9 @@ describe('AuthorizationService issue and verify', () => {
     await expect(make(() => NOW, () => 'not-a-uuid').issue(request())).rejects.toBeInstanceOf(
       CapabilityInvalidError,
     );
-    await expect(
-      make(() => '2026-01-01T00:00:01.000Z').issue(request()),
-    ).rejects.toBeInstanceOf(CapabilityInvalidError);
+   await expect(
+     make(() => '2026-01-01T00:00:11.000Z').issue(request()),
+   ).rejects.toBeInstanceOf(CapabilityInvalidError);
 
     let clock = NOW;
     const service = make(() => clock);

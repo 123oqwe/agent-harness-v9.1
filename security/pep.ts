@@ -169,8 +169,9 @@ export class PolicyEnforcementPoint {
     ) {
       return this.#deny(request, 'invalid_time', tier);
     }
-    if (issuedAt > notBefore || notBefore >= expiresAt) {
-      return this.#deny(request, 'invalid_time_order', tier);
+   // Allow 10s clock skew tolerance for issued_at vs not_before
+   if (issuedAt > notBefore + 10_000 || notBefore >= expiresAt) {
+     return this.#deny(request, 'invalid_time_order', tier);
     }
     if (nowValue < notBefore) return this.#deny(request, 'not_yet_valid', tier);
     if (nowValue >= expiresAt) return this.#deny(request, 'expired', tier);

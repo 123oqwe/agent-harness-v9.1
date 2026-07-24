@@ -423,8 +423,8 @@ describe('AH-POLICY-ENGINE-001: token time validation', () => {
     const action = manifest();
     const ctx = executionContext(engine);
     const invalid = tokenFor(engine, action, risk(), ctx, {
-      issued_at: '2026-01-01T00:00:30.000Z',
-      not_before: '2026-01-01T00:00:20.000Z',
+     issued_at: '2026-01-01T00:00:30.000Z',
+     not_before: '2026-01-01T00:00:15.000Z',
     });
 
     await expectDenied(

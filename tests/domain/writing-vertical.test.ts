@@ -1,12 +1,22 @@
 import { describe, it, expect } from 'vitest';
+import { createTestSecurityDeps } from '../helpers/test-security.js';
+
 import { Harness, type HarnessProvider } from '../../harness.js';
+
 import { ToolRegistry } from '../../tools/tool-registry.js';
+
 import { SkillRegistry } from '../../tools/skill-registry.js';
+
 import { VirtualFilesystem, StoreBackend } from '../../vfs/virtual-filesystem.js';
+
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
+
 import type { SandboxProfile } from '../../runtime/sandbox.js';
+
 import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+
 import { runWritingVertical } from '../../writing/ah_writing_vertical_001.js';
+
 
 function toolSpec(name: string): ToolSpec {
   return { name, version: '1.0.0', domains: ['writing'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
@@ -18,7 +28,7 @@ function makeHarness(): Harness {
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: '/tmp', allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const provider: HarnessProvider = { async resolve() { return { content: 'Draft about Agent Harness with 14 modules', decision_summary: 'I wrote the draft' }; } };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
 }
 
 describe('AH-WRITING-VERTICAL-001 writing vertical (thin adapter)', () => {
