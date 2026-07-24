@@ -1,32 +1,52 @@
 /**
  * GLM Provider Adapter — real LLM calls via Zhipu (BigModel) OpenAI-compatible API.
  *
- * Implements the full GatewayProviderRuntime interface so it can be registered
- * into ModelGateway alongside ScriptedTestProvider. Credentials are read from
- * env ONLY (GLM_API_KEY, GLM_MODEL, GLM_REASONING_EFFORT) — never from args,
- * never printed, never stored.
+ * Implements the full GatewayProviderRuntime interface. Credentials arrive
+ * only through the dispatch context supplied by ModelGateway.
  */
+import type { ProviderDispatchContext } from './model-gateway.js';
 import type {
   ProviderRequest, ParsedResponse, ToolCall, Usage,
   HealthStatus, DataPolicyResult, ProviderError, StreamEvent,
 } from './scripted-provider.js';
+import { ProviderHttpError, ProviderTimeoutError } from './scripted-provider.js';
 
 export class GlmProviderError extends Error {
   constructor(message: string) { super(message); this.name = 'GlmProviderError'; Object.setPrototypeOf(this, GlmProviderError.prototype); }
 }
 
+export interface GlmProviderOptions {
+  model: string;
+  reasoningEffort?: string;
+  endpoint?: string;
+  fetch?: typeof fetch;
+}
+
+function stopReason(
+  reason: string | null | undefined,
+): NonNullable<ParsedResponse['stop_reason']> {
+  if (reason === 'length') return 'length';
+  if (reason === 'tool_calls') return 'tool_use';
+  if (reason === 'content_filter') return 'content_filter';
+  return 'stop';
+}
+
 export class GlmProvider {
   readonly provider_type = 'openai' as const; // Zhipu API is OpenAI-compatible
-  private readonly apiKey: string;
   private readonly model: string;
   private readonly reasoningEffort: string;
-  private readonly endpoint = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+  private readonly endpoint: string;
+  private readonly fetchImpl: typeof fetch;
 
-  constructor() {
-    this.apiKey = process.env.GLM_API_KEY ?? '';
-    this.model = process.env.GLM_MODEL ?? '';
-    this.reasoningEffort = process.env.GLM_REASONING_EFFORT ?? 'xhigh';
-    // Key may be empty if constructed during agent phase; checked lazily in resolve()
+  constructor(options: GlmProviderOptions) {
+    if (!options?.model?.trim()) throw new GlmProviderError('GLM model is required');
+    this.model = options.model;
+    this.reasoningEffort = options.reasoningEffort ?? 'xhigh';
+    this.endpoint =
+      options.endpoint ?? 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    const endpoint = new URL(this.endpoint);
+    if (endpoint.protocol !== 'https:') throw new GlmProviderError('GLM endpoint must use HTTPS');
+    this.fetchImpl = options.fetch ?? globalThis.fetch;
   }
 
   normalizeRequest(req: ProviderRequest): unknown {
@@ -36,7 +56,18 @@ export class GlmProvider {
       messages: req.messages.map(m => ({ role: m.role, content: m.content })),
       temperature: req.temperature ?? 0.1,
       max_tokens: req.max_tokens ?? 4096,
-      ...(req.tools && req.tools.length > 0 ? { tools: req.tools.map(t => ({ type: 'function', function: { name: t.name, description: '', parameters: {} } })) } : {}),
+      ...(req.tools && req.tools.length > 0
+        ? {
+            tools: req.tools.map((tool) => ({
+              type: 'function',
+              function: {
+                name: tool.name,
+                description: tool.risk_feature_extractor ?? '',
+                parameters: tool.input_schema ?? {},
+              },
+            })),
+          }
+        : {}),
     };
   }
 
@@ -49,7 +80,7 @@ export class GlmProvider {
       name: tc.function.name,
       arguments: JSON.parse(tc.function.arguments || '{}'),
     }));
-    const stop_reason = (choice.finish_reason === 'stop' ? 'stop' : choice.finish_reason === 'length' ? 'length' : choice.finish_reason === 'tool_calls' ? 'tool_use' : 'stop') as 'stop' | 'length' | 'tool_use' | 'content_filter';
+    const stop_reason = stopReason(choice.finish_reason);
     const usage = data.usage ? { input_tokens: data.usage.prompt_tokens, output_tokens: data.usage.completion_tokens } : { input_tokens: 0, output_tokens: 0 };
     return {
       content: choice.message.content ?? '',
@@ -67,25 +98,131 @@ export class GlmProvider {
     return { id: tc.id, name: tc.function.name, arguments: tc.function.arguments ? JSON.parse(tc.function.arguments) : {} };
   }
 
-  async *streamEvents(_req: ProviderRequest): AsyncIterable<StreamEvent> {
-    // Phase 1: no streaming; single response. Yield message_stop at the end.
-    const raw = await this.resolve(_req);
-    const res = this.parseResponse(raw);
-    if (res.content) yield { type: 'text_delta', text: res.content };
-    for (const tc of res.tool_calls ?? []) yield { type: 'tool_call', tool_call: tc };
-    const stopEv: { type: "message_stop"; stop_reason: NonNullable<typeof res.stop_reason> } & { usage?: Usage } = { type: "message_stop", stop_reason: res.stop_reason ?? "stop" };
-    if (res.usage) stopEv.usage = res.usage;
-    yield stopEv;
+  async *streamEvents(
+    request: ProviderRequest,
+    context?: ProviderDispatchContext,
+  ): AsyncIterable<StreamEvent> {
+    const response = await this.request(request, context, true);
+    if (!response.body) throw new GlmProviderError('GLM stream returned no body');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let pendingStopReason: NonNullable<ParsedResponse['stop_reason']> | undefined;
+    let pendingUsage: Usage | undefined;
+    const toolCalls = new Map<
+      number,
+      { id: string; name: string; arguments: string }
+    >();
+
+    const parseFrame = (frame: string): {
+      text?: string;
+      finish?: NonNullable<ParsedResponse['stop_reason']>;
+      usage?: Usage;
+      toolCalls?: ToolCall[];
+      done?: boolean;
+    } => {
+      const data = frame
+        .split(/\r?\n/u)
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trim())
+        .join('');
+      if (!data) return {};
+      if (data === '[DONE]') return { done: true };
+      const payload = JSON.parse(data) as {
+        choices?: Array<{
+          delta?: {
+            content?: string;
+            tool_calls?: Array<{
+              index: number;
+              id?: string;
+              function?: { name?: string; arguments?: string };
+            }>;
+          };
+          finish_reason?: string | null;
+        }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+      const choice = payload.choices?.[0];
+      for (const delta of choice?.delta?.tool_calls ?? []) {
+        const current = toolCalls.get(delta.index) ?? { id: '', name: '', arguments: '' };
+        if (delta.id) current.id = delta.id;
+        if (delta.function?.name) current.name += delta.function.name;
+        if (delta.function?.arguments) current.arguments += delta.function.arguments;
+        toolCalls.set(delta.index, current);
+      }
+      const usage =
+        payload.usage === undefined
+          ? undefined
+          : {
+              input_tokens: payload.usage.prompt_tokens ?? 0,
+              output_tokens: payload.usage.completion_tokens ?? 0,
+            };
+      const finish = choice?.finish_reason
+        ? stopReason(choice.finish_reason)
+        : undefined;
+      const completedTools =
+        finish === undefined
+          ? undefined
+          : [...toolCalls.entries()]
+              .sort(([left], [right]) => left - right)
+              .map(([, tool]) => {
+                if (!tool.id || !tool.name) {
+                  throw new GlmProviderError('streamed tool call missing id or name');
+                }
+                return {
+                  id: tool.id,
+                  name: tool.name,
+                  arguments: JSON.parse(tool.arguments || '{}') as Record<string, unknown>,
+                };
+              });
+      return {
+        ...(choice?.delta?.content ? { text: choice.delta.content } : {}),
+        ...(finish ? { finish } : {}),
+        ...(usage ? { usage } : {}),
+        ...(completedTools ? { toolCalls: completedTools } : {}),
+      };
+    };
+
+    for (;;) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      const frames = buffer.split(/\r?\n\r?\n/u);
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        const parsed = parseFrame(frame);
+        if (parsed.text) yield { type: 'text_delta', text: parsed.text };
+        for (const toolCall of parsed.toolCalls ?? []) {
+          yield { type: 'tool_call', tool_call: toolCall };
+        }
+        if (parsed.finish) pendingStopReason = parsed.finish;
+        if (parsed.usage) pendingUsage = parsed.usage;
+      }
+      if (chunk.done) break;
+    }
+    if (!pendingStopReason) {
+      throw new GlmProviderError('GLM stream ended without a terminal event');
+    }
+    yield {
+      type: 'message_stop',
+      stop_reason: pendingStopReason,
+      ...(pendingUsage ? { usage: pendingUsage } : {}),
+    };
   }
 
   mapError(raw: unknown): ProviderError {
+    if (raw instanceof ProviderHttpError) {
+      if (raw.status === 401 || raw.status === 403) {
+        return { kind: 'auth', retryable: false, detail: 'Provider authentication failed', status: raw.status };
+      }
+      if (raw.status === 429) return { kind: 'rate_limited', retryable: true, detail: 'Provider rate limited', status: raw.status };
+      if (raw.status >= 500) return { kind: 'server', retryable: true, detail: 'Provider server failure', status: raw.status };
+      return { kind: 'invalid_request', retryable: false, detail: 'Provider rejected request', status: raw.status };
+    }
+    if (raw instanceof ProviderTimeoutError) {
+      return { kind: 'timeout', retryable: true, detail: 'Provider request timed out' };
+    }
     if (raw instanceof Error) {
       const msg = raw.message;
-      if (/401|auth|unauthorized/i.test(msg)) return { kind: 'auth', retryable: false, detail: msg };
-      if (/429|rate/i.test(msg)) return { kind: 'rate_limited', retryable: true, detail: msg };
-      if (/timeout|timed out/i.test(msg)) return { kind: 'timeout', retryable: true, detail: msg };
-      if (/500|502|503|504|server/i.test(msg)) return { kind: 'server', retryable: true, detail: msg };
-      if (/400|invalid/i.test(msg)) return { kind: 'invalid_request', retryable: false, detail: msg };
       return { kind: 'unknown', retryable: false, detail: msg };
     }
     return { kind: 'unknown', retryable: false, detail: String(raw) };
@@ -96,39 +233,56 @@ export class GlmProvider {
   }
 
   checkHealth(): HealthStatus {
-    return this.apiKey ? 'healthy' : 'down';
+    return this.model ? 'healthy' : 'down';
   }
 
   validateDataPolicy(_req: ProviderRequest): DataPolicyResult {
     // GLM is a remote provider; data leaves the local machine.
     // Deny by default unless the caller has explicitly allowed remote execution.
     // The caller (ModelGateway) must check egress policy before dispatching.
-    const allowRemote = process.env.GLM_ALLOW_REMOTE === 'true';
-    return { allowed: allowRemote, reason: allowRemote ? 'remote egress permitted by config' : 'remote egress denied by default' };
+    return { allowed: true, reason: 'remote policy is enforced by ModelGateway' };
   }
 
-  /** The main resolve: makes a real HTTP call to the GLM API, returns raw JSON.
-   *  dispatch() will call parseResponse() on the result. */
-  async resolve(request: ProviderRequest): Promise<unknown> {
+  async resolve(
+    request: ProviderRequest,
+    context?: ProviderDispatchContext,
+  ): Promise<unknown> {
+    const response = await this.request(request, context, false);
+    return response.json();
+  }
+
+  private async request(
+    request: ProviderRequest,
+    context: ProviderDispatchContext | undefined,
+    stream: boolean,
+  ): Promise<Response> {
+    const secret = context?.credential?.secret;
+    if (!secret) throw new GlmProviderError('dispatch credential secret is required');
     const body = this.normalizeRequest(request) as Record<string, unknown>;
-    if (!this.apiKey) throw new GlmProviderError('GLM_API_KEY not set in env');
-    if (!this.model) throw new GlmProviderError('GLM_MODEL not set in env — must be a GLM-5.2 model ID, no default fallback');
-    const res = await fetch(this.endpoint, {
+    if (stream) {
+      body.stream = true;
+      body.stream_options = { include_usage: true };
+    }
+    let signal = context?.signal;
+    if (context?.deadline_at) {
+      const remaining = Date.parse(context.deadline_at) - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) throw new ProviderTimeoutError();
+      const deadlineSignal = AbortSignal.timeout(remaining);
+      signal = signal ? AbortSignal.any([signal, deadlineSignal]) : deadlineSignal;
+    }
+    const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
-      signal: AbortSignal.timeout(120_000),
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
+      ...(signal ? { signal } : {}),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new GlmProviderError(`GLM API error ${res.status}: ${errText.slice(0, 300)}`);
-    }
-    return res.json();
+    if (!response.ok) throw new ProviderHttpError(response.status);
+    return response;
   }
 }
 
 /** Build a GatewayProviderRuntime from GlmProvider for ModelGateway registration. */
-export function glmProviderRuntime(): {
+export function glmProviderRuntime(options: GlmProviderOptions): {
   provider_type: string;
   normalizeRequest: GlmProvider['normalizeRequest'];
   parseResponse: GlmProvider['parseResponse'];
@@ -138,9 +292,9 @@ export function glmProviderRuntime(): {
   meterUsage: GlmProvider['meterUsage'];
   checkHealth: GlmProvider['checkHealth'];
   validateDataPolicy: GlmProvider['validateDataPolicy'];
-  resolve: (req: ProviderRequest) => Promise<unknown>;
+  resolve: (req: ProviderRequest, context?: ProviderDispatchContext) => Promise<unknown>;
 } {
-  const p = new GlmProvider();
+  const p = new GlmProvider(options);
   return {
     provider_type: p.provider_type,
     normalizeRequest: p.normalizeRequest.bind(p),
@@ -151,6 +305,6 @@ export function glmProviderRuntime(): {
     meterUsage: p.meterUsage.bind(p),
     checkHealth: p.checkHealth.bind(p),
     validateDataPolicy: p.validateDataPolicy.bind(p),
-    resolve: (req: ProviderRequest) => p.resolve(req),
+    resolve: (req: ProviderRequest, context?: ProviderDispatchContext) => p.resolve(req, context),
   };
 }

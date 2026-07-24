@@ -33,7 +33,9 @@ export interface ParsedResponse {
 }
 
 export type ProviderTool = Pick<ContractToolSpec, 'name'> &
-  Partial<Omit<ContractToolSpec, 'name'>>;
+  Partial<Omit<ContractToolSpec, 'name'>> & {
+    readonly input_schema?: Readonly<Record<string, unknown>>;
+  };
 
 export interface ProviderRequest {
   readonly messages: readonly Message[];

@@ -141,8 +141,19 @@ export function createScriptedGateway(options: ScriptedGatewayOptions | readonly
   const usageMeter: UsageMeterPort = {
     async record() {},
   };
+  const clock = {
+    now: () => Date.now(),
+    sleep: (milliseconds: number, signal: AbortSignal) =>
+      new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, milliseconds);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('cancelled'));
+        }, { once: true });
+      }),
+  };
 
-  const gateway = new ModelGateway(registry, { secretsBroker, egressPolicy, usageMeter });
+  const gateway = new ModelGateway(registry, { secretsBroker, egressPolicy, usageMeter, clock });
 
   const selectionRequest: ProviderSelectionRequest = {
     registry_snapshot_hash: registry.snapshot.hash,

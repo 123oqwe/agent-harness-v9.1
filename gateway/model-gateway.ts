@@ -9,6 +9,7 @@ import type {
   ProviderError,
   ProviderRequest,
   ScriptedTestProvider,
+  StreamEvent,
   Usage,
 } from './scripted-provider.js';
 
@@ -20,7 +21,6 @@ type ScriptedRuntimeMethods = Pick<
   | 'normalizeRequest'
   | 'normalizeToolCall'
   | 'parseResponse'
-  | 'streamEvents'
   | 'validateDataPolicy'
 >;
 
@@ -47,6 +47,10 @@ export type GatewayProviderRuntime = ScriptedRuntimeMethods & {
     request: Parameters<ScriptedTestProvider['resolve']>[0],
     context?: ProviderDispatchContext,
   ) => MaybePromise<ReturnType<ScriptedTestProvider['resolve']>>;
+  streamEvents: (
+    request: ProviderRequest,
+    context?: ProviderDispatchContext,
+  ) => AsyncIterable<StreamEvent>;
 };
 
 export interface ProviderDataPolicyMetadata {
@@ -160,8 +164,14 @@ export interface UsageMeterPort {
   record(input: {
     readonly provider_id: string;
     readonly operation_id: string;
+    readonly attempt_id?: string;
     readonly usage: Usage;
   }): Promise<void>;
+}
+
+export interface GatewayClockPort {
+  now(): number;
+  sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
 }
 
 export interface GatewayDispatchResult {
@@ -744,6 +754,7 @@ export class ModelGateway {
     readonly secretsBroker: SecretsBrokerPort;
     readonly egressPolicy: EgressPolicyPort;
     readonly usageMeter: UsageMeterPort;
+    readonly clock: GatewayClockPort;
   };
 
   constructor(
@@ -752,6 +763,7 @@ export class ModelGateway {
       readonly secretsBroker: SecretsBrokerPort;
       readonly egressPolicy: EgressPolicyPort;
       readonly usageMeter: UsageMeterPort;
+      readonly clock: GatewayClockPort;
     },
   ) {
     if (!(registry instanceof FrozenProviderRegistry)) {
@@ -764,6 +776,8 @@ export class ModelGateway {
       ['secretsBroker.exchangeCredential', ports.secretsBroker?.exchangeCredential],
       ['egressPolicy.authorize', ports.egressPolicy?.authorize],
       ['usageMeter.record', ports.usageMeter?.record],
+      ['clock.now', ports.clock?.now],
+      ['clock.sleep', ports.clock?.sleep],
     ] as const) {
       if (typeof method !== 'function') {
         throw new ProviderConfigurationError(`${name} must be a function`);
@@ -776,6 +790,10 @@ export class ModelGateway {
       },
       egressPolicy: { authorize: ports.egressPolicy.authorize.bind(ports.egressPolicy) },
       usageMeter: { record: ports.usageMeter.record.bind(ports.usageMeter) },
+      clock: {
+        now: ports.clock.now.bind(ports.clock),
+        sleep: ports.clock.sleep.bind(ports.clock),
+      },
     });
     Object.freeze(this);
   }
@@ -822,11 +840,243 @@ export class ModelGateway {
     ) {
       throw new ProviderDispatchError('provider_no_longer_compatible');
     }
-    if (context.signal?.aborted) throw new ProviderDispatchError('cancelled');
-    if (context.deadline_at !== undefined && Date.now() > Date.parse(context.deadline_at)) {
-      throw new ProviderDispatchError('timeout');
-    }
     const operationId = nonEmptyString(context.operation_id, 'dispatch.operation_id');
+    const deadline =
+      context.deadline_at === undefined ? undefined : Date.parse(context.deadline_at);
+    if (deadline !== undefined && !Number.isFinite(deadline)) {
+      throw new ProviderConfigurationError('dispatch.deadline_at must be an ISO timestamp');
+    }
+    const abort = this.createDispatchAbort(context.signal, deadline);
+    const attemptedProviderIds: string[] = [];
+    let selected = resolved;
+    try {
+      for (;;) {
+        try {
+          return await this.dispatchToProvider(
+            selected,
+            request,
+            context,
+            operationId,
+            abort.signal,
+            abort.code,
+          );
+        } catch (error) {
+          if (
+            !(error instanceof ProviderDispatchError) ||
+            error.code !== 'provider_failure' ||
+            error.provider_error?.retryable !== true ||
+            error.provider_error.kind === 'auth' ||
+            error.provider_error.kind === 'invalid_request'
+          ) {
+            throw error;
+          }
+          attemptedProviderIds.push(selected.provider_id);
+          try {
+            selected = this.switchProvider(selected, request, attemptedProviderIds);
+          } catch (switchError) {
+            if (switchError instanceof ProviderResolutionError) throw error;
+            throw switchError;
+          }
+        }
+      }
+    } finally {
+      abort.cleanup();
+    }
+  }
+
+  private async dispatchToProvider(
+    resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    context: {
+      readonly attempt_id?: string;
+      readonly deadline_at?: string;
+    },
+    operationId: string,
+    signal: AbortSignal,
+    abortCode: () => 'cancelled' | 'timeout',
+  ): Promise<GatewayDispatchResult> {
+    if (signal.aborted) throw new ProviderDispatchError(abortCode());
+    const { binding, credential } = await this.prepareProvider(
+      resolved,
+      request,
+      operationId,
+    );
+
+    let response: ParsedResponse;
+    let usage: Usage;
+    const maxAttempts = 3;
+    for (let attempt = 0; ; attempt++) {
+      if (signal.aborted) throw new ProviderDispatchError(abortCode());
+      const attemptId =
+        context.attempt_id ?? `${operationId}.${binding.entry.provider_id}.${attempt + 1}`;
+      try {
+        const raw = await this.raceWithAbort(
+          Promise.resolve(binding.adapter.resolve(request.request, {
+            operation_id: operationId,
+            attempt_id: attemptId,
+            ...(credential === undefined ? {} : { credential }),
+            signal,
+            ...(context.deadline_at === undefined
+              ? {}
+              : { deadline_at: context.deadline_at }),
+          })),
+          signal,
+          abortCode,
+        );
+        response = binding.adapter.parseResponse(raw);
+        usage = binding.adapter.meterUsage(response);
+        break;
+      } catch (error) {
+        if (signal.aborted) throw new ProviderDispatchError(abortCode());
+        let mapped: ProviderError;
+        try {
+          mapped = binding.adapter.mapError(error);
+        } catch {
+          mapped = {
+            kind: 'unknown',
+            retryable: false,
+            detail: 'Provider error normalization failed',
+          };
+        }
+        if (
+          !mapped.retryable ||
+          mapped.kind === 'auth' ||
+          mapped.kind === 'invalid_request' ||
+          attempt >= maxAttempts - 1
+        ) {
+          throw new ProviderDispatchError('provider_failure', mapped);
+        }
+        const backoffMs = Math.min(100 * 2 ** attempt, 1_000);
+        await this.raceWithAbort(
+          this.ports.clock.sleep(backoffMs, signal),
+          signal,
+          abortCode,
+        );
+      }
+    }
+
+    try {
+      await this.ports.usageMeter.record({
+        provider_id: binding.entry.provider_id,
+        operation_id: operationId,
+        ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
+        usage,
+      });
+    } catch {
+      throw new ProviderDispatchError('metering_failed');
+    }
+    return deepFreeze({ provider_id: binding.entry.provider_id, response, usage });
+  }
+
+  async *stream(
+    resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    context: {
+      readonly operation_id: string;
+      readonly attempt_id?: string;
+      readonly signal?: AbortSignal;
+      readonly deadline_at?: string;
+    },
+  ): AsyncIterable<StreamEvent> {
+    if (
+      resolved.registry_snapshot_hash !== this.registry.snapshot.hash ||
+      resolved.selection_request_hash !== selectionHash(request)
+    ) {
+      throw new ProviderDispatchError('provider_no_longer_compatible');
+    }
+    const operationId = nonEmptyString(context.operation_id, 'stream.operation_id');
+    const deadline =
+      context.deadline_at === undefined ? undefined : Date.parse(context.deadline_at);
+    if (deadline !== undefined && !Number.isFinite(deadline)) {
+      throw new ProviderConfigurationError('stream.deadline_at must be an ISO timestamp');
+    }
+    const abort = this.createDispatchAbort(context.signal, deadline);
+    try {
+      const { binding, credential } = await this.prepareProvider(
+        resolved,
+        request,
+        operationId,
+      );
+      const attemptId =
+        context.attempt_id ?? `${operationId}.${binding.entry.provider_id}.1`;
+      let terminalSeen = false;
+      let usage: Usage = { input_tokens: 0, output_tokens: 0 };
+      try {
+        const events = binding.adapter.streamEvents(request.request, {
+          operation_id: operationId,
+          attempt_id: attemptId,
+          ...(credential === undefined ? {} : { credential }),
+          signal: abort.signal,
+          ...(context.deadline_at === undefined
+            ? {}
+            : { deadline_at: context.deadline_at }),
+        });
+        for await (const event of events) {
+          if (abort.signal.aborted) throw new ProviderDispatchError(abort.code());
+          if (terminalSeen) {
+            throw new ProviderDispatchError('provider_failure', {
+              kind: 'invalid_request',
+              retryable: false,
+              detail: 'Provider emitted data after terminal stream event',
+            });
+          }
+          let normalized = event;
+          if (event.type === 'tool_call') {
+            normalized = {
+              type: 'tool_call',
+              tool_call: binding.adapter.normalizeToolCall(event.tool_call),
+            };
+          } else if (event.type === 'message_stop') {
+            terminalSeen = true;
+            usage = event.usage ?? usage;
+          }
+          yield deepFreeze(structuredClone(normalized));
+        }
+      } catch (error) {
+        if (error instanceof ProviderDispatchError) throw error;
+        if (abort.signal.aborted) throw new ProviderDispatchError(abort.code());
+        let mapped: ProviderError;
+        try {
+          mapped = binding.adapter.mapError(error);
+        } catch {
+          mapped = {
+            kind: 'unknown',
+            retryable: false,
+            detail: 'Provider error normalization failed',
+          };
+        }
+        throw new ProviderDispatchError('provider_failure', mapped);
+      }
+      if (!terminalSeen) {
+        throw new ProviderDispatchError('provider_failure', {
+          kind: 'invalid_request',
+          retryable: false,
+          detail: 'Provider stream ended without terminal event',
+        });
+      }
+      try {
+        await this.ports.usageMeter.record({
+          provider_id: binding.entry.provider_id,
+          operation_id: operationId,
+          ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
+          usage,
+        });
+      } catch {
+        throw new ProviderDispatchError('metering_failed');
+      }
+    } finally {
+      abort.cleanup();
+    }
+  }
+
+  private async prepareProvider(
+    resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    operationId: string,
+  ): Promise<{
+    binding: NormalizedBinding;
+    credential: EphemeralCredentialLease | undefined;
+  }> {
     const binding = bindingFor(this.registry, resolved.provider_id);
     if (
       binding.entry.metadata_hash !== resolved.provider_metadata_hash ||
@@ -861,62 +1111,75 @@ export class ModelGateway {
           audience: binding.entry.credentials.audience,
           operation_id: operationId,
         });
+        if (
+          typeof credential.lease_id !== 'string' ||
+          credential.lease_id.length === 0 ||
+          credential.audience !== binding.entry.credentials.audience ||
+          !Number.isFinite(Date.parse(credential.expires_at)) ||
+          Date.parse(credential.expires_at) <= this.ports.clock.now()
+        ) {
+          throw new Error('invalid credential lease');
+        }
       } catch {
         throw new ProviderDispatchError('credential_exchange_failed');
       }
     }
+    return { binding, credential };
+  }
 
-    let response: ParsedResponse;
-    let usage: Usage;
-    const maxAttempts = 3;
-    for (let attempt = 0; ; attempt++) {
-      if (context.signal?.aborted) throw new ProviderDispatchError('cancelled');
-      if (context.deadline_at !== undefined && Date.now() > Date.parse(context.deadline_at)) {
-        throw new ProviderDispatchError('timeout');
-      }
-      try {
-        const raw = await binding.adapter.resolve(request.request, {
-          operation_id: operationId,
-          ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
-          ...(credential === undefined ? {} : { credential }),
-          ...(context.signal === undefined ? {} : { signal: context.signal }),
-          ...(context.deadline_at === undefined ? {} : { deadline_at: context.deadline_at }),
-        });
-        response = binding.adapter.parseResponse(raw);
-        usage = binding.adapter.meterUsage(response);
-        break;
-      } catch (error) {
-        let mapped: ProviderError;
-        try {
-          mapped = binding.adapter.mapError(error);
-        } catch {
-          mapped = {
-            kind: 'unknown',
-            retryable: false,
-            detail: 'Provider error normalization failed',
-          };
-        }
-        if (
-          !mapped.retryable ||
-          mapped.kind === 'auth' ||
-          mapped.kind === 'invalid_request' ||
-          attempt >= maxAttempts - 1
-        ) {
-          throw new ProviderDispatchError('provider_failure', mapped);
-        }
+  private createDispatchAbort(
+    source: AbortSignal | undefined,
+    deadline: number | undefined,
+  ): {
+    signal: AbortSignal;
+    code: () => 'cancelled' | 'timeout';
+    cleanup: () => void;
+  } {
+    const controller = new AbortController();
+    let timedOut = false;
+    const onAbort = () => controller.abort();
+    if (source?.aborted) controller.abort();
+    else source?.addEventListener('abort', onAbort, { once: true });
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (deadline !== undefined) {
+      const remaining = deadline - this.ports.clock.now();
+      if (remaining <= 0) {
+        timedOut = true;
+        controller.abort();
+      } else {
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, remaining);
       }
     }
+    return {
+      signal: controller.signal,
+      code: () => (timedOut ? 'timeout' : 'cancelled'),
+      cleanup: () => {
+        if (timer !== undefined) clearTimeout(timer);
+        source?.removeEventListener('abort', onAbort);
+      },
+    };
+  }
 
+  private async raceWithAbort<T>(
+    operation: Promise<T>,
+    signal: AbortSignal,
+    abortCode: () => 'cancelled' | 'timeout',
+  ): Promise<T> {
+    if (signal.aborted) throw new ProviderDispatchError(abortCode());
+    let listener: (() => void) | undefined;
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      listener = () => reject(new ProviderDispatchError(abortCode()));
+      signal.addEventListener('abort', listener, { once: true });
+    });
     try {
-      await this.ports.usageMeter.record({
-        provider_id: binding.entry.provider_id,
-        operation_id: operationId,
-        usage,
-      });
-    } catch {
-      throw new ProviderDispatchError('metering_failed');
+      return await Promise.race([operation, cancelled]);
+    } finally {
+      if (listener) signal.removeEventListener('abort', listener);
     }
-    return deepFreeze({ provider_id: binding.entry.provider_id, response, usage });
   }
 
   private resolveExcluding(

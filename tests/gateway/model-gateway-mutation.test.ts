@@ -6,18 +6,20 @@ import {
   ProviderResolutionError,
   ProviderDispatchError,
   type GatewayProviderRegistration,
+  type GatewayProviderRuntime,
   type ProviderSelectionRequest,
   type EgressPolicyPort,
   type SecretsBrokerPort,
   type UsageMeterPort,
 } from '../../gateway/model-gateway.js';
 import {
+  ProviderHttpError,
   ScriptedTestProvider,
   scriptedProviderContract,
   type ParsedResponse,
 } from '../../gateway/scripted-provider.js';
 
-function makeRuntime(response?: ParsedResponse) {
+function makeRuntime(response?: ParsedResponse): GatewayProviderRuntime {
   const provider = new ScriptedTestProvider({
     queue: [response ?? { content: 'ok', model: 's', stop_reason: 'stop', usage: { input_tokens: 1, output_tokens: 1 } }],
   });
@@ -56,11 +58,15 @@ function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {
 }
 
 function makePorts() {
-  const credentialLease = Object.freeze({ lease_id: 'lease-1', audience: 'provider', expires_at: '2030-01-01T00:00:00.000Z' });
+  const credentialLease = Object.freeze({ lease_id: 'lease-1', audience: 'test-audience', expires_at: '2030-01-01T00:00:00.000Z' });
   const secretsBroker: SecretsBrokerPort = { exchangeCredential: vi.fn(async () => credentialLease) };
   const egressPolicy: EgressPolicyPort = { authorize: vi.fn(async () => ({ allowed: true })) };
   const usageMeter: UsageMeterPort = { record: vi.fn(async () => undefined) };
-  return { secretsBroker, egressPolicy, usageMeter };
+  const clock = {
+    now: vi.fn(() => Date.now()),
+    sleep: vi.fn(async () => undefined),
+  };
+  return { secretsBroker, egressPolicy, usageMeter, clock };
 }
 
 function makeGateway(reg?: GatewayProviderRegistration[], ports?: ReturnType<typeof makePorts>) {
@@ -85,6 +91,153 @@ function makeSelection(snapshotHash: string, overrides: Partial<ProviderSelectio
 }
 
 describe('ModelGateway mutation-killing edge cases', () => {
+  it('cancels an in-flight provider even when the adapter ignores AbortSignal', async () => {
+    const runtime = makeRuntime();
+    runtime.resolve = vi.fn(
+      () =>
+        new Promise<ParsedResponse>((resolve) =>
+          setTimeout(() => resolve({ content: 'late' }), 100),
+        ),
+    );
+    const { gateway } = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(gateway['registry'].snapshot.hash);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 10);
+
+    await expect(
+      gateway.dispatch(gateway.resolve(selection), selection, {
+        operation_id: 'cancel-in-flight',
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ code: 'cancelled' });
+  });
+
+  it('enforces an absolute deadline while a provider call is in flight', async () => {
+    const runtime = makeRuntime();
+    runtime.resolve = vi.fn(
+      () =>
+        new Promise<ParsedResponse>((resolve) =>
+          setTimeout(() => resolve({ content: 'late' }), 100),
+        ),
+    );
+    const { gateway } = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(gateway['registry'].snapshot.hash);
+
+    await expect(
+      gateway.dispatch(gateway.resolve(selection), selection, {
+        operation_id: 'deadline-in-flight',
+        deadline_at: new Date(Date.now() + 10).toISOString(),
+      }),
+    ).rejects.toMatchObject({ code: 'timeout' });
+  });
+
+  it('uses bounded backoff for retryable failures and not for auth failures', async () => {
+    const retryable = makeRuntime();
+    retryable.resolve = vi
+      .fn()
+      .mockRejectedValueOnce(new ProviderHttpError(503))
+      .mockRejectedValueOnce(new ProviderHttpError(503))
+      .mockResolvedValue({ content: 'ok', stop_reason: 'stop' });
+    const retryPorts = makePorts();
+    const retryGateway = makeGateway([makeReg({}, retryable)], retryPorts).gateway;
+    const retrySelection = makeSelection(retryGateway['registry'].snapshot.hash);
+
+    await retryGateway.dispatch(retryGateway.resolve(retrySelection), retrySelection, {
+      operation_id: 'retryable',
+    });
+    expect(retryable.resolve).toHaveBeenCalledTimes(3);
+    expect(retryPorts.clock.sleep).toHaveBeenNthCalledWith(1, 100, expect.any(AbortSignal));
+    expect(retryPorts.clock.sleep).toHaveBeenNthCalledWith(2, 200, expect.any(AbortSignal));
+
+    const auth = makeRuntime();
+    auth.resolve = vi.fn().mockRejectedValue(new ProviderHttpError(401));
+    const authPorts = makePorts();
+    const authGateway = makeGateway([makeReg({}, auth)], authPorts).gateway;
+    const authSelection = makeSelection(authGateway['registry'].snapshot.hash);
+    await expect(
+      authGateway.dispatch(authGateway.resolve(authSelection), authSelection, {
+        operation_id: 'auth',
+      }),
+    ).rejects.toMatchObject({ code: 'provider_failure' });
+    expect(auth.resolve).toHaveBeenCalledTimes(1);
+    expect(authPorts.clock.sleep).not.toHaveBeenCalled();
+  });
+
+  it('falls back through switchProvider without changing frozen selection hashes', async () => {
+    const failing = makeRuntime();
+    failing.resolve = vi.fn().mockRejectedValue(new ProviderHttpError(503));
+    const working = makeRuntime({
+      content: 'fallback',
+      model: 's',
+      stop_reason: 'stop',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const cheap = makeReg(
+      { pricing: { currency: 'USD', input_per_million: 0, output_per_million: 0 } },
+      failing,
+    );
+    cheap.provider_id = 'cheap-failing';
+    const backup = makeReg(
+      { pricing: { currency: 'USD', input_per_million: 10, output_per_million: 10 } },
+      working,
+    );
+    backup.provider_id = 'backup';
+    const { gateway } = makeGateway([cheap, backup]);
+    const selection = makeSelection(gateway['registry'].snapshot.hash);
+    const resolved = gateway.resolve(selection);
+
+    const result = await gateway.dispatch(resolved, selection, {
+      operation_id: 'fallback',
+    });
+    expect(result.provider_id).toBe('backup');
+    expect(result.response.content).toBe('fallback');
+    expect(resolved.registry_snapshot_hash).toBe(gateway.registrySnapshotHash);
+  });
+
+  it('normalizes complete and stream paths to equivalent content, tool calls and usage', async () => {
+    const response: ParsedResponse = {
+      content: 'use it',
+      tool_calls: [{ id: 'call-1', name: 'read_file', arguments: { path: '/workspace/a' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 7, output_tokens: 4 },
+      model: 's',
+    };
+    const completeGateway = makeGateway([makeReg({}, makeRuntime(response))]);
+    const completeSelection = makeSelection(completeGateway.gateway['registry'].snapshot.hash);
+    const complete = await completeGateway.gateway.dispatch(
+      completeGateway.gateway.resolve(completeSelection),
+      completeSelection,
+      { operation_id: 'complete' },
+    );
+
+    const streamPorts = makePorts();
+    const streamGateway = makeGateway([makeReg({}, makeRuntime(response))], streamPorts);
+    const streamSelection = makeSelection(streamGateway.gateway['registry'].snapshot.hash);
+    const events = [];
+    for await (const event of streamGateway.gateway.stream(
+      streamGateway.gateway.resolve(streamSelection),
+      streamSelection,
+      { operation_id: 'stream' },
+    )) {
+      events.push(event);
+    }
+
+    expect(events.filter((event) => event.type === 'text_delta').map((event) => event.text).join('')).toBe(
+      complete.response.content,
+    );
+    expect(events.filter((event) => event.type === 'tool_call').map((event) => event.tool_call)).toEqual(
+      complete.response.tool_calls,
+    );
+    expect(events.at(-1)).toEqual({
+      type: 'message_stop',
+      stop_reason: complete.response.stop_reason,
+      usage: complete.usage,
+    });
+    expect(streamPorts.usageMeter.record).toHaveBeenCalledWith(
+      expect.objectContaining({ operation_id: 'stream', usage: complete.usage }),
+    );
+  });
+
   it('rejects non-array registrations', () => {
     expect(() => new FrozenProviderRegistry('not-array' as unknown as GatewayProviderRegistration[])).toThrow(ProviderConfigurationError);
   });
@@ -317,6 +470,30 @@ describe('ModelGateway mutation-killing edge cases', () => {
     const sel = makeSelection(gateway['registry'].snapshot.hash);
     const resolved = gateway.resolve(sel);
     await expect(gateway.dispatch(resolved, sel, { operation_id: 'op-1' })).rejects.toThrow(ProviderDispatchError);
+  });
+
+  it('rejects expired or wrong-audience credential leases before provider execution', async () => {
+    for (const lease of [
+      { lease_id: 'expired', audience: 'test-audience', expires_at: '2000-01-01T00:00:00.000Z' },
+      { lease_id: 'wrong', audience: 'another-audience', expires_at: '2030-01-01T00:00:00.000Z' },
+    ]) {
+      const runtime = makeRuntime();
+      runtime.resolve = vi.fn(runtime.resolve);
+      const ports = makePorts();
+      ports.secretsBroker.exchangeCredential = vi.fn(async () => lease);
+      const { gateway } = makeGateway(
+        [makeReg({ credentials: { required: true, audience: 'test-audience' } }, runtime)],
+        ports,
+      );
+      const selection = makeSelection(gateway['registry'].snapshot.hash);
+
+      await expect(
+        gateway.dispatch(gateway.resolve(selection), selection, {
+          operation_id: `invalid-lease-${lease.lease_id}`,
+        }),
+      ).rejects.toMatchObject({ code: 'credential_exchange_failed' });
+      expect(runtime.resolve).not.toHaveBeenCalled();
+    }
   });
 
   it('dispatch rejects when selection request hash changed', async () => {

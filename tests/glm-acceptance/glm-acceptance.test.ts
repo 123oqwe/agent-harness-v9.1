@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { VirtualFilesystem, LocalBackend, OverlayBackend } from '../../vfs/virtual-filesystem.js';
-import { createGlmGateway } from '../../gateway/glm-gateway-bridge.js';
+import { createLiveGlmGateway } from './glm-test-config.js';
 import { runCodingVertical } from '../../domains/coding/ah_coding_vertical_001.js';
 import { runDocVertical } from '../../ingestion/ah_doc_vertical_001.js';
 import { runResearchVertical } from '../../research/ah_research_vertical_001.js';
@@ -31,9 +31,9 @@ const SKIP = !process.env.GLM_API_KEY;
 
 /** Cached GLM gateway — created once so GlmProvider captures the API key before
  *  any LoopEngine strips process.env during agent phase. */
-let _glmGateway: ReturnType<typeof createGlmGateway> | null = null;
-function getGlmGateway(): ReturnType<typeof createGlmGateway> {
-  if (!_glmGateway) _glmGateway = createGlmGateway();
+let _glmGateway: ReturnType<typeof createLiveGlmGateway> | null = null;
+function getGlmGateway(): ReturnType<typeof createLiveGlmGateway> {
+  if (!_glmGateway) _glmGateway = createLiveGlmGateway();
   return _glmGateway;
 }
 

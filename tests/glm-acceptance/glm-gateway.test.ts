@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createGlmGateway } from '../../gateway/glm-gateway-bridge.js';
+import { createLiveGlmGateway } from './glm-test-config.js';
 import type { ProviderSelectionRequest } from '../../gateway/model-gateway.js';
 
 const SKIP = !process.env.GLM_API_KEY;
@@ -21,7 +21,7 @@ function makeRequest(snapshotHash: string): ProviderSelectionRequest {
 
 describe.skipIf(SKIP)('GLM via ModelGateway', () => {
   it('dispatches through the full gateway chain (egress + credential + usage)', async () => {
-    const { gateway, registry, usageMeter } = createGlmGateway();
+    const { gateway, registry, usageMeter } = createLiveGlmGateway();
     const request = makeRequest(registry.snapshot.hash);
     const resolved = gateway.resolve(request);
     const result = await gateway.dispatch(resolved, request, { operation_id: 'op-glm-1' });
@@ -33,18 +33,14 @@ describe.skipIf(SKIP)('GLM via ModelGateway', () => {
   }, 120000);
 
   it('egress policy denies when GLM_ALLOW_REMOTE is not set', async () => {
-    const oldVal = process.env.GLM_ALLOW_REMOTE;
-    delete process.env.GLM_ALLOW_REMOTE;
     try {
-      const { gateway, registry } = createGlmGateway();
+      const { gateway, registry } = createLiveGlmGateway(false);
       const request = makeRequest(registry.snapshot.hash);
       // resolve may succeed, but dispatch must fail at egress check
       let resolved;
       try { resolved = gateway.resolve(request); } catch { return; }
       await expect(gateway.dispatch(resolved, request, { operation_id: 'op-glm-deny' })).rejects.toThrow();
-    } finally {
-      if (oldVal !== undefined) process.env.GLM_ALLOW_REMOTE = oldVal;
-    }
+    } finally { /* no mutable production configuration */ }
   });
 });
 
@@ -56,4 +52,3 @@ describe('GLM provider: no default model fallback', () => {
     expect(source).not.toContain('glm-4-plus');
   });
 });
-

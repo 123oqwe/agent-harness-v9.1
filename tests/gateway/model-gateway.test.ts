@@ -116,7 +116,7 @@ function makeSelection(
 function makePorts() {
   const credentialLease = Object.freeze({
     lease_id: 'lease-1',
-    audience: 'provider',
+    audience: 'provider-api',
     expires_at: '2030-01-01T00:00:00.000Z',
   });
   const secretsBroker: SecretsBrokerPort = {
@@ -128,7 +128,11 @@ function makePorts() {
   const usageMeter: UsageMeterPort = {
     record: vi.fn(async () => undefined),
   };
-  return { credentialLease, egressPolicy, secretsBroker, usageMeter };
+  const clock = {
+    now: vi.fn(() => Date.now()),
+    sleep: vi.fn(async () => undefined),
+  };
+  return { credentialLease, egressPolicy, secretsBroker, usageMeter, clock };
 }
 
 function setField(target: unknown, field: string, value: unknown): unknown {
