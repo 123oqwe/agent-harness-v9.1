@@ -34,6 +34,7 @@ const mutationAuthorityFiles = [
   'mutation/equivalent-mutants.json',
   'package.json',
   'package-lock.json',
+  'patches/@stryker-mutator+core+9.6.1.patch',
   'patches/@stryker-mutator+vitest-runner+9.6.1.patch',
   'vitest.mutation.config.ts',
   'scripts/run-mutation.mjs',

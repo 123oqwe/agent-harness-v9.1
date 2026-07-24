@@ -1,0 +1,32 @@
+diff --git a/node_modules/@stryker-mutator/core/dist/src/mutants/mutant-test-planner.js b/node_modules/@stryker-mutator/core/dist/src/mutants/mutant-test-planner.js
+index 04bcfff..1efaebe 100644
+--- a/node_modules/@stryker-mutator/core/dist/src/mutants/mutant-test-planner.js
++++ b/node_modules/@stryker-mutator/core/dist/src/mutants/mutant-test-planner.js
+@@ -145,7 +145,10 @@ export class MutantTestPlanner {
+                     mutatorName: mutant.mutatorName,
+                     replacement: mutant.replacement,
+                 },
+-                mutantActivation: testFilter ? 'runtime' : 'static',
++                // A static mutant must be active while modules load, even when the
++                // user supplied a global testFiles filter. testFiles narrows the
++                // suite; it does not make module-initializer mutations hot-swappable.
++                mutantActivation: isStatic ? 'static' : testFilter ? 'runtime' : 'static',
+                 timeout,
+                 testFilter,
+                 sandboxFileName: this.sandbox.sandboxFileFor(mutant.fileName),
+diff --git a/node_modules/@stryker-mutator/core/src/mutants/mutant-test-planner.ts b/node_modules/@stryker-mutator/core/src/mutants/mutant-test-planner.ts
+index 8ea60bc..1646d9d 100644
+--- a/node_modules/@stryker-mutator/core/src/mutants/mutant-test-planner.ts
++++ b/node_modules/@stryker-mutator/core/src/mutants/mutant-test-planner.ts
+@@ -208,7 +208,10 @@ export class MutantTestPlanner {
+           mutatorName: mutant.mutatorName,
+           replacement: mutant.replacement,
+         },
+-        mutantActivation: testFilter ? 'runtime' : 'static',
++        // A static mutant must be active while modules load, even when the
++        // user supplied a global testFiles filter. testFiles narrows the
++        // suite; it does not make module-initializer mutations hot-swappable.
++        mutantActivation: isStatic ? 'static' : testFilter ? 'runtime' : 'static',
+         timeout,
+         testFilter,
+         sandboxFileName: this.sandbox.sandboxFileFor(mutant.fileName),

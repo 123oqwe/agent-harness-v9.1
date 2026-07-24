@@ -151,6 +151,20 @@ describe('Phase 1 mutation manifest', () => {
     expect(strykerBase.concurrency).toBe(4);
   });
 
+  it('keeps static mutants static when a testFiles filter narrows the suite', () => {
+    const patch = readFileSync(
+      join(
+        harnessRoot,
+        'patches',
+        '@stryker-mutator+core+9.6.1.patch',
+      ),
+      'utf8',
+    );
+    expect(patch).toContain(
+      "mutantActivation: isStatic ? 'static' : testFilter ? 'runtime' : 'static'",
+    );
+  });
+
   it('owns every executable Phase 1 TypeScript source exactly once', () => {
     const assigned = new Map<string, string[]>();
     for (const [moduleName, module] of Object.entries(mutationModules)) {
@@ -493,6 +507,10 @@ describe('Phase 1 mutation report integrity', () => {
     writeFileSync(join(root, 'package.json'), '{}');
     writeFileSync(join(root, 'package-lock.json'), '{}');
     mkdirSync(join(root, 'patches'), { recursive: true });
+    writeFileSync(
+      join(root, 'patches', '@stryker-mutator+core+9.6.1.patch'),
+      'static-activation-patch',
+    );
     writeFileSync(
       join(root, 'patches', '@stryker-mutator+vitest-runner+9.6.1.patch'),
       'fork-patch',
