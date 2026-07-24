@@ -217,9 +217,11 @@ describe('AuthorizationService issue and verify', () => {
   it('rejects signature, claims and confirmation-key tampering before execution', async () => {
     const { service } = setup();
     const signed = await service.issue(request());
+    const tamperedSignature =
+      `${signed.signature.startsWith('A') ? 'B' : 'A'}${signed.signature.slice(1)}`;
 
     await expect(
-      service.verify({ ...signed, signature: `A${signed.signature.slice(1)}` }),
+      service.verify({ ...signed, signature: tamperedSignature }),
     ).rejects.toBeInstanceOf(CapabilityInvalidError);
     await expect(
       service.verify({
