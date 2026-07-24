@@ -142,6 +142,18 @@ export interface ToolExecutorInjectedDeps {
   pep: PolicyEnforcementPoint;
   stateStore: InMemoryCapabilityStateStore;
   now: () => string;
+  /** Execution context providing tenant_id, user_id, run_id, etc. */
+  execCtx?: {
+    tenant_id: string;
+    user_id: string;
+    run_id: string;
+    plan_id: string;
+    step_id: string;
+    attempt_id: string;
+    operation_id: string;
+    idempotency_key: string;
+    confirmation_key_thumbprint: string;
+  };
 }
 
 export class ToolExecutor {
@@ -153,21 +165,29 @@ export class ToolExecutor {
   private callCount = 0;
   private _currentTokenHash = '';
 
-  constructor(private deps: ToolExecutorDeps, injected: ToolExecutorInjectedDeps) {
-    this.authz = injected.authz;
-    this.pep = injected.pep;
-    this.stateStore = injected.stateStore;
-    this.injectedNow = injected.now;
-  }
+ constructor(private deps: ToolExecutorDeps, injected: ToolExecutorInjectedDeps) {
+   this.authz = injected.authz;
+   this.pep = injected.pep;
+   this.stateStore = injected.stateStore;
+   this.injectedNow = injected.now;
+   this.injected = injected;
+ }
+ private readonly injected: ToolExecutorInjectedDeps;
 
-  async execute<T>(toolName: string, input: unknown, fn: (deps: ToolExecutorDeps) => Promise<T>): Promise<{ result: T; receipt: ToolReceipt }> {
-    const start = Date.now();
-    this.callCount++;
-    const operationId = `op-${this.callCount}`;
-    const attemptId = `att-${this.callCount}`;
+ async execute<T>(toolName: string, input: unknown, fn: (deps: ToolExecutorDeps) => Promise<T>): Promise<{ result: T; receipt: ToolReceipt }> {
+   const start = Date.now();
+   this.callCount++;
+   const ctx = this.injected.execCtx;
+   const operationId = ctx?.operation_id ?? `op-${this.callCount}`;
+   const attemptId = ctx?.attempt_id ?? `att-${this.callCount}`;
+   const tenantId = ctx?.tenant_id ?? 'default-tenant';
+   const userId = ctx?.user_id ?? 'default-user';
+   const planId = ctx?.plan_id ?? `plan-${this.callCount}`;
+   const stepId = ctx?.step_id ?? `step-${this.callCount}`;
+   const thumbprint = ctx?.confirmation_key_thumbprint ?? 'runtime-thumbprint';
 
-    // 1. ToolSpec validation: tool must exist in frozen snapshot
-    if (!this.deps.toolRegistry.inSnapshot(toolName, this.deps.snapshot)) {
+   // 1. ToolSpec validation: tool must exist in frozen snapshot
+   if (!this.deps.toolRegistry.inSnapshot(toolName, this.deps.snapshot)) {
       throw new ToolExecutorError(`tool not in frozen snapshot: ${toolName}`);
     }
 
@@ -181,13 +201,13 @@ export class ToolExecutor {
     // 3. Build manifest and evaluate risk
     const toolSpec = this.deps.toolRegistry.get(toolName);
     const risk = extractRisk(toolSpec);
-    const manifest = buildManifest(toolName, input, policy.version, 'task-1', 'plan-1', `step-${this.callCount}`, risk);
-    const policyContext: PolicyContext = {
-      tenant_id: 'tenant-1',
-      user_id: 'user-1',
-      run_phase: 'agent',
-      trust_level: 'trusted',
-      now: new Date().toISOString(),
+   const manifest = buildManifest(toolName, input, policy.version, ctx?.run_id ?? `task-${this.callCount}`, planId, stepId, risk);
+   const policyContext: PolicyContext = {
+     tenant_id: tenantId,
+     user_id: userId,
+     run_phase: 'agent',
+     trust_level: 'trusted',
+     now: new Date().toISOString(),
     };
 
     // 4. Issue a single-use capability token
@@ -212,15 +232,15 @@ export class ToolExecutor {
         manifest_hash: manifest.manifest_hash,
         policy_decision_hash: decision.decision_hash,
         tool_effect_contract_hash: hash(risk),
-        subject_workload: 'harness-runtime',
-        tenant_id: 'tenant-1',
-        audience: 'tool-host',
-        tool_grant_hash: hash(toolName),
-        resource_grant_hash: hash(manifest.resource_ids),
-        budget_ceiling_hash: hash({ max_iterations: 3 }),
-        execution_epoch: issueTime,
-        confirmation_key_thumbprint: 'thumbprint-1',
-        not_before: issueTime,
+       subject_workload: 'harness-runtime',
+       tenant_id: tenantId,
+       audience: 'tool-host',
+       tool_grant_hash: hash(toolName),
+       resource_grant_hash: hash(manifest.resource_ids),
+       budget_ceiling_hash: hash({ max_iterations: 3 }),
+       execution_epoch: issueTime,
+       confirmation_key_thumbprint: thumbprint,
+       not_before: issueTime,
         expires_at: new Date(Date.parse(issueTime) + 300_000).toISOString(),
       });
       token = signedToken.claims;
@@ -253,9 +273,9 @@ export class ToolExecutor {
             tool_effect_contract_hash: hash(risk),
             tool_grant_hash: hash(toolName),
             resource_grant_hash: hash(manifest.resource_ids),
-            budget_ceiling_hash: hash({ max_iterations: 3 }),
-            confirmation_key_thumbprint: 'thumbprint-1',
-          },
+           budget_ceiling_hash: hash({ max_iterations: 3 }),
+           confirmation_key_thumbprint: thumbprint,
+         },
         },
         async () => {
           tokenId = token.token_id;

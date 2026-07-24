@@ -3,18 +3,32 @@
  * the unified Harness, not its own mini agent loop.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestSecurityDeps } from '../helpers/test-security.js';
+
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
+
 import { Harness, type HarnessProvider } from '../../harness.js';
+
 import { ToolRegistry } from '../../tools/tool-registry.js';
+
 import { SkillRegistry } from '../../tools/skill-registry.js';
+
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
+
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
+
 import type { SandboxProfile } from '../../runtime/sandbox.js';
+
 import type { ModelTurn } from '../../runtime/loop.js';
+
 import type { ToolSpec } from '../../../spec/types/tool-spec.js';
+
 import { runCodingVertical } from '../../domains/coding/ah_coding_vertical_001.js';
+
 
 function toolSpec(name: string): ToolSpec {
   return { name, version: '1.0.0', domains: ['coding'], implementation_status: 'implemented', input_schema_ref: 'in.json', output_schema_ref: 'out.json', effect_model: {}, risk_feature_extractor: 'ex', preconditions: [], postconditions: [], timeout_policy: {}, cancellation_policy: {}, retry_policy: {}, idempotency_policy: {}, sandbox_policy: {}, network_policy: {}, credential_requirements: [], data_egress_policy: {}, receipt_schema_ref: 'r.json', verification_adapter: 'v', maturity: 'draft' } as ToolSpec;
@@ -28,7 +42,7 @@ function makeHarness(tmp: string, provider: HarnessProvider): Harness {
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
 }
 
 describe('AH-CODING-VERTICAL-001 coding vertical (thin adapter)', () => {

@@ -193,10 +193,11 @@ function validateClaimsShape(claims: CapabilityToken): void {
     not_before: claims.not_before,
     expires_at: claims.expires_at,
   });
-  const issuedAt = strictTimestamp(claims.issued_at, 'issued_at');
-  if (issuedAt > Date.parse(claims.not_before)) {
-    throw new CapabilityInvalidError('issued_at must not be after not_before');
-  }
+ const issuedAt = strictTimestamp(claims.issued_at, 'issued_at');
+ // Allow 10s clock skew tolerance (same as #issue check)
+ if (issuedAt > Date.parse(claims.not_before) + 10_000) {
+   throw new CapabilityInvalidError('issued_at must not be after not_before');
+ }
   if (claims.use_limit !== 1) throw new CapabilityInvalidError('use_limit must be 1');
   if (
     claims.parent_delegation_proof !== undefined &&
@@ -314,12 +315,15 @@ export class AuthorizationService {
     request: CapabilityIssueRequest,
     parentDelegationProof?: string,
   ): Promise<SignedCapabilityToken> {
-    validateIssueRequest(request);
-    const issuedAt = this.#now();
-    const issuedAtValue = strictTimestamp(issuedAt, 'current time');
-    const notBefore = Date.parse(request.not_before);
-    const expiresAt = Date.parse(request.expires_at);
-    if (issuedAtValue > notBefore || issuedAtValue >= expiresAt) {
+   validateIssueRequest(request);
+   const issuedAt = this.#now();
+   const issuedAtValue = strictTimestamp(issuedAt, 'current time');
+   const notBefore = Date.parse(request.not_before);
+   const expiresAt = Date.parse(request.expires_at);
+   // Allow 10s clock skew tolerance: the caller's clock (which set not_before)
+   // may be slightly behind this service's clock. Without tolerance, any
+   // cross-component call where the two clocks differ by even 1ms fails.
+   if (issuedAtValue > notBefore + 10_000 || issuedAtValue >= expiresAt) {
       throw new CapabilityInvalidError('capability is not valid at issuance time');
     }
     if (expiresAt - issuedAtValue > this.#maxTtlMs) {
