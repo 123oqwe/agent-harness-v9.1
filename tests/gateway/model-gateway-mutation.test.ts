@@ -366,3 +366,261 @@ describe('ModelGateway mutation-killing edge cases', () => {
     expect(() => gateway.switchProvider(resolved, changedSel)).toThrow(ProviderResolutionError);
   });
 });
+
+describe('ModelGateway validation mutation kills', () => {
+  function makeRuntime() {
+    const provider = new ScriptedTestProvider({ queue: [{ content: 'ok', model: 's', stop_reason: 'stop', usage: { input_tokens: 1, output_tokens: 1 } }] });
+    return {
+      provider_type: provider.provider_type,
+      normalizeRequest: provider.normalizeRequest.bind(provider),
+      parseResponse: provider.parseResponse.bind(provider),
+      normalizeToolCall: provider.normalizeToolCall.bind(provider),
+      streamEvents: provider.streamEvents.bind(provider),
+      mapError: provider.mapError.bind(provider),
+      meterUsage: provider.meterUsage.bind(provider),
+      checkHealth: () => 'healthy' as const,
+      validateDataPolicy: provider.validateDataPolicy.bind(provider),
+      resolve: provider.resolve.bind(provider),
+    };
+  }
+
+  function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}) {
+    return {
+      provider_id: 'p1',
+      contract: scriptedProviderContract,
+      adapter: makeRuntime(),
+      metadata: {
+        capabilities: ['text_reasoning'],
+        max_context_tokens: 128000,
+        structured_output: true,
+        tool_calling: true,
+        data_policy: { execution: 'local', regions: ['us'], retention_days: 30, training_allowed: false },
+        pricing: { currency: 'USD', input_per_million: 1, output_per_million: 2 },
+        health: 'healthy',
+        network: { required: false },
+        credentials: { required: false, audience: 'none' },
+        ...overrides,
+      },
+    };
+  }
+
+  it('rejects provider_id that is empty string', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).provider_id = '';
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects provider_id that is whitespace only', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).provider_id = '   ';
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects max_context_tokens of 0', () => {
+    const reg = makeReg({ max_context_tokens: 0 });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects max_context_tokens that is negative', () => {
+    const reg = makeReg({ max_context_tokens: -1 });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects max_context_tokens that is not integer', () => {
+    const reg = makeReg({ max_context_tokens: 1.5 });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects max_context_tokens that is NaN', () => {
+    const reg = makeReg({ max_context_tokens: NaN });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects max_context_tokens that is Infinity', () => {
+    const reg = makeReg({ max_context_tokens: Infinity });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects structured_output that is not boolean', () => {
+    const reg = makeReg({ structured_output: 'true' as unknown as boolean });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects tool_calling that is not boolean', () => {
+    const reg = makeReg({ tool_calling: 1 as unknown as boolean });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects health that is not a valid enum', () => {
+    const reg = makeReg({ health: 'unknown' as unknown as string });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects capabilities that is not array', () => {
+    const reg = makeReg({ capabilities: 'text_reasoning' as unknown as string[] });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects capabilities with empty array', () => {
+    const reg = makeReg({ capabilities: [] });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects capabilities with empty string', () => {
+    const reg = makeReg({ capabilities: [''] });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects capabilities with duplicates', () => {
+    const reg = makeReg({ capabilities: ['text_reasoning', 'text_reasoning'] });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects pricing with non-USD currency', () => {
+    const reg = makeReg({ pricing: { currency: 'EUR', input_per_million: 1, output_per_million: 2 } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects pricing with negative input_per_million', () => {
+    const reg = makeReg({ pricing: { currency: 'USD', input_per_million: -1, output_per_million: 2 } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects pricing with NaN output_per_million', () => {
+    const reg = makeReg({ pricing: { currency: 'USD', input_per_million: 1, output_per_million: NaN } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.execution that is not local or remote', () => {
+    const reg = makeReg({ data_policy: { execution: 'cloud' as unknown as 'local', regions: ['us'], retention_days: 30, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.retention_days that is -1', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: ['us'], retention_days: -1, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.retention_days that is negative', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: ['us'], retention_days: -1, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.training_allowed that is not boolean', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: ['us'], retention_days: 30, training_allowed: 'no' as unknown as boolean } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.regions with empty array', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: [], retention_days: 30, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.regions with duplicates', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: ['us', 'us'], retention_days: 30, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects data_policy.regions with empty string', () => {
+    const reg = makeReg({ data_policy: { execution: 'local', regions: [''], retention_days: 30, training_allowed: false } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects network with required=true but no destination', () => {
+    const reg = makeReg({ network: { required: true } as unknown as { required: true; destination: string } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects network.destination that is not HTTPS', () => {
+    const reg = makeReg({ network: { required: true, destination: 'http://example.com' } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects network.destination with credentials in URL', () => {
+    const reg = makeReg({ network: { required: true, destination: 'https://user:pass@example.com' } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects network.destination with path (not origin)', () => {
+    const reg = makeReg({ network: { required: true, destination: 'https://example.com/path' } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects credentials.audience that is empty string', () => {
+    const reg = makeReg({ credentials: { required: false, audience: '' } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects credentials.required that is not boolean', () => {
+    const reg = makeReg({ credentials: { required: 'yes' as unknown as boolean, audience: 'test' } });
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects adapter that is null', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).adapter = null;
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects adapter that is an array', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).adapter = [];
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects adapter.provider_type mismatch with contract', () => {
+    const reg = makeReg();
+    (reg.adapter as Record<string, unknown>).provider_type = 'openai';
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects adapter missing resolve method', () => {
+    const reg = makeReg();
+    const adapter = reg.adapter as Record<string, unknown>;
+    delete adapter.resolve;
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects adapter missing normalizeRequest method', () => {
+    const reg = makeReg();
+    const adapter = reg.adapter as Record<string, unknown>;
+    delete adapter.normalizeRequest;
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects metadata that is not an object', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).metadata = null;
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects metadata with unknown field', () => {
+    const reg = makeReg();
+    (reg.metadata as Record<string, unknown>).unknown_field = true;
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects contract with unknown field', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, unknown_field: true };
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects contract.provider_type that is not in enum', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, provider_type: 'invalid' };
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects contract.normalize_request that is not true', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, normalize_request: false };
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+
+  it('rejects contract with optional field that is not boolean', () => {
+    const reg = makeReg();
+    (reg as Record<string, unknown>).contract = { ...scriptedProviderContract, rate_limiter: 'yes' };
+    expect(() => new FrozenProviderRegistry([reg])).toThrow();
+  });
+});
