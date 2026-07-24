@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Ajv from 'ajv/dist/2020.js';
-import type { ToolSpec } from '../../spec/types/tool-spec.js';
+import type { ToolSpec } from '../contracts/index.js';
 
 export class ToolRegistryError extends Error {
   constructor(message: string) { super(message); this.name = 'ToolRegistryError'; Object.setPrototypeOf(this, ToolRegistryError.prototype); }

@@ -1,5 +1,5 @@
 /** AH-WRITING-VERTICAL-001: thin adapter. Brief → draft → self-check → output. */
-import type { TaskContract } from '../../spec/types/task-contract.js';
+import type { TaskContract } from '../contracts/index.js';
 import type { Harness, HarnessOutcome } from '../harness.js';
 
 export interface WritingVerticalInput { brief: string; requirements: string[] }

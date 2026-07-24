@@ -10,8 +10,8 @@
  * or defines consent. tool_grants are proposed bindings, not grants.
  */
 import { createHash } from 'node:crypto';
-import type { TaskContract } from '../../spec/types/task-contract.js';
-import type { RunPlan } from '../../spec/types/run-plan.js';
+import type { TaskContract } from '../contracts/index.js';
+import type { RunPlan } from '../contracts/index.js';
 export type { RunPlan };
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';

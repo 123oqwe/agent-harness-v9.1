@@ -10,7 +10,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
-import type { SkillSpec } from '../../spec/types/skill-spec.js';
+import type { SkillSpec } from '../contracts/index.js';
 
 export interface SkillActivationResult {
   skill: SkillSpec;

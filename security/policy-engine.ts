@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
 import { domainToASCII } from 'node:url';
 
-import type { EffectRisk } from '../../spec/types/effect-risk.js';
+import type { EffectRisk } from '../contracts/index.js';
 
 export type DerivedRiskTier = 0 | 1 | 2 | 3 | 4 | 5;
 export type EgressPolicy = NonNullable<EffectRisk['egress_policy']>;
