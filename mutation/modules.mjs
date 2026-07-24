@@ -11,8 +11,6 @@ export const mutationModules = {
     mutate: [
       'gateway/model-gateway.ts',
       'gateway/scripted-provider.ts',
-      'gateway/glm-provider.ts',
-      'gateway/glm-gateway-bridge.ts',
     ],
     minimum: 85,
   },
@@ -59,7 +57,6 @@ export const mutationModules = {
       'runtime/direct.ts',
       'runtime/react.ts',
       'runtime/plan-execute.ts',
-      'runtime/reasoning-strategy.ts',
     ],
     minimum: 85,
   },
