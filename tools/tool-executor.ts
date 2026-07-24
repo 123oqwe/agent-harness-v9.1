@@ -27,9 +27,7 @@ import type { CapabilityToken } from '../contracts/index.js';
 import type { DurableSession } from '../session/durable-session.js';
 import type { AuthorizationService } from '../security/authorization-service.js';
 import type { CapabilityStateStore } from '../security/capability.js';
-import { hashCapabilityValue } from '../security/capability.js';
 import type { PolicyEnforcementPoint} from '../security/pep.js';
-import { type AuditEvent } from '../security/pep.js';
 import type { ConsentService } from '../security/consent.js';
 
 export interface ToolReceipt {
@@ -255,9 +253,6 @@ export class ToolExecutor {
   private readonly pep: PolicyEnforcementPoint;
   private readonly stateStore: CapabilityStateStore;
   private readonly injectedNow: () => string;
-  private readonly auditLog: AuditEvent[] = [];
-  private callCount = 0;
-  private _currentTokenHash = '';
 
  constructor(private deps: ToolExecutorDeps, injected: ToolExecutorInjectedDeps) {
    this.authz = injected.authz;
@@ -275,7 +270,6 @@ export class ToolExecutor {
   verifyResult?: (result: T) => Promise<void> | void,
  ): Promise<{ result: T; receipt: ToolReceipt }> {
    const start = Date.now();
-   this.callCount++;
   const ctx = this.injected.execCtx;
   // ExecutionContext is required — no fallback to default identity in production path
   if (!ctx) throw new ToolExecutorError('ExecutionContext is required — no default identity allowed');
@@ -303,10 +297,7 @@ export class ToolExecutor {
     }
 
     // 3. Build manifest and evaluate risk
-    const toolSpec = this.deps.toolRegistry.get(toolName);
-    if (!toolSpec) {
-      throw new ToolExecutorError(`tool not found in registry: ${toolName}`);
-    }
+    const toolSpec = this.deps.toolRegistry.loadFull(toolName, this.deps.snapshot);
     const risk = extractRisk(toolSpec);
    const issueTime = this.injectedNow();
    const budget = ctx.budget ?? { max_iterations: 3 };
@@ -429,7 +420,6 @@ export class ToolExecutor {
         expires_at: new Date(Date.parse(issueTime) + 300_000).toISOString(),
       });
       token = signedToken.claims;
-      this._currentTokenHash = hashCapabilityValue(signedToken.claims);
       if (this.injected.effectJournal) {
         this.injected.effectJournal.recordOperation({
           operation_id: operationId,
@@ -584,6 +574,4 @@ export class ToolExecutor {
 
     return { result, receipt };
   }
-
-  getAuditLog(): readonly AuditEvent[] { return this.auditLog; }
 }

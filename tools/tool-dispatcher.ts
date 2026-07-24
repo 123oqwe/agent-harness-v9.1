@@ -49,6 +49,16 @@ export type ToolImplementation = (
   input: unknown,
 ) => Promise<unknown>;
 
+export interface ToolDispatcherClock {
+  monotonicNow(): number;
+  isoNow(): string;
+}
+
+const SYSTEM_CLOCK: ToolDispatcherClock = Object.freeze({
+  monotonicNow: () => performance.now(),
+  isoNow: () => new Date().toISOString(),
+});
+
 export class ToolDispatcher {
   private readonly implementations: ReadonlyMap<string, ToolImplementation>;
   private readonly validators = new Map<
@@ -64,6 +74,7 @@ export class ToolDispatcher {
     private readonly snapshot: RegistrySnapshot,
     private readonly executor: ToolExecutor,
     implementations: ReadonlyMap<string, ToolImplementation>,
+    private readonly clock: ToolDispatcherClock = SYSTEM_CLOCK,
   ) {
     const frozen = new Map(implementations);
     for (const name of snapshot.tool_names) {
@@ -80,20 +91,14 @@ export class ToolDispatcher {
   }
 
   async dispatch<T = unknown>(req: DispatchRequest): Promise<DispatchResult<T>> {
-    const started = performance.now();
+    const started = this.clock.monotonicNow();
     // 1. Resolve tool from frozen snapshot
     if (!this.registry.inSnapshot(req.tool_name, this.snapshot)) {
       throw new ToolDispatcherError(`tool not in frozen snapshot: ${req.tool_name}`);
     }
 
-    const spec = this.registry.get(req.tool_name);
-    if (!spec) {
-      throw new ToolDispatcherError(`tool not found in registry: ${req.tool_name}`);
-    }
-    const implementation = this.implementations.get(req.tool_name);
-    if (!implementation) {
-      throw new ToolDispatcherError(`tool implementation not registered: ${req.tool_name}`);
-    }
+    const spec = this.registry.loadFull(req.tool_name, this.snapshot);
+    const implementation = this.implementations.get(req.tool_name)!;
 
     // 2. Validate model-originated, untrusted input against the packaged schema.
     if (req.input === undefined || req.input === null) {
@@ -146,7 +151,7 @@ export class ToolDispatcher {
         },
       );
 
-      return { success: true, result, receipt };
+      return Object.freeze({ success: true, result, receipt });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       return this.failure(req, error, started);
@@ -182,10 +187,10 @@ export class ToolDispatcher {
   ): DispatchResult<T> {
     const receipt = Object.freeze({
       tool_name: req.tool_name,
-      timestamp: new Date().toISOString(),
+      timestamp: this.clock.isoNow(),
       success: false,
       error,
-      duration_ms: Math.max(1, Math.ceil(performance.now() - started)),
+      duration_ms: Math.max(1, Math.ceil(this.clock.monotonicNow() - started)),
       input_hash: createHash('sha256')
         .update(JSON.stringify(req.input) ?? 'undefined')
         .digest('hex')

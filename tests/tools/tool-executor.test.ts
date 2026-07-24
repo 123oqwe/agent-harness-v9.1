@@ -309,13 +309,11 @@ describe('ToolExecutor unified pipeline', () => {
     expect(receipt.success).toBe(true);
   });
 
-  it('callCount increments after each execution', async () => {
+  it('supports multiple executions without process-local identity counters', async () => {
     writeFileSync(join(tmp, 'c1.txt'), 'a');
     writeFileSync(join(tmp, 'c2.txt'), 'b');
     await executor.execute('read_file', { path: '/workspace/c1.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/c1.txt' }));
     await executor.execute('read_file', { path: '/workspace/c2.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/c2.txt' }));
-    // If callCount didn't increment, the second execution might use the same operation_id
-    // Both should succeed
     const events = session.getEvents();
     expect(events.filter(e => e.type === 'tool_call').length).toBeGreaterThanOrEqual(2);
   });
@@ -731,12 +729,6 @@ describe('ToolExecutor unified pipeline', () => {
     writeFileSync(join(tmp, 'em_nonstr.txt'), 'data');
     const { receipt } = await exec2.execute('read_file', { path: '/workspace/em_nonstr.txt' }, async (deps) => readFile(deps.vfs, { path: '/workspace/em_nonstr.txt' }));
     expect(receipt.derived_risk_tier).toBe(1);
-  });
-
-  it('getAuditLog returns empty array when no PEP audit events recorded', async () => {
-    // The default PEP in beforeEach has audit_sink: { write: async () => {} } — no-op
-    // So auditLog should remain empty
-    expect(executor.getAuditLog()).toEqual([]);
   });
 
 });

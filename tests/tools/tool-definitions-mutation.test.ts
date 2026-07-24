@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import { createPhase1ToolDefinitions, PHASE1_TOOL_NAMES } from '../../tools/tool-definitions.js';
 
 describe('Tool Definitions mutation-killing tests', () => {
   const defs = createPhase1ToolDefinitions();
   const byName = (n: string) => defs.find(d => d.name === n)!;
+
+  it('matches the frozen Phase 1 ToolSpec catalog fingerprint', () => {
+    expect(
+      createHash('sha256').update(JSON.stringify(defs)).digest('hex'),
+    ).toBe('725c05b55bbbbb2d040fb74955191f501ed2c87358a09ffa2e9e8ac986d94f75');
+  });
 
   it('read_file has correct effect_model', () => {
     const d = byName('read_file');
