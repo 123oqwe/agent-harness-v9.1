@@ -23,4 +23,12 @@ describe('AH-TOOL-EXEC-001 execute_command', () => {
     expect(r.exit_code).toBe(1);
     expect(r.stderr.trim()).toBe('err');
   });
+  it('forwards stdin without changing its contents', async () => {
+    const r = await executeCommand(
+      { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] },
+      { argv: ['/bin/cat'], cwd: tmp, stdin: 'input payload\n' },
+    );
+    expect(r.exit_code).toBe(0);
+    expect(r.stdout).toBe('input payload\n');
+  });
 });

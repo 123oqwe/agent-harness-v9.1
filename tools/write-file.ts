@@ -5,7 +5,7 @@ export interface WriteFileInput { path: string; content: string }
 export interface WriteFileOutput { path: string; bytes: number; checkpoint: string }
 
 export async function writeFile(vfs: VirtualFilesystem, input: WriteFileInput): Promise<WriteFileOutput> {
-  const buf = Buffer.from(input.content, 'utf8');
+  const buf = Buffer.from(input.content);
   vfs.write(input.path, buf);
   return { path: input.path, bytes: buf.length, checkpoint: `write:${input.path}` };
 }

@@ -21,4 +21,10 @@ describe('AH-TOOL-SEARCH-001 search_files', () => {
     expect(r.matches.length).toBe(2);
     expect(r.truncated).toBe(true);
   });
+  it('does not report truncation when matches exactly equal max_results', async () => {
+    for (let i = 0; i < 2; i++) writeFileSync(join(tmp, `exact${i}.txt`), 'needle');
+    const r = await searchFiles(vfs, { root: '/workspace', needle: 'needle', max_results: 2 });
+    expect(r.matches).toHaveLength(2);
+    expect(r.truncated).toBe(false);
+  });
 });

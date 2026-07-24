@@ -54,7 +54,7 @@ export interface SandboxProfile {
 export interface SandboxExecOptions {
   argv: string[];              // command + args; NEVER a shell string
   cwd: string;
-  stdin?: Buffer | string;
+  stdin?: Buffer | string | undefined;
   limits?: Partial<SandboxLimits>;
   profile: SandboxProfile;
   signal?: AbortSignal;
