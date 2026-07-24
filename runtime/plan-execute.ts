@@ -216,7 +216,9 @@ export async function runPlanExecute(
     const previousState = states.get(stepId);
     if (
       previousState === 'done' ||
-      previousState === 'awaiting_verification'
+      previousState === 'awaiting_verification' ||
+      previousState === 'failed' ||
+      previousState === 'blocked'
     ) {
       continue;
     }
