@@ -48,6 +48,9 @@ function gateway() {
 describe('GlmProvider mutation-killing tests', () => {
   it('requires injected model configuration', () => {
     expect(() => new GlmProvider({ model: '' })).toThrow('model is required');
+    expect(() => new GlmProvider({ model: '   ' })).toThrow(
+      'GLM model is required',
+    );
     expect(provider().checkHealth()).toBe('healthy');
     expect(provider().provider_type).toBe('openai');
   });
@@ -63,7 +66,7 @@ describe('GlmProvider mutation-killing tests', () => {
       provider().normalizeRequest({
         messages: [{ role: 'user', content: 'hello' }],
       }),
-    ).toMatchObject({
+    ).toEqual({
       model: 'glm-5.2',
       reasoning_effort: 'xhigh',
       messages: [{ role: 'user', content: 'hello' }],
@@ -80,6 +83,17 @@ describe('GlmProvider mutation-killing tests', () => {
         max_tokens: 2048,
       }),
     ).toMatchObject({ temperature: 0.5, max_tokens: 2048 });
+    expect(
+      provider({ reasoningEffort: 'high' }).normalizeRequest({
+        messages: [],
+      }),
+    ).toEqual({
+      model: 'glm-5.2',
+      reasoning_effort: 'high',
+      messages: [],
+      temperature: 0.1,
+      max_tokens: 4096,
+    });
   });
 
   it('maps full tools and omits an empty tool list', () => {
@@ -132,6 +146,18 @@ describe('GlmProvider mutation-killing tests', () => {
       usage: { input_tokens: 5, output_tokens: 3 },
       model: 'response-model',
     });
+    expect(
+      provider().parseResponse({
+        choices: [
+          { message: { content: 'blocked' }, finish_reason: 'content_filter' },
+        ],
+      }).stop_reason,
+    ).toBe('content_filter');
+    expect(
+      provider().parseResponse({
+        choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+      }).stop_reason,
+    ).toBe('stop');
   });
 
   it('parses tool calls and default response fields', () => {
@@ -179,6 +205,24 @@ describe('GlmProvider mutation-killing tests', () => {
     expect(() =>
       provider().normalizeToolCall({ id: 'call-1' }),
     ).toThrow(GlmProviderError);
+    expect(() =>
+      provider().normalizeToolCall({
+        id: '',
+        function: { name: 'tool', arguments: '{}' },
+      }),
+    ).toThrow('tool call missing id or name');
+    expect(() =>
+      provider().normalizeToolCall({
+        id: 'call-1',
+        function: { name: '', arguments: '{}' },
+      }),
+    ).toThrow('tool call missing id or name');
+    expect(
+      provider().normalizeToolCall({
+        id: 'call-2',
+        function: { name: 'tool' },
+      }),
+    ).toEqual({ id: 'call-2', name: 'tool', arguments: {} });
   });
 
   it.each([
@@ -192,6 +236,37 @@ describe('GlmProvider mutation-killing tests', () => {
     expect(provider().mapError(error)).toMatchObject({
       kind,
       retryable,
+    });
+  });
+
+  it('maps exact provider errors including status and non-Error values', () => {
+    expect(provider().mapError(new ProviderHttpError(403))).toEqual({
+      kind: 'auth',
+      retryable: false,
+      detail: 'Provider authentication failed',
+      status: 403,
+    });
+    expect(provider().mapError(new ProviderHttpError(502))).toEqual({
+      kind: 'server',
+      retryable: true,
+      detail: 'Provider server failure',
+      status: 502,
+    });
+    expect(provider().mapError(new ProviderHttpError(418))).toEqual({
+      kind: 'invalid_request',
+      retryable: false,
+      detail: 'Provider rejected request',
+      status: 418,
+    });
+    expect(provider().mapError(new Error('specific failure'))).toEqual({
+      kind: 'unknown',
+      retryable: false,
+      detail: 'specific failure',
+    });
+    expect(provider().mapError('plain failure')).toEqual({
+      kind: 'unknown',
+      retryable: false,
+      detail: 'plain failure',
     });
   });
 
@@ -224,6 +299,32 @@ describe('GlmProvider mutation-killing tests', () => {
     expect(runtime.provider_type).toBe('openai');
     expect(typeof runtime.normalizeRequest).toBe('function');
     expect(typeof runtime.resolve).toBe('function');
+  });
+
+  it('runtime resolve preserves the bound provider instance', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [] }), { status: 200 }),
+    );
+    const runtime = glmProviderRuntime({
+      model: 'glm-bound',
+      endpoint: 'https://provider.invalid/chat',
+      fetch: fetchImpl,
+    });
+    const raw = await runtime.resolve(
+      { messages: [] },
+      {
+        operation_id: 'operation',
+        credential: {
+          lease_id: 'lease',
+          audience: 'provider',
+          expires_at: '2030-01-01T00:00:00.000Z',
+          secret: 'secret',
+        },
+      },
+    );
+
+    expect(raw).toEqual({ choices: [] });
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });
 

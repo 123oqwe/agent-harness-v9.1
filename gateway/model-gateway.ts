@@ -266,6 +266,7 @@ const PROVIDER_TYPES = [
   'local',
   'scripted_test',
 ] as const satisfies readonly ProviderType[];
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 const registryBindings = new WeakMap<
   FrozenProviderRegistry,
@@ -1172,16 +1173,19 @@ export class ModelGateway {
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (deadline !== undefined) {
-      const remaining = deadline - this.ports.clock.now();
-      if (remaining <= 0) {
-        timedOut = true;
-        controller.abort();
-      } else {
-        timer = setTimeout(() => {
+      const scheduleDeadline = () => {
+        const remaining = deadline - this.ports.clock.now();
+        if (remaining <= 0) {
           timedOut = true;
           controller.abort();
-        }, remaining);
-      }
+          return;
+        }
+        timer = setTimeout(
+          scheduleDeadline,
+          Math.min(remaining, MAX_TIMER_DELAY_MS),
+        );
+      };
+      scheduleDeadline();
     }
     return {
       signal: controller.signal,

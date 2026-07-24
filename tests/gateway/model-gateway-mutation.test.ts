@@ -811,3 +811,321 @@ describe('ModelGateway validation mutation kills', () => {
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 });
+
+describe('ModelGateway externally observable boundary contracts', () => {
+  it('accepts exact context and retention boundaries without requiring tools', () => {
+    const registration = makeReg({
+      max_context_tokens: 74,
+      tool_calling: false,
+      data_policy: {
+        execution: 'local',
+        regions: ['eu', 'us'],
+        retention_days: 90,
+        training_allowed: false,
+      },
+    });
+    const { gateway } = makeGateway([registration]);
+    const selection = makeSelection(gateway.registrySnapshotHash, {
+      estimated_input_tokens: 10,
+      request: {
+        messages: [{ role: 'user', content: 'boundary' }],
+        max_tokens: 64,
+      },
+      data_policy: {
+        local_only: false,
+        allowed_regions: ['us'],
+        max_retention_days: 90,
+        training_allowed: false,
+      },
+    });
+
+    expect(gateway.resolve(selection).provider_id).toBe('p1');
+  });
+
+  it('requires a complete SHA-256 snapshot hash', () => {
+    const { gateway } = makeGateway();
+    for (const registry_snapshot_hash of [
+      `prefix${gateway.registrySnapshotHash}`,
+      `${gateway.registrySnapshotHash}suffix`,
+      gateway.registrySnapshotHash.slice(1),
+    ]) {
+      expect(() =>
+        gateway.resolve(
+          makeSelection(registry_snapshot_hash),
+        ),
+      ).toThrow('selection.registry_snapshot_hash must be SHA-256');
+    }
+  });
+
+  it('treats an explicit empty provider allowlist as deny-all', () => {
+    const { gateway } = makeGateway();
+    const selection = makeSelection(gateway.registrySnapshotHash, {
+      policy: { allowed_provider_ids: [], denied_provider_ids: [] },
+    });
+
+    expect(() => gateway.resolve(selection)).toThrow(
+      'No provider satisfies Policy, RunPlan, context, tool and data-policy constraints',
+    );
+  });
+
+  it('describes only a provider bound to the same frozen registry metadata', () => {
+    const { gateway } = makeGateway();
+    const selection = makeSelection(gateway.registrySnapshotHash);
+    const resolved = gateway.resolve(selection);
+
+    expect(gateway.describeResolved(resolved)).toEqual({
+      provider_id: 'p1',
+      provider_type: 'scripted_test',
+      execution: 'local',
+      metadata_hash: resolved.provider_metadata_hash,
+    });
+    expect(() =>
+      gateway.describeResolved({
+        ...resolved,
+        registry_snapshot_hash: 'a'.repeat(64),
+      }),
+    ).toThrow('Resolved provider does not belong to this frozen registry');
+    expect(() =>
+      gateway.describeResolved({
+        ...resolved,
+        provider_metadata_hash: 'a'.repeat(64),
+      }),
+    ).toThrow(
+      'Resolved provider metadata does not match the frozen registry',
+    );
+  });
+
+  it('passes stable operation and attempt identity through dispatch and metering', async () => {
+    const runtime = makeRuntime();
+    runtime.resolve = vi.fn(runtime.resolve);
+    const ports = makePorts();
+    const { gateway } = makeGateway([makeReg({}, runtime)], ports);
+    const selection = makeSelection(gateway.registrySnapshotHash);
+
+    const timer = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      await gateway.dispatch(gateway.resolve(selection), selection, {
+        operation_id: 'operation-exact',
+        attempt_id: 'attempt-exact',
+        deadline_at: '2030-01-01T00:00:00.000Z',
+      });
+      expect(timer).toHaveBeenCalledWith(expect.any(Function), 2_147_483_647);
+    } finally {
+      timer.mockRestore();
+    }
+
+    expect(runtime.resolve).toHaveBeenCalledWith(
+      selection.request,
+      expect.objectContaining({
+        operation_id: 'operation-exact',
+        attempt_id: 'attempt-exact',
+        deadline_at: '2030-01-01T00:00:00.000Z',
+      }),
+    );
+    expect(ports.usageMeter.record).toHaveBeenCalledWith({
+      provider_id: 'p1',
+      operation_id: 'operation-exact',
+      attempt_id: 'attempt-exact',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+  });
+
+  it('fails closed on invalid dispatch and stream deadlines', async () => {
+    const { gateway } = makeGateway();
+    const selection = makeSelection(gateway.registrySnapshotHash);
+    const resolved = gateway.resolve(selection);
+
+    await expect(
+      gateway.dispatch(resolved, selection, {
+        operation_id: 'dispatch',
+        deadline_at: 'invalid',
+      }),
+    ).rejects.toThrow('dispatch.deadline_at must be an ISO timestamp');
+    await expect(async () => {
+      for await (const _event of gateway.stream(resolved, selection, {
+        operation_id: 'stream',
+        deadline_at: 'invalid',
+      })) {
+        // No provider event may escape an invalid deadline.
+      }
+    }).rejects.toThrow('stream.deadline_at must be an ISO timestamp');
+  });
+
+  it('distinguishes a pre-cancelled dispatch from a timed-out dispatch', async () => {
+    const runtime = makeRuntime();
+    runtime.resolve = vi.fn(runtime.resolve);
+    const { gateway } = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(gateway.registrySnapshotHash);
+    const resolved = gateway.resolve(selection);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      gateway.dispatch(resolved, selection, {
+        operation_id: 'cancelled',
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ code: 'cancelled' });
+    await expect(
+      gateway.dispatch(resolved, selection, {
+        operation_id: 'timed-out',
+        deadline_at: '1970-01-01T00:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(runtime.resolve).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stream without exactly one terminal event', async () => {
+    const runtime = makeRuntime();
+    runtime.streamEvents = async function* () {
+      yield { type: 'text_delta', text: 'partial' };
+    };
+    const { gateway } = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(gateway.registrySnapshotHash);
+
+    await expect(async () => {
+      for await (const _event of gateway.stream(
+        gateway.resolve(selection),
+        selection,
+        { operation_id: 'missing-terminal' },
+      )) {
+        // Consume partial output before terminal validation.
+      }
+    }).rejects.toMatchObject({
+      code: 'provider_failure',
+      provider_error: {
+        kind: 'invalid_request',
+        retryable: false,
+        detail: 'Provider stream ended without terminal event',
+      },
+    });
+
+    runtime.streamEvents = async function* () {
+      yield { type: 'message_stop', stop_reason: 'stop' };
+      yield { type: 'text_delta', text: 'illegal' };
+    };
+    const second = makeGateway([makeReg({}, runtime)]);
+    const secondSelection = makeSelection(second.gateway.registrySnapshotHash);
+    await expect(async () => {
+      for await (const _event of second.gateway.stream(
+        second.gateway.resolve(secondSelection),
+        secondSelection,
+        { operation_id: 'after-terminal' },
+      )) {
+        // The second event must fail closed.
+      }
+    }).rejects.toMatchObject({
+      code: 'provider_failure',
+      provider_error: {
+        kind: 'invalid_request',
+        retryable: false,
+        detail: 'Provider emitted data after terminal stream event',
+      },
+    });
+  });
+
+  it('normalizes stream adapter failures and metering failures', async () => {
+    const runtime = makeRuntime();
+    runtime.streamEvents = async function* () {
+      throw new Error('stream failed');
+    };
+    runtime.mapError = vi.fn(() => {
+      throw new Error('mapper failed');
+    });
+    const first = makeGateway([makeReg({}, runtime)]);
+    const selection = makeSelection(first.gateway.registrySnapshotHash);
+    await expect(async () => {
+      for await (const _event of first.gateway.stream(
+        first.gateway.resolve(selection),
+        selection,
+        { operation_id: 'normalize' },
+      )) {
+        // No event is expected.
+      }
+    }).rejects.toMatchObject({
+      code: 'provider_failure',
+      provider_error: {
+        kind: 'unknown',
+        retryable: false,
+        detail: 'Provider error normalization failed',
+      },
+    });
+
+    const ports = makePorts();
+    ports.usageMeter.record = vi.fn(async () => {
+      throw new Error('meter unavailable');
+    });
+    const second = makeGateway([makeReg()], ports);
+    const secondSelection = makeSelection(second.gateway.registrySnapshotHash);
+    await expect(async () => {
+      for await (const _event of second.gateway.stream(
+        second.gateway.resolve(secondSelection),
+        secondSelection,
+        { operation_id: 'meter' },
+      )) {
+        // Consume the valid stream before metering.
+      }
+    }).rejects.toMatchObject({ code: 'metering_failed' });
+  });
+
+  it('checks live provider health before egress or execution', async () => {
+    const runtime = makeRuntime();
+    runtime.checkHealth = vi.fn(async () => 'down' as const);
+    runtime.resolve = vi.fn(runtime.resolve);
+    const ports = makePorts();
+    const { gateway } = makeGateway([makeReg({}, runtime)], ports);
+    const selection = makeSelection(gateway.registrySnapshotHash);
+
+    await expect(
+      gateway.dispatch(gateway.resolve(selection), selection, {
+        operation_id: 'unhealthy',
+      }),
+    ).rejects.toMatchObject({ code: 'provider_unhealthy' });
+    expect(ports.egressPolicy.authorize).not.toHaveBeenCalled();
+    expect(runtime.resolve).not.toHaveBeenCalled();
+  });
+
+  it('rejects a credential expiring exactly now and empty lease identity', async () => {
+    const now = Date.parse('2030-01-01T00:00:00.000Z');
+    for (const lease of [
+      {
+        lease_id: '',
+        audience: 'test-audience',
+        expires_at: '2030-01-02T00:00:00.000Z',
+      },
+      {
+        lease_id: 'lease',
+        audience: 'test-audience',
+        expires_at: '2030-01-01T00:00:00.000Z',
+      },
+    ]) {
+      const runtime = makeRuntime();
+      runtime.resolve = vi.fn(runtime.resolve);
+      const ports = makePorts();
+      ports.clock.now = vi.fn(() => now);
+      ports.secretsBroker.exchangeCredential = vi.fn(async () => lease);
+      const { gateway } = makeGateway(
+        [
+          makeReg(
+            {
+              credentials: {
+                required: true,
+                audience: 'test-audience',
+              },
+            },
+            runtime,
+          ),
+        ],
+        ports,
+      );
+      const selection = makeSelection(gateway.registrySnapshotHash);
+
+      await expect(
+        gateway.dispatch(gateway.resolve(selection), selection, {
+          operation_id: 'credential-boundary',
+        }),
+      ).rejects.toMatchObject({ code: 'credential_exchange_failed' });
+      expect(runtime.resolve).not.toHaveBeenCalled();
+    }
+  });
+});
