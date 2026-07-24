@@ -133,9 +133,16 @@ export async function runPlanExecute(ctx: StrategyContext, messages: unknown[]):
     }
   }
 
-  if (!ctx.terminated) {
-    ctx.deps.session.append('system', { action: 'overlay_commit', reason: 'all steps completed' });
-    if (ctx.deps.goalSatisfied?.(ctx.turns)) ctx.terminate('goal_satisfied');
-    else ctx.terminate('completed');
-  }
+ if (!ctx.terminated) {
+   // If any step failed or was blocked, discard overlay and terminate as failure
+   if (failedSteps.size > 0) {
+     ctx.deps.session.append('system', { action: 'overlay_discard', reason: `${failedSteps.size} step(s) failed` });
+     ctx.terminate('malformed_response');
+     return;
+   }
+   // Only commit if ALL steps completed and no failures
+   ctx.deps.session.append('system', { action: 'overlay_commit', reason: 'all steps completed' });
+   if (ctx.deps.goalSatisfied?.(ctx.turns)) ctx.terminate('goal_satisfied');
+   else ctx.terminate('completed');
+ }
 }

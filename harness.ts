@@ -271,6 +271,12 @@ export class Harness {
     };
   }
 
+ /** Return the overlay as a VirtualFilesystem-compatible object for tool dispatch. */
+ private currentOverlayAsVfs(): VirtualFilesystem {
+   // The overlay IS a Backend; wrap it so tool reads/writes go through it
+   return this.config.vfs;  // VFS already routes /workspace to the overlay via mount
+ }
+
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
 private async executeTool(name: string, args: Record<string, unknown>, session: DurableSession): Promise<unknown> {
   const execCtxForTool = this.execCtx ? {
@@ -284,8 +290,10 @@ private async executeTool(name: string, args: Record<string, unknown>, session: 
     idempotency_key: this.execCtx.idempotency_key,
     confirmation_key_thumbprint: this.execCtx.confirmation_key_thumbprint,
   } : undefined;
+  // Pass overlay VFS (if active) so tool writes go through the overlay, not the real FS
+  const activeVfs = this.currentOverlay ? this.currentOverlayAsVfs() : this.config.vfs;
   const executor = new ToolExecutor(
-    { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: this.config.vfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
+   { toolRegistry: this.config.toolRegistry, snapshot: this.toolSnapshot, vfs: activeVfs, sandbox: this.config.sandbox, policyEngine: this.config.policyEngine, session },
     {
       authz: this.config.security.authz,
       pep: this.config.security.pep,

@@ -376,7 +376,7 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
       
       const result = await loop.run();
       
-      expect(result.termination_reason).toBe('completed');
+      expect(result.termination_reason).toBe('malformed_response');
     });
 
     it('cycle in workflow graph is detected', async () => {
@@ -463,7 +463,7 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
         { session: sess, modelCall: async () => ({ content: 'work', decision_summary: 'work', stop_reason: 'stop' }), goalSatisfied: () => false },
       );
       const result = await loop.run();
-      expect(result.termination_reason).toBe('completed');
+      expect(result.termination_reason).toBe('malformed_response');
     });
 
     it('blocked step skipped when dependency failed', async () => {
@@ -1340,7 +1340,7 @@ describe('AH-RUNTIME-LOOP-001 loop engine', () => {
       );
       const result = await loop.run();
       // No goalSatisfied → verification fails → completed
-      expect(result.termination_reason).toBe('completed');
+      expect(result.termination_reason).toBe('malformed_response');
     });
   });
 
