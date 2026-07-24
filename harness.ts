@@ -114,7 +114,7 @@ export interface HarnessConfig {
   sandbox: SandboxProfile;
   provider: HarnessProvider;
   security: HarnessSecurityDeps;
-  executionContext?: ExecutionContext;
+  executionContext: ExecutionContext;
   dataDir?: string;
   sessionLogPath?: string;
 }
@@ -330,7 +330,7 @@ private async executeTool(name: string, args: Record<string, unknown>, session: 
       case 'edit_file': return editFile(vfs, args as never);
       case 'list_directory': return listDirectory(vfs, args as never);
       case 'search_files': return searchFiles(vfs, args as never);
-      case 'execute_command_sandboxed': return executeCommand(this.config.sandbox, args as never);
+      case 'execute_command': return executeCommand(this.config.sandbox, args as never);
       case 'create_artifact': return createArtifact(vfs, args as never);
       case 'parse_document': return parseDocument(vfs, args as never);
       case 'ask_user': throw new Error('ask_user must be handled by the caller, not dispatched');

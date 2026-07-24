@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps } from '../helpers/test-security.js';
 
 import { Harness, type HarnessProvider } from '../../harness.js';
@@ -28,7 +29,7 @@ function makeHarness(): Harness {
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file'], allowed_resource_prefixes: ['/workspace'], rules: [] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: '/tmp', allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const provider: HarnessProvider = { async resolve() { return { content: 'Draft about Agent Harness with 14 modules', decision_summary: 'I wrote the draft' }; } };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 describe('AH-WRITING-VERTICAL-001 writing vertical (thin adapter)', () => {

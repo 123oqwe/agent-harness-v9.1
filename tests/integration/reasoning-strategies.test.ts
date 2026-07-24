@@ -4,6 +4,7 @@
  * StaticRouter, Runtime, Session, ToolExecutor, VFS and Evidence.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createDefaultExecutionContext } from '../../harness.js';
 import { createTestSecurityDeps } from '../helpers/test-security.js';
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -57,7 +58,7 @@ function makeHarness(tmp: string, extraTools: string[] = []): Harness {
   vfs.mount(new LocalBackend('/workspace', tmp));
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command_sandboxed', 'list_directory', 'search_files', 'parse_document', 'create_artifact'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([]), security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([]), security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
 }
 
 function task(goal: string, over: Partial<TaskContract> = {}): TaskContract {
@@ -140,7 +141,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider: makeProvider([
       { content: '', decision_summary: 'write', tool_calls: [{ id: '1', name: 'write_file', arguments: { path: '/workspace/x', content: 'x' } }] },
       { content: 'done', decision_summary: 'done' },
-    ]), security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+    ]), security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
     const r = await h.run(task('write a file'));
     // Router prefilter denies write_file (not in policy allowed_tools) → routing abstains
     expect(r.routing.outcome).toBe('abstain');
@@ -157,7 +158,7 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp));
     const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'allow-all', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
     const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
-    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()) });
+    const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, provider, security: createTestSecurityDeps(pe, () => new Date().toISOString()), executionContext: createDefaultExecutionContext('test-run') });
     await h.run(task('rewrite text'));
     expect(calls.length).toBe(1); // exactly one provider call
   });
