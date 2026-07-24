@@ -35,7 +35,7 @@ function makeRuntime(response?: ParsedResponse) {
   };
 }
 
-function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}, runtime?: ReturnType<typeof makeRuntime>): GatewayProviderRegistration {
+function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}, runtime?: ReturnType<typeof makeRuntime>): any {
   return {
     provider_id: 'p1',
     contract: scriptedProviderContract,
@@ -128,12 +128,12 @@ describe('ModelGateway mutation-killing edge cases', () => {
   });
 
   it('rejects non-USD currency in pricing', () => {
-    const reg = makeReg({ pricing: { currency: 'EUR' as 'USD', input_per_million: 1, output_per_million: 2 } });
+    const reg = makeReg({ pricing: { currency: 'EUR' as any as 'USD', input_per_million: 1, output_per_million: 2 } });
     expect(() => new FrozenProviderRegistry([reg])).toThrow(ProviderConfigurationError);
   });
 
   it('rejects invalid health value', () => {
-    const reg = makeReg({ health: 'invalid' as unknown as 'healthy' | 'degraded' | 'down' });
+    const reg = makeReg({ health: 'invalid' as any });
     expect(() => new FrozenProviderRegistry([reg])).toThrow(ProviderConfigurationError);
   });
 
@@ -384,11 +384,11 @@ describe('ModelGateway validation mutation kills', () => {
     };
   }
 
-  function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}) {
+  function makeReg(overrides: Partial<GatewayProviderRegistration['metadata']> = {}): any {
     return {
       provider_id: 'p1',
       contract: scriptedProviderContract,
-      adapter: makeRuntime(),
+      adapter: makeRuntime() as any,
       metadata: {
         capabilities: ['text_reasoning'],
         max_context_tokens: 128000,
@@ -452,7 +452,7 @@ describe('ModelGateway validation mutation kills', () => {
   });
 
   it('rejects health that is not a valid enum', () => {
-    const reg = makeReg({ health: 'unknown' as unknown as string });
+    const reg = makeReg({ health: 'unknown' as any });
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -477,7 +477,7 @@ describe('ModelGateway validation mutation kills', () => {
   });
 
   it('rejects pricing with non-USD currency', () => {
-    const reg = makeReg({ pricing: { currency: 'EUR', input_per_million: 1, output_per_million: 2 } });
+    const reg = makeReg({ pricing: { currency: 'EUR' as any, input_per_million: 1, output_per_million: 2 } });
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
@@ -492,7 +492,7 @@ describe('ModelGateway validation mutation kills', () => {
   });
 
   it('rejects data_policy.execution that is not local or remote', () => {
-    const reg = makeReg({ data_policy: { execution: 'cloud' as unknown as 'local', regions: ['us'], retention_days: 30, training_allowed: false } });
+    const reg = makeReg({ data_policy: { execution: 'cloud' as any, regions: ['us'], retention_days: 30, training_allowed: false } });
     expect(() => new FrozenProviderRegistry([reg])).toThrow();
   });
 
