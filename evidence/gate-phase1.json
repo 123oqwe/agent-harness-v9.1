@@ -43,7 +43,7 @@
     {
       "name": "unit_tests",
       "passed": true,
-      "detail": "exit_code=0, stdout_hash=6c18ee68b0464a40"
+      "detail": "exit_code=0, stdout_hash=400278cc2ce79918"
     },
     {
       "name": "lint",
@@ -68,10 +68,10 @@
     {
       "name": "all_requirements_verified",
       "passed": false,
-      "detail": "40 requirements not verified: ['AH-CAPABILITY-001', 'AH-CAPMAP-002', 'AH-CAPMAP-006', 'AH-CAPMAP-013', 'AH-CAPMAP-017']"
+      "detail": "39 requirements not verified: ['AH-CAPABILITY-001', 'AH-CAPMAP-002', 'AH-CAPMAP-006', 'AH-CAPMAP-013', 'AH-CAPMAP-017']"
     }
   ],
   "result": "FAIL",
-  "timestamp": "2026-07-23T04:02:07.294833",
+  "timestamp": "2026-07-24T13:33:17.452697",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }
