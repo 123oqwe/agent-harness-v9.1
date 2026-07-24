@@ -54,8 +54,12 @@ describe('Task Normalizer', () => {
   });
 
   it('throws on empty prompt', () => {
-    expect(() => norm.normalize({ prompt: '' })).toThrow();
-    expect(() => norm.normalize({ prompt: '   ' })).toThrow();
+    expect(() => norm.normalize({ prompt: '' })).toThrowError(
+      'TaskNormalizer: prompt must not be empty',
+    );
+    expect(() => norm.normalize({ prompt: '   ' })).toThrowError(
+      'TaskNormalizer: prompt must not be empty',
+    );
   });
 
   it('extracts Chinese privacy, test and priority intent', () => {
@@ -67,4 +71,111 @@ describe('Task Normalizer', () => {
     });
     expect(result.priority).toBe('urgent');
   });
+
+  it('trims the goal and emits the exact semantic default contract', () => {
+    expect(norm.normalize({ prompt: '  explain this clearly  ' })).toEqual({
+      goal: 'explain this clearly',
+      success_criteria: [
+        {
+          criterion: 'task completed as described',
+          verification_method: 'semantic',
+        },
+      ],
+      constraints: [],
+      priority: 'normal',
+    });
+  });
+
+  it.each([
+    ['12 dollar budget', '12000000'],
+    ['$12.5 usd', '12500000'],
+    ['$12.34 usd', '12340000'],
+    ['12budget', '12000000'],
+    ['123 budget', '123000000'],
+  ])('extracts exact budget syntax from %s', (prompt, value) => {
+    expect(norm.normalize({ prompt }).constraints).toContainEqual({
+      type: 'budget',
+      value,
+    });
+  });
+
+  it.each([
+    ['finish in 2 hours', '7200000'],
+    ['finish in 2hours', '7200000'],
+    ['finish in 3 minutes', '180000'],
+    ['finish in 4 seconds', '4000'],
+    ['finish in 1 hour', '3600000'],
+  ])('converts exact time units from %s', (prompt, value) => {
+    expect(norm.normalize({ prompt }).constraints).toContainEqual({
+      type: 'time',
+      value,
+    });
+  });
+
+  it.each([
+    'safe',
+    'read-only',
+    'read only',
+    'readonly',
+    'no-write',
+    'no write',
+    'nowrite',
+    'local-only',
+    'local only',
+    'localonly',
+    '只读',
+    '安全模式',
+    '禁止写入',
+  ])('maps %s to the read-only risk ceiling', (phrase) => {
+    expect(norm.normalize({ prompt: `work in ${phrase} mode` }).constraints).toContainEqual({
+      type: 'risk_ceiling',
+      value: 'read_only',
+    });
+  });
+
+  it.each([
+    'private',
+    'no-network',
+    'no network',
+    'nonetwork',
+    'offline',
+    'local',
+    '只在本地',
+    '本地运行',
+    '离线',
+    '不联网',
+    '禁止联网',
+    '隐私',
+  ])('maps %s to local-only privacy', (phrase) => {
+    expect(norm.normalize({ prompt: `process ${phrase}` }).constraints).toContainEqual({
+      type: 'privacy',
+      value: 'local_only',
+    });
+  });
+
+  it('emits exact and cumulative success criteria', () => {
+    expect(norm.normalize({ prompt: 'verify the result' }).success_criteria).toEqual([
+      { criterion: 'tests pass', verification_method: 'test' },
+    ]);
+    expect(norm.normalize({ prompt: 'produce a document' }).success_criteria).toEqual([
+      {
+        criterion: 'output artifact produced',
+        verification_method: 'deterministic',
+      },
+    ]);
+    expect(norm.normalize({ prompt: 'test the code artifact' }).success_criteria).toEqual([
+      { criterion: 'tests pass', verification_method: 'test' },
+      {
+        criterion: 'output artifact produced',
+        verification_method: 'deterministic',
+      },
+    ]);
+  });
+
+  it.each(['low priority', 'whenever', 'no rush', '低优先级', '不着急', '不急'])(
+    'derives low priority from %s',
+    (phrase) => {
+      expect(norm.normalize({ prompt: `do this ${phrase}` }).priority).toBe('low');
+    },
+  );
 });

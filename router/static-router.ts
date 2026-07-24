@@ -51,10 +51,6 @@ export interface RoutingResult {
   policy_post_route_vetoed: boolean;
 }
 
-export class RoutingAbstainedError extends Error {
-  constructor(message: string) { super(message); this.name = 'RoutingAbstainedError'; Object.setPrototypeOf(this, RoutingAbstainedError.prototype); }
-}
-
 export interface RouterDeps {
   toolRegistry: ToolRegistry;
   skillRegistry: SkillRegistry;
@@ -74,13 +70,13 @@ export function profileIntent(task: TaskContract): IntentProfile {
   const explicitFileWrite = /\b(?:write|create)\s+(?:(?:a|the)\s+)?(?:file|code|function|module)\b|写入(?:文件|代码)|新建(?:文件|模块)/u.test(goal);
   const requires_writes = explicitFileWrite || mutationVerb && (codeOrFileTarget || !pureWriting);
   const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(goal);
-  const explicit_plan = /\b(plan|step by step|multi.?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
+  const explicit_plan = /\b(plan|step by step|multi[- ]?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
   const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze|research|cite|source|reference)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析|研究|引用|来源|参考/u.test(goal);
   const requires_tools = requires_writes || requires_tests || observationTools;
   const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);
   const missing_info: string[] = [];
-  if (!task.success_criteria || task.success_criteria.length === 0) missing_info.push('success_criteria_empty');
+  if (task.success_criteria.length === 0) missing_info.push('success_criteria_empty');
   const ambiguity: 'none' | 'low' | 'high' = missing_info.length > 0 ? 'high' : (goal.length < 15 ? 'low' : 'none');
   const domains: string[] = [];
   if (/\b(code|bug|function|repo|typescript|javascript|python|build)\b|代码|缺陷|函数|仓库|构建|编译/u.test(goal)) domains.push('coding');
@@ -89,7 +85,7 @@ export function profileIntent(task: TaskContract): IntentProfile {
   if (pureWriting) domains.push('writing');
   if (/\b(plan|schedule|dependency|dag|task)\b|计划|排期|依赖|任务/u.test(goal)) domains.push('planning');
   if (domains.length === 0) domains.push('general');
-  return { goal: task.goal, domains, requires_tools, requires_writes, requires_tests, multi_step, explicit_plan, ambiguity, missing_info, success_criteria_count: task.success_criteria?.length ?? 0 };
+  return { goal: task.goal, domains, requires_tools, requires_writes, requires_tests, multi_step, explicit_plan, ambiguity, missing_info, success_criteria_count: task.success_criteria.length };
 }
 
 export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
@@ -100,7 +96,7 @@ export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
 
 /** Deterministic run_id: UUID v5-style (deterministic from task + snapshots, no Date.now()). */
 function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string, providerSnapId: string): string {
-  const hash = createHash('sha256').update(JSON.stringify(task) + toolSnapId + skillSnapId + providerSnapId).digest('hex');
+  const hash = createHash('sha256').update(JSON.stringify(canonicalize(task)) + toolSnapId + skillSnapId + providerSnapId).digest('hex');
   // Format as UUID: 8-4-4-4-12 hex chars from the hash
   return `${hash.slice(0,8)}-${hash.slice(8,12)}-${hash.slice(12,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
 }
@@ -125,7 +121,7 @@ export class StaticRouter {
     const intent = profileIntent(task);
 
     // 2. Missing required info -> ask_user
-    if (intent.ambiguity === 'high' && intent.missing_info.includes('success_criteria_empty')) {
+    if (intent.missing_info.includes('success_criteria_empty')) {
       return { outcome: 'ask_user', intent, policy_prefilter_passed: true, policy_post_route_vetoed: false, ask_user_message: 'Task success criteria are empty. Please describe what a successful outcome looks like.' };
     }
 
@@ -147,7 +143,7 @@ export class StaticRouter {
       : undefined;
 
     // 5. Search compact tool metadata; selected tools must match snapshot and Policy.
-    const proposedTools = this.proposedTools(strategy, intent, fullSkill?.required_tools as string[] | undefined);
+    const proposedTools = this.proposedTools(strategy, fullSkill?.required_tools as string[] | undefined);
     const requiredTools: string[] = [];
     for (const name of proposedTools) {
       if (!this.deps.policyEngine.snapshot.allowed_tools.includes(name)) {
@@ -160,10 +156,6 @@ export class StaticRouter {
         return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `required tool not in frozen snapshot: ${name}` };
       }
       requiredTools.push(name);
-    }
-    const prefilter = this.policyPrefilter(requiredTools);
-    if (!prefilter.passed) {
-      return { outcome: 'abstain', intent, policy_prefilter_passed: false, policy_post_route_vetoed: false, abstain_reason: `policy prefilter: ${prefilter.reason}` };
     }
 
     // 6. Resolve the actual provider from the frozen Gateway snapshot.
@@ -178,7 +170,13 @@ export class StaticRouter {
       return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `provider policy veto: ${reason}` };
     }
 
-    // 7. Build the RunPlan (deterministic, no Date.now())
+    // 7. Policy post-route veto validates the provider that was actually bound.
+    const postRouteViolation = this.policyPostRouteViolation(task, provider);
+    if (postRouteViolation !== undefined) {
+      return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `policy post-route veto: ${postRouteViolation}` };
+    }
+
+    // 8. Build the RunPlan only after every policy authority has accepted it.
     const runPlan = this.buildRunPlan(
       task,
       intent,
@@ -189,38 +187,22 @@ export class StaticRouter {
       runIdOverride,
     );
 
-    // 8. Policy post-route veto.
-    const vetoed = this.policyPostRouteVeto(task, strategy, intent);
-    if (vetoed.vetoed) {
-      return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `policy post-route veto: ${vetoed.reason}` };
-    }
-
     return { outcome: 'route', strategy, intent, run_plan: runPlan, policy_prefilter_passed: true, policy_post_route_vetoed: false };
   }
 
-  private proposedTools(strategy: ReasoningStrategy, intent: IntentProfile, skillTools?: string[]): string[] {
-    if (strategy === 'direct') return [];
-    if (skillTools && skillTools.length > 0) return [...new Set(skillTools)];
-    const tools: string[] = ['read_file'];
-    if (intent.requires_writes) tools.push('write_file', 'edit_file');
-    if (intent.requires_tests) tools.push('execute_command');
-    return [...new Set(tools)];
+  private proposedTools(strategy: ReasoningStrategy, skillTools?: string[]): string[] {
+    if (strategy === 'direct' || skillTools === undefined) return [];
+    return [...new Set(skillTools)];
   }
 
-  private policyPrefilter(requiredTools: readonly string[]): { passed: boolean; reason?: string } {
-    const policy = this.deps.policyEngine.snapshot;
-    for (const tool of requiredTools) {
-      if (!policy.allowed_tools.includes(tool)) {
-        return { passed: false, reason: `tool ${tool} not in policy allowed_tools` };
-      }
+  private policyPostRouteViolation(task: TaskContract, provider: ResolvedProviderDescription): string | undefined {
+    const localOnly = task.constraints.some(
+      (constraint) => constraint.type === 'privacy' && constraint.value === 'local_only',
+    );
+    if (localOnly && provider.execution !== 'local') {
+      return `provider ${provider.provider_id} is remote for a local_only task`;
     }
-    return { passed: true };
-  }
-
-  private policyPostRouteVeto(_task: TaskContract, _strategy: ReasoningStrategy, _intent: IntentProfile): { vetoed: boolean; reason?: string } {
-    // Phase 1: all providers are local (scripted_test), so local_only is always satisfied.
-    // Remote provider veto is a Phase 3 concern.
-    return { vetoed: false };
+    return undefined;
   }
 
   private skillFor(intent: IntentProfile): string | undefined {
@@ -364,7 +346,7 @@ export class StaticRouter {
     }];
 
     // VerificationGraph: one per success criterion
-    const verification_nodes = (task.success_criteria || []).map((c, i) => ({
+    const verification_nodes = task.success_criteria.map((c, i) => ({
       verification_id: `verify-${i}`,
       step_id_ref: workflow_nodes[workflow_nodes.length - 1]!.step_id,
       verification_type: c.verification_method === 'test' ? 'test_execution' as const
@@ -375,11 +357,10 @@ export class StaticRouter {
       acceptance_criteria_refs: [String(i)],
     }));
 
-    const plan: RunPlan = {
+    const planWithoutHash: Omit<RunPlan, 'run_plan_hash'> = {
       schema_version: 'run-plan.v1',
       run_id,
       revision: 1,
-      run_plan_hash: '', // computed below
       previous_revision_hash: null,
       task,
       experience_profile: 'default',
@@ -419,10 +400,9 @@ export class StaticRouter {
       context_strategy: { active_plan_injection: true },
     };
 
-    // Compute run_plan_hash deterministically (excluding the hash itself)
-    const { run_plan_hash: _omit, ...rest } = plan;
-    plan.run_plan_hash = canonicalHash(rest);
-
-    return plan;
+    return {
+      ...planWithoutHash,
+      run_plan_hash: canonicalHash(planWithoutHash),
+    };
   }
 }

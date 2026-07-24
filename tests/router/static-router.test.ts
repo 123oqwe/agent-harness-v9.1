@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { validateFixture } from '../helpers/schema-validator.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,6 +38,20 @@ function setupRouter(gatewayOverride?: ModelGateway) {
   const gateway =
     gatewayOverride ?? createScriptedGateway([{ content: 'unused' }]).gateway;
   return new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tsnap, skillSnapshot: ssnap, policyEngine: pe, policySnapshotRef: 'policy-v1', gateway });
+}
+
+function gatewayProxy(
+  gateway: ModelGateway,
+  overrides: Partial<Pick<ModelGateway, 'resolve' | 'describeResolved'>>,
+): ModelGateway {
+  return new Proxy(gateway, {
+    get(target, property) {
+      const override = overrides[property as keyof typeof overrides];
+      if (override !== undefined) return override;
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
@@ -780,6 +794,493 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const r = router.route(task('fix the bug'));
       const cs = (r.run_plan as unknown as { context_strategy: { active_plan_injection: boolean } }).context_strategy;
       expect(cs.active_plan_injection).toBe(true);
+    });
+  });
+
+  describe('boundary-complete routing contracts', () => {
+    it('profiles a tool-free task as an exact intent record', () => {
+      expect(profileIntent(task('explain this paragraph clearly'))).toEqual({
+        goal: 'explain this paragraph clearly',
+        domains: ['general'],
+        requires_tools: false,
+        requires_writes: false,
+        requires_tests: false,
+        multi_step: false,
+        explicit_plan: false,
+        ambiguity: 'none',
+        missing_info: [],
+        success_criteria_count: 1,
+      });
+    });
+
+    it('uses the documented fifteen-character ambiguity boundary', () => {
+      expect(profileIntent(task('abcdefghijklmn')).ambiguity).toBe('low');
+      expect(profileIntent(task('abcdefghijklmno')).ambiguity).toBe('none');
+    });
+
+    it.each([
+      'write file',
+      'write a file',
+      'write the file',
+      'create code',
+      'create a function',
+      '新建模块',
+      '写入代码',
+    ])('recognizes an explicit file mutation in %s', (goal) => {
+      const intent = profileIntent(task(goal));
+      expect(intent.requires_writes).toBe(true);
+      expect(intent.requires_tools).toBe(true);
+    });
+
+    it('does not turn pure writing into a filesystem mutation', () => {
+      expect(profileIntent(task('write an essay')).requires_writes).toBe(false);
+      expect(profileIntent(task('edit this essay')).requires_writes).toBe(false);
+    });
+
+    it('requires real plan token separators and preserves repeated whitespace', () => {
+      expect(profileIntent(task('use a multi-step workflow')).explicit_plan).toBe(true);
+      expect(profileIntent(task('use a multi step workflow')).explicit_plan).toBe(true);
+      expect(profileIntent(task('use a multistep workflow')).explicit_plan).toBe(true);
+      expect(profileIntent(task('use a multixstep approach')).explicit_plan).toBe(false);
+      expect(profileIntent(task('write    file')).requires_writes).toBe(true);
+      expect(profileIntent(task('writefile')).requires_writes).toBe(false);
+    });
+
+    it('does not infer multi-step merely from one mutation or test requirement', () => {
+      expect(profileIntent(task('modify config')).multi_step).toBe(false);
+      expect(profileIntent(task('test function')).multi_step).toBe(false);
+    });
+
+    it('profiles all applicable domains without dropping earlier matches', () => {
+      expect(
+        profileIntent(task('research sources and plan a code document update')).domains,
+      ).toEqual(['coding', 'documents', 'research', 'planning']);
+    });
+
+    it('reports missing criteria and the exact count independently', () => {
+      expect(
+        profileIntent(task('perform this operation', { success_criteria: [] })),
+      ).toMatchObject({
+        ambiguity: 'high',
+        missing_info: ['success_criteria_empty'],
+        success_criteria_count: 0,
+      });
+      expect(
+        profileIntent(
+          task('perform this operation', {
+            success_criteria: [
+              { criterion: 'one', verification_method: 'deterministic' },
+              { criterion: 'two', verification_method: 'test' },
+            ],
+          }),
+        ).success_criteria_count,
+      ).toBe(2);
+    });
+
+    it('selects plan_execute for a multi-step intent even without tools', () => {
+      expect(
+        selectStrategy({
+          goal: 'first reason then answer',
+          domains: ['general'],
+          requires_tools: false,
+          requires_writes: false,
+          requires_tests: false,
+          multi_step: true,
+          explicit_plan: false,
+          ambiguity: 'none',
+          missing_info: [],
+          success_criteria_count: 1,
+        }),
+      ).toBe('plan_execute');
+      const result = router.route(task('think first then answer carefully'));
+      expect(result.strategy).toBe('plan_execute');
+      expect(result.run_plan!.tool_grants).toEqual([]);
+      expect(result.run_plan!.skill_bindings).toEqual([]);
+    });
+
+    it('returns the exact fail-closed ask_user result', () => {
+      const result = router.route(task('do something', { success_criteria: [] }));
+      expect(result).toEqual({
+        outcome: 'ask_user',
+        intent: expect.objectContaining({
+          ambiguity: 'high',
+          missing_info: ['success_criteria_empty'],
+        }),
+        policy_prefilter_passed: true,
+        policy_post_route_vetoed: false,
+        ask_user_message:
+          'Task success criteria are empty. Please describe what a successful outcome looks like.',
+      });
+    });
+
+    it('fails closed when a selected skill is outside the frozen snapshot', () => {
+      const tools = new ToolRegistry();
+      for (const name of [
+        'read_file',
+        'write_file',
+        'edit_file',
+        'execute_command',
+      ]) {
+        tools.register(toolSpec(name));
+      }
+      const skills = new SkillRegistry();
+      const frozenEmptySkills = skills.freezeSnapshot();
+      skills.loadBaseSkills();
+      const policy = new PolicyEngine({
+        version: 'p',
+        default_decision: 'deny',
+        allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command'],
+        allowed_resource_prefixes: ['workspace://'],
+        rules: [],
+      } as Policy);
+      const result = new StaticRouter({
+        toolRegistry: tools,
+        skillRegistry: skills,
+        toolSnapshot: tools.freezeSnapshot(),
+        skillSnapshot: frozenEmptySkills,
+        policyEngine: policy,
+        policySnapshotRef: 'p',
+        gateway: createScriptedGateway([{ content: 'unused' }]).gateway,
+      }).route(task('fix the bug'));
+
+      expect(result).toMatchObject({
+        outcome: 'abstain',
+        policy_prefilter_passed: false,
+        policy_post_route_vetoed: false,
+        abstain_reason: 'required skill not in frozen snapshot: bug-fix',
+      });
+    });
+
+    it('fails closed when a selected tool is outside the frozen snapshot', () => {
+      const tools = new ToolRegistry();
+      const frozenEmptyTools = tools.freezeSnapshot();
+      for (const name of ['read_file', 'edit_file', 'execute_command']) {
+        tools.register(toolSpec(name));
+      }
+      const skills = new SkillRegistry();
+      skills.loadBaseSkills();
+      const policy = new PolicyEngine({
+        version: 'p',
+        default_decision: 'deny',
+        allowed_tools: ['read_file', 'edit_file', 'execute_command'],
+        allowed_resource_prefixes: ['workspace://'],
+        rules: [],
+      } as Policy);
+      const result = new StaticRouter({
+        toolRegistry: tools,
+        skillRegistry: skills,
+        toolSnapshot: frozenEmptyTools,
+        skillSnapshot: skills.freezeSnapshot(),
+        policyEngine: policy,
+        policySnapshotRef: 'p',
+        gateway: createScriptedGateway([{ content: 'unused' }]).gateway,
+      }).route(task('fix the bug'));
+
+      expect(result).toMatchObject({
+        outcome: 'abstain',
+        policy_prefilter_passed: false,
+        policy_post_route_vetoed: false,
+        abstain_reason: 'required tool not in frozen snapshot: read_file',
+      });
+    });
+
+    it('runs the single policy prefilter before disclosing registry state', () => {
+      const tools = new ToolRegistry();
+      for (const name of ['read_file', 'edit_file', 'execute_command']) {
+        tools.register(toolSpec(name));
+      }
+      const skills = new SkillRegistry();
+      skills.loadBaseSkills();
+      const policy = new PolicyEngine({
+        version: 'p',
+        default_decision: 'deny',
+        allowed_tools: ['read_file'],
+        allowed_resource_prefixes: ['workspace://'],
+        rules: [],
+      } as Policy);
+      const result = new StaticRouter({
+        toolRegistry: tools,
+        skillRegistry: skills,
+        toolSnapshot: tools.freezeSnapshot(),
+        skillSnapshot: skills.freezeSnapshot(),
+        policyEngine: policy,
+        policySnapshotRef: 'p',
+        gateway: createScriptedGateway([{ content: 'unused' }]).gateway,
+      }).route(task('fix the bug'));
+
+      expect(result).toMatchObject({
+        outcome: 'abstain',
+        policy_prefilter_passed: false,
+        policy_post_route_vetoed: false,
+        abstain_reason: 'policy prefilter: tool edit_file not in policy allowed_tools',
+      });
+    });
+
+    it('maps an unexpected provider resolver failure to a stable veto reason', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const resolve = vi.fn<ModelGateway['resolve']>(() => {
+        throw new Error('internal detail must not escape');
+      });
+
+      expect(
+        setupRouter(gatewayProxy(gateway, { resolve })).route(
+          task('rewrite this paragraph'),
+        ),
+      ).toMatchObject({
+        outcome: 'abstain',
+        policy_prefilter_passed: true,
+        policy_post_route_vetoed: true,
+        abstain_reason: 'provider policy veto: provider_resolution_failed',
+      });
+    });
+
+    it('post-route veto rejects a provider that violates local_only', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const describeResolved = vi.fn<ModelGateway['describeResolved']>(() => ({
+        provider_id: 'scripted',
+        provider_type: 'scripted_test',
+        execution: 'remote',
+        metadata_hash: '0'.repeat(64),
+      }));
+      const result = setupRouter(gatewayProxy(gateway, { describeResolved })).route(
+        task('rewrite this paragraph', {
+          constraints: [{ type: 'privacy', value: 'local_only' }],
+        }),
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'abstain',
+        policy_prefilter_passed: true,
+        policy_post_route_vetoed: true,
+        abstain_reason:
+          'policy post-route veto: provider scripted is remote for a local_only task',
+      });
+      expect(result.run_plan).toBeUndefined();
+    });
+
+    it('does not treat a matching value on the wrong constraint type as privacy authority', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const describeResolved = vi.fn<ModelGateway['describeResolved']>(() => ({
+        provider_id: 'scripted',
+        provider_type: 'scripted_test',
+        execution: 'remote',
+        metadata_hash: '0'.repeat(64),
+      }));
+      const result = setupRouter(gatewayProxy(gateway, { describeResolved })).route(
+        task('rewrite this paragraph', {
+          constraints: [{ type: 'risk_ceiling', value: 'local_only' }],
+        }),
+      );
+      expect(result.outcome).toBe('route');
+      expect(result.policy_post_route_vetoed).toBe(false);
+      expect(result.run_plan!.environment_bindings).toEqual([
+        { sandbox: true, network: true },
+      ]);
+    });
+
+    it('sends exact authority constraints to Gateway resolution', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const resolve = vi.fn<ModelGateway['resolve']>((request) =>
+        gateway.resolve(request),
+      );
+      const result = setupRouter(gatewayProxy(gateway, { resolve })).route(
+        task('read this document and summarize it', {
+          constraints: [
+            { type: 'privacy', value: 'local_only' },
+            { type: 'model_restriction', value: 'scripted' },
+          ],
+        }),
+      );
+
+      expect(result.outcome).toBe('route');
+      expect(resolve).toHaveBeenCalledOnce();
+      expect(resolve.mock.calls[0]![0]).toMatchObject({
+        registry_snapshot_hash: gateway.registrySnapshotHash,
+        estimated_input_tokens: 9,
+        required_capabilities: ['text_reasoning', 'tool_calling'],
+        requires_structured_output: false,
+        data_policy: {
+          local_only: true,
+          allowed_regions: ['local'],
+          max_retention_days: 0,
+          training_allowed: false,
+        },
+        policy: {
+          allowed_provider_ids: ['scripted'],
+          denied_provider_ids: [],
+        },
+        run_plan: {
+          allowed_provider_ids: ['scripted'],
+          required_capabilities: ['text_reasoning', 'tool_calling'],
+        },
+      });
+      expect(resolve.mock.calls[0]![0].request.messages).toEqual([
+        { role: 'user', content: 'read this document and summarize it' },
+      ]);
+      expect(
+        resolve.mock.calls[0]![0].request.tools?.map((tool) => tool.name),
+      ).toEqual(['parse_document', 'read_file']);
+    });
+
+    it('uses unrestricted local/remote defaults for direct reasoning', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const resolve = vi.fn<ModelGateway['resolve']>((request) =>
+        gateway.resolve(request),
+      );
+      setupRouter(gatewayProxy(gateway, { resolve })).route(
+        task('rewrite this paragraph'),
+      );
+      expect(resolve.mock.calls[0]![0]).toMatchObject({
+        estimated_input_tokens: 6,
+        required_capabilities: ['text_reasoning'],
+        requires_structured_output: false,
+        data_policy: {
+          local_only: false,
+          allowed_regions: ['local', 'cn', 'us', 'eu'],
+          max_retention_days: 365,
+          training_allowed: false,
+        },
+        policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+        run_plan: {
+          allowed_provider_ids: undefined,
+          required_capabilities: ['text_reasoning'],
+        },
+      });
+      expect(resolve.mock.calls[0]![0].request.tools).toEqual([]);
+    });
+
+    it('marks plan_execute resolution as structured output', () => {
+      const { gateway } = createScriptedGateway([{ content: 'unused' }]);
+      const resolve = vi.fn<ModelGateway['resolve']>((request) =>
+        gateway.resolve(request),
+      );
+      setupRouter(gatewayProxy(gateway, { resolve })).route(
+        task('fix the bug then run the tests'),
+      );
+      expect(resolve.mock.calls[0]![0].requires_structured_output).toBe(true);
+    });
+
+    it('honors an explicit run id without changing the remaining plan contract', () => {
+      expect(
+        router.route(
+          task('rewrite this paragraph'),
+          '11111111-1111-1111-1111-111111111111',
+        ).run_plan!.run_id,
+      ).toBe('11111111-1111-1111-1111-111111111111');
+    });
+
+    it('canonicalizes equivalent TaskContract property ordering', () => {
+      const first = task('rewrite this paragraph', {
+        constraints: [{ type: 'budget', value: '1000' }],
+      });
+      const second = {
+        constraints: [{ value: '1000', type: 'budget' }],
+        success_criteria: [
+          { verification_method: 'deterministic', criterion: 'done' },
+        ],
+        goal: 'rewrite this paragraph',
+      } as TaskContract;
+      const a = router.route(first).run_plan!;
+      const b = router.route(second).run_plan!;
+      expect(a.run_id).toBe(b.run_id);
+      expect(a.run_plan_hash).toBe(b.run_plan_hash);
+    });
+
+    it('binds every base skill to its exact tool set', () => {
+      const cases = [
+        ['fix the bug', 'bug-fix', ['read_file', 'edit_file', 'execute_command']],
+        [
+          'implement code feature',
+          'feature-implementation',
+          ['read_file', 'write_file', 'edit_file', 'execute_command'],
+        ],
+        [
+          'test the service output',
+          'test-and-verify',
+          ['read_file', 'write_file', 'execute_command'],
+        ],
+        [
+          'summarize this document',
+          'document-summary',
+          ['parse_document', 'read_file'],
+        ],
+        [
+          'research sources with citations',
+          'research-with-citations',
+          ['search_files', 'read_file', 'parse_document'],
+        ],
+        [
+          'polish this article and read it',
+          'writing-refinement',
+          ['read_file', 'write_file'],
+        ],
+        [
+          'schedule dependencies for the project plan',
+          'dependency-aware-planning',
+          ['read_file', 'search_files'],
+        ],
+        [
+          'list repository contents',
+          'repository-exploration',
+          ['list_directory', 'read_file', 'search_files'],
+        ],
+      ] as const;
+
+      for (const [goal, skillName, tools] of cases) {
+        const plan = router.route(task(goal)).run_plan!;
+        expect(plan.skill_bindings).toEqual([
+          { skill_name: skillName, version: '1.0.0' },
+        ]);
+        expect(plan.tool_grants.map((grant) => grant.tool)).toEqual(tools);
+      }
+    });
+
+    it('changes deterministic run identity when the tool snapshot changes', () => {
+      const tools = new ToolRegistry();
+      for (const name of [
+        'read_file',
+        'write_file',
+        'edit_file',
+        'execute_command',
+        'list_directory',
+        'search_files',
+        'parse_document',
+        'create_artifact',
+      ]) {
+        tools.register(toolSpec(name));
+      }
+      const skills = new SkillRegistry();
+      skills.loadBaseSkills();
+      const policy = new PolicyEngine({
+        version: 'policy-v1',
+        default_decision: 'deny',
+        allowed_tools: [
+          'read_file',
+          'write_file',
+          'edit_file',
+          'execute_command',
+          'list_directory',
+          'search_files',
+          'parse_document',
+          'create_artifact',
+        ],
+        allowed_resource_prefixes: ['workspace://'],
+        rules: [],
+      } as Policy);
+      const withExtraTool = new StaticRouter({
+        toolRegistry: tools,
+        skillRegistry: skills,
+        toolSnapshot: tools.freezeSnapshot(),
+        skillSnapshot: skills.freezeSnapshot(),
+        policyEngine: policy,
+        policySnapshotRef: 'policy-v1',
+        gateway: createScriptedGateway([{ content: 'unused' }]).gateway,
+      });
+      expect(
+        router.route(task('rewrite this paragraph')).run_plan!.run_id,
+      ).not.toBe(
+        withExtraTool.route(task('rewrite this paragraph')).run_plan!.run_id,
+      );
     });
   });
 
