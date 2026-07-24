@@ -115,7 +115,7 @@ export interface HarnessConfig {
   provider: HarnessProvider;
   security: HarnessSecurityDeps;
   executionContext: ExecutionContext;
-  dataDir?: string;
+  dataDir?: string | undefined;
   sessionLogPath?: string;
 }
 
