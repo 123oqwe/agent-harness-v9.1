@@ -358,7 +358,7 @@ export class Harness {
               this.config.toolRegistry.get(toolName)?.effect_model as
                 | { operation?: unknown }
                 | undefined
-            )?.operation ?? 'read',
+            )?.operation,
           ),
         ]),
       ),

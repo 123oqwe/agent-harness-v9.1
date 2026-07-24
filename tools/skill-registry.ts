@@ -54,7 +54,7 @@ const SKILL_SPEC_SCHEMA_PATH = findSchemaPath('skill-spec.schema.json');
 
 function loadSchema(): object {
   try {
-    return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH, 'utf8'));
+    return JSON.parse(readFileSync(SKILL_SPEC_SCHEMA_PATH).toString());
   } catch (error) {
     throw new SkillValidationError(
       `packaged SkillSpec schema unavailable: ${(error as Error).message}`,
@@ -102,43 +102,11 @@ function findBaseSkillsDir(): string {
 
 /** The 8 declarative base skills shipped with Phase 1. */
 export function baseSkills(): SkillSpec[] {
-  const mk = (
-    name: string,
-    tools: string[],
-    effects: string[],
-    risk: string,
-    _domain: string,
-    _summary: string,
-  ): SkillSpec => ({
-    name, version: '1.0.0',
-    supported_experience_profiles: ['default'],
-    input_schema_ref: `schemas/skills/${name}-input.json`,
-    output_schema_ref: `schemas/skills/${name}-output.json`,
-    required_context: [],
-    required_tools: tools,
-    allowed_effect_classes: effects,
-    workflow_template_ref: `workflows/${name}.yaml`,
-    verification_template_ref: `verifications/${name}.yaml`,
-    failure_policy: { on_failure: 'abort', max_retries: 0 },
-    risk_ceiling: risk,
-    eval_suite_ref: `evals/skills/${name}.yaml`,
-    // extra metadata carried in a side-channel via a frozen extension is not allowed
-    // by the schema; encode summary/domain in required_tools list ordering is wrong.
-    // We keep summary/domain out of SkillSpec and in a parallel catalog map instead.
-  } as SkillSpec);
-  // The 8 base skills per AC: repository exploration, bug fix, feature implementation,
-  // test and verify, research with citations, document summary, writing refinement,
-  // dependency-aware planning.
-  return [
-    mk('repository-exploration', ['list_directory', 'read_file', 'search_files'], ['read'], 'low', 'coding', 'Explore a repository structure'),
-    mk('bug-fix', ['read_file', 'edit_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Fix a bug in a repository'),
-    mk('feature-implementation', ['read_file', 'write_file', 'edit_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Implement a new feature'),
-    mk('test-and-verify', ['read_file', 'write_file', 'execute_command'], ['read', 'write', 'execute'], 'medium', 'coding', 'Write and run tests'),
-    mk('research-with-citations', ['search_files', 'read_file', 'parse_document'], ['read'], 'low', 'research', 'Research with source citations'),
-    mk('document-summary', ['parse_document', 'read_file'], ['read'], 'low', 'documents', 'Summarize a document with page references'),
-    mk('writing-refinement', ['read_file', 'write_file'], ['read', 'write'], 'low', 'writing', 'Refine writing through brief, draft, self-check'),
-    mk('dependency-aware-planning', ['read_file', 'search_files'], ['read'], 'low', 'planning', 'Build a dependency-aware plan with DAG validation'),
-  ];
+  const registry = new SkillRegistry();
+  registry.loadBaseSkills();
+  return registry
+    .listSkills()
+    .map((name) => structuredClone(registry.getSkill(name)!));
 }
 
 export class SkillRegistry {
@@ -174,17 +142,27 @@ export class SkillRegistry {
     this.snapshot = null;
   }
 
-  /** loadSkills('./skills/') reads all .yaml/.json files in directory. */
+  /** Load JSON SkillSpecs atomically. Unsupported files are ignored. */
   loadSkills(dir: string): void {
     if (!existsSync(dir)) throw new SkillValidationError(`directory not found: ${dir}`, dir);
-    for (const f of readdirSync(dir)) {
-      if (!f.endsWith('.json') && !f.endsWith('.yaml') && !f.endsWith('.yml')) continue;
+    const pending: SkillSpec[] = [];
+    const pendingNames = new Set<string>();
+    for (const f of readdirSync(dir).sort()) {
+      if (!f.endsWith('.json')) continue;
       const fp = join(dir, f);
       let spec: unknown;
-      try { spec = JSON.parse(readFileSync(fp, 'utf8')); }
+      try { spec = JSON.parse(readFileSync(fp).toString()); }
       catch (e) { throw new SkillValidationError(`failed to parse ${f}: ${(e as Error).message}`, fp); }
-      try { this.register(spec as SkillSpec, { summary: (spec as { summary?: string }).summary, tags: (spec as { tags?: string[] }).tags, domain: (spec as { domain?: string }).domain }); }
+      try { this.validate(spec); }
       catch (e) { throw new SkillValidationError(`${(e as Error).message}`, fp); }
+      if (this.skills.has(spec.name) || pendingNames.has(spec.name)) {
+        throw new SkillValidationError(`duplicate skill name: ${spec.name}`, fp);
+      }
+      pendingNames.add(spec.name);
+      pending.push(spec);
+    }
+    for (const spec of pending) {
+      this.register(spec);
     }
   }
 
@@ -214,8 +192,15 @@ export class SkillRegistry {
 
   /** reloadSkills re-reads directory and updates cache. */
   reloadSkills(dir: string): void {
-    this.skills.clear(); this.summaries.clear(); this.snapshot = null;
-    this.loadSkills(dir);
+    const replacement = new SkillRegistry();
+    replacement.loadSkills(dir);
+    this.skills.clear();
+    this.summaries.clear();
+    for (const name of replacement.listSkills()) {
+      this.skills.set(name, replacement.skills.get(name)!);
+      this.summaries.set(name, replacement.summaries.get(name)!);
+    }
+    this.snapshot = null;
   }
 
   /**
@@ -238,7 +223,7 @@ export class SkillRegistry {
         });
       }
     }
-    return results.sort((a, b) => a.name.localeCompare(b.name));
+    return cloneAndFreeze(results.sort((a, b) => a.name.localeCompare(b.name)));
   }
 
   freezeSnapshot(): SkillRegistrySnapshot {

@@ -7,7 +7,7 @@
  *
  * A skill cannot add grants. It can only suggest tools; Policy decides.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
@@ -30,6 +30,54 @@ export class SkillLoaderError extends Error {
     this.name = 'SkillLoaderError';
     Object.setPrototypeOf(this, SkillLoaderError.prototype);
   }
+}
+
+const RISK_TIERS: Readonly<Record<string, number>> = Object.freeze({
+  low: 1,
+  medium: 2,
+  high: 3,
+  critical: 4,
+  tier_1: 1,
+  tier_2: 2,
+  tier_3: 3,
+  tier_4: 4,
+});
+
+const VALID_EFFECTS = new Set([
+  'pure',
+  'read_only',
+  'idempotent_write',
+  'non_idempotent_write',
+  'irreversible',
+  'read',
+  'write',
+  'create',
+  'delete',
+  'execute',
+  'publish',
+  'communicate',
+]);
+
+function normalizedEffects(effects: readonly string[]): ReadonlySet<string> {
+  const normalized = new Set<string>();
+  for (const effect of effects) {
+    if (!VALID_EFFECTS.has(effect)) {
+      throw new SkillLoaderError(`invalid allowed_effect_class: ${effect}`);
+    }
+    if (effect === 'read_only') {
+      normalized.add('read');
+    } else if (
+      effect === 'idempotent_write' ||
+      effect === 'non_idempotent_write'
+    ) {
+      normalized.add('write');
+      normalized.add('create');
+      normalized.add('delete');
+    } else {
+      normalized.add(effect);
+    }
+  }
+  return normalized;
 }
 
 export class SkillLoader {
@@ -59,10 +107,11 @@ export class SkillLoader {
     ) {
       throw new SkillLoaderError(`${kind} path escapes packaged resource root: ${reference}`);
     }
-    if (!existsSync(assetPath)) {
+    try {
+      return readFileSync(assetPath).toString();
+    } catch {
       throw new SkillLoaderError(`${kind} asset not found: ${reference}`);
     }
-    return readFileSync(assetPath, 'utf8');
   }
 
   /** Activate a skill by name: load full spec, check tools, effects, risk. */
@@ -77,8 +126,12 @@ export class SkillLoader {
     const frozenSkill = this.registry.loadFull(skillName, this.snapshot);
 
     // Check required tools are available
-    const requiredTools = (frozenSkill.required_tools as string[]) ?? [];
-    const missingTools = requiredTools.filter((t) => !this.availableTools.includes(t));
+    const requiredTools = frozenSkill.required_tools;
+    if (!requiredTools.every((tool): tool is string => typeof tool === 'string')) {
+      throw new SkillLoaderError(`skill '${skillName}' has invalid required_tools`);
+    }
+    const availableTools = new Set(this.availableTools);
+    const missingTools = requiredTools.filter((tool) => !availableTools.has(tool));
     if (missingTools.length > 0) {
       throw new SkillLoaderError(
         `skill '${skillName}' requires tools not available: ${missingTools.join(', ')}`,
@@ -86,17 +139,13 @@ export class SkillLoader {
     }
 
     // Check risk ceiling
-    const riskCeiling = frozenSkill.risk_ceiling ?? 'tier_1';
-    const namedTiers: Readonly<Record<string, number>> = {
-      low: 1,
-      medium: 2,
-      high: 3,
-      critical: 4,
-    };
-    const parsedTier = parseInt(riskCeiling.replace('tier_', ''), 10);
-    const ceilingTier =
-      namedTiers[riskCeiling] ??
-      (Number.isSafeInteger(parsedTier) ? parsedTier : 1);
+    const riskCeiling = frozenSkill.risk_ceiling;
+    const ceilingTier = RISK_TIERS[riskCeiling];
+    if (ceilingTier === undefined) {
+      throw new SkillLoaderError(
+        `skill '${skillName}' has invalid risk ceiling: ${riskCeiling}`,
+      );
+    }
     if (ceilingTier > this.maxRiskTier) {
       throw new SkillLoaderError(
         `skill '${skillName}' risk ceiling ${riskCeiling} exceeds max tier ${this.maxRiskTier}`,
@@ -104,28 +153,28 @@ export class SkillLoader {
     }
 
     // Verify allowed effects
-    const allowedEffects = (frozenSkill.allowed_effect_classes as string[]) ?? ['read_only'];
-    const validEffects = ['pure', 'read_only', 'idempotent_write', 'non_idempotent_write', 'irreversible', 'read', 'write', 'create', 'delete', 'execute', 'publish', 'communicate'];
-    for (const e of allowedEffects) {
-      if (!validEffects.includes(e)) {
-        throw new SkillLoaderError(`skill '${skillName}' has invalid allowed_effect_class: ${e}`);
-      }
+    const allowedEffects = frozenSkill.allowed_effect_classes;
+    if (!allowedEffects.every((effect): effect is string => typeof effect === 'string')) {
+      throw new SkillLoaderError(
+        `skill '${skillName}' has invalid allowed_effect_classes`,
+      );
     }
-    const normalizedAllowedEffects = new Set(
-      allowedEffects.flatMap((effect) => {
-        if (effect === 'read_only') return ['read'];
-        if (
-          effect === 'idempotent_write' ||
-          effect === 'non_idempotent_write'
-        ) {
-          return ['write', 'create', 'delete'];
-        }
-        return [effect];
-      }),
-    );
+    let normalizedAllowedEffects: ReadonlySet<string>;
+    try {
+      normalizedAllowedEffects = normalizedEffects(allowedEffects);
+    } catch (error) {
+      throw new SkillLoaderError(
+        `skill '${skillName}' ${(error as Error).message}`,
+      );
+    }
     for (const tool of requiredTools) {
       const effect = this.availableToolEffects[tool];
-      if (effect && !normalizedAllowedEffects.has(effect)) {
+      if (effect === undefined) {
+        throw new SkillLoaderError(
+          `skill '${skillName}' cannot verify effect for required tool: ${tool}`,
+        );
+      }
+      if (!normalizedAllowedEffects.has(effect)) {
         throw new SkillLoaderError(
           `skill '${skillName}' cannot activate ${tool}: effect ${effect} exceeds allowed effects`,
         );
