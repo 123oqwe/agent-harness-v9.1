@@ -12,8 +12,14 @@
  * via AbortSignal. Shell injection blocked by argv (no shell) for the wrapped
  * command. Path traversal/symlink escape blocked by VFS before reaching here.
  */
-import { spawn, execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, execFileSync, execSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, isAbsolute, relative } from 'node:path';
 
@@ -41,6 +47,8 @@ export interface SandboxProfile {
   allowUnixSockets: boolean;   // default false
   allowRead: string[];         // extra readable paths
   egressAllowlist?: EgressAllowRule[];
+  /** Explicit non-secret variables exposed to the child. Host env is not inherited. */
+  environment?: Readonly<Record<string, string>>;
 }
 
 export interface SandboxExecOptions {
@@ -61,6 +69,7 @@ export interface SandboxResult {
   truncated: boolean;
   mechanism: SandboxMechanism;
   durationMs: number;
+  limitExceeded?: 'memory' | 'process' | 'output';
 }
 
 export class SandboxError extends Error {
@@ -83,9 +92,92 @@ export function detectMechanism(): SandboxMechanism {
 
 /** Validate that a requested cwd is inside the workspace root (anti-traversal). */
 export function assertWithinWorkspace(path: string, root: string): void {
-  const abs = isAbsolute(path) ? path : resolve(path);
-  const rel = relative(resolve(root), abs);
+  const rootAbsolute = resolve(root);
+  const rootCanonical = existsSync(rootAbsolute)
+    ? realpathSync(rootAbsolute)
+    : rootAbsolute;
+  const absolute = isAbsolute(path) ? resolve(path) : resolve(path);
+  const canonical = existsSync(absolute) ? realpathSync(absolute) : absolute;
+  const rel = relative(rootCanonical, canonical);
   if (rel.startsWith('..') || isAbsolute(rel)) throw new SandboxError(`cwd outside workspace root: ${path}`);
+}
+
+function validatePositiveInteger(name: string, value: number): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new SandboxError(`${name} must be a positive safe integer`);
+  }
+}
+
+function validateSandboxOptions(
+  opts: SandboxExecOptions,
+  limits: SandboxLimits,
+): SandboxExecOptions {
+  if (
+    !Array.isArray(opts.argv) ||
+    opts.argv.length === 0 ||
+    opts.argv.some(
+      (arg) =>
+        typeof arg !== 'string' ||
+        arg.length === 0 ||
+        arg.includes('\0'),
+    )
+  ) {
+    throw new SandboxError('argv must be a non-empty array of safe strings');
+  }
+  if (!isAbsolute(opts.argv[0]!)) {
+    throw new SandboxError('argv[0] must be an absolute executable path');
+  }
+  validatePositiveInteger('timeoutMs', limits.timeoutMs);
+  validatePositiveInteger('memoryMb', limits.memoryMb);
+  validatePositiveInteger('outputBytes', limits.outputBytes);
+  validatePositiveInteger('processLimit', limits.processLimit);
+  if (!existsSync(opts.profile.workspaceRoot)) {
+    throw new SandboxError('workspaceRoot does not exist');
+  }
+  const workspaceRoot = realpathSync(resolve(opts.profile.workspaceRoot));
+  assertWithinWorkspace(opts.cwd, workspaceRoot);
+  const cwd = realpathSync(resolve(opts.cwd));
+  const allowRead = opts.profile.allowRead.map((path) => {
+    if (
+      !isAbsolute(path) ||
+      /[\0\r\n]/.test(path) ||
+      !existsSync(path)
+    ) {
+      throw new SandboxError(`invalid allowRead path: ${path}`);
+    }
+    return realpathSync(path);
+  });
+  const environment: Record<string, string> = {};
+  for (const [key, value] of Object.entries(opts.profile.environment ?? {})) {
+    if (!/^[A-Z_][A-Z0-9_]*$/i.test(key) || value.includes('\0')) {
+      throw new SandboxError(`invalid environment variable: ${key}`);
+    }
+    if (/TOKEN|API_KEY|SECRET|PASSWORD|CREDENTIAL/i.test(key)) {
+      throw new SandboxError(
+        `credential-like environment variable rejected: ${key}`,
+      );
+    }
+    environment[key] = value;
+  }
+  for (const rule of opts.profile.egressAllowlist ?? []) {
+    if (
+      !/^(?:[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?|(?:\d{1,3}\.){3}\d{1,3})$/i.test(
+        rule.host,
+      )
+    ) {
+      throw new SandboxError(`invalid egress host: ${rule.host}`);
+    }
+  }
+  return {
+    ...opts,
+    cwd,
+    profile: {
+      ...opts.profile,
+      workspaceRoot,
+      allowRead,
+      environment,
+    },
+  };
 }
 
 function seatbeltProfile(p: SandboxProfile, tmpDir: string): string {
@@ -95,12 +187,21 @@ function seatbeltProfile(p: SandboxProfile, tmpDir: string): string {
   lines.push('(allow process-info* (target self))');
   lines.push('(allow signal (target self))');
   lines.push('(allow sysctl-read)');
-  // allow reads from system paths needed to run commands
-  // Deny sensitive paths explicitly (defense in depth)
+  // macOS executables access system resources through paths that are not
+  // stable API. Permit reads, then carve out user/volume/temp data; explicit
+  // workspace and allowRead rules below re-open only scoped roots.
   lines.push('(allow file-read*)');
+  lines.push('(deny file-read* (subpath "/Users"))');
+  lines.push('(deny file-read* (subpath "/Volumes"))');
+  lines.push('(deny file-read* (subpath "/private/var/folders"))');
   lines.push('(deny file-read* (subpath "/etc/ssh"))');
   lines.push('(deny file-read* (subpath "/etc/ssl/private"))');
-  lines.push('(deny file-read* (subpath "/Users"))');
+  lines.push('(deny file-read* (literal "/etc/passwd"))');
+  lines.push('(deny file-read* (literal "/etc/master.passwd"))');
+  lines.push('(deny file-read* (literal "/etc/shadow"))');
+  lines.push('(deny file-read* (literal "/private/etc/passwd"))');
+  lines.push('(deny file-read* (literal "/private/etc/master.passwd"))');
+  lines.push('(deny file-read* (literal "/private/etc/shadow"))');
   lines.push(`(allow file-read* (subpath "${ws}"))`);
   // workspace write only
   lines.push(`(allow file-write* (subpath "${ws}"))`);
@@ -172,14 +273,25 @@ function buildWrappedArgv(opts: SandboxExecOptions, mech: SandboxMechanism, prof
   if (mech === 'bubblewrap') {
     const memMb = limits?.memoryMb ?? 256;
     const args = [
-      'bwrap', '--ro-bind', '/', '/',
+      'bwrap',
+      '--unshare-all',
+      '--new-session',
+      '--proc', '/proc',
+      '--dev', '/dev',
+      '--tmpfs', '/tmp',
+      ...['/usr', '/bin', '/sbin', '/lib', '/lib64']
+        .filter(existsSync)
+        .flatMap((path) => ['--ro-bind', path, path]),
+      ...opts.profile.allowRead.flatMap((path) => ['--ro-bind', path, path]),
       '--bind', opts.profile.workspaceRoot, opts.profile.workspaceRoot,
-      '--unshare-net', '--die-with-parent',
-      '--unshare-uts', '--hostname', 'sandbox',
+      '--die-with-parent',
+      '--hostname', 'sandbox',
       '--',
       '/bin/sh', '-c',
-      'ulimit -v ' + String(memMb * 1024) + ' && exec "$@"',
+      'ulimit -v "$1" && ulimit -u "$2" && shift 2 && exec "$@"',
       '--',
+      String(memMb * 1024),
+      String(limits?.processLimit ?? 32),
       ...opts.argv,
     ];
     return args;
@@ -191,7 +303,11 @@ function buildWrappedArgv(opts: SandboxExecOptions, mech: SandboxMechanism, prof
 /** Execute a command inside the OS sandbox with hard limits. */
 export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> {
   const limits = { ...DEFAULT_LIMITS, ...opts.limits };
-  assertWithinWorkspace(opts.cwd, opts.profile.workspaceRoot);
+  try {
+    opts = validateSandboxOptions(opts, limits);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   const mech = detectMechanism();
 
   // Fail-closed: if no OS containment is available, refuse to execute.
@@ -219,15 +335,21 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
     }
 
     const argv = buildWrappedArgv(opts, mech, profileFile, limits);
-    const env = { ...process.env };
-    // strip credentials from the child env (FG2): never leak secrets into sandboxed process
-    for (const k of Object.keys(env)) if (/TOKEN|API_KEY|SECRET|PASSWORD|CREDENTIAL/i.test(k)) delete env[k];
+    const env: NodeJS.ProcessEnv = {
+      PATH: process.env.PATH ?? '/usr/bin:/bin',
+      HOME: tmpDir,
+      TMPDIR: tmpDir,
+      LANG: process.env.LANG ?? 'C.UTF-8',
+      NPM_CONFIG_CACHE: join(tmpDir, 'npm-cache'),
+      ...opts.profile.environment,
+    };
 
     const child = spawn(argv[0]!, argv.slice(1), {
       cwd: opts.cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      detached: process.platform !== 'win32',
     });
 
     let stdout: Buffer = Buffer.alloc(0);
@@ -235,21 +357,27 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
     let truncated = false;
     let timedOut = false;
     let canceled = false;
+    let limitExceeded: SandboxResult['limitExceeded'];
     let settled = false;
+
+    const killTree = (): void => {
+      try {
+        if (process.platform !== 'win32') process.kill(-child.pid!, 'SIGKILL');
+        else child.kill('SIGKILL');
+      } catch {
+        try { child.kill('SIGKILL'); } catch { /* already exited */ }
+      }
+    };
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      try { process.kill(-child.pid!, 'SIGKILL'); } catch {
-        try { child.kill('SIGKILL'); } catch { /* */ }
-      }
+      killTree();
     }, limits.timeoutMs);
 
     const onAbort = () => {
       if (settled) return;
       canceled = true;
-      try { process.kill(-child.pid!, 'SIGKILL'); } catch {
-        try { child.kill('SIGKILL'); } catch { /* */ }
-      }
+      killTree();
     };
     if (opts.signal) {
       if (opts.signal.aborted) onAbort();
@@ -257,20 +385,67 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
     }
 
     let totalOutput = 0;
-    const acc = (buf: Buffer, chunk: Buffer, kind: 'stdout' | 'stderr'): Buffer => {
-      totalOutput += chunk.length;
-      if (totalOutput > limits.outputBytes) {
-        const room = Math.max(0, limits.outputBytes - buf.length);
-        buf = Buffer.concat([buf, chunk.subarray(0, room)]);
+    const acc = (buf: Buffer, chunk: Buffer): Buffer => {
+      const room = Math.max(0, limits.outputBytes - totalOutput);
+      const accepted = chunk.subarray(0, room);
+      totalOutput += accepted.length;
+      buf = Buffer.concat([buf, accepted]);
+      if (accepted.length < chunk.length || totalOutput >= limits.outputBytes) {
         truncated = true;
-        try { child[kind === 'stdout' ? 'stdout' : 'stderr']?.destroy(); } catch { /* */ }
-        return buf;
+        limitExceeded = 'output';
+        killTree();
       }
-      return Buffer.concat([buf, chunk]);
+      return buf;
     };
 
-    child.stdout.on('data', (c: Buffer) => { stdout = acc(stdout, c, 'stdout'); });
-    child.stderr.on('data', (c: Buffer) => { stderr = acc(stderr, c, 'stderr'); });
+    child.stdout.on('data', (c: Buffer) => { stdout = acc(stdout, c); });
+    child.stderr.on('data', (c: Buffer) => { stderr = acc(stderr, c); });
+
+    const resourceMonitor =
+      process.platform === 'win32'
+        ? undefined
+        : setInterval(() => {
+            if (settled || child.pid === undefined) return;
+            try {
+              const rows = execFileSync(
+                '/bin/ps',
+                ['-axo', 'pid=,ppid=,rss='],
+                { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 },
+              )
+                .trim()
+                .split('\n')
+                .map((line) => line.trim().split(/\s+/).map(Number))
+                .filter(
+                  (row): row is [number, number, number] =>
+                    row.length === 3 && row.every(Number.isFinite),
+                );
+              const descendants = new Set<number>([child.pid]);
+              let changed = true;
+              while (changed) {
+                changed = false;
+                for (const [pid, ppid] of rows) {
+                  if (descendants.has(ppid) && !descendants.has(pid)) {
+                    descendants.add(pid);
+                    changed = true;
+                  }
+                }
+              }
+              const rssKb = rows
+                .filter(([pid]) => descendants.has(pid))
+                .reduce((sum, [, , rss]) => sum + rss, 0);
+              if (descendants.size > limits.processLimit) {
+                limitExceeded = 'process';
+                killTree();
+              } else if (rssKb > limits.memoryMb * 1024) {
+                limitExceeded = 'memory';
+                killTree();
+              }
+            } catch {
+              // If the host cannot inspect a running process, timeout and OS
+              // containment still apply; the failure is visible via evidence.
+            }
+          }, 50);
+    resourceMonitor?.unref();
 
     // prevent stdin hang: write provided stdin then close; if none, close immediately
     if (opts.stdin != null) {
@@ -282,12 +457,32 @@ export function execSandboxed(opts: SandboxExecOptions): Promise<SandboxResult> 
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      if (resourceMonitor) clearInterval(resourceMonitor);
       if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
       cleanup();
-      resolveP({ exitCode, timedOut, canceled, stdout, stderr, truncated, mechanism: mech, durationMs: Date.now() - start });
+      resolveP({
+        exitCode,
+        timedOut,
+        canceled,
+        stdout,
+        stderr,
+        truncated,
+        mechanism: mech,
+        durationMs: Date.now() - start,
+        ...(limitExceeded === undefined ? {} : { limitExceeded }),
+      });
     };
 
-    child.on('error', (err) => { cleanup(); if (!settled) { settled = true; clearTimeout(timeout); rejectP(new SandboxError(`spawn failed: ${err.message}`)); } });
+    child.on('error', (err) => {
+      cleanup();
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        if (resourceMonitor) clearInterval(resourceMonitor);
+        if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
+        rejectP(new SandboxError(`spawn failed: ${err.message}`));
+      }
+    });
     child.on('close', (code) => finish(code));
 
     function cleanup() { try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* */ } }

@@ -16,6 +16,7 @@ export * from './security/audit-sink.js';
 export * from './security/action-executor.js';
 // VFS + Sandbox
 export * from './vfs/virtual-filesystem.js';
+export * from './vfs/workspace-transaction.js';
 export * from './runtime/sandbox.js';
 // Tools
 export * from './tools/tool-registry.js';

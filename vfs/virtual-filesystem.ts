@@ -13,7 +13,7 @@
  * evaluated for EVERY access regardless of caller (closes the RAG-bypass hole).
  */
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, realpathSync, existsSync, rmSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, realpathSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, relative, resolve, isAbsolute, basename } from 'node:path';
 
 export type VfsBackendKind = 'local' | 'overlay' | 'store' | 'evidence';
@@ -40,9 +40,10 @@ export interface Backend {
   readonly prefix: string;
   read(path: string): Buffer;
   list(path: string): VfsEntry[];
-  write(path: string, data: Buffer): void;
+  write(path: string, data: Buffer, mode?: number): void;
   delete(path: string): void;
   exists(path: string): boolean;
+  mode?(path: string): number | undefined;
 }
 
 /** Reject traversal/escape anywhere a user-supplied path is accepted. */
@@ -70,18 +71,18 @@ function now(): string { return new Date().toISOString(); }
 /** Real-filesystem backend rooted at an OS directory, exposed under a VFS prefix. */
 export class LocalBackend implements Backend {
   readonly kind = 'local' as const;
-  constructor(readonly prefix: string, private readonly root: string) {}
+  constructor(readonly prefix: string, readonly rootPath: string) {}
   private osPath(vfsPath: string): string {
     const rel = relative(this.prefix, vfsPath);
     if (rel.startsWith('..')) throw new VfsError(`escape from ${this.prefix}: ${vfsPath}`);
-    return resolve(this.root, rel);
+    return resolve(this.rootPath, rel);
   }
   private safe(osPath: string): string {
     // Resolve both paths through realpath to handle macOS /var -> /private/var
     const real = realpathSafe(osPath);
-    const rootReal = realpathSafe(this.root);
+    const rootReal = realpathSafe(this.rootPath);
     const rel = relative(rootReal, real);
-    if (rel.startsWith('..') || isAbsolute(rel)) throw new VfsError(`symlink escape from ${this.root}: ${osPath}`);
+    if (rel.startsWith('..') || isAbsolute(rel)) throw new VfsError(`symlink escape from ${this.rootPath}: ${osPath}`);
     return real;
   }
   read(path: string): Buffer { return readFileSync(this.safe(this.osPath(path))); }
@@ -93,17 +94,21 @@ export class LocalBackend implements Backend {
       size: e.isDirectory() ? 0 : statSync(join(dir, e.name)).size,
     }));
   }
-  write(path: string, data: Buffer): void {
+  write(path: string, data: Buffer, mode?: number): void {
     const os = this.osPath(path);
     // Check symlink escape BEFORE writing (not after) to prevent writing outside root
     this.safe(os);
     mkdirSync(dirname(os), { recursive: true });
     // Re-check after mkdir in case a symlink was created in the parent dir
     this.safe(os);
-    writeFileSync(os, data);
+    writeFileSync(os, data, mode === undefined ? undefined : { mode });
+    if (mode !== undefined) chmodSync(os, mode);
   }
   delete(path: string): void { rmSync(this.osPath(path), { recursive: true, force: true }); }
   exists(path: string): boolean { try { this.safe(this.osPath(path)); return existsSync(this.osPath(path)); } catch { return false; } }
+  mode(path: string): number | undefined {
+    try { return statSync(this.safe(this.osPath(path))).mode & 0o777; } catch { return undefined; }
+  }
 }
 
 /** In-memory cross-thread store (e.g. /memories). */
@@ -147,6 +152,7 @@ export class OverlayBackend implements Backend {
   readonly kind = 'overlay' as const;
   private readonly staged = new Map<string, Buffer>();
   private readonly tombstones = new Set<string>();
+  private readonly stagedModes = new Map<string, number>();
   private committed = false;
   private discarded = false;
   private baseBackend: Backend | null = null;
@@ -181,15 +187,28 @@ export class OverlayBackend implements Backend {
     }
     return out;
   }
-  write(path: string, data: Buffer): void { this.checkTx(); this.staged.set(path, clone(data)); this.tombstones.delete(path); }
-  delete(path: string): void { this.checkTx(); this.tombstones.add(path); this.staged.delete(path); }
+  write(path: string, data: Buffer, mode?: number): void {
+    this.checkTx();
+    this.staged.set(path, clone(data));
+    if (mode === undefined) this.stagedModes.delete(path);
+    else this.stagedModes.set(path, mode);
+    this.tombstones.delete(path);
+  }
+  delete(path: string): void { this.checkTx(); this.tombstones.add(path); this.staged.delete(path); this.stagedModes.delete(path); }
   exists(path: string): boolean {
     if (this.tombstones.has(path)) return false;
     if (this.staged.has(path)) return true;
     if (this.baseBackend) return this.baseBackend.exists(path);
     return false;
   }
-  stagedEntries(): ReadonlyArray<readonly [string, Buffer]> { return [...this.staged.entries()].map(([p, b]) => [p, clone(b)] as const); }
+  stagedEntries(): ReadonlyArray<readonly [string, Buffer, number?]> {
+    return [...this.staged.entries()].map(([path, data]) => {
+      const mode = this.stagedModes.get(path);
+      return mode === undefined
+        ? [path, clone(data)] as const
+        : [path, clone(data), mode] as const;
+    });
+  }
   stagedTombstones(): readonly string[] { return [...this.tombstones]; }
   markCommitted(): void { this.committed = true; }
   markDiscarded(): void { this.discarded = true; }
@@ -209,6 +228,27 @@ export class VirtualFilesystem {
     this.backends.sort((a, b) => b.prefix.length - a.prefix.length);
   }
   addPermissionRule(rule: VfsPermissionRule): void { this.permissions.push(rule); }
+  /** Fork the routing table while replacing exactly one authority.
+   *  Permission rules are copied verbatim so a transaction cannot widen ACLs. */
+  forkReplacing(prefix: string, replacement: Backend): VirtualFilesystem {
+    if (replacement.prefix !== prefix) {
+      throw new VfsError(`replacement prefix mismatch: ${replacement.prefix} != ${prefix}`);
+    }
+    const fork = new VirtualFilesystem(
+      this.permissions.map((rule) => ({ ...rule })),
+    );
+    let replaced = false;
+    for (const backend of this.backends) {
+      if (backend.prefix === prefix) {
+        fork.mount(replacement);
+        replaced = true;
+      } else {
+        fork.mount(backend);
+      }
+    }
+    if (!replaced) throw new VfsError(`no backend mounted at ${prefix}`);
+    return fork;
+  }
   route(path: string): Backend {
     assertSafeVfsPath(path);
     for (const b of this.backends) if (path === b.prefix || path.startsWith(b.prefix === '/' ? '/' : b.prefix + '/')) return b;
@@ -254,22 +294,34 @@ export class VirtualFilesystem {
    // If no target provided, route to the overlay's prefix to find the backend
    if (!target) target = this.route(overlay.prefix);
    // Save originals for rollback: content of existing files + existence of new files
-    const originals = new Map<string, Buffer | null>(); // null = file did not exist
-    const deletedFiles = new Map<string, Buffer>(); // path -> original content (for restore)
+    const originals = new Map<string, { data: Buffer; mode?: number } | null>(); // null = file did not exist
+    const deletedFiles = new Map<string, { data: Buffer; mode?: number }>(); // path -> original content (for restore)
     const writtenPaths: string[] = [];
     try {
       // Phase 1: Save originals for all staged writes and tombstones
       for (const [path] of overlay.stagedEntries()) {
         this.checkPermission(path, true);
-        try { originals.set(path, target.read(path)); } catch { originals.set(path, null); }
+        try {
+          const mode = target.mode?.(path);
+          originals.set(path, {
+            data: target.read(path),
+            ...(mode === undefined ? {} : { mode }),
+          });
+        } catch { originals.set(path, null); }
       }
       for (const path of overlay.stagedTombstones()) {
         this.checkPermission(path, true);
-        try { deletedFiles.set(path, target.read(path)); } catch { /* file may not exist */ }
+        try {
+          const mode = target.mode?.(path);
+          deletedFiles.set(path, {
+            data: target.read(path),
+            ...(mode === undefined ? {} : { mode }),
+          });
+        } catch { /* file may not exist */ }
       }
       // Phase 2: Write all entries
-      for (const [path, buf] of overlay.stagedEntries()) {
-        target.write(path, buf);
+      for (const [path, buf, mode] of overlay.stagedEntries()) {
+        target.write(path, buf, mode);
         writtenPaths.push(path);
         this.record({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
       }
@@ -283,14 +335,14 @@ export class VirtualFilesystem {
       // Rollback: restore original content for overwritten files, restore deleted files, delete new files
       for (const [path, original] of originals) {
         if (original !== null) {
-          try { target.write(path, original); } catch { /* best effort */ }
+          try { target.write(path, original.data, original.mode); } catch { /* best effort */ }
         } else {
           // File was new — delete it
           try { target.delete(path); } catch { /* best effort */ }
         }
       }
       for (const [path, original] of deletedFiles) {
-        try { target.write(path, original); } catch { /* best effort */ }
+        try { target.write(path, original.data, original.mode); } catch { /* best effort */ }
       }
       this.record({ path: overlay.prefix, backend: target.kind, operation: 'discard', timestamp: now() });
       throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}`);

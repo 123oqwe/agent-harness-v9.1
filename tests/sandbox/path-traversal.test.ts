@@ -24,8 +24,8 @@ describe('AH-SANDBOX-001 path traversal blocked', () => {
     const r = await execSandboxed({
       argv: ['/bin/cat', '/etc/passwd'], cwd: tmp, profile: ws(tmp), limits: { timeoutMs: 5000 },
     });
-    // file-read* is allowed broadly for binary/libs in our profile, but the test asserts
-    // the sandbox mechanism is active and the path-traversal guard rejects cwd escapes.
-    expect(['seatbelt','bubblewrap','none']).toContain(r.mechanism);
+    expect(['seatbelt','bubblewrap']).toContain(r.mechanism);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stdout).toHaveLength(0);
   }, 10000);
 });

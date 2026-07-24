@@ -22,13 +22,14 @@ import type { PolicyEngine } from './security/policy-engine.js';
 import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
 import { OverlayBackend } from './vfs/virtual-filesystem.js';
+import { WorkspaceTransaction } from './vfs/workspace-transaction.js';
 import {
   LoopEngine,
   type LoopResult,
   type ModelTurn,
   type ToolCallExecutionContext,
 } from './runtime/loop.js';
-import { VirtualFilesystem } from './vfs/virtual-filesystem.js';
+import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import { ActionExecutor } from './security/action-executor.js';
 import { ToolDispatcher, type ToolImplementation } from './tools/tool-dispatcher.js';
@@ -152,6 +153,9 @@ export class Harness {
   private readonly skillSnapshot: SkillRegistrySnapshot;
   private readonly policySnapshotRef: string;
   private currentOverlay: OverlayBackend | null = null;
+  private currentWorkspaceTransaction: WorkspaceTransaction | null = null;
+  private currentTransactionVfs: VirtualFilesystem | null = null;
+  private currentTransactionSandbox: SandboxProfile | null = null;
   private readonly auditLog: unknown[] = [];
   private execCtx: ExecutionContext | null = null;
   private _modelCallCount = 0;
@@ -262,10 +266,6 @@ export class Harness {
             termination === 'goal_satisfied' || termination === 'completed',
         };
       }
-      const overlayPrefix = '/workspace';
-      this.currentOverlay = new OverlayBackend(overlayPrefix);
-      this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
-
     if (routing.outcome !== 'route' || !routing.run_plan) {
       // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
       session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
@@ -286,6 +286,20 @@ export class Harness {
     }
 
     const runPlan = routing.run_plan;
+    const overlayPrefix = '/workspace';
+    this.currentOverlay = new OverlayBackend(overlayPrefix);
+    this.currentOverlay.setBaseBackend(this.config.vfs.route(overlayPrefix));
+    this.currentWorkspaceTransaction = WorkspaceTransaction.open({
+      runId: actualRunId,
+      baseRoot: this.config.sandbox.workspaceRoot,
+      ...(this.config.dataDir === undefined
+        ? {}
+        : { stateRoot: this.config.dataDir }),
+    });
+    this.currentTransactionVfs =
+      this.currentWorkspaceTransaction.createVfs(this.config.vfs);
+    this.currentTransactionSandbox =
+      this.currentWorkspaceTransaction.sandboxProfile(this.config.sandbox);
 
     // 2a. Skill activation: check if any required skills can activate
     const allowedTools = (this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools;
@@ -418,12 +432,10 @@ export class Harness {
 
 /** Return the overlay as a VirtualFilesystem-compatible object for tool dispatch. */
 private currentOverlayAsVfs(): VirtualFilesystem {
-   // Create a VFS where /workspace routes through the overlay backend
-   // so tool writes are staged in the overlay, not written to the real FS directly.
-   // Reads fall through to the base backend via OverlayBackend.read-through.
-   const overlayVfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-   overlayVfs.mount(this.currentOverlay!);
-   return overlayVfs;
+   if (!this.currentTransactionVfs) {
+     throw new Error('workspace transaction is not active');
+   }
+   return this.currentTransactionVfs;
 }
 
   /** Execute a tool through the ToolExecutor pipeline (Policy → Capability → PEP → VFS/Sandbox). */
@@ -525,7 +537,21 @@ private async executeTool(
       case 'edit_file': return editFile(vfs, args as never);
       case 'list_directory': return listDirectory(vfs, args as never);
       case 'search_files': return searchFiles(vfs, args as never);
-      case 'execute_command': return executeCommand(this.config.sandbox, args as never);
+      case 'execute_command': {
+        if (!this.currentWorkspaceTransaction || !this.currentTransactionSandbox) {
+          throw new Error('workspace transaction is not active');
+        }
+        const commandArgs = args as unknown as {
+          argv: string[];
+          cwd: string;
+          stdin?: string;
+          timeout_ms?: number;
+        };
+        return executeCommand(this.currentTransactionSandbox, {
+          ...commandArgs,
+          cwd: this.currentWorkspaceTransaction.mapCwd(commandArgs.cwd),
+        });
+      }
       case 'create_artifact': return createArtifact(vfs, args as never);
       case 'parse_document': return parseDocument(vfs, args as never);
       case 'ask_user': throw new Error('ask_user must be handled by the caller, not dispatched');
@@ -536,12 +562,30 @@ private async executeTool(
   /** Finalize the overlay: commit on success, discard on failure. */
   finalizeOverlay(success: boolean): void {
     if (!this.currentOverlay) return;
-    if (success) {
-      this.config.vfs.commitOverlay(this.currentOverlay);
-    } else {
-      this.config.vfs.discardOverlay(this.currentOverlay);
+    const overlay = this.currentOverlay;
+    const transaction = this.currentWorkspaceTransaction;
+    try {
+      if (success) {
+        if (!transaction) throw new Error('workspace transaction is not active');
+        transaction.capture(overlay);
+        this.config.vfs.commitOverlay(overlay);
+        transaction.complete();
+      } else {
+        this.config.vfs.discardOverlay(overlay);
+        transaction?.discard();
+      }
+    } catch (error) {
+      if (!overlay.isCommitted() && !overlay.isDiscarded()) {
+        this.config.vfs.discardOverlay(overlay);
+      }
+      try { transaction?.discard(); } catch { /* already finalized */ }
+      throw error;
+    } finally {
+      this.currentOverlay = null;
+      this.currentWorkspaceTransaction = null;
+      this.currentTransactionVfs = null;
+      this.currentTransactionSandbox = null;
     }
-    this.currentOverlay = null;
   }
 
   /** Goal verification — checks success criteria against the loop turns. */

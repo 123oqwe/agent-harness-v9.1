@@ -1,9 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
-  detectMechanism, assertWithinWorkspace, SandboxError, DEFAULT_LIMITS,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  detectMechanism,
+  assertWithinWorkspace,
+  execSandboxed,
+  SandboxError,
+  DEFAULT_LIMITS,
 } from '../../runtime/sandbox.js';
 
 describe('AH-SANDBOX-001 unit-level mutation tests', () => {
+  const cleanup: string[] = [];
+  afterEach(() => {
+    for (const path of cleanup.splice(0)) {
+      rmSync(path, { recursive: true, force: true });
+    }
+    delete process.env.AH_UNRELATED_HOST_VALUE;
+  });
   it('detectMechanism returns a valid mechanism for the current platform', () => {
     const m = detectMechanism();
     expect(['seatbelt', 'bubblewrap', 'appcontainer', 'none']).toContain(m);
@@ -38,6 +56,78 @@ describe('AH-SANDBOX-001 unit-level mutation tests', () => {
     } finally {
       process.cwd = origCwd;
     }
+  });
+
+  it('assertWithinWorkspace rejects an existing symlink cwd escape', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ah-sandbox-root-'));
+    const outside = mkdtempSync(join(tmpdir(), 'ah-sandbox-outside-'));
+    cleanup.push(root, outside);
+    symlinkSync(outside, join(root, 'escape'));
+    expect(() => assertWithinWorkspace(join(root, 'escape'), root)).toThrow(
+      SandboxError,
+    );
+  });
+
+  it('passes only the explicit safe environment allowlist', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ah-sandbox-env-'));
+    cleanup.push(root);
+    process.env.AH_UNRELATED_HOST_VALUE = 'must-not-leak';
+    const result = await execSandboxed({
+      argv: [
+        '/bin/sh',
+        '-c',
+        'printf "%s:%s" "${SAFE_VALUE:-none}" "${AH_UNRELATED_HOST_VALUE:-none}"',
+      ],
+      cwd: root,
+      profile: {
+        workspaceRoot: root,
+        allowNetwork: false,
+        allowUnixSockets: false,
+        allowRead: [],
+        environment: { SAFE_VALUE: 'visible' },
+      },
+    });
+    expect(result.stdout.toString()).toBe('visible:none');
+  });
+
+  it('rejects credentials even when explicitly supplied as environment', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ah-sandbox-secret-'));
+    cleanup.push(root);
+    await expect(
+      execSandboxed({
+        argv: ['/bin/echo', 'no'],
+        cwd: root,
+        profile: {
+          workspaceRoot: root,
+          allowNetwork: false,
+          allowUnixSockets: false,
+          allowRead: [],
+          environment: { API_KEY: 'secret' },
+        },
+      }),
+    ).rejects.toThrow(/credential-like environment variable/);
+  });
+
+  it('rejects empty argv and invalid resource limits before spawning', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ah-sandbox-input-'));
+    cleanup.push(root);
+    const profile = {
+      workspaceRoot: root,
+      allowNetwork: false,
+      allowUnixSockets: false,
+      allowRead: [],
+    };
+    await expect(
+      execSandboxed({ argv: [], cwd: root, profile }),
+    ).rejects.toThrow(/argv/);
+    await expect(
+      execSandboxed({
+        argv: ['/bin/echo', 'no'],
+        cwd: root,
+        profile,
+        limits: { timeoutMs: 0 },
+      }),
+    ).rejects.toThrow(/timeoutMs/);
   });
 
   it('DEFAULT_LIMITS values are correct', () => {
