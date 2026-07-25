@@ -38,10 +38,15 @@ export interface EvidencePackage {
 }
 
 export class EvidenceError extends Error {
-  constructor(message: string) { super(message); this.name = 'EvidenceError'; Object.setPrototypeOf(this, EvidenceError.prototype); }
+  constructor(message: string) {
+    super(message);
+    this.name = 'EvidenceError';
+    Object.setPrototypeOf(this, EvidenceError.prototype);
+  }
 }
 
 const sha = (s: string | null | undefined): string | null => s ? createHash('sha256').update(s).digest('hex').slice(0, 16) : null;
+const exactCommitSha = /^[0-9a-f]{40}$/u;
 
 export interface CommandSpec {
   argv: readonly string[];
@@ -107,15 +112,18 @@ export function generateEvidence(params: {
   security_checks: Record<string, unknown>;
   verifier_model?: string;
 }): EvidencePackage {
+  const base = params.cwd ?? process.cwd();
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: base,
     encoding: 'utf8',
     shell: false,
   });
   const commit_sha = revision.status === 0 ? revision.stdout.trim() : '';
-  if (!/^[0-9a-f]{40}$/.test(commit_sha)) throw new EvidenceError(`invalid commit_sha: ${commit_sha}`);
+  if (!exactCommitSha.test(commit_sha)) {
+    throw new EvidenceError(`invalid commit_sha: ${commit_sha}`);
+  }
 
   // verify source_files and tests_added exist — fail on missing, do not silently filter
-  const base = params.cwd ?? process.cwd();
   for (const f of params.source_files) {
     if (!existsSync(resolve(base, f))) throw new EvidenceError(`source_file does not exist: ${f}`);
   }
@@ -153,10 +161,16 @@ export function generateEvidence(params: {
 /** Write an EvidencePackage to disk (immutable once written). */
 export function writeEvidence(evidence: EvidencePackage, path: string): void {
   if (existsSync(path)) {
-    // immutability: allow re-write only if verifier_result changed from fail to pass
+    // A failed attempt may be replaced exactly once by a verified package.
+    // A verified package is final and cannot be rewritten, even with PASS.
     const existing = JSON.parse(readFileSync(path, 'utf8')) as EvidencePackage;
-    if (existing.verifier_result === 'pass' && evidence.verifier_result !== 'pass') {
-      throw new EvidenceError(`evidence is immutable: ${path} already has verifier_result=pass`);
+    if (
+      existing.verifier_result === 'pass' ||
+      evidence.verifier_result !== 'pass'
+    ) {
+      throw new EvidenceError(
+        `evidence is immutable: ${path} may only transition from fail to pass`,
+      );
     }
   }
   writeFileSync(path, JSON.stringify(evidence, null, 2));
@@ -172,8 +186,30 @@ export function validateEvidence(evidence: unknown, schemaPath: string): boolean
     throw new EvidenceError(`evidence schema validation failed: ${errors}`);
   }
   const e = evidence as EvidencePackage;
-  if (!/^[0-9a-f]{40}$/.test(e.commit_sha)) throw new EvidenceError(`commit_sha must be a 40-char SHA: ${e.commit_sha}`);
-  if (e.verifier_result === 'pass' && e.commands_run.length === 0) throw new EvidenceError('PASS without commands is forbidden');
-  if (e.verifier_result === 'pass' && e.commit_sha === 'pending') throw new EvidenceError('PASS with pending commit_sha is forbidden');
+  if (!exactCommitSha.test(e.commit_sha)) {
+    throw new EvidenceError(
+      `commit_sha must be a 40-char SHA: ${e.commit_sha}`,
+    );
+  }
+  if (e.commands_run.length === 0) {
+    throw new EvidenceError('evidence without commands is forbidden');
+  }
+  if (
+    e.commands_run.length !== e.exit_codes.length ||
+    e.commands_run.some(
+      (command, index) => command.exit_code !== e.exit_codes[index],
+    )
+  ) {
+    throw new EvidenceError('command results and exit_codes do not match');
+  }
+  const commandsPassed = e.exit_codes.every((exitCode) => exitCode === 0);
+  if (
+    (e.verifier_result === 'pass' && !commandsPassed) ||
+    (e.verifier_result === 'fail' && commandsPassed)
+  ) {
+    throw new EvidenceError(
+      'verifier_result does not match the recorded command exits',
+    );
+  }
   return true;
 }

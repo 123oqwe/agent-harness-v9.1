@@ -272,6 +272,11 @@ export class VerificationEngine {
       if (adapter.adapterId.trim() === '') {
         throw new VerificationEngineError('adapterId required');
       }
+      if (adapter.verificationTypes.length === 0) {
+        throw new VerificationEngineError(
+          `adapter ${adapter.adapterId} has no verification types`,
+        );
+      }
       for (const verificationType of adapter.verificationTypes) {
         if (this.adapters.has(verificationType)) {
           throw new VerificationEngineError(
@@ -291,6 +296,7 @@ export class VerificationEngine {
 
     for (const node of graph.order) {
       const refs = node.acceptance_criteria_refs!.map(Number);
+      const nodeStatuses: VerificationRecord['status'][] = [];
       for (const criterionIndex of refs) {
         const criterion = context.task.success_criteria[criterionIndex]!;
         const recordStartedAt = this.clock();
@@ -311,7 +317,7 @@ export class VerificationEngine {
             completed_at: this.clock(),
           });
           records.push(record);
-          statusById.set(node.verification_id, record.status);
+          nodeStatuses.push(record.status);
           continue;
         }
         const adapter = this.adapters.get(node.verification_type);
@@ -329,7 +335,7 @@ export class VerificationEngine {
             completed_at: this.clock(),
           });
           records.push(record);
-          statusById.set(node.verification_id, record.status);
+          nodeStatuses.push(record.status);
           continue;
         }
         try {
@@ -353,7 +359,7 @@ export class VerificationEngine {
             completed_at: this.clock(),
           });
           records.push(record);
-          statusById.set(node.verification_id, record.status);
+          nodeStatuses.push(record.status);
         } catch (error) {
           const record = deepFreeze<VerificationRecord>({
             verification_id: node.verification_id,
@@ -368,9 +374,17 @@ export class VerificationEngine {
             completed_at: this.clock(),
           });
           records.push(record);
-          statusById.set(node.verification_id, record.status);
+          nodeStatuses.push(record.status);
         }
       }
+      statusById.set(
+        node.verification_id,
+        nodeStatuses.every((status) => status === 'passed')
+          ? 'passed'
+          : nodeStatuses.some((status) => status === 'failed')
+            ? 'failed'
+            : 'blocked',
+      );
     }
     return deepFreeze({
       plan_revision: context.runPlan.revision,
@@ -641,7 +655,7 @@ export class ReceiptPostconditionVerificationAdapter
     request: CriterionVerificationRequest,
   ): Promise<AdapterVerificationResult> {
     const expectation = this.expectations[request.criterion.criterion];
-    if (!expectation) {
+    if (!expectation || expectation.expectedTools.length === 0) {
       return {
         passed: false,
         reason: 'missing receipt expectation',

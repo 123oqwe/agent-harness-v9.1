@@ -54,10 +54,26 @@ export interface EvalReport {
 }
 
 export class EvalRunnerError extends Error {
-  constructor(message: string) { super(message); this.name = 'EvalRunnerError'; Object.setPrototypeOf(this, EvalRunnerError.prototype); }
+  constructor(message: string) {
+    super(message);
+    this.name = 'EvalRunnerError';
+    Object.setPrototypeOf(this, EvalRunnerError.prototype);
+  }
 }
 
 const sha = (s: string | null | undefined): string | null => s ? createHash('sha256').update(s).digest('hex').slice(0, 16) : null;
+const kinds = new Set<EvalSuiteKind>([
+  'unit',
+  'integration',
+  'adversarial',
+  'vertical',
+  'e2e',
+]);
+const strategies = new Set<Strategy>([
+  'direct',
+  'react',
+  'plan_execute',
+]);
 
 export class EvalRunner {
   /** Execute all eval cases in a manifest. A failing/missing eval cannot be pass. */
@@ -72,21 +88,17 @@ export class EvalRunner {
       throw new EvalRunnerError('cannot resolve an exact git revision');
     }
     const commit_sha = revision.stdout.trim();
-    const results: EvalResult[] = [];
-    let strategies_consistent = true;
-
-    for (const c of manifest.suites) {
-      const result = this.runCase(c, cwd);
-      results.push(result);
-      if (!result.passed) strategies_consistent = false;
-    }
+    const results = manifest.suites.map((evalCase) =>
+      this.runCase(evalCase, cwd),
+    );
 
     // verify reasoning_strategy consistency across e2e cases
-    const e2eResults = results.filter((_, i) => manifest.suites[i]!.kind === 'e2e' && manifest.suites[i]!.expected_strategy);
-    if (e2eResults.length > 0) {
-      // all e2e cases must pass for strategy consistency
-      strategies_consistent = e2eResults.every(r => r.passed);
-    }
+    const e2eResults = results.filter(
+      (_, index) => manifest.suites[index]!.kind === 'e2e',
+    );
+    const strategies_consistent = e2eResults.every(
+      (result) => result.passed,
+    );
 
     return {
       requirement_id: manifest.requirement_id,
@@ -132,6 +144,26 @@ export class EvalRunner {
       }
       if (ids.has(c.id)) throw new EvalRunnerError(`duplicate eval id: ${c.id}`);
       ids.add(c.id);
+      if (!kinds.has(c.kind)) {
+        throw new EvalRunnerError(`invalid eval kind: ${String(c.kind)}`);
+      }
+      if (
+        c.kind === 'e2e' &&
+        (c.expected_strategy === undefined ||
+          !strategies.has(c.expected_strategy))
+      ) {
+        throw new EvalRunnerError(
+          'e2e eval requires a valid expected_strategy',
+        );
+      }
+      if (
+        c.kind !== 'e2e' &&
+        c.expected_strategy !== undefined
+      ) {
+        throw new EvalRunnerError(
+          'expected_strategy is only valid for e2e evals',
+        );
+      }
       if (
         !Array.isArray(c.argv) ||
         c.argv.length === 0 ||

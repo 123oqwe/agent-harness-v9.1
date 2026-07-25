@@ -103,6 +103,28 @@ describe('AH-EVAL-RUNNER-001 argv-only evaluation runner', () => {
     expect(report.reasoning_strategy_consistent).toBe(false);
   });
 
+  it('keeps strategy consistency independent from non-e2e suite failures', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'unit-failure',
+          kind: 'unit',
+          argv: [node, '-e', 'process.exit(4)'],
+          expected_exit: 0,
+        },
+        {
+          id: 'direct',
+          kind: 'e2e',
+          argv: [node, '-e', 'process.exit(0)'],
+          expected_exit: 0,
+          expected_strategy: 'direct',
+        },
+      ]),
+    );
+    expect(report.all_passed).toBe(false);
+    expect(report.reasoning_strategy_consistent).toBe(true);
+  });
+
   it('passes arguments literally and never interprets shell syntax', () => {
     scratch = mkdtempSync(join(tmpdir(), 'eval-argv-'));
     const target = join(scratch, 'must-not-exist');
@@ -199,7 +221,68 @@ describe('AH-EVAL-RUNNER-001 argv-only evaluation runner', () => {
         { id: 'x', kind: 'unit', argv: [node], expected_exit: 0 },
       ],
     },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [
+        { id: 'x', kind: 'unknown', argv: [node], expected_exit: 0 },
+      ],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [
+        { id: 'x', kind: 'e2e', argv: [node], expected_exit: 0 },
+      ],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [
+        {
+          id: 'x',
+          kind: 'e2e',
+          argv: [node],
+          expected_exit: 0,
+          expected_strategy: 'unknown',
+        },
+      ],
+    },
+    {
+      manifest_version: 'eval-manifest.v1',
+      requirement_id: 'x',
+      suites: [
+        {
+          id: 'x',
+          kind: 'unit',
+          argv: [node],
+          expected_exit: 0,
+          expected_strategy: 'direct',
+        },
+      ],
+    },
   ])('rejects malformed manifest %#', (candidate) => {
     expect(() => EvalRunner.validateManifest(candidate)).toThrow(EvalRunnerError);
+  });
+
+  it('preserves EvalRunnerError identity and exact validation messages', () => {
+    const error = new EvalRunnerError('boundary');
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('EvalRunnerError');
+    expect(error.message).toBe('boundary');
+    expect(() =>
+      EvalRunner.validateManifest({
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          {
+            id: 'x',
+            kind: 'e2e',
+            argv: [node],
+            expected_exit: 0,
+          },
+        ],
+      }),
+    ).toThrow('e2e eval requires a valid expected_strategy');
   });
 });

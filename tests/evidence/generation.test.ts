@@ -93,7 +93,7 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
           'process.exit(process.cwd()===process.argv[1]?0:8)',
           realpathSync(scratch),
         ],
-        cwd: scratch,
+        cwd: scratch!,
       }).exit_code,
     ).toBe(0);
     expect(
@@ -189,7 +189,26 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
     expect(() =>
       writeEvidence({ ...pass, verifier_result: 'fail' }, path),
     ).toThrow('immutable');
-    expect(() => writeEvidence(pass, path)).not.toThrow();
+    expect(() => writeEvidence(pass, path)).toThrow('immutable');
+
+    const retryPath = join(scratch, 'retry.json');
+    writeEvidence(
+      validEvidence({
+        verifier_result: 'fail',
+        exit_codes: [1],
+        commands_run: [
+          {
+            ...validEvidence().commands_run[0]!,
+            exit_code: 1,
+          },
+        ],
+      }),
+      retryPath,
+    );
+    expect(() => writeEvidence(pass, retryPath)).not.toThrow();
+    expect(JSON.parse(readFileSync(retryPath, 'utf8'))).toMatchObject({
+      verifier_result: 'pass',
+    });
   });
 
   it('validates schema plus semantic evidence invariants', () => {
@@ -206,5 +225,60 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
     expect(() => validateEvidence({ requirement_id: 'missing' }, schemaPath)).toThrow(
       EvidenceError,
     );
+    expect(() =>
+      validateEvidence(
+        validEvidence({ exit_codes: [1] }),
+        schemaPath,
+      ),
+    ).toThrow('command results and exit_codes do not match');
+    expect(() =>
+      validateEvidence(
+        validEvidence({
+          verifier_result: 'fail',
+        }),
+        schemaPath,
+      ),
+    ).toThrow('does not match');
+    expect(() =>
+      validateEvidence(
+        validEvidence({
+          verifier_result: 'pass',
+          exit_codes: [7],
+          commands_run: [
+            { ...validEvidence().commands_run[0]!, exit_code: 7 },
+          ],
+        }),
+        schemaPath,
+      ),
+    ).toThrow('does not match');
+  });
+
+  it('uses the requested repository cwd when resolving the exact revision', () => {
+    scratch = mkdtempSync(join(tmpdir(), 'evidence-not-repo-'));
+    expect(() =>
+      generateEvidence({
+        requirement_id: 'AH-EVIDENCE-WRONG-REPO',
+        source_files: [],
+        tests_added: [],
+        commands: [{ argv: [node, '-e', 'process.exit(0)'] }],
+        cwd: scratch!,
+        test_results: {},
+        coverage: {},
+        security_checks: {},
+      }),
+    ).toThrow('invalid commit_sha');
+  });
+
+  it('preserves error identity and exact validation diagnostics', () => {
+    const error = new EvidenceError('boundary');
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('EvidenceError');
+    expect(error.message).toBe('boundary');
+    expect(() =>
+      validateEvidence(
+        { requirement_id: 'missing' },
+        schemaPath,
+      ),
+    ).toThrow(/evidence schema validation failed:/u);
   });
 });
