@@ -15,7 +15,16 @@ export class SettingsController {
     return { state: 'success', data: { ...this.store.read() } };
   }
   update(patch: Partial<Settings>): UiResult<Settings> {
-    if (patch.max_budget_usd !== undefined && patch.max_budget_usd < 0) return { state: 'error', error: 'budget must be >= 0' };
+    if (
+      patch.max_budget_usd !== undefined &&
+      (!Number.isFinite(patch.max_budget_usd) ||
+        patch.max_budget_usd < 0)
+    ) {
+      return {
+        state: 'error',
+        error: 'budget must be a finite non-negative number',
+      };
+    }
     const settings = this.store.write({ ...this.store.read(), ...patch });
     return { state: 'success', data: { ...settings } };
   }

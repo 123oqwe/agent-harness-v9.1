@@ -32,24 +32,29 @@ export class ChatController {
       this.sequence += 1;
       const outcome = await this.harness.run(task, `chat-${this.sequence}`);
       if (!outcome.success) {
-        this.loading = false;
         return {
           state: 'error',
           error: `Harness run failed: ${outcome.loop_result.termination_reason}`,
         };
       }
       const reply = outcome.loop_result.turns.at(-1)?.model.content ?? '';
+      if (reply.trim() === '') {
+        return { state: 'error', error: 'verified reply is empty' };
+      }
       const msg: ChatMessage = {
         role: 'assistant',
         content: reply,
         timestamp: this.clock(),
       };
       this.messages.push(msg);
-      this.loading = false;
       return { state: 'success', data: msg };
     } catch (e) {
+      return {
+        state: 'error',
+        error: e instanceof Error ? e.message : 'chat unavailable',
+      };
+    } finally {
       this.loading = false;
-      return { state: 'error', error: (e as Error).message };
     }
   }
   list(): UiResult<ChatMessage[]> { return { state: this.messages.length === 0 ? 'empty' : 'success', data: [...this.messages] }; }

@@ -15,6 +15,12 @@ export class CodingWorkspaceController {
             data: result,
             error: `Harness run failed: ${result.outcome.loop_result.termination_reason}`,
           };
-    } catch (e) { return { state: 'error', error: (e as Error).message }; }
+    } catch (e) {
+      return {
+        state: 'error',
+        error:
+          e instanceof Error ? e.message : 'coding workspace unavailable',
+      };
+    }
   }
 }

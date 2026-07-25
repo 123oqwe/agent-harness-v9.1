@@ -193,7 +193,8 @@ describe('Phase 1 mutation manifest', () => {
           !sourceFile.endsWith('/index.ts') &&
           !sourceFile.endsWith('.d.ts') &&
           sourceFile !== 'session/session-store.ts' &&
-          sourceFile !== 'runtime/reasoning-strategy.ts',
+          sourceFile !== 'runtime/reasoning-strategy.ts' &&
+          sourceFile !== 'ui/ui-state.ts',
       )
       .sort();
     expect([...assigned.keys()].sort()).toEqual(executableSources);
@@ -211,6 +212,15 @@ describe('Phase 1 mutation manifest', () => {
     ).toMatch(
       /^\/\*\*[\s\S]*\*\/\s*export \{[\s\S]*\} from ['"][^'"]+['"];\s*export type \{/u,
     );
+  });
+
+  it('does not send the type-only UI result contract to Stryker', () => {
+    expect(mutationModules.uiAdapters!.mutate).not.toContain(
+      'ui/ui-state.ts',
+    );
+    expect(
+      readFileSync(join(harnessRoot, 'ui', 'ui-state.ts'), 'utf8'),
+    ).toMatch(/export type UiState[\s\S]*export interface UiResult/u);
   });
 
   it('keeps the declared aggregate and critical-module floors', () => {

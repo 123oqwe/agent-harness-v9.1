@@ -20,7 +20,16 @@ export class PrivacyController {
     return { state: 'success', data: { ...this.store.read() } };
   }
   update(patch: Partial<PrivacySettings>): UiResult<PrivacySettings> {
-    if (patch.data_retention_days !== undefined && patch.data_retention_days < 0) return { state: 'error', error: 'retention must be >= 0' };
+    if (
+      patch.data_retention_days !== undefined &&
+      (!Number.isSafeInteger(patch.data_retention_days) ||
+        patch.data_retention_days < 0)
+    ) {
+      return {
+        state: 'error',
+        error: 'retention must be a non-negative integer',
+      };
+    }
     const settings = this.store.write({ ...this.store.read(), ...patch });
     return { state: 'success', data: { ...settings } };
   }

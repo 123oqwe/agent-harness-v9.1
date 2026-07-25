@@ -126,7 +126,6 @@ export const mutationModules = {
   },
   uiAdapters: {
     mutate: [
-      'ui/ui-state.ts',
       'ui/ah_ui_onboarding_001.ts',
       'ui/ah_ui_settings_001.ts',
       'ui/ah_ui_approval_001.ts',

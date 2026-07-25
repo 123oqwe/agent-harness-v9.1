@@ -19,7 +19,10 @@ export class OnboardingController {
   constructor(private readonly authority: OnboardingAuthorityPort) {}
 
   getCurrentStep(): UiResult<OnboardingStep> {
-    return { state: 'success', data: this.state.steps[this.state.current_step] };
+    const step = this.state.steps[this.state.current_step];
+    return step === undefined
+      ? { state: 'empty' }
+      : { state: 'success', data: { ...step } };
   }
   advance(authToken?: string, policyAccepted?: boolean): UiResult<OnboardingState> {
     const step = this.state.steps[this.state.current_step];
@@ -38,7 +41,13 @@ export class OnboardingController {
     }
     step.completed = true;
     this.state.current_step++;
-    return { state: this.state.current_step >= this.state.steps.length ? 'success' : 'success', data: this.state };
+    return {
+      state: 'success',
+      data: {
+        steps: this.state.steps.map((value) => ({ ...value })),
+        current_step: this.state.current_step,
+      },
+    };
   }
   isComplete(): boolean { return this.state.current_step >= this.state.steps.length; }
 }

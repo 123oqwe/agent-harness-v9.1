@@ -12,7 +12,10 @@ export class TaskController {
 
   create(goal: string, strategy?: string): UiResult<Task> {
     if (goal.trim() === '') return { state: 'error', error: 'goal required' };
-    return { state: 'success', data: this.runtime.submit(goal, strategy) };
+    return {
+      state: 'success',
+      data: this.runtime.submit(goal.trim(), strategy),
+    };
   }
   list(): UiResult<Task[]> {
     const tasks = [...this.runtime.list()];
