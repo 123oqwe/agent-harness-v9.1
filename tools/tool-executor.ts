@@ -42,6 +42,7 @@ export interface ToolReceipt {
   policy_decision?: string | undefined;
   derived_risk_tier?: number | undefined;
   side_effect_class?: string | undefined;
+  budget_ceiling_hash?: string | undefined;
 }
 
 export interface ToolExecutorDeps {
@@ -229,9 +230,9 @@ export interface ToolExecutorInjectedDeps {
   stateStore: CapabilityStateStore;
   now: () => string;
   consent?: ConsentService;
-  credentialBroker?: ToolCredentialBrokerPort;
+  credentialBroker?: ToolCredentialBrokerPort | undefined;
   postconditionVerifier?: PostconditionVerifierPort;
-  effectJournal?: EffectJournalPort;
+  effectJournal?: EffectJournalPort | undefined;
   /** Execution context providing tenant_id, user_id, run_id, etc. */
   execCtx?: {
     tenant_id: string;
@@ -547,6 +548,7 @@ export class ToolExecutor {
       policy_decision: 'allow',
       derived_risk_tier: tier,
       side_effect_class: manifest.side_effect_class,
+      budget_ceiling_hash: hash(budget),
     });
 
     // 8. Evidence

@@ -39,6 +39,7 @@ export const mutationModules = {
       'tools/execute-command.ts',
       'tools/create-artifact.ts',
       'tools/ask-user.ts',
+      'tools/local-tool-host.ts',
       'ingestion/parse-document.ts',
     ],
     minimum: 85,
@@ -73,7 +74,11 @@ export const mutationModules = {
     minimum: 90,
   },
   vfs: {
-    mutate: ['vfs/virtual-filesystem.ts', 'vfs/workspace-transaction.ts'],
+    mutate: [
+      'vfs/virtual-filesystem.ts',
+      'vfs/workspace-transaction.ts',
+      'vfs/transactional-workspace.ts',
+    ],
     minimum: 90,
   },
   sandbox: {
@@ -85,12 +90,14 @@ export const mutationModules = {
       'session/durable-session.ts',
       'session/sqlite-session-store.ts',
       'session/progress-store.ts',
+      'session/run-session.ts',
     ],
     minimum: 90,
   },
   runtime: {
     mutate: [
       'harness.ts',
+      'runtime/harness-support.ts',
       'runtime/loop.ts',
       'runtime/retry.ts',
       'runtime/notifications.ts',

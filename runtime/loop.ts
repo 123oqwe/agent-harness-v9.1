@@ -41,7 +41,7 @@ export interface LoopConfig {
   max_output_tokens_per_call?: number;
   max_observation_bytes?: number;
   deadline_ms?: number;
-  data_dir?: string;
+  data_dir?: string | undefined;
   run_id: string;
   goal: string;
   run_plan?: Readonly<RunPlan>;
@@ -129,7 +129,7 @@ export interface LoopDeps {
   ) => Promise<unknown>;
   /** Legacy stop hint only. It never grants verification success. */
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
 }
 
 export interface ToolCallExecutionContext {

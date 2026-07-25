@@ -860,7 +860,7 @@ export class ModelGateway {
     context: {
       readonly operation_id: string;
       readonly attempt_id?: string;
-      readonly signal?: AbortSignal;
+      readonly signal?: AbortSignal | undefined;
       readonly deadline_at?: string;
     },
   ): Promise<GatewayDispatchResult> {

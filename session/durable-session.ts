@@ -41,7 +41,7 @@ export interface SessionPersistencePort {
 }
 
 export interface DurableSessionOptions {
-  persistence?: SessionPersistencePort;
+  persistence?: SessionPersistencePort | undefined;
   clock?: () => string;
 }
 

@@ -18,6 +18,7 @@ import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
+import Database from 'better-sqlite3';
 
 function toolSpec(name: string): ToolSpec {
   const spec = createPhase1ToolDefinitions().find((entry) => entry.name === name);
@@ -145,6 +146,37 @@ describe('Main chain integration: no bypasses', () => {
       const originalEvents = first.session.export_().events;
       const second = await h.run(task('rewrite this paragraph'), 'run-resume');
       expect(second.session.export_().events).toEqual(originalEvents);
+      const assistantEvents = originalEvents.filter(
+        (event) => event.type === 'assistant',
+      );
+      expect(second.success).toBe(true);
+      expect(second.run_plan).toEqual(first.run_plan);
+      expect(second.loop_result).toEqual({
+        strategy: 'direct',
+        iterations: assistantEvents.length,
+        termination_reason: 'goal_satisfied',
+        turns: [],
+        decision_summaries: assistantEvents.map(
+          (event) =>
+            (event.data as { decision_summary?: string }).decision_summary ??
+            '',
+        ),
+        context_reset_emitted: false,
+        usage: first.loop_result.usage,
+        step_states: first.loop_result.step_states,
+      });
+      expect(second.verification_report).toEqual(first.verification_report);
+      expect(second.evidence).toMatchObject({
+        run_id: 'run-resume',
+        plan_hash: first.run_plan?.run_plan_hash,
+        plan_revision: first.run_plan?.revision,
+        reasoning_strategy: 'direct',
+        termination_reason: 'goal_satisfied',
+        iterations: assistantEvents.length,
+        turns: 0,
+        usage: first.loop_result.usage,
+        workspace_changes: first.evidence.workspace_changes,
+      });
       expect(
         second.session
           .getEvents()
@@ -152,6 +184,44 @@ describe('Main chain integration: no bypasses', () => {
             JSON.stringify(event.data).includes('resuming run'),
           ),
       ).toBe(false);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores a stale SQLite snapshot and restores terminal state from the authoritative event chain', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'stale-snapshot-'));
+    try {
+      const firstHarness = makeHarness(
+        tmp,
+        [{ content: 'done' } as ParsedResponse],
+        dataDir,
+      );
+      const first = await firstHarness.run(
+        task('rewrite this paragraph'),
+        'run-stale-snapshot',
+      );
+      const database = new Database(join(dataDir, 'session.db'));
+      try {
+        database
+          .prepare(
+            'UPDATE snapshots SET last_hash = ? WHERE run_id = ?',
+          )
+          .run('not-the-event-head', 'run-stale-snapshot');
+      } finally {
+        database.close();
+      }
+      const restored = await makeHarness(
+        tmp,
+        [{ content: 'must not execute' } as ParsedResponse],
+        dataDir,
+      ).run(task('rewrite this paragraph'), 'run-stale-snapshot');
+      expect(restored.success).toBe(true);
+      expect(restored.loop_result.termination_reason).toBe('goal_satisfied');
+      expect(restored.session.getEvents()).toEqual(first.session.getEvents());
+      expect(restored.evidence.session_head_hash).toBe(
+        first.evidence.session_head_hash,
+      );
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
     }

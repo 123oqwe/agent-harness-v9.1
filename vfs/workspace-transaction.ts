@@ -126,7 +126,7 @@ export interface WorkspaceTransactionOptions {
   runId: string;
   baseRoot: string;
   /** Durable state parent. Omit for an ephemeral transaction. */
-  stateRoot?: string;
+  stateRoot?: string | undefined;
 }
 
 export interface WorkspaceChange {
