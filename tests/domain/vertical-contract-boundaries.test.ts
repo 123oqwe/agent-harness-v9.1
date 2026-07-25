@@ -256,6 +256,197 @@ describe('Phase 1 vertical contracts and evidence boundaries', () => {
     });
   });
 
+  it('rejects coding receipts with the wrong tool, status, path, or missing result', async () => {
+    const result = outcome({
+      loop_result: {
+        turns: [
+          {
+            tool_observations: [
+              {
+                name: 'write_file',
+                status: 'ok',
+                result: {
+                  path: '/workspace/bug.ts',
+                  content: 'poison',
+                },
+              },
+              {
+                name: 'read_file',
+                status: 'error',
+                result: {
+                  path: '/workspace/bug.ts',
+                  content: 'poison',
+                },
+              },
+              {
+                name: 'read_file',
+                status: 'ok',
+                result: {
+                  path: '/workspace/other.ts',
+                  content: 'poison',
+                },
+              },
+              {
+                name: 'edit_file',
+                status: 'error',
+                result: {
+                  path: '/workspace/bug.ts',
+                  replacements: 5,
+                },
+              },
+              {
+                name: 'execute_command',
+                status: 'error',
+                arguments: {
+                  argv: ['npm', 'test'],
+                  cwd: '/workspace',
+                },
+                result: { exit_code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+      evidence: {
+        workspace_changes: [
+          {
+            path: '/workspace/other.ts',
+            before_sha256: 'before',
+            after_sha256: 'after',
+          },
+        ],
+        tool_calls: [],
+        audit_entries: [],
+      },
+    });
+    const output = await runCodingVertical(
+      fakeHarness(result).harness,
+      {
+        repo_path: '/workspace',
+        bug_file: '/workspace/bug.ts',
+        test_command: ['npm', 'test'],
+      },
+    );
+    expect(output).toMatchObject({
+      read_ok: false,
+      fix_applied: false,
+      test_exit_code: null,
+      diff_before: '',
+      diff_after: '',
+      bug_located: false,
+    });
+  });
+
+  it('requires both a successful edit receipt and a changed workspace hash', async () => {
+    const baseTurn = {
+      tool_observations: [
+        {
+          name: 'read_file',
+          status: 'ok',
+          result: {
+            path: '/workspace/bug.ts',
+            content: 'bug',
+            truncated: false,
+          },
+        },
+      ],
+    };
+    const input = {
+      repo_path: '/workspace',
+      bug_file: '/workspace/bug.ts',
+      test_command: ['npm', 'test'],
+    };
+    const diffWithoutEdit = outcome({
+      loop_result: { turns: [baseTurn] },
+      evidence: {
+        workspace_changes: [
+          {
+            path: '/workspace/bug.ts',
+            before_sha256: 'before',
+            after_sha256: 'after',
+          },
+        ],
+        tool_calls: [],
+        audit_entries: [],
+      },
+    });
+    expect(
+      await runCodingVertical(
+        fakeHarness(diffWithoutEdit).harness,
+        input,
+      ),
+    ).toMatchObject({
+      read_ok: true,
+      fix_applied: false,
+      bug_located: false,
+    });
+
+    const editWithoutDiff = outcome({
+      loop_result: {
+        turns: [
+          {
+            tool_observations: [
+              ...baseTurn.tool_observations,
+              {
+                name: 'edit_file',
+                status: 'ok',
+                result: {
+                  path: '/workspace/bug.ts',
+                  replacements: 1,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      evidence: {
+        workspace_changes: [],
+        tool_calls: [],
+        audit_entries: [],
+      },
+    });
+    expect(
+      await runCodingVertical(
+        fakeHarness(editWithoutDiff).harness,
+        input,
+      ),
+    ).toMatchObject({
+      read_ok: true,
+      fix_applied: false,
+      bug_located: true,
+      diff_before: '',
+      diff_after: '',
+    });
+  });
+
+  it('does not accept an empty read result as coding proof', async () => {
+    const result = outcome({
+      loop_result: {
+        turns: [
+          {
+            tool_observations: [
+              {
+                name: 'read_file',
+                status: 'ok',
+                result: { path: '/workspace/bug.ts' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const output = await runCodingVertical(
+      fakeHarness(result).harness,
+      {
+        repo_path: '/workspace',
+        bug_file: '/workspace/bug.ts',
+        test_command: ['npm', 'test'],
+      },
+    );
+    expect(output.read_ok).toBe(false);
+    expect(output.bug_located).toBe(false);
+  });
+
   it('freezes the document contract and filters citations from parsed evidence', async () => {
     const input = { path: '/workspace/report.pdf', max_pages: 3 };
     expect(docTaskContract(input)).toEqual({

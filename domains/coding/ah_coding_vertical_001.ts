@@ -90,7 +90,10 @@ export async function runCodingVertical(
   );
 
   return {
-    read_ok: read !== undefined && readResult?.truncated !== true,
+    read_ok:
+      read !== undefined &&
+      typeof readResult?.content === 'string' &&
+      readResult.truncated !== true,
     fix_applied:
       edit !== undefined &&
       (editResult?.replacements ?? 0) > 0 &&
