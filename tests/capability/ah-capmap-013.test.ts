@@ -14,13 +14,56 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
       expect(calls).toBe(1);
     });
     it('retryable errors: 429, 500, 502, 503, 504, network, timeout', () => {
-      for (const s of [429, 500, 502, 503, 504]) expect(classifyError({ status: s, message: 'x' }).retryable).toBe(true);
-      expect(classifyError(new Error('network error')).retryable).toBe(true);
-      expect(classifyError(new Error('ETIMEDOUT')).retryable).toBe(true);
+      expect(classifyError({ status: 429, message: 'x' })).toMatchObject({
+        kind: 'rate_limited',
+        status: 429,
+        retryable: true,
+        message: 'x',
+      });
+      for (const status of [500, 502, 503, 504, 599]) {
+        expect(classifyError({ status, message: 'x' })).toMatchObject({
+          kind: 'server',
+          status,
+          retryable: true,
+        });
+      }
+      expect(classifyError(new Error('network error'))).toMatchObject({
+        kind: 'network',
+        retryable: true,
+      });
+      expect(classifyError(new Error('ETIMEDOUT'))).toMatchObject({
+        kind: 'timeout',
+        retryable: true,
+      });
     });
     it('default baseDelay=1000 maxDelay=30000 jitterMs=500 maxAttempts=3', () => {
-      // structural: exercised by the maxAttempts test above with overrides
-      expect(true).toBe(true);
+      const logs: RetryLogEntry[] = [];
+      const delays: number[] = [];
+      let calls = 0;
+      return expect(
+        retry(
+          async () => {
+            calls += 1;
+            throw { status: 500, message: 'down' };
+          },
+          {
+            idempotencyKey: 'defaults',
+            log: (entry) => logs.push(entry),
+            dependencies: {
+              now: () => new Date('2026-07-25T00:00:00.000Z'),
+              randomJitter: () => 0,
+              sleep: async (milliseconds) => {
+                delays.push(milliseconds);
+              },
+            },
+          },
+        ),
+      ).rejects.toMatchObject({ attempts: 3 }).then(() => {
+        expect(calls).toBe(3);
+        expect(delays).toEqual([1_000, 2_000]);
+        expect(logs.map((entry) => entry.delayMs)).toEqual([1_000, 2_000, 0]);
+        expect(logs[0]!.timestamp).toBe('2026-07-25T00:00:00.000Z');
+      });
     });
     it('backoff: attempt N waits baseDelay * 2^(N-1) + random(0, jitterMs)', async () => {
       const delays: number[] = [];
@@ -53,18 +96,20 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
       expect(() => cb.allow()).toThrow(CircuitOpenError);
     });
     it('half-open allows 1 probe request after cooldown', () => {
-      const cb = new CircuitBreaker(2, 10); // short cooldown for test
+      let now = 0;
+      const cb = new CircuitBreaker(2, 10, () => now);
       cb.allow(); cb.recordFailure();
       cb.allow(); cb.recordFailure();
       expect(cb.state_).toBe('open');
-      // wait for cooldown
-      return new Promise<void>(resolve => setTimeout(() => {
-        cb.allow(); // should transition to half_open (no throw)
-        expect(cb.state_).toBe('half_open');
-        cb.recordSuccess();
-        expect(cb.state_).toBe('closed');
-        resolve();
-      }, 20));
+      expect(() => cb.allow()).toThrow(CircuitOpenError);
+      now = 10;
+      cb.allow();
+      expect(cb.state_).toBe('half_open');
+      expect(cb.halfOpenProbeInFlight_).toBe(true);
+      expect(() => cb.allow()).toThrow(CircuitOpenError);
+      cb.recordSuccess();
+      expect(cb.state_).toBe('closed');
+      expect(cb.halfOpenProbeInFlight_).toBe(false);
     });
     it('success resets consecutive failures', () => {
       const cb = new CircuitBreaker(5);
@@ -91,6 +136,230 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
       const result = await retry(fn, { maxAttempts: 3, baseDelay: 1, idempotencyKey: 'key-1' });
       expect(result).toBe('ok');
       expect(calls).toBe(3);
+    });
+  });
+
+  describe('boundary behavior', () => {
+    it.each([400, 401, 403, 404, 422, 499])(
+      'classifies HTTP %s as non-retryable',
+      (status) => {
+        expect(classifyError({ status, message: 'denied' })).toEqual({
+          kind: 'unknown',
+          status,
+          retryable: false,
+          message: 'denied',
+        });
+      },
+    );
+
+    it('classifies HTTP 408 as timeout and malformed statuses as unknown', () => {
+      expect(classifyError({ status: 408, message: 'late' })).toMatchObject({
+        kind: 'timeout',
+        status: 408,
+        retryable: true,
+      });
+      expect(classifyError({ status: '500', message: 'wrong type' })).toEqual({
+        kind: 'unknown',
+        retryable: false,
+        message: 'wrong type',
+        cause: { status: '500', message: 'wrong type' },
+      });
+      expect(classifyError(null)).toMatchObject({
+        kind: 'unknown',
+        retryable: false,
+        message: 'null',
+      });
+      expect(classifyError({ status: 600, message: 'not a server error' }))
+        .toEqual({
+          kind: 'unknown',
+          status: 600,
+          retryable: false,
+          message: 'not a server error',
+        });
+      expect(classifyError({ status: 500.5, message: 'not an integer' }))
+        .toEqual({
+          kind: 'unknown',
+          retryable: false,
+          message: 'not an integer',
+          cause: { status: 500.5, message: 'not an integer' },
+        });
+      expect(classifyError({ message: 42 })).toEqual({
+        kind: 'unknown',
+        retryable: false,
+        message: '[object Object]',
+        cause: { message: 42 },
+      });
+    });
+
+    it('reopens a failed half-open probe and reports exact remaining cooldown', () => {
+      let now = 100;
+      const cb = new CircuitBreaker(1, 50, () => now);
+      cb.recordFailure();
+      now = 120;
+      try {
+        cb.allow();
+        expect.fail('expected open circuit');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CircuitOpenError);
+        expect((error as CircuitOpenError).retryAfterMs).toBe(30);
+      }
+      now = 150;
+      cb.allow();
+      cb.recordFailure();
+      expect(cb.state_).toBe('open');
+      now = 151;
+      expect(() => cb.allow()).toThrow(CircuitOpenError);
+    });
+
+    it('validates circuit and retry configuration', async () => {
+      expect(() => new CircuitBreaker(0)).toThrow(RangeError);
+      expect(() => new CircuitBreaker(1, -1)).toThrow(RangeError);
+      for (const options of [
+        { maxAttempts: 0 },
+        { baseDelay: -1 },
+        { maxDelay: -1 },
+        { jitterMs: -1 },
+      ]) {
+        await expect(retry(async () => 'never', options)).rejects.toThrow(
+          RangeError,
+        );
+      }
+      await expect(
+        retry(async () => 'ok', {
+          maxAttempts: 1,
+          baseDelay: 0,
+          maxDelay: 0,
+          jitterMs: 0,
+        }),
+      ).resolves.toBe('ok');
+    });
+
+    it('caps delay, validates jitter and clock, and preserves original non-retryable error', async () => {
+      const delays: number[] = [];
+      let attempts = 0;
+      await expect(
+        retry(
+          async () => {
+            attempts += 1;
+            if (attempts < 3) throw { status: 500, message: 'retry' };
+            return 'ok';
+          },
+          {
+            idempotencyKey: 'cap',
+            maxAttempts: 3,
+            baseDelay: 80,
+            maxDelay: 100,
+            jitterMs: 30,
+            dependencies: {
+              randomJitter: () => 30,
+              sleep: async (milliseconds) => {
+                delays.push(milliseconds);
+              },
+            },
+          },
+        ),
+      ).resolves.toBe('ok');
+      expect(delays).toEqual([100, 100]);
+
+      await expect(
+        retry(async () => {
+          throw { status: 500 };
+        }, {
+          idempotencyKey: 'bad-jitter',
+          maxAttempts: 2,
+          dependencies: { randomJitter: () => 501 },
+        }),
+      ).rejects.toThrow('randomJitter returned an out-of-range value');
+      const lowJitterCause = { status: 500, message: 'low jitter' };
+      try {
+        await retry(async () => {
+          throw lowJitterCause;
+        }, {
+          idempotencyKey: 'low-jitter',
+          maxAttempts: 2,
+          dependencies: { randomJitter: () => -1 },
+        });
+        expect.fail('expected invalid jitter');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RangeError);
+        expect((error as Error & { cause: unknown }).cause).toBe(
+          lowJitterCause,
+        );
+      }
+
+      const clockCause = { status: 500, message: 'bad clock' };
+      await expect(
+        retry(async () => {
+          throw clockCause;
+        }, {
+          idempotencyKey: 'bad-clock',
+          maxAttempts: 2,
+          dependencies: {
+            randomJitter: () => 0,
+            now: () => new Date(Number.NaN),
+          },
+        }),
+      ).rejects.toThrow('retry clock returned an invalid date');
+
+      const original = { status: 400, message: 'bad request' };
+      await expect(retry(async () => {
+        throw original;
+      }, { log: () => undefined })).rejects.toBe(original);
+    });
+
+    it('treats a blank idempotency key as unsafe to replay', async () => {
+      let calls = 0;
+      await expect(
+        retry(async () => {
+          calls += 1;
+          throw { status: 500 };
+        }, { idempotencyKey: '   ', maxAttempts: 3 }),
+      ).rejects.toMatchObject({ attempts: 1 });
+      expect(calls).toBe(1);
+    });
+
+    it('exposes typed, exact retry and circuit errors', () => {
+      const root = new Error('root failure');
+      const exhausted = new RetryExhausted(root, 2);
+      expect(exhausted.name).toBe('RetryExhausted');
+      expect(exhausted.message).toBe(
+        'retry exhausted after 2 attempts: root failure',
+      );
+      expect(exhausted.lastError).toBe(root);
+      expect(exhausted.attempts).toBe(2);
+
+      const exhaustedValue = new RetryExhausted({ code: 1 }, 1);
+      expect(exhaustedValue.message).toBe(
+        'retry exhausted after 1 attempts: [object Object]',
+      );
+      const open = new CircuitOpenError(25);
+      expect(open.name).toBe('CircuitOpenError');
+      expect(open.message).toBe('circuit breaker open; retry after 25ms');
+      expect(open.retryAfterMs).toBe(25);
+    });
+
+    it('uses zero default jitter without calling crypto for a zero range', async () => {
+      const delays: number[] = [];
+      let calls = 0;
+      await expect(
+        retry(async () => {
+          calls += 1;
+          if (calls === 1) throw { status: 500, message: 'once' };
+          return 'ok';
+        }, {
+          idempotencyKey: 'zero',
+          maxAttempts: 2,
+          baseDelay: 0,
+          maxDelay: 0,
+          jitterMs: 0,
+          dependencies: {
+            sleep: async (milliseconds) => {
+              delays.push(milliseconds);
+            },
+          },
+        }),
+      ).resolves.toBe('ok');
+      expect(delays).toEqual([0]);
     });
   });
 });

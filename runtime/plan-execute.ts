@@ -262,7 +262,9 @@ export async function runPlanExecute(
         context.iterations,
         context.nextModelBudget(),
       );
+      if (context.terminated) return;
       const recorded = context.recordTurn(turn);
+      if (context.terminated) return;
       if (turn.stop_reason === 'length') {
         states.set(stepId, 'failed');
         context.setStepState(stepId, 'failed', { reason: 'truncated model turn' });

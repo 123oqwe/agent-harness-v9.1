@@ -1,15 +1,9 @@
 /**
- * AH-CAPMAP-013: Retry with exponential backoff + jitter and circuit breaker.
+ * AH-CAPMAP-013: bounded retry and a deterministic circuit breaker.
  *
- * - maxAttempts: default 3
- * - backoff: baseDelay * 2^(N-1) + random(0, jitterMs)
- * - defaults: baseDelay=1000, maxDelay=30000, jitterMs=500, maxAttempts=3
- * - non-retryable errors (e.g. 400) do NOT trigger retry
- * - retryable: network errors, 429, 500, 502, 503, 504
- * - circuit breaker: opens after 5 consecutive failures, blocks 60s, half-open allows 1 probe
- * - all attempts logged
- * - RetryExhausted includes last error + attempt count
- * - retry never replays non-idempotent ops without idempotency key
+ * A retry is permitted only when the caller supplies an idempotency key.
+ * Delay, jitter, time, and sleep are injectable so tests and replay do not
+ * depend on wall-clock races.
  */
 import { randomInt } from 'node:crypto';
 
@@ -21,6 +15,12 @@ export type RetryableError = {
   cause?: unknown;
 };
 
+export interface RetryDependencies {
+  readonly now?: () => Date;
+  readonly sleep?: (milliseconds: number) => Promise<void>;
+  readonly randomJitter?: (maxInclusive: number) => number;
+}
+
 export interface RetryOptions {
   maxAttempts?: number;
   baseDelay?: number;
@@ -28,6 +28,7 @@ export interface RetryOptions {
   jitterMs?: number;
   idempotencyKey?: string;
   log?: (entry: RetryLogEntry) => void;
+  dependencies?: RetryDependencies;
 }
 
 export interface RetryLogEntry {
@@ -40,8 +41,11 @@ export interface RetryLogEntry {
 export class RetryExhausted extends Error {
   readonly lastError: unknown;
   readonly attempts: number;
+
   constructor(lastError: unknown, attempts: number) {
-    super(`retry exhausted after ${attempts} attempts: ${(lastError as Error)?.message ?? String(lastError)}`);
+    const detail =
+      lastError instanceof Error ? lastError.message : String(lastError);
+    super(`retry exhausted after ${attempts} attempts: ${detail}`);
     this.name = 'RetryExhausted';
     this.lastError = lastError;
     this.attempts = attempts;
@@ -51,6 +55,7 @@ export class RetryExhausted extends Error {
 
 export class CircuitOpenError extends Error {
   readonly retryAfterMs: number;
+
   constructor(retryAfterMs: number) {
     super(`circuit breaker open; retry after ${retryAfterMs}ms`);
     this.name = 'CircuitOpenError';
@@ -59,46 +64,101 @@ export class CircuitOpenError extends Error {
   }
 }
 
-const DEFAULTS = { maxAttempts: 3, baseDelay: 1000, maxDelay: 30000, jitterMs: 500 };
+const DEFAULTS = Object.freeze({
+  maxAttempts: 3,
+  baseDelay: 1_000,
+  maxDelay: 30_000,
+  jitterMs: 500,
+});
 
-/** Classify an error as retryable or non-retryable. */
-export function classifyError(err: unknown): RetryableError {
-  if (err && typeof err === 'object' && 'status' in err) {
-    const status = (err as { status: number }).status;
-    if (status === 400 || status === 401 || status === 403 || status === 404 || status === 422) {
-      return { kind: 'unknown', status, retryable: false, message: (err as { message?: string })?.message ?? `status ${status}` };
-    }
-    if (status === 429) return { kind: 'rate_limited', status, retryable: true, message: 'rate limited' };
-    if (status >= 500) return { kind: 'server', status, retryable: true, message: `server error ${status}` };
+function errorMessage(error: unknown): string {
+  if (
+    error !== null &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
   }
-  const msg = (err as Error)?.message ?? String(err);
-  if (/network|econnreset|econnrefused|etimedout|socket hang up|fetch failed/i.test(msg)) {
-    return { kind: 'network', retryable: true, message: msg, cause: err };
-  }
-  if (/timeout|timed out/i.test(msg)) return { kind: 'timeout', retryable: true, message: msg, cause: err };
-  return { kind: 'unknown', retryable: false, message: msg, cause: err };
+  return String(error);
 }
 
-/** Circuit breaker: opens after 5 consecutive failures, blocks 60s, half-open allows 1 probe. */
+export function classifyError(error: unknown): RetryableError {
+  const message = errorMessage(error);
+  if (error !== null && typeof error === 'object' && 'status' in error) {
+    const status = error.status;
+    if (typeof status === 'number' && Number.isInteger(status)) {
+      if (status === 408) {
+        return {
+          kind: 'timeout',
+          status,
+          retryable: true,
+          message,
+          cause: error,
+        };
+      }
+      if (status === 429) {
+        return {
+          kind: 'rate_limited',
+          status,
+          retryable: true,
+          message,
+          cause: error,
+        };
+      }
+      if (status >= 500 && status <= 599) {
+        return {
+          kind: 'server',
+          status,
+          retryable: true,
+          message,
+          cause: error,
+        };
+      }
+      return { kind: 'unknown', status, retryable: false, message };
+    }
+  }
+  if (/timeout|timed out|etimedout/iu.test(message)) {
+    return { kind: 'timeout', retryable: true, message, cause: error };
+  }
+  if (
+    /network|econnreset|econnrefused|socket hang up|fetch failed/iu.test(
+      message,
+    )
+  ) {
+    return { kind: 'network', retryable: true, message, cause: error };
+  }
+  return { kind: 'unknown', retryable: false, message, cause: error };
+}
+
 export class CircuitBreaker {
   private consecutiveFailures = 0;
   private state: 'closed' | 'open' | 'half_open' = 'closed';
   private openedAt = 0;
+
   constructor(
     private readonly threshold = 5,
     private readonly cooldownMs = 60_000,
-  ) {}
-
-  /** Throw CircuitOpenError if the circuit is open and cooldown hasn't elapsed. */
-  allow(): void {
-    if (this.state === 'open') {
-      const elapsed = Date.now() - this.openedAt;
-      if (elapsed >= this.cooldownMs) {
-        this.state = 'half_open'; // allow 1 probe
-      } else {
-        throw new CircuitOpenError(this.cooldownMs - elapsed);
-      }
+    private readonly now: () => number = Date.now,
+  ) {
+    if (!Number.isSafeInteger(threshold) || threshold < 1) {
+      throw new RangeError('threshold must be a positive safe integer');
     }
+    if (!Number.isSafeInteger(cooldownMs) || cooldownMs < 0) {
+      throw new RangeError('cooldownMs must be a non-negative safe integer');
+    }
+  }
+
+  allow(): void {
+    if (this.state === 'closed') return;
+    if (this.state === 'half_open') {
+      throw new CircuitOpenError(0);
+    }
+    const elapsed = Math.max(0, this.now() - this.openedAt);
+    if (elapsed < this.cooldownMs) {
+      throw new CircuitOpenError(this.cooldownMs - elapsed);
+    }
+    this.state = 'half_open';
   }
 
   recordSuccess(): void {
@@ -107,44 +167,109 @@ export class CircuitBreaker {
   }
 
   recordFailure(): void {
-    this.consecutiveFailures++;
-    if (this.consecutiveFailures >= this.threshold) {
-      this.state = 'open';
-      this.openedAt = Date.now();
+    if (this.state === 'half_open') {
+      this.open();
+      return;
     }
+    this.consecutiveFailures += 1;
+    if (this.consecutiveFailures >= this.threshold) this.open();
   }
 
-  get state_(): 'closed' | 'open' | 'half_open' { return this.state; }
-  get consecutiveFailures_(): number { return this.consecutiveFailures; }
+  get state_(): 'closed' | 'open' | 'half_open' {
+    return this.state;
+  }
+
+  get consecutiveFailures_(): number {
+    return this.consecutiveFailures;
+  }
+
+  get halfOpenProbeInFlight_(): boolean {
+    return this.state === 'half_open';
+  }
+
+  private open(): void {
+    this.state = 'open';
+    this.openedAt = this.now();
+  }
 }
 
-function delay(ms: number): Promise<void> {
-  return ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve();
+function validateInteger(name: string, value: number, minimum: number): void {
+  if (!Number.isSafeInteger(value) || value < minimum) {
+    throw new RangeError(`${name} must be a safe integer >= ${minimum}`);
+  }
 }
 
-/**
- * retry(fn, opts): calls fn at most maxAttempts times with exponential backoff.
- * Non-retryable errors fail immediately. Non-idempotent ops require idempotencyKey.
- */
-export async function retry<T>(fn: (attempt: number) => Promise<T>, opts: RetryOptions = {}): Promise<T> {
-  const { maxAttempts = DEFAULTS.maxAttempts, baseDelay = DEFAULTS.baseDelay, maxDelay = DEFAULTS.maxDelay, jitterMs = DEFAULTS.jitterMs, idempotencyKey, log } = opts;
-  // Security invariant: retry must NOT replay non-idempotent operations without idempotency key.
-  // Without a key, only 1 attempt is allowed (no retry).
-  const effectiveMaxAttempts = idempotencyKey ? maxAttempts : 1;
+function defaultSleep(milliseconds: number): Promise<void> {
+  return milliseconds === 0
+    ? Promise.resolve()
+    : new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function defaultJitter(maxInclusive: number): number {
+  return maxInclusive === 0 ? 0 : randomInt(0, maxInclusive + 1);
+}
+
+export async function retry<T>(
+  operation: (attempt: number) => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  const maxAttempts = options.maxAttempts ?? DEFAULTS.maxAttempts;
+  const baseDelay = options.baseDelay ?? DEFAULTS.baseDelay;
+  const maxDelay = options.maxDelay ?? DEFAULTS.maxDelay;
+  const jitterMs = options.jitterMs ?? DEFAULTS.jitterMs;
+  validateInteger('maxAttempts', maxAttempts, 1);
+  validateInteger('baseDelay', baseDelay, 0);
+  validateInteger('maxDelay', maxDelay, 0);
+  validateInteger('jitterMs', jitterMs, 0);
+
+  const replaySafe = (options.idempotencyKey?.trim().length ?? 0) > 0;
+  const effectiveMaxAttempts = replaySafe ? maxAttempts : 1;
+  const now = options.dependencies?.now ?? (() => new Date());
+  const sleep = options.dependencies?.sleep ?? defaultSleep;
+  const randomJitter =
+    options.dependencies?.randomJitter ?? defaultJitter;
   let lastError: unknown;
-  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
+
+  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt += 1) {
     try {
-      const result = await fn(attempt);
-      return result;
-    } catch (err) {
-      lastError = err;
-      const classified = classifyError(err);
-      const isLast = attempt >= effectiveMaxAttempts;
-      const delayMs = isLast || !classified.retryable ? 0 : Math.min(baseDelay * Math.pow(2, attempt - 1) + randomInt(0, jitterMs), maxDelay);
-      log?.({ attempt, delayMs, error: classified.message, timestamp: new Date().toISOString() });
-      if (!classified.retryable) throw err;
-      if (isLast) throw new RetryExhausted(err, attempt);
-      await delay(delayMs);
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+      const classified = classifyError(error);
+      const isLast = attempt === effectiveMaxAttempts;
+      const jitter = isLast ? 0 : randomJitter(jitterMs);
+      if (
+        !Number.isSafeInteger(jitter) ||
+        jitter < 0 ||
+        jitter > jitterMs
+      ) {
+        throw new RangeError('randomJitter returned an out-of-range value', {
+          cause: error,
+        });
+      }
+      const exponential = Math.min(
+        maxDelay,
+        baseDelay * 2 ** (attempt - 1),
+      );
+      const delayMs =
+        isLast || !classified.retryable
+          ? 0
+          : Math.min(maxDelay, exponential + jitter);
+      const timestamp = now();
+      if (!Number.isFinite(timestamp.getTime())) {
+        throw new RangeError('retry clock returned an invalid date', {
+          cause: error,
+        });
+      }
+      options.log?.({
+        attempt,
+        delayMs,
+        error: classified.message,
+        timestamp: timestamp.toISOString(),
+      });
+      if (!classified.retryable) throw error;
+      if (isLast) throw new RetryExhausted(error, attempt);
+      await sleep(delayMs);
     }
   }
   throw new RetryExhausted(lastError, effectiveMaxAttempts);

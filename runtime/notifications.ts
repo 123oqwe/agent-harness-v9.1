@@ -2,84 +2,172 @@
  * AH-CAPMAP-020: In-app notifications (local event queue, no push).
  * No external delivery (no email/push/SMS) in Phase 1.
  */
-export type NotificationType = 'info' | 'warning' | 'error' | 'success' | 'approval_request';
+import { randomUUID } from 'node:crypto';
+
+export type NotificationType =
+  | 'info'
+  | 'warning'
+  | 'error'
+  | 'success'
+  | 'approval_request';
 
 export interface Notification {
-  id: string;
-  user_id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  created_at: string;
-  read: boolean;
-  expires_at: string;
-  seq: number; // monotonic creation order for deterministic sort tie-break
+  readonly id: string;
+  readonly user_id: string;
+  readonly type: NotificationType;
+  readonly title: string;
+  readonly body: string;
+  readonly created_at: string;
+  readonly read: boolean;
+  readonly expires_at: string;
+  readonly seq: number;
+}
+
+export interface NotificationServiceOptions {
+  readonly ttlDays?: number;
+  readonly now?: () => Date;
+  readonly createId?: () => string;
 }
 
 export class NotificationError extends Error {
-  constructor(message: string) { super(message); this.name = 'NotificationError'; Object.setPrototypeOf(this, NotificationError.prototype); }
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationError';
+    Object.setPrototypeOf(this, NotificationError.prototype);
+  }
 }
 
 const MAX_BODY = 500;
 const DEFAULT_TTL_DAYS = 30;
+const DAY_MS = 86_400_000;
+const TYPES = new Set<NotificationType>([
+  'info',
+  'warning',
+  'error',
+  'success',
+  'approval_request',
+]);
 
-function uid(): string { return 'n-' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36); }
+function publicNotification(value: Notification): Notification {
+  return Object.freeze({ ...value });
+}
 
 export class NotificationService {
   private readonly notifications = new Map<string, Notification>();
   private readonly userIndex = new Map<string, Set<string>>();
   private readonly ttlDays: number;
+  private readonly now: () => Date;
+  private readonly createId: () => string;
   private seq = 0;
 
-  constructor(ttlDays = DEFAULT_TTL_DAYS) { this.ttlDays = ttlDays; }
-
-  /** POST /notifications — requires authenticated user. */
-  create(user_id: string, type: NotificationType, title: string, body: string): Notification {
-    if (!user_id) throw new NotificationError('authenticated session required');
-    if (body.length > MAX_BODY) throw new NotificationError(`body exceeds ${MAX_BODY} chars`);
-    const now = new Date();
-    const expires = new Date(now.getTime() + this.ttlDays * 86400_000);
-    const n: Notification = { id: uid(), user_id, type, title, body, created_at: now.toISOString(), read: false, expires_at: expires.toISOString(), seq: ++this.seq };
-    this.notifications.set(n.id, n);
-    if (!this.userIndex.has(user_id)) this.userIndex.set(user_id, new Set());
-    this.userIndex.get(user_id)!.add(n.id);
-    return n;
+  constructor(options: number | NotificationServiceOptions = {}) {
+    const normalized =
+      typeof options === 'number' ? { ttlDays: options } : options;
+    const ttlDays = normalized.ttlDays ?? DEFAULT_TTL_DAYS;
+    if (!Number.isFinite(ttlDays) || ttlDays < 0) {
+      throw new NotificationError('ttlDays must be a non-negative number');
+    }
+    this.ttlDays = ttlDays;
+    this.now = normalized.now ?? (() => new Date());
+    this.createId = normalized.createId ?? randomUUID;
   }
 
-  /** GET /notifications — returns unread for user, sorted by created_at desc. */
-  list(user_id: string, includeRead = false): Notification[] {
-    const ids = this.userIndex.get(user_id);
-    if (!ids) return [];
-    const now = new Date().toISOString();
+  create(
+    userId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+  ): Notification {
+    if (userId.trim().length === 0) {
+      throw new NotificationError('authenticated session required');
+    }
+    if (!TYPES.has(type)) {
+      throw new NotificationError('unsupported notification type');
+    }
+    if (title.trim().length === 0) {
+      throw new NotificationError('title is required');
+    }
+    if (body.length > MAX_BODY) {
+      throw new NotificationError(`body exceeds ${MAX_BODY} chars`);
+    }
+    const now = this.now();
+    if (!Number.isFinite(now.getTime())) {
+      throw new NotificationError('clock returned an invalid date');
+    }
+    const id = this.createId();
+    if (id.trim().length === 0 || this.notifications.has(id)) {
+      throw new NotificationError('notification id must be non-empty and unique');
+    }
+    const value: Notification = Object.freeze({
+      id,
+      user_id: userId,
+      type,
+      title,
+      body,
+      created_at: now.toISOString(),
+      read: false,
+      expires_at: new Date(now.getTime() + this.ttlDays * DAY_MS).toISOString(),
+      seq: ++this.seq,
+    });
+    this.notifications.set(id, value);
+    const ids = this.userIndex.get(userId) ?? new Set<string>();
+    ids.add(id);
+    this.userIndex.set(userId, ids);
+    return publicNotification(value);
+  }
+
+  list(userId: string, includeRead = false): Notification[] {
+    const ids = this.userIndex.get(userId);
+    if (ids === undefined) return [];
+    const now = this.now().getTime();
     return [...ids]
-      .map(id => this.notifications.get(id)!)
-      .filter(n => n && n.expires_at > now)
-      .filter(n => includeRead || !n.read)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.seq - a.seq);
+      .map((id) => this.notifications.get(id))
+      .filter(
+        (value): value is Notification =>
+          value !== undefined && Date.parse(value.expires_at) > now,
+      )
+      .filter((value) => includeRead || !value.read)
+      .sort(
+        (left, right) =>
+          Date.parse(right.created_at) - Date.parse(left.created_at) ||
+          right.seq - left.seq,
+      )
+      .map(publicNotification);
   }
 
-  /** PATCH /notifications/{id} — mark as read. */
-  markRead(user_id: string, id: string): void {
-    const n = this.notifications.get(id);
-    if (!n || n.user_id !== user_id) throw new NotificationError('not found or not owner');
-    n.read = true;
+  markRead(userId: string, id: string): void {
+    const value = this.owned(userId, id);
+    this.notifications.set(id, Object.freeze({ ...value, read: true }));
   }
 
-  /** DELETE /notifications/{id} — dismiss. */
-  dismiss(user_id: string, id: string): void {
-    const n = this.notifications.get(id);
-    if (!n || n.user_id !== user_id) throw new NotificationError('not found or not owner');
+  dismiss(userId: string, id: string): void {
+    this.owned(userId, id);
     this.notifications.delete(id);
-    this.userIndex.get(user_id)?.delete(id);
+    const ids = this.userIndex.get(userId)!;
+    ids.delete(id);
+    if (ids.size === 0) this.userIndex.delete(userId);
   }
 
-  /** Purge expired notifications. */
   purgeExpired(): number {
-    const now = new Date().toISOString();
+    const now = this.now().getTime();
     let purged = 0;
-    for (const [id, n] of this.notifications) {
-      if (n.expires_at <= now) { this.notifications.delete(id); this.userIndex.get(n.user_id)?.delete(id); purged++; }
+    for (const [id, value] of this.notifications) {
+      if (Date.parse(value.expires_at) <= now) {
+        this.notifications.delete(id);
+        const ids = this.userIndex.get(value.user_id);
+        ids?.delete(id);
+        if (ids?.size === 0) this.userIndex.delete(value.user_id);
+        purged += 1;
+      }
     }
     return purged;
+  }
+
+  private owned(userId: string, id: string): Notification {
+    const value = this.notifications.get(id);
+    if (value === undefined || value.user_id !== userId) {
+      throw new NotificationError('not found or not owner');
+    }
+    return value;
   }
 }

@@ -48,7 +48,6 @@ export interface StrategyContext {
     state: RuntimeStepState,
     details?: Readonly<Record<string, unknown>>,
   ): void;
-  writeProgress(): void;
 }
 
 export type ReasoningStrategyHandler = (

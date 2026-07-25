@@ -41,7 +41,9 @@ export async function runReact(
       context.iterations,
       budget,
     );
+    if (context.terminated) return;
     const recorded = context.recordTurn(turn);
+    if (context.terminated) return;
     if (turn.stop_reason === 'length') {
       context.terminate('malformed_response');
       return;

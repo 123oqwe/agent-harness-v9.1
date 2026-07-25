@@ -193,16 +193,23 @@ export class LoopEngine {
   private inputTokens = 0;
   private outputTokens = 0;
   private readonly stepStatesValue = new Map<string, RuntimeStepState>();
+  private lifecycle: 'idle' | 'running' | 'finished' = 'idle';
+  private requestedStop: TerminationReason | null = null;
 
   constructor(
     private readonly config: LoopConfig,
     private readonly deps: LoopDeps,
   ) {
+    this.validateConfig();
     this.startTime = this.nowMs();
   }
 
   async run(): Promise<LoopResult> {
+    if (this.lifecycle !== 'idle') {
+      throw new LoopError('LoopEngine instances can run exactly once');
+    }
     this.deps.session.acquireWriter();
+    this.lifecycle = 'running';
     try {
       const messages: unknown[] = [
         { role: 'user', content: this.config.goal },
@@ -229,6 +236,7 @@ export class LoopEngine {
     } finally {
       this.writeProgressSafely();
       this.deps.session.releaseWriter();
+      this.lifecycle = 'finished';
     }
     return {
       strategy: this.config.strategy,
@@ -247,6 +255,12 @@ export class LoopEngine {
       },
       step_states: Object.freeze(Object.fromEntries(this.stepStatesValue)),
     };
+  }
+
+  stop(reason: TerminationReason): void {
+    if (this.lifecycle === 'finished' || this.terminatedValue) return;
+    this.requestedStop = reason;
+    if (this.lifecycle === 'running') this.terminate(reason);
   }
 
   private createContext(): StrategyContext {
@@ -280,11 +294,11 @@ export class LoopEngine {
       terminate: (reason: TerminationReason) => this.terminate(reason),
       setStepState: (stepId, state, details) =>
         this.setStepState(stepId, state, details),
-      writeProgress: () => this.writeProgressSafely(),
     };
   }
 
   private preflight(): TerminationReason | null {
+    if (this.requestedStop !== null) return this.requestedStop;
     if (this.deps.signal?.aborted) return 'user_cancel';
     if (
       this.config.deadline_ms !== undefined &&
@@ -452,11 +466,58 @@ export class LoopEngine {
   }
 
   private now(): string {
-    return this.config.clock?.() ?? new Date().toISOString();
+    const value = this.config.clock?.() ?? new Date().toISOString();
+    if (!Number.isFinite(Date.parse(value))) {
+      throw new LoopError('clock returned an invalid timestamp');
+    }
+    return value;
   }
 
   private nowMs(): number {
-    return this.config.nowMs?.() ?? Date.now();
+    const value = this.config.nowMs?.() ?? Date.now();
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new LoopError('nowMs returned an invalid timestamp');
+    }
+    return value;
+  }
+
+  private validateConfig(): void {
+    if (this.config.run_id.trim().length === 0) {
+      throw new LoopError('run_id is required');
+    }
+    if (this.config.goal.trim().length === 0) {
+      throw new LoopError('goal is required');
+    }
+    if (
+      !Number.isSafeInteger(this.config.max_iterations) ||
+      this.config.max_iterations < 0
+    ) {
+      throw new LoopError(
+        'max_iterations must be a non-negative safe integer',
+      );
+    }
+    for (const [name, value] of [
+      ['budget_tokens', this.config.budget_tokens],
+      ['deadline_ms', this.config.deadline_ms],
+    ] as const) {
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(value) || value < 0)
+      ) {
+        throw new LoopError(`${name} must be a non-negative safe integer`);
+      }
+    }
+    for (const [name, value] of [
+      ['max_output_tokens_per_call', this.config.max_output_tokens_per_call],
+      ['max_observation_bytes', this.config.max_observation_bytes],
+    ] as const) {
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(value) || value < 0)
+      ) {
+        throw new LoopError(`${name} must be a non-negative safe integer`);
+      }
+    }
   }
 
   private writeProgressSafely(): void {
