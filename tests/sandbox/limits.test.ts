@@ -27,6 +27,7 @@ describe('AH-SANDBOX-001 limits enforced', () => {
     });
     expect(r.truncated).toBe(true);
     expect(r.stdout.length).toBeLessThanOrEqual(256);
+    expect(r.limitExceeded).toBe('output');
   }, 10000);
 
   it('AbortSignal cancels a running process', async () => {
