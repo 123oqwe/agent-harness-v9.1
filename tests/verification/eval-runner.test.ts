@@ -125,6 +125,32 @@ describe('AH-EVAL-RUNNER-001 argv-only evaluation runner', () => {
     expect(report.reasoning_strategy_consistent).toBe(true);
   });
 
+  it('requires every e2e strategy fixture to pass', () => {
+    const report = new EvalRunner().run(
+      manifest([
+        {
+          id: 'direct-pass',
+          kind: 'e2e',
+          argv: [node, '-e', 'process.exit(0)'],
+          expected_exit: 0,
+          expected_strategy: 'direct',
+        },
+        {
+          id: 'plan-fail',
+          kind: 'e2e',
+          argv: [node, '-e', 'process.exit(9)'],
+          expected_exit: 0,
+          expected_strategy: 'plan_execute',
+        },
+      ]),
+    );
+    expect(report.results.map((result) => result.passed)).toEqual([
+      true,
+      false,
+    ]);
+    expect(report.reasoning_strategy_consistent).toBe(false);
+  });
+
   it('passes arguments literally and never interprets shell syntax', () => {
     scratch = mkdtempSync(join(tmpdir(), 'eval-argv-'));
     const target = join(scratch, 'must-not-exist');
@@ -284,5 +310,132 @@ describe('AH-EVAL-RUNNER-001 argv-only evaluation runner', () => {
         ],
       }),
     ).toThrow('e2e eval requires a valid expected_strategy');
+  });
+
+  it('rejects execution outside a repository with an exact revision error', () => {
+    scratch = mkdtempSync(join(tmpdir(), 'eval-not-repo-'));
+    expect(() =>
+      new EvalRunner().run(
+        manifest([
+          {
+            id: 'unit',
+            kind: 'unit',
+            argv: [node, '-e', 'process.exit(0)'],
+            expected_exit: 0,
+          },
+        ]),
+        scratch,
+      ),
+    ).toThrow('cannot resolve an exact git revision');
+  });
+
+  it.each([
+    [null, 'invalid manifest_version'],
+    [{}, 'invalid manifest_version'],
+    [
+      { manifest_version: 'wrong', requirement_id: 'x', suites: [] },
+      'invalid manifest_version',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: '',
+        suites: [],
+      },
+      'manifest requires requirement_id',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [],
+      },
+      'manifest requires non-empty suites',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          { id: ' ', kind: 'unit', argv: [node], expected_exit: 0 },
+        ],
+      },
+      'each eval case requires a non-empty id',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          { id: 'x', kind: 'unit', argv: [node], expected_exit: 0 },
+          { id: 'x', kind: 'unit', argv: [node], expected_exit: 0 },
+        ],
+      },
+      'duplicate eval id: x',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          { id: 'x', kind: 'unknown', argv: [node], expected_exit: 0 },
+        ],
+      },
+      'invalid eval kind: unknown',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          { id: 'x', kind: 'unit', argv: [node, 4], expected_exit: 0 },
+        ],
+      },
+      'each eval case requires non-empty argv',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          { id: 'x', kind: 'unit', argv: [node], expected_exit: 0.5 },
+        ],
+      },
+      'expected_exit must be an integer',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          {
+            id: 'x',
+            kind: 'unit',
+            argv: [node],
+            expected_exit: 0,
+            timeout_ms: -1,
+          },
+        ],
+      },
+      'timeout_ms must be a positive integer',
+    ],
+    [
+      {
+        manifest_version: 'eval-manifest.v1',
+        requirement_id: 'x',
+        suites: [
+          {
+            id: 'x',
+            kind: 'unit',
+            argv: [node],
+            expected_exit: 0,
+            expected_strategy: 'direct',
+          },
+        ],
+      },
+      'expected_strategy is only valid for e2e evals',
+    ],
+  ])('returns exact manifest diagnostic %#', (candidate, message) => {
+    expect(() => EvalRunner.validateManifest(candidate)).toThrow(message);
   });
 });

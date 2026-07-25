@@ -112,6 +112,7 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
     {},
     { argv: [] },
     { argv: [''] },
+    { argv: [node, 4] },
     { argv: [node], timeout_ms: 0 },
   ])('rejects malformed command %#', (candidate) => {
     expect(() => runCommand(candidate as never)).toThrow(EvidenceError);
@@ -251,6 +252,34 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
         schemaPath,
       ),
     ).toThrow('does not match');
+    expect(() =>
+      validateEvidence(
+        validEvidence({
+          verifier_result: 'fail',
+          exit_codes: [0, 3],
+          commands_run: [
+            validEvidence().commands_run[0]!,
+            {
+              ...validEvidence().commands_run[0]!,
+              exit_code: 3,
+            },
+          ],
+        }),
+        schemaPath,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateEvidence(
+        validEvidence({ commit_sha: `${'a'.repeat(40)}suffix` }),
+        schemaPath,
+      ),
+    ).toThrow('commit_sha must be a 40-char SHA');
+    expect(() =>
+      validateEvidence(
+        validEvidence({ commit_sha: `prefix${'a'.repeat(40)}` }),
+        schemaPath,
+      ),
+    ).toThrow('commit_sha must be a 40-char SHA');
   });
 
   it('uses the requested repository cwd when resolving the exact revision', () => {
@@ -280,5 +309,11 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
         schemaPath,
       ),
     ).toThrow(/evidence schema validation failed:/u);
+    expect(() => runCommand({ argv: [] })).toThrow(
+      'command requires non-empty argv',
+    );
+    expect(() =>
+      runCommand({ argv: [node], timeout_ms: -1 }),
+    ).toThrow('command timeout_ms must be a positive integer');
   });
 });

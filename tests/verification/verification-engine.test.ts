@@ -647,6 +647,19 @@ describe('Phase 1 VerificationGraph execution', () => {
         /missing read-back expectation|read-back hash mismatch/u,
       );
     }
+    const mismatch = await new VerificationEngine([
+      new ReadBackVerificationAdapter({
+        'criterion-0': {
+          path: '/workspace/answer.txt',
+          expectedSha256: '0'.repeat(64),
+        },
+      }),
+    ]).verify(context(fixture('deterministic', 'read_back')));
+    expect(mismatch.records[0]!.evidence).toEqual({
+      path: '/workspace/answer.txt',
+      sha256: createHash('sha256').update('actual').digest('hex'),
+      bytes: 6,
+    });
   });
 
   it('fails sandbox test verification for missing, nonzero, and timed-out commands', async () => {
@@ -703,6 +716,15 @@ describe('Phase 1 VerificationGraph execution', () => {
       );
       expect(report.records[0]!.reason).toBe(reasons[index]);
       expect(report.all_passed).toBe(false);
+      if (index === 2) {
+        expect(report.records[0]!.evidence).toMatchObject({
+          path: '/workspace/wrong.json',
+          sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          errors: expect.arrayContaining([
+            expect.objectContaining({ keyword: 'const' }),
+          ]),
+        });
+      }
     }
   });
 
@@ -781,6 +803,23 @@ describe('Phase 1 VerificationGraph execution', () => {
           },
         },
       ],
+    });
+    const wrongTool = await new VerificationEngine([adapter]).verify(
+      context(input, [
+        {
+          tool_name: 'read_file',
+          success: true,
+          policy_decision: 'allow',
+        },
+      ]),
+    );
+    expect(wrongTool.records[0]).toMatchObject({
+      status: 'failed',
+      evidence: {
+        expected_tools: ['write_file'],
+        verified_tools: [],
+        receipt_count: 1,
+      },
     });
   });
 });
