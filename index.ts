@@ -35,6 +35,7 @@ export * from './tools/ask-user.js';
 export * from './router/static-router.js';
 // Session + Runtime
 export * from './session/durable-session.js';
+export * from './session/session-store.js';
 export * from './runtime/loop.js';
 export * from './runtime/retry.js';
 export * from './runtime/notifications.js';

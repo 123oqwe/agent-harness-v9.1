@@ -25,6 +25,8 @@ function toolSpec(name: string): ToolSpec {
   return spec;
 }
 
+const SESSION_MASTER_KEY = Buffer.alloc(32, 0x41);
+
 function makeHarness(tmp: string, responses: ParsedResponse[] = [{ content: 'done' }], dataDir?: string): Harness {
   const gw = createScriptedGateway(responses);
   const tr = new ToolRegistry();
@@ -35,7 +37,7 @@ function makeHarness(tmp: string, responses: ParsedResponse[] = [{ content: 'don
   const pe = new PolicyEngine({ version: 'v1', default_decision: 'deny', allowed_tools: ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files'], allowed_resource_prefixes: ['/workspace'], rules: [{ id: 'a', priority: 1, effect: 'allow', tools: ['*'], resource_prefixes: ['/workspace'] }] } as Policy);
   const sandbox: SandboxProfile = { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };
   const _sec = createTestSecurityDeps(pe, () => new Date().toISOString());
-  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run'), ...(dataDir ? { dataDir } : {}) });
+  return new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run'), ...(dataDir ? { dataDir, sessionMasterKey: SESSION_MASTER_KEY } : {}) });
 }
 
 function task(goal: string) {
@@ -101,6 +103,17 @@ describe('Main chain integration: no bypasses', () => {
       // SQLite database should exist
       expect(existsSync(join(dataDir, 'session.db'))).toBe(true);
       expect(r.session.eventCount()).toBeGreaterThan(0);
+      const store = new SqliteSessionStore(join(dataDir, 'session.db'), {
+        masterKey: SESSION_MASTER_KEY,
+      });
+      try {
+        expect(store.getLatestSnapshot(r.session.session_id)).toMatchObject({
+          session_id: r.session.session_id,
+          last_seq: r.session.eventCount(),
+        });
+      } finally {
+        store.close();
+      }
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
     }
@@ -172,7 +185,9 @@ describe('Main chain integration: no bypasses', () => {
         dataDir,
       );
       await h.run(task('read the files'), 'run-operations');
-      const store = new SqliteSessionStore(join(dataDir, 'session.db'));
+      const store = new SqliteSessionStore(join(dataDir, 'session.db'), {
+        masterKey: SESSION_MASTER_KEY,
+      });
       try {
         const operations = store.listOperations('run-operations');
         expect(operations).toHaveLength(2);

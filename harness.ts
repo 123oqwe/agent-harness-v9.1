@@ -156,6 +156,8 @@ export interface HarnessConfig {
   verification: VerificationEngine;
   signal?: AbortSignal;
   dataDir?: string | undefined;
+  /** Caller-custodied 256-bit key required whenever dataDir enables persistence. */
+  sessionMasterKey?: Uint8Array;
   sessionLogPath?: string;
 }
 
@@ -190,6 +192,14 @@ export class Harness {
   private _modelCallCount = 0;
 
   constructor(config: HarnessConfig) {
+    if (
+      (config.dataDir !== undefined || config.sessionLogPath !== undefined) &&
+      config.sessionMasterKey?.byteLength !== 32
+    ) {
+      throw new Error(
+        '32-byte sessionMasterKey is required when session persistence is configured',
+      );
+    }
     this.config = config;
     this.execCtx = config.executionContext;
     this.toolSnapshot = config.toolRegistry.freezeSnapshot();
@@ -227,6 +237,7 @@ export class Harness {
     if (this.config.dataDir) {
       sqliteStore = new SqliteSessionStore(
         join(this.config.dataDir, 'session.db'),
+        { masterKey: this.config.sessionMasterKey! },
       );
       sqliteStore.createRun(
         actualRunId,
@@ -235,6 +246,13 @@ export class Harness {
       );
     }
     const existingEvents = sqliteStore?.loadEvents(actualRunId) ?? [];
+    const latestSnapshot = sqliteStore?.getLatestSnapshot(actualRunId) ?? null;
+    const usableSnapshot =
+      latestSnapshot !== null &&
+      latestSnapshot.last_seq === existingEvents.length &&
+      latestSnapshot.last_hash === (existingEvents.at(-1)?.hash ?? '')
+        ? latestSnapshot
+        : null;
     const persistedRun = sqliteStore?.getRun(actualRunId) ?? null;
     const session =
       existingEvents.length === 0
@@ -246,7 +264,7 @@ export class Harness {
             {
               session_id: actualRunId,
               events: existingEvents,
-              snapshot: null,
+              snapshot: usableSnapshot,
             },
             {
               ...(sqliteStore === null ? {} : { persistence: sqliteStore }),
@@ -292,6 +310,11 @@ export class Harness {
     if (routing.outcome !== 'route' || !routing.run_plan) {
       // Router deny is terminal: model_calls=0, tool_calls=0, no fake RunPlan
       session.append('error', { reason: 'routing_denied', outcome: routing.outcome, abstain_reason: routing.abstain_reason });
+      session.snapshot_({
+        termination_reason: 'denied',
+        iterations: 0,
+        last_event_seq: session.eventCount(),
+      });
       session.releaseWriter();
       this.finalizeOverlay(false);
       sqliteStore?.updateRunStatus(actualRunId, 'denied');
@@ -398,10 +421,17 @@ export class Harness {
           verification_report: null,
           workspace_changes: [],
         });
+        session.snapshot_({
+          termination_reason: 'denied',
+          iterations: 0,
+          last_event_seq: session.eventCount(),
+        });
         session.releaseWriter();
         this.finalizeOverlay(false);
         if (this.config.sessionLogPath) {
-          persistSession(session, this.config.sessionLogPath);
+          persistSession(session, this.config.sessionLogPath, {
+            encryptionKey: this.config.sessionMasterKey!,
+          });
         }
         sqliteStore?.updateRunStatus(actualRunId, 'denied');
         return {
@@ -577,6 +607,11 @@ export class Harness {
       verification_report: verificationReport,
       workspace_changes: workspaceChanges,
     });
+    session.snapshot_({
+      termination_reason: loopResult.termination_reason,
+      iterations: loopResult.iterations,
+      last_event_seq: session.eventCount(),
+    });
     session.releaseWriter();
 
     // VerificationGraph pass is the only commit authority.
@@ -584,7 +619,9 @@ export class Harness {
 
     // 4. Persist session if path provided
     if (this.config.sessionLogPath) {
-      persistSession(session, this.config.sessionLogPath);
+      persistSession(session, this.config.sessionLogPath, {
+        encryptionKey: this.config.sessionMasterKey!,
+      });
     }
 
     // 5. Build evidence
