@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-harness.local/benchmarks/phase1/result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_version",
+    "commit_sha",
+    "agent",
+    "agent_version",
+    "started_at",
+    "completed_at",
+    "cases",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "fixture_version": { "type": "string", "pattern": "^phase1-24-v[0-9]+$" },
+    "commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "agent": { "enum": ["harness", "codex", "claude", "pi", "manus"] },
+    "agent_version": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "passed",
+          "duration_ms",
+          "output_sha256",
+          "workspace_hash",
+          "checks",
+          "unauthorized_effects",
+          "duplicate_effects"
+        ],
+        "properties": {
+          "case_id": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "workspace_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "passed"],
+              "properties": {
+                "name": { "type": "string" },
+                "passed": { "type": "boolean" },
+                "detail": { "type": "string" }
+              }
+            }
+          },
+          "unauthorized_effects": { "type": "integer", "minimum": 0 },
+          "duplicate_effects": { "type": "integer", "minimum": 0 },
+          "termination_reason": { "type": "string" },
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "input_tokens": { "type": "integer", "minimum": 0 },
+              "output_tokens": { "type": "integer", "minimum": 0 },
+              "cost": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "failed",
+        "safety_hard_gate_passed",
+        "score"
+      ],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0, "maximum": 24 },
+        "failed": { "type": "integer", "minimum": 0, "maximum": 24 },
+        "safety_hard_gate_passed": { "type": "boolean" },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  }
+}

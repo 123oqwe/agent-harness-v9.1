@@ -5,6 +5,7 @@ export * from './harness.js';
 export * from './gateway/scripted-provider.js';
 export * from './gateway/model-gateway.js';
 export * from './gateway/glm-provider.js';
+export * from './gateway/glm-gateway-bridge.js';
 export * from './security/policy-engine.js';
 export * from './security/pep.js';
 export * from './security/capability.js';
@@ -33,9 +34,11 @@ export * from './tools/create-artifact.js';
 export * from './tools/ask-user.js';
 // Router
 export * from './router/static-router.js';
+export * from './router/task-normalizer.js';
 // Session + Runtime
 export * from './session/durable-session.js';
 export * from './session/session-store.js';
+export * from './session/sqlite-session-store.js';
 export * from './runtime/loop.js';
 export * from './runtime/retry.js';
 export * from './runtime/notifications.js';

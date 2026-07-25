@@ -67,6 +67,9 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     }
     expect(pkg.exports).toHaveProperty('.');
     expect(pkg.files).toEqual(['dist']);
+    expect(pkg.scripts.postinstall).toBeUndefined();
+    expect(pkg.scripts.prepare).toBe('patch-package');
+    expect(pkg.scripts.lint).toContain('benchmarks');
   });
 
   it('limits mutation to product source and cleans the sandbox even after failure', () => {
