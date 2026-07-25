@@ -51,17 +51,21 @@ export function assertSafeVfsPath(path: string): void {
   if (typeof path !== 'string' || path.length === 0) throw new VfsError('path required');
   if (!path.startsWith('/')) throw new VfsError(`path must be absolute within VFS: ${path}`);
   if (path.includes('\0')) throw new VfsError('null byte in path');
-  if (/(^|\/)\.\.(\/|$)/.test(path)) throw new VfsError(`traversal rejected: ${path}`);
+  if (path.split('/').includes('..')) throw new VfsError(`traversal rejected: ${path}`);
 }
 
 function realpathSafe(p: string): string {
-  try { return realpathSync(p); } catch {
-    // For non-existent paths, resolve the parent directory and rejoin
+  let candidate = resolve(p);
+  const missing: string[] = [];
+  for (;;) {
     try {
-      const dir = dirname(p);
-      const dirReal = realpathSync(dir);
-      return join(dirReal, basename(p));
-    } catch { return p; }
+      return resolve(realpathSync(candidate), ...missing.reverse());
+    } catch {
+      const parent = dirname(candidate);
+      if (parent === candidate) return resolve(p);
+      missing.push(basename(candidate));
+      candidate = parent;
+    }
   }
 }
 function clone(b: Buffer | undefined): Buffer { if (!b) throw new VfsError('not found'); return Buffer.from(b); }
@@ -101,7 +105,7 @@ export class LocalBackend implements Backend {
     mkdirSync(dirname(os), { recursive: true });
     // Re-check after mkdir in case a symlink was created in the parent dir
     this.safe(os);
-    writeFileSync(os, data, mode === undefined ? undefined : { mode });
+    writeFileSync(os, data);
     if (mode !== undefined) chmodSync(os, mode);
   }
   delete(path: string): void { rmSync(this.osPath(path), { recursive: true, force: true }); }
@@ -190,8 +194,8 @@ export class OverlayBackend implements Backend {
   write(path: string, data: Buffer, mode?: number): void {
     this.checkTx();
     this.staged.set(path, clone(data));
-    if (mode === undefined) this.stagedModes.delete(path);
-    else this.stagedModes.set(path, mode);
+    this.stagedModes.delete(path);
+    if (mode !== undefined) this.stagedModes.set(path, mode);
     this.tombstones.delete(path);
   }
   delete(path: string): void { this.checkTx(); this.tombstones.add(path); this.staged.delete(path); this.stagedModes.delete(path); }
@@ -257,18 +261,37 @@ export class VirtualFilesystem {
   private checkPermission(path: string, write: boolean): void {
     // deny-by-default: a path is accessible only if a rule explicitly permits it.
     let allowed = false;
-    for (const r of this.permissions) if (path === r.prefix || path.startsWith(r.prefix === '/' ? '/' : r.prefix + '/')) allowed = write ? r.write : r.read;
+    let specificity = -1;
+    for (const rule of this.permissions) {
+      if (
+        path !== rule.prefix &&
+        !path.startsWith(rule.prefix === '/' ? '/' : `${rule.prefix}/`)
+      ) {
+        continue;
+      }
+      const decision = write ? rule.write : rule.read;
+      if (rule.prefix.length > specificity) {
+        allowed = decision;
+        specificity = rule.prefix.length;
+      } else if (rule.prefix.length === specificity && !decision) {
+        allowed = false;
+      }
+    }
     if (!allowed) throw new VfsError(`permission denied: ${path}`);
   }
   private record(r: VfsReceipt): void { this.log.push(r); }
-  receipts(): readonly VfsReceipt[] { return this.log; }
+  receipts(): readonly VfsReceipt[] {
+    return Object.freeze(
+      this.log.map((receipt) => Object.freeze({ ...receipt })),
+    );
+  }
 
   read(path: string): Buffer { this.checkPermission(path, false); const b = this.route(path); const data = b.read(path); this.record({ path, backend: b.kind, operation: 'read', bytes: data.length, sha256: sha(data), timestamp: now() }); return data; }
   readText(path: string): string { return this.read(path).toString('utf8'); }
   list(path: string): VfsEntry[] { this.checkPermission(path, false); const b = this.route(path); const entries = b.list(path); this.record({ path, backend: b.kind, operation: 'list', timestamp: now() }); return entries; }
-  write(path: string, data: Buffer | string): void { this.checkPermission(path, true); const b = this.route(path); const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : data; b.write(path, buf); this.record({ path, backend: b.kind, operation: 'write', bytes: buf.length, sha256: sha(buf), timestamp: now() }); }
+  write(path: string, data: Buffer | string): void { this.checkPermission(path, true); const b = this.route(path); const buf = typeof data === 'string' ? Buffer.from(data) : data; b.write(path, buf); this.record({ path, backend: b.kind, operation: 'write', bytes: buf.length, sha256: sha(buf), timestamp: now() }); }
   writeText(path: string, text: string): void { this.write(path, text); }
-  edit(path: string, data: Buffer | string): void { this.write(path, data); const last = this.log[this.log.length - 1]; if (last) last.operation = 'edit'; }
+  edit(path: string, data: Buffer | string): void { this.write(path, data); this.log[this.log.length - 1]!.operation = 'edit'; }
   delete(path: string): void { this.checkPermission(path, true); const b = this.route(path); b.delete(path); this.record({ path, backend: b.kind, operation: 'delete', timestamp: now() }); }
   exists(path: string): boolean { try { this.checkPermission(path, false); return this.route(path).exists(path); } catch { return false; } }
   search(root: string, needle: string): VfsEntry[] {
@@ -294,43 +317,47 @@ export class VirtualFilesystem {
    // If no target provided, route to the overlay's prefix to find the backend
    if (!target) target = this.route(overlay.prefix);
    // Save originals for rollback: content of existing files + existence of new files
-    const originals = new Map<string, { data: Buffer; mode?: number } | null>(); // null = file did not exist
-    const deletedFiles = new Map<string, { data: Buffer; mode?: number }>(); // path -> original content (for restore)
+    const originals = new Map<string, { data: Buffer; mode: number | undefined } | null>(); // null = file did not exist
+    const deletedFiles = new Map<string, { data: Buffer; mode: number | undefined }>(); // path -> original content (for restore)
     const writtenPaths: string[] = [];
+    const stagedEntries = overlay.stagedEntries();
+    const stagedTombstones = overlay.stagedTombstones();
+    const receipts: VfsReceipt[] = [];
     try {
       // Phase 1: Save originals for all staged writes and tombstones
-      for (const [path] of overlay.stagedEntries()) {
+      for (const [path] of stagedEntries) {
         this.checkPermission(path, true);
         try {
           const mode = target.mode?.(path);
           originals.set(path, {
             data: target.read(path),
-            ...(mode === undefined ? {} : { mode }),
+            mode,
           });
         } catch { originals.set(path, null); }
       }
-      for (const path of overlay.stagedTombstones()) {
+      for (const path of stagedTombstones) {
         this.checkPermission(path, true);
         try {
           const mode = target.mode?.(path);
           deletedFiles.set(path, {
             data: target.read(path),
-            ...(mode === undefined ? {} : { mode }),
+            mode,
           });
         } catch { /* file may not exist */ }
       }
       // Phase 2: Write all entries
-      for (const [path, buf, mode] of overlay.stagedEntries()) {
+      for (const [path, buf, mode] of stagedEntries) {
         target.write(path, buf, mode);
         writtenPaths.push(path);
-        this.record({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
+        receipts.push({ path, backend: target.kind, operation: 'commit', bytes: buf.length, sha256: sha(buf), timestamp: now() });
       }
       // Phase 3: Delete tombstoned files
-      for (const path of overlay.stagedTombstones()) {
+      for (const path of stagedTombstones) {
         target.delete(path);
-        this.record({ path, backend: target.kind, operation: 'commit', timestamp: now() });
+        receipts.push({ path, backend: target.kind, operation: 'commit', timestamp: now() });
       }
       overlay.markCommitted();
+      for (const receipt of receipts) this.record(receipt);
     } catch (e) {
       // Rollback: restore original content for overwritten files, restore deleted files, delete new files
       for (const [path, original] of originals) {
@@ -344,11 +371,15 @@ export class VirtualFilesystem {
       for (const [path, original] of deletedFiles) {
         try { target.write(path, original.data, original.mode); } catch { /* best effort */ }
       }
+      overlay.markDiscarded();
       this.record({ path: overlay.prefix, backend: target.kind, operation: 'discard', timestamp: now() });
       throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}`);
     }
   }
   discardOverlay(overlay: OverlayBackend): void {
+    if (overlay.isCommitted() || overlay.isDiscarded()) {
+      throw new VfsError('overlay already finalized');
+    }
     overlay.markDiscarded();
     this.record({ path: overlay.prefix, backend: 'overlay', operation: 'discard', timestamp: now() });
   }

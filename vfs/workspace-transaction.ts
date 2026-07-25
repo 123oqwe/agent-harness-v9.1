@@ -53,6 +53,75 @@ interface TransactionMetadata {
   excluded_base_paths: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSafeMetadataPath(value: string): boolean {
+  return value.length > 0 &&
+    !isAbsolute(value) &&
+    !value.includes('\0') &&
+    !value.split('/').includes('..');
+}
+
+function isManifestEntry(value: unknown): value is ManifestEntry {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'file') {
+    return typeof value.sha256 === 'string' &&
+      /^[0-9a-f]{64}$/u.test(value.sha256) &&
+      Number.isInteger(value.mode) &&
+      (value.mode as number) >= 0 &&
+      (value.mode as number) <= 0o777;
+  }
+  return value.kind === 'symlink' && typeof value.target === 'string';
+}
+
+function isTransactionMetadata(
+  value: unknown,
+  runId: string,
+  baseRoot: string,
+  workspaceRoot: string,
+): value is TransactionMetadata {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    value.run_id !== runId ||
+    value.base_root !== baseRoot ||
+    !isRecord(value.initial) ||
+    !isRecord(value.protected_links) ||
+    !Array.isArray(value.excluded_base_paths)
+  ) {
+    return false;
+  }
+  if (
+    !existsSync(workspaceRoot) ||
+    lstatSync(workspaceRoot).isSymbolicLink() ||
+    !lstatSync(workspaceRoot).isDirectory()
+  ) {
+    return false;
+  }
+  for (const [path, entry] of Object.entries(value.initial)) {
+    if (!isSafeMetadataPath(path) || !isManifestEntry(entry)) return false;
+  }
+  for (const [path, target] of Object.entries(value.protected_links)) {
+    if (
+      !PROTECTED_TOP_LEVEL.has(path) ||
+      target !== join(baseRoot, path)
+    ) {
+      return false;
+    }
+  }
+  const excluded = value.excluded_base_paths;
+  if (!excluded.every((path): path is string => {
+    if (typeof path !== 'string' || !isAbsolute(path)) return false;
+    const rel = relative(baseRoot, path);
+    return rel !== '' && !rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel);
+  })) {
+    return false;
+  }
+  return new Set(excluded).size === excluded.length;
+}
+
 export interface WorkspaceTransactionOptions {
   runId: string;
   baseRoot: string;
@@ -81,7 +150,6 @@ function hashBuffer(value: Buffer): string {
 
 function safeRelative(root: string, candidate: string): string {
   const rel = relative(root, candidate);
-  if (rel === '') return '';
   if (rel.startsWith(`..${sep}`) || rel === '..' || isAbsolute(rel)) {
     throw new VfsError(`path outside workspace transaction: ${candidate}`);
   }
@@ -114,11 +182,11 @@ function equalEntry(
 ): boolean {
   if (left == null || right == null) return left == null && right == null;
   if (left.kind !== right.kind) return false;
-  return left.kind === 'file' && right.kind === 'file'
-    ? left.sha256 === right.sha256 && left.mode === right.mode
-    : left.kind === 'symlink' &&
-        right.kind === 'symlink' &&
-        left.target === right.target;
+  if (left.kind === 'file') {
+    return left.sha256 === (right as Extract<ManifestEntry, { kind: 'file' }>).sha256 &&
+      left.mode === (right as Extract<ManifestEntry, { kind: 'file' }>).mode;
+  }
+  return left.target === (right as Extract<ManifestEntry, { kind: 'symlink' }>).target;
 }
 
 function copyWorkspace(
@@ -135,7 +203,7 @@ function copyWorkspace(
   const walk = (sourceDir: string, targetDir: string, relDir: string): void => {
     mkdirSync(targetDir, { recursive: true, mode: 0o700 });
     for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
-      const rel = relDir === '' ? entry.name : join(relDir, entry.name);
+      const rel = join(relDir, entry.name);
       const normalized = normalizeRelative(rel);
       const source = join(sourceDir, entry.name);
       const target = join(targetDir, entry.name);
@@ -175,7 +243,7 @@ function scanWorkspace(
   const manifest: Record<string, ManifestEntry> = {};
   const walk = (dir: string, relDir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const rel = relDir === '' ? entry.name : join(relDir, entry.name);
+      const rel = join(relDir, entry.name);
       const normalized = normalizeRelative(rel);
       const path = join(dir, entry.name);
       if (Object.hasOwn(protectedLinks, normalized)) {
@@ -245,16 +313,18 @@ export class WorkspaceTransaction {
     const metadataPath = join(containerRoot, 'metadata.json');
 
     if (existsSync(metadataPath)) {
-      const parsed = JSON.parse(
-        readFileSync(metadataPath, 'utf8'),
-      ) as TransactionMetadata;
-      if (
-        parsed.version !== 1 ||
-        parsed.run_id !== options.runId ||
-        parsed.base_root !== baseRoot ||
-        !Array.isArray(parsed.excluded_base_paths) ||
-        !existsSync(workspaceRoot)
-      ) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readFileSync(metadataPath, 'utf8'));
+      } catch {
+        throw new VfsError('workspace transaction metadata mismatch');
+      }
+      if (!isTransactionMetadata(
+        parsed,
+        options.runId,
+        baseRoot,
+        workspaceRoot,
+      )) {
         throw new VfsError('workspace transaction metadata mismatch');
       }
       return new WorkspaceTransaction(containerRoot, parsed, true);
