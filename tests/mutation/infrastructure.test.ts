@@ -192,6 +192,7 @@ describe('Phase 1 mutation manifest', () => {
         (sourceFile) =>
           !sourceFile.endsWith('/index.ts') &&
           !sourceFile.endsWith('.d.ts') &&
+          sourceFile !== 'session/session-store.ts' &&
           sourceFile !== 'runtime/reasoning-strategy.ts',
       )
       .sort();
@@ -199,6 +200,17 @@ describe('Phase 1 mutation manifest', () => {
     for (const [sourceFile, owners] of assigned) {
       expect(owners, `${sourceFile} has duplicate owners`).toHaveLength(1);
     }
+  });
+
+  it('does not send the type-only session facade to Stryker', () => {
+    expect(mutationModules.session!.mutate).not.toContain(
+      'session/session-store.ts',
+    );
+    expect(
+      readFileSync(join(harnessRoot, 'session', 'session-store.ts'), 'utf8'),
+    ).toMatch(
+      /^\/\*\*[\s\S]*\*\/\s*export \{[\s\S]*\} from ['"][^'"]+['"];\s*export type \{/u,
+    );
   });
 
   it('keeps the declared aggregate and critical-module floors', () => {

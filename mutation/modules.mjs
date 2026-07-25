@@ -84,7 +84,6 @@ export const mutationModules = {
     mutate: [
       'session/durable-session.ts',
       'session/sqlite-session-store.ts',
-      'session/session-store.ts',
       'session/progress-store.ts',
     ],
     minimum: 90,
