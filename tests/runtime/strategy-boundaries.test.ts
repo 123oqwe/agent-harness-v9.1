@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { RunPlan } from '../../contracts/index.js';
 import {
@@ -197,6 +200,48 @@ describe('Direct strategy boundaries', () => {
     ).run();
     expect(result.termination_reason).toBe('completed');
     expect(result.turns[0]!.tool_observations).toEqual([]);
+  });
+
+  it('does not record tool effects after progress persistence terminates the run', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'direct-progress-failure-'));
+    const blockedDataDirectory = join(directory, 'not-a-directory');
+    writeFileSync(blockedDataDirectory, 'blocked');
+    try {
+      const runtimeDeps = deps([
+        {
+          ...answer,
+          tool_calls: [
+            { id: 'forbidden', name: 'write_file', arguments: { path: '/later' } },
+          ],
+        },
+      ]);
+      const result = await new LoopEngine(
+        config('direct', { data_dir: blockedDataDirectory }),
+        runtimeDeps,
+      ).run();
+
+      expect(result.termination_reason).toBe('internal_error');
+      expect(result.turns).toHaveLength(1);
+      expect(
+        runtimeDeps.session
+          .getEvents()
+          .filter((event) =>
+            ['tool_call', 'tool_result'].includes(event.type),
+          ),
+      ).toEqual([]);
+      expect(
+        runtimeDeps.session
+          .getEvents()
+          .filter(
+            (event) =>
+              event.type === 'system' &&
+              (event.data as { reason?: string }).reason ===
+                'strategy_violation',
+          ),
+      ).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
