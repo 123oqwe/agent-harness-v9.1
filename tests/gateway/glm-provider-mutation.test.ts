@@ -74,8 +74,9 @@ describe('GlmProvider mutation-killing tests', () => {
     ).toEqual({
       model: 'glm-5.2',
       reasoning_effort: 'xhigh',
+      thinking: { type: 'enabled', clear_thinking: false },
       messages: [{ role: 'user', content: 'hello' }],
-      temperature: 0.1,
+      temperature: 1,
       max_tokens: 4096,
     });
   });
@@ -95,8 +96,9 @@ describe('GlmProvider mutation-killing tests', () => {
     ).toEqual({
       model: 'glm-5.2',
       reasoning_effort: 'high',
+      thinking: { type: 'enabled', clear_thinking: false },
       messages: [],
-      temperature: 0.1,
+      temperature: 1,
       max_tokens: 4096,
     });
   });
@@ -117,11 +119,13 @@ describe('GlmProvider mutation-killing tests', () => {
         },
       ],
     }) as {
+      parallel_tool_calls: boolean;
       tools: Array<{
         type: string;
         function: { name: string; description: string; parameters: unknown };
       }>;
     };
+    expect(normalized.parallel_tool_calls).toBe(false);
     expect(normalized.tools[0]).toEqual({
       type: 'function',
       function: {
@@ -137,7 +141,15 @@ describe('GlmProvider mutation-killing tests', () => {
 
   it('parses text, usage, model and finish reasons', () => {
     const parsed = provider().parseResponse({
-      choices: [{ message: { content: 'hello' }, finish_reason: 'length' }],
+      choices: [
+        {
+          message: {
+            content: 'hello',
+            reasoning_content: 'private reasoning',
+          },
+          finish_reason: 'length',
+        },
+      ],
       usage: {
         prompt_tokens: 5,
         completion_tokens: 3,
@@ -147,6 +159,7 @@ describe('GlmProvider mutation-killing tests', () => {
     });
     expect(parsed).toMatchObject({
       content: 'hello',
+      reasoning_content: 'private reasoning',
       stop_reason: 'length',
       usage: { input_tokens: 5, output_tokens: 3 },
       model: 'response-model',

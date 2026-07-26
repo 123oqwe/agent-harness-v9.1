@@ -64,24 +64,48 @@ export interface RouterDeps {
 /** Deterministic intent profiler. No LLM in Phase 1 — rules only. */
 export function profileIntent(task: TaskContract): IntentProfile {
   const goal = task.goal.toLowerCase();
+  // Prohibitions describe safety boundaries, not requested effects. Remove
+  // their clause before classifying mutations so "read X; do not modify it"
+  // stays a read-only ReAct task instead of becoming Plan+Execute.
+  const affirmativeGoal = goal
+    .replace(/\b(?:do\s+not|don't|never|without)\b[^.。;；]*/gu, '')
+    .replace(/(?:不要|禁止)[^.。;；]*/gu, '')
+    .replace(/[;；,，]\s*(?=[.。]?\s*$)/u, '');
   const pureWriting = /\b(rewrite|polish|draft|essay|article|copyedit)\b|润色|改写|优化文案|写作|文章|草稿/u.test(goal);
-  const codeOrFileTarget = /\b(code|bug|function|repo|repository|typescript|javascript|python|file|module|config)\b|代码|缺陷|文件|函数|仓库|模块|配置/u.test(goal);
-  const mutationVerb = /\b(edit|create|modify|update|fix|implement|refactor|delete|remove|patch)\b|修复|修改|编辑|创建|更新|实现|重构|删除|移除|打补丁/u.test(goal);
-  const explicitFileWrite = /\b(?:write|create)\s+(?:(?:a|the)\s+)?(?:file|code|function|module)\b|写入(?:文件|代码)|新建(?:文件|模块)/u.test(goal);
-  const requires_writes = explicitFileWrite || mutationVerb && (codeOrFileTarget || !pureWriting);
-  const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(goal);
+  const hasCodePath =
+    /(?:^|[\s("'，。；])(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.(?:c|cc|cpp|cs|go|h|hpp|java|js|jsx|mjs|cjs|kt|php|py|rb|rs|sh|swift|ts|tsx)\b/iu.test(
+      goal,
+    );
+  const codeOrFileTarget =
+    hasCodePath ||
+    /\b(code|bug|function|repo|repository|typescript|javascript|python|file|module|config)\b|代码|缺陷|文件|函数|仓库|模块|配置/u.test(goal);
+  const explicitFileWrite =
+    /\b(?:write|create)\s+(?:(?:a|the)\s+)?(?:file|code|function|module)\b|\b(?:write|create)\s+(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+\b|\b(?:into|to)\s+(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+\b|写入(?:文件|代码)|新建(?:文件|模块)|(?:写入|创建|新建)\s*(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/u.test(
+      affirmativeGoal,
+    );
+  const affirmativeMutation =
+    /\b(edit|create|change|modify|update|fix|implement|refactor|delete|remove|patch)\b|修复|改变|修改|编辑|创建|更新|实现|重构|删除|移除|打补丁/u.test(
+      affirmativeGoal,
+    );
+  const requires_writes =
+    explicitFileWrite ||
+    affirmativeMutation && (codeOrFileTarget || !pureWriting);
+  const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(affirmativeGoal);
   const explicit_plan = /\b(plan|step by step|multi[- ]?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
   const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze|research|cite|source|reference)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析|研究|引用|来源|参考/u.test(goal);
   const requires_tools = requires_writes || requires_tests || observationTools;
-  const stepMarkers = (goal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
+  const stepMarkers = (affirmativeGoal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);
   const missing_info: string[] = [];
   if (task.success_criteria.length === 0) missing_info.push('success_criteria_empty');
   const ambiguity: 'none' | 'low' | 'high' = missing_info.length > 0 ? 'high' : (goal.length < 15 ? 'low' : 'none');
   const domains: string[] = [];
-  if (/\b(code|bug|function|repo|typescript|javascript|python|build)\b|代码|缺陷|函数|仓库|构建|编译/u.test(goal)) domains.push('coding');
+  if (
+    hasCodePath ||
+    /\b(code|bug|function|repo|typescript|javascript|python|build)\b|代码|缺陷|函数|仓库|构建|编译/u.test(goal)
+  ) domains.push('coding');
   if (/\b(document|pdf|page|file|summary|summarize|summarise)\b|文档|文件|页面|总结|摘要/u.test(goal)) domains.push('documents');
-  if (/\b(research|cite|source|reference)\b|研究|引用|来源|参考/u.test(goal)) domains.push('research');
+  if (/\b(research|citations?|sources?|references?)\b|研究|引用|来源|参考/u.test(goal)) domains.push('research');
   if (pureWriting) domains.push('writing');
   if (/\b(plan|schedule|dependency|dag|task)\b|计划|排期|依赖|任务/u.test(goal)) domains.push('planning');
   if (domains.length === 0) domains.push('general');
@@ -89,7 +113,7 @@ export function profileIntent(task: TaskContract): IntentProfile {
 }
 
 export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
-  if (intent.explicit_plan || (intent.requires_writes && intent.requires_tests) || intent.multi_step) return 'plan_execute';
+  if (intent.explicit_plan || intent.requires_writes || intent.multi_step) return 'plan_execute';
   if (intent.requires_tools) return 'react';
   return 'direct';
 }
@@ -125,10 +149,29 @@ export class StaticRouter {
       return { outcome: 'ask_user', intent, policy_prefilter_passed: true, policy_post_route_vetoed: false, ask_user_message: 'Task success criteria are empty. Please describe what a successful outcome looks like.' };
     }
 
-    // 3. Strategy selection
+    // 3. A declared read-only ceiling is a binding veto, not a routing hint.
+    if (
+      intent.requires_writes &&
+      task.constraints.some(
+        (constraint) =>
+          constraint.type === 'risk_ceiling' &&
+          constraint.value === 'read_only',
+      )
+    ) {
+      return {
+        outcome: 'abstain',
+        intent,
+        policy_prefilter_passed: false,
+        policy_post_route_vetoed: false,
+        abstain_reason:
+          'task requests a write but the risk ceiling is read_only',
+      };
+    }
+
+    // 4. Strategy selection
     const strategy = selectStrategy(intent);
 
-    // 4. Search compact skill metadata, then load only the selected frozen skill.
+    // 5. Search compact skill metadata, then load only the selected frozen skill.
     const skillName = this.skillFor(intent);
     const selectedSkill = skillName
       ? this.deps.skillRegistry
@@ -142,8 +185,13 @@ export class StaticRouter {
       ? this.deps.skillRegistry.loadFull(selectedSkill.name, this.deps.skillSnapshot)
       : undefined;
 
-    // 5. Search compact tool metadata; selected tools must match snapshot and Policy.
-    const proposedTools = this.proposedTools(strategy, fullSkill?.required_tools as string[] | undefined);
+    // 6. Search compact tool metadata; selected tools must match snapshot and Policy.
+    const workflowTools = this.workflowTools(task, intent, strategy);
+    const proposedTools = this.proposedTools(
+      strategy,
+      fullSkill?.required_tools as string[] | undefined,
+      workflowTools,
+    );
     const requiredTools: string[] = [];
     for (const name of proposedTools) {
       if (!this.deps.policyEngine.snapshot.allowed_tools.includes(name)) {
@@ -158,7 +206,7 @@ export class StaticRouter {
       requiredTools.push(name);
     }
 
-    // 6. Resolve the actual provider from the frozen Gateway snapshot.
+    // 7. Resolve the actual provider from the frozen Gateway snapshot.
     let resolved: ResolvedProvider;
     let provider: ResolvedProviderDescription;
     try {
@@ -170,18 +218,19 @@ export class StaticRouter {
       return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `provider policy veto: ${reason}` };
     }
 
-    // 7. Policy post-route veto validates the provider that was actually bound.
+    // 8. Policy post-route veto validates the provider that was actually bound.
     const postRouteViolation = this.policyPostRouteViolation(task, provider);
     if (postRouteViolation !== undefined) {
       return { outcome: 'abstain', intent, policy_prefilter_passed: true, policy_post_route_vetoed: true, abstain_reason: `policy post-route veto: ${postRouteViolation}` };
     }
 
-    // 8. Build the RunPlan only after every policy authority has accepted it.
+    // 9. Build the RunPlan only after every policy authority has accepted it.
     const runPlan = this.buildRunPlan(
       task,
       intent,
       strategy,
       requiredTools,
+      workflowTools,
       fullSkill ? { name: fullSkill.name, version: fullSkill.version } : undefined,
       provider,
       runIdOverride,
@@ -190,9 +239,77 @@ export class StaticRouter {
     return { outcome: 'route', strategy, intent, run_plan: runPlan, policy_prefilter_passed: true, policy_post_route_vetoed: false };
   }
 
-  private proposedTools(strategy: ReasoningStrategy, skillTools?: string[]): string[] {
-    if (strategy === 'direct' || skillTools === undefined) return [];
-    return [...new Set(skillTools)];
+  private proposedTools(
+    strategy: ReasoningStrategy,
+    skillTools: string[] | undefined,
+    workflowTools: readonly string[],
+  ): string[] {
+    if (strategy === 'direct') return [];
+    return [...new Set([...(skillTools ?? []), ...workflowTools])];
+  }
+
+  /**
+   * Skill required_tools are capability prerequisites, not a command to invoke
+   * every tool. This selects the concrete, ordered action nodes for this task.
+   */
+  private workflowTools(
+    task: TaskContract,
+    intent: IntentProfile,
+    strategy: ReasoningStrategy,
+  ): string[] {
+    if (strategy !== 'plan_execute') return [];
+    const goal = task.goal.toLowerCase();
+    const paths = [
+      ...new Set(
+        [
+          ...goal.matchAll(
+            /(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/gu,
+          ),
+        ].map((match) => match[0]!),
+      ),
+    ];
+    const outputPaths = new Set<string>();
+    for (const match of goal.matchAll(
+      /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/gu,
+    )) {
+      outputPaths.add(match[1]!);
+    }
+    const forbiddenPaths = new Set<string>();
+    for (const match of goal.matchAll(
+      /(?:\bnever\b|\bdo\s+not\b|\bdon't\b|不要|禁止)[^.。;；]*?\b(?:read|reveal|copy|include|edit|modify|change|write|create|delete|remove|touch|读取|泄露|复制|包含|编辑|修改|改变|写入|创建|删除|移除|触碰)\b[^.。;；]*?((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/gu,
+    )) {
+      forbiddenPaths.add(match[1]!);
+    }
+    const sourcePaths = paths.filter(
+      (path) => !outputPaths.has(path) && !forbiddenPaths.has(path),
+    );
+    const codingMutation =
+      intent.domains.includes('coding') &&
+      /\b(?:bug|fix|patch|change|modify|update|refactor)\b|修复|修改|更新|重构/u.test(
+        goal,
+      );
+    if (codingMutation) {
+      return [
+        'read_file',
+        'edit_file',
+        ...(intent.requires_tests ? ['execute_command'] : []),
+      ];
+    }
+    if (intent.requires_writes) {
+      if (intent.explicit_plan && paths.length === 0) return [];
+      const mutationInPlace =
+        outputPaths.size === 0 &&
+        /\b(?:edit|change|modify|update|fix|delete|remove|patch)\b|改变|修改|编辑|更新|修复|删除|移除|打补丁/u.test(
+          goal,
+        );
+      return [
+        ...sourcePaths.map(() => 'read_file'),
+        mutationInPlace ? 'edit_file' : 'write_file',
+        ...(intent.requires_tests ? ['execute_command'] : []),
+      ];
+    }
+    if (intent.requires_tests) return ['execute_command'];
+    return [];
   }
 
   private policyPostRouteViolation(task: TaskContract, provider: ResolvedProviderDescription): string | undefined {
@@ -208,8 +325,6 @@ export class StaticRouter {
   private skillFor(intent: IntentProfile): string | undefined {
     const goal = intent.goal.toLowerCase();
     if (intent.domains.includes('coding') && /\b(bug|fix|patch)\b|缺陷|修复|漏洞/u.test(goal)) return 'bug-fix';
-    if (intent.requires_writes) return 'feature-implementation';
-    if (intent.requires_tests) return 'test-and-verify';
     if (
       intent.domains.includes('documents') &&
       /\b(document|pdf|summary|summarize|summarise)\b|文档|总结|摘要/u.test(goal)
@@ -217,6 +332,8 @@ export class StaticRouter {
     if (intent.domains.includes('research')) return 'research-with-citations';
     if (intent.domains.includes('writing')) return 'writing-refinement';
     if (intent.domains.includes('planning')) return 'dependency-aware-planning';
+    if (intent.requires_writes) return 'feature-implementation';
+    if (intent.requires_tests) return 'test-and-verify';
     if (intent.requires_tools) return 'repository-exploration';
     return undefined;
   }
@@ -267,6 +384,7 @@ export class StaticRouter {
     intent: IntentProfile,
     strategy: ReasoningStrategy,
     requiredTools: string[],
+    workflowTools: string[],
     skill: { name: string; version: string } | undefined,
     provider: ResolvedProviderDescription,
     runIdOverride?: string,
@@ -285,12 +403,7 @@ export class StaticRouter {
     const workflow_nodes: RunPlan['workflow_graph']['nodes'] =
       strategy === 'plan_execute'
         ? [
-            {
-              step_id: 'step-plan',
-              step_type: 'model_call',
-              status: 'pending',
-            },
-            ...requiredTools.flatMap((tool, index) => [
+            ...workflowTools.flatMap((tool, index) => [
               {
                 step_id: `step-propose-${index}`,
                 step_type: 'model_call' as const,
@@ -391,7 +504,7 @@ export class StaticRouter {
           strategy === 'direct'
             ? 1
             : strategy === 'plan_execute'
-              ? Math.max(3, requiredTools.length + 2)
+              ? (workflowTools.length + 1) * 2
               : 3,
       },
       persistence_policy: { event_log: true, snapshot: true },

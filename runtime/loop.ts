@@ -51,6 +51,8 @@ export interface LoopConfig {
 
 export interface ModelTurn {
   content: string;
+  /** Provider-private reasoning carried in memory only between tool turns. */
+  reasoning_content?: string;
   tool_calls?: Array<{
     id: string;
     name: string;
@@ -64,6 +66,12 @@ export interface ModelTurn {
 export interface ModelCallBudget {
   remaining_tokens: number;
   max_output_tokens: number;
+}
+
+export interface ModelCallDirective {
+  readonly system_instruction: string;
+  readonly allowed_tools?: readonly string[];
+  readonly required_tool?: string;
 }
 
 export interface ToolObservation {
@@ -121,6 +129,7 @@ export interface LoopDeps {
     messages: unknown[],
     attempt: number,
     budget: ModelCallBudget,
+    directive?: ModelCallDirective,
   ) => Promise<ModelTurn>;
   toolExecute?: (
     name: string,

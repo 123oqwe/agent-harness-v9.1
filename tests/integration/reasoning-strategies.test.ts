@@ -94,11 +94,12 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
     const first = requests[0] as {
       messages: Array<{ role: string; content: string }>;
     };
-    expect(first.messages[0]).toMatchObject({ role: 'user' });
-    expect(first.messages[0]!.content).toContain(
+    expect(first.messages[0]).toMatchObject({ role: 'system' });
+    expect(first.messages[1]).toMatchObject({ role: 'user' });
+    expect(first.messages[1]!.content).toContain(
       "Preserve the author's intent",
     );
-    expect(first.messages[0]!.content).toContain(
+    expect(first.messages[1]!.content).toContain(
       'rewrite this paragraph more concisely',
     );
   });
@@ -118,7 +119,6 @@ describe('reasoning-strategies integration: one Harness, three strategies', () =
   it('plan_execute: multi-step write + test', async () => {
     writeFileSync(join(tmp, 'bug.ts'), 'function add(a, b) { return a - b; }');
     const h = makeHarness(tmp, [], [
-      { content: 'plan: read, fix, test' },
       { content: '', tool_calls: [{ id: '1', name: 'read_file', arguments: { path: '/workspace/bug.ts' } }] },
       { content: '', tool_calls: [{ id: '2', name: 'edit_file', arguments: { path: '/workspace/bug.ts', find: 'a - b', replace: 'a + b' } }] },
       { content: '', tool_calls: [{ id: '3', name: 'execute_command', arguments: { argv: ['/usr/bin/true'], cwd: '/workspace' } }] },

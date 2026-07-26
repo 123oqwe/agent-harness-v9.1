@@ -86,6 +86,44 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(i.requires_tests).toBe(true);
       expect(i.multi_step).toBe(true);
     });
+    it('routes an explicit file change and failed-test rollback as Plan+Execute', () => {
+      const result = router.route(
+        task(
+          "Change app.js to return 'new', run node failing-test.mjs, and preserve transactional semantics: a failed verification must not commit app.js.",
+        ),
+      );
+      expect(result.strategy).toBe('plan_execute');
+      expect(
+        result.run_plan!.workflow_graph.nodes
+          .filter((node) => node.step_type === 'tool_call')
+          .map((node) => node.tool_name),
+      ).toEqual([
+        'read_file',
+        'edit_file',
+        'execute_command',
+      ]);
+    });
+    it.each([
+      'Search the workspace and report the match. Do not modify files.',
+      'Read data/value.txt; do not create or change files.',
+      'Read the config without modifying any file.',
+      '读取 memo.txt，只回答结果；不要修改任何文件。',
+    ])('does not treat a prohibited mutation as requested work: %s', (goal) => {
+      const intent = profileIntent(task(goal));
+      expect(intent.requires_writes).toBe(false);
+      expect(selectStrategy(intent)).toBe('react');
+    });
+    it.each([
+      'write docs/summary.md with three bullets',
+      'create plan.json for build and test',
+      'summarize public.txt into summary.md',
+      '写入 docs/summary.md',
+      '创建 plan.json',
+    ])('recognizes an explicit output path as a filesystem write: %s', (goal) => {
+      const intent = profileIntent(task(goal));
+      expect(intent.requires_writes).toBe(true);
+      expect(intent.requires_tools).toBe(true);
+    });
   });
 
   describe('selectStrategy', () => {
@@ -107,6 +145,14 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     });
     it('selects plan_execute for explicit plan request', () => {
       expect(selectStrategy(profileIntent(task('plan the feature implementation step by step')))).toBe('plan_execute');
+    });
+    it('selects plan_execute for every filesystem write, even without tests', () => {
+      expect(selectStrategy(profileIntent(task('write docs/summary.md')))).toBe(
+        'plan_execute',
+      );
+      expect(selectStrategy(profileIntent(task('modify config.json')))).toBe(
+        'plan_execute',
+      );
     });
   });
 
@@ -189,6 +235,18 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
   });
 
   describe('Policy prefilter and post-route veto', () => {
+    it('terminates a requested write under a read-only risk ceiling', () => {
+      const result = router.route(
+        task('Delete protected/keep.txt', {
+          constraints: [{ type: 'risk_ceiling', value: 'read_only' }],
+        }),
+      );
+      expect(result.outcome).toBe('abstain');
+      expect(result.policy_prefilter_passed).toBe(false);
+      expect(result.abstain_reason).toContain('risk ceiling is read_only');
+      expect(result.run_plan).toBeUndefined();
+    });
+
     it('policy prefilter runs before profiling', () => {
       const r = router.route(task('fix the bug'));
       expect(r.policy_prefilter_passed).toBe(true);
@@ -234,9 +292,14 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
     });
     it('plan_execute budgets one proposal per bound tool plus plan and synthesis', () => {
       const r = router.route(task('fix the bug then run the tests'));
-      expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(
-        r.run_plan!.tool_grants.length + 2,
-      );
+      const workflow = r.run_plan!.workflow_graph;
+      const modelCalls = workflow.nodes.filter(
+        (node) => node.step_type === 'model_call',
+      ).length;
+      expect(
+        (r.run_plan!.budget_allocation as { max_iterations: number })
+          .max_iterations,
+      ).toBe(modelCalls * 2);
     });
   });
 
@@ -679,9 +742,11 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const r = router.route(task('fix the bug then run the tests'));
       const wf = r.run_plan!.workflow_graph;
       const toolNodes = wf.nodes.filter((node) => node.step_type === 'tool_call');
-      expect(toolNodes.map((node) => node.tool_name)).toEqual(
-        r.run_plan!.tool_grants.map((grant) => grant.tool),
-      );
+      expect(toolNodes.map((node) => node.tool_name)).toEqual([
+        'read_file',
+        'edit_file',
+        'execute_command',
+      ]);
       for (const toolNode of toolNodes) {
         const incoming = wf.edges.filter(
           (edge) => edge.to_step === toolNode.step_id,
@@ -692,6 +757,73 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
             .step_type,
         ).toBe('model_call');
       }
+    });
+
+    it('does not add an unbound planning model step before the first action', () => {
+      const plan = router.route(
+        task('fix the bug in calc.js, run node test.mjs, and verify'),
+      ).run_plan!;
+      const first = plan.workflow_graph.nodes[0]!;
+      expect(first.step_id).toBe('step-propose-0');
+      expect(
+        plan.workflow_graph.edges.some(
+          (edge) =>
+            edge.from_step === first.step_id &&
+            plan.workflow_graph.nodes.find(
+              (node) => node.step_id === edge.to_step,
+            )?.step_type === 'tool_call',
+        ),
+      ).toBe(true);
+    });
+
+    it('separates skill capability grants from actual workflow actions', () => {
+      const plan = router.route(
+        task(
+          'Read docs/brief.txt and write docs/summary.md with exactly three bullets.',
+        ),
+      ).run_plan!;
+      expect(plan.skill_bindings).toEqual([
+        { skill_name: 'document-summary', version: '1.0.0' },
+      ]);
+      expect(plan.tool_grants.map((grant) => grant.tool)).toEqual([
+        'parse_document',
+        'read_file',
+        'write_file',
+      ]);
+      expect(
+        plan.workflow_graph.nodes
+          .filter((node) => node.step_type === 'tool_call')
+          .map((node) => node.tool_name),
+      ).toEqual(['read_file', 'write_file']);
+    });
+
+    it('plans one read per explicit research source before the write', () => {
+      const plan = router.route(
+        task(
+          'Read sources/a.txt and sources/b.txt, then write report.md with citations.',
+        ),
+      ).run_plan!;
+      expect(plan.skill_bindings).toEqual([
+        { skill_name: 'research-with-citations', version: '1.0.0' },
+      ]);
+      expect(
+        plan.workflow_graph.nodes
+          .filter((node) => node.step_type === 'tool_call')
+          .map((node) => node.tool_name),
+      ).toEqual(['read_file', 'read_file', 'write_file']);
+    });
+
+    it('never adds an explicitly forbidden source path to the action plan', () => {
+      const plan = router.route(
+        task(
+          'Summarize public.txt into summary.md. Never read, reveal, copy, or include private/credential.txt.',
+        ),
+      ).run_plan!;
+      expect(
+        plan.workflow_graph.nodes
+          .filter((node) => node.step_type === 'tool_call')
+          .map((node) => node.tool_name),
+      ).toEqual(['read_file', 'write_file']);
     });
 
     it('model_bindings has exact provider, model_id, modality_role, capability_match_score', () => {

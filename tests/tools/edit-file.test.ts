@@ -21,4 +21,54 @@ describe('AH-TOOL-EDIT-001 edit_file', () => {
     writeFileSync(join(tmp, 'f.txt'), 'hello');
     await expect(editFile(vfs, { path: '/workspace/f.txt', find: 'xyz', replace: 'q' })).rejects.toThrow();
   });
+
+  it('rejects exact and whitespace-fallback no-op replacements', async () => {
+    writeFileSync(join(tmp, 'f.txt'), 'value\n');
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: 'value',
+        replace: 'value',
+      }),
+    ).rejects.toThrow('replacement must change');
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: '  value ',
+        replace: ' value  ',
+      }),
+    ).rejects.toThrow('replacement must change');
+    expect(vfs.readText('/workspace/f.txt')).toBe('value\n');
+  });
+
+  it('uses a unique whitespace-trimmed fallback for model-proposed snippets', async () => {
+    writeFileSync(
+      join(tmp, 'f.txt'),
+      'export function add(a, b) { return a - b; }\n',
+    );
+    const result = await editFile(vfs, {
+      path: '/workspace/f.txt',
+      find: '  return a - b;  ',
+      replace: '  return a + b;  ',
+    });
+    expect(result.replacements).toBe(1);
+    expect(vfs.readText('/workspace/f.txt')).toBe(
+      'export function add(a, b) { return a + b; }\n',
+    );
+  });
+
+  it('fails closed when the whitespace-trimmed fallback is ambiguous', async () => {
+    writeFileSync(
+      join(tmp, 'f.txt'),
+      'return a - b;\nreturn a - b;\n',
+    );
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: '  return a - b;  ',
+        replace: 'return a + b;',
+      }),
+    ).rejects.toThrow('ambiguous');
+    expect(vfs.readText('/workspace/f.txt')).toContain('a - b');
+  });
 });

@@ -526,7 +526,7 @@ describe('Harness composition-root authority', () => {
     ]);
     expect(result.success).toBe(false);
     expect(result.loop_result).toEqual({
-      strategy: 'react',
+      strategy: 'plan_execute',
       iterations: 0,
       termination_reason: 'denied',
       turns: [],
@@ -554,7 +554,7 @@ describe('Harness composition-root authority', () => {
     expect(result.evidence).toMatchObject({
       run_id: 'run-skill-denied',
       commit_sha: BUILD_SHA,
-      reasoning_strategy: 'react',
+      reasoning_strategy: 'plan_execute',
       termination_reason: 'denied',
       iterations: 0,
       session_events: 3,
@@ -591,6 +591,10 @@ describe('Harness composition-root authority', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       messages: [
+        {
+          role: 'system',
+          content: expect.stringContaining('Direct mode'),
+        },
         {
           role: 'user',
           content: 'Provide a concise answer to this well-defined question',
@@ -742,6 +746,10 @@ describe('Harness composition-root authority', () => {
       'search_files',
     ]);
     expect(dispatchRequests[1]!.messages).toEqual([
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('ReAct mode'),
+      }),
       expect.objectContaining({
         role: 'user',
         content: expect.stringContaining(

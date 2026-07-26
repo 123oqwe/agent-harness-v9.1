@@ -21,6 +21,88 @@ interface ValidatedWorkflow {
   outgoing: ReadonlyMap<string, readonly string[]>;
 }
 
+function taskPaths(goal: string): string[] {
+  return [
+    ...new Set(
+      [
+        ...goal.matchAll(
+          /(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/giu,
+        ),
+      ].map((match) => match[0]!),
+    ),
+  ];
+}
+
+function outputPaths(goal: string): Set<string> {
+  const paths = new Set<string>();
+  for (const match of goal.matchAll(
+    /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/giu,
+  )) {
+    paths.add(match[1]!);
+  }
+  return paths;
+}
+
+function isTestPath(path: string): boolean {
+  return /(?:^|\/)(?:test|spec|[^/]*(?:test|spec)[^/]*)\.[a-z0-9]+$/iu.test(
+    path,
+  );
+}
+
+/**
+ * Narrow the current frozen tool node without putting untrusted task prose in
+ * a system message. These are routing hints, not capabilities; Dispatcher,
+ * Policy and VFS remain the execution authorities.
+ */
+export function planActionInstruction(
+  runPlan: Readonly<RunPlan>,
+  requiredTool: string,
+  targetStep: string,
+): string {
+  const goal = runPlan.task?.goal ?? '';
+  const paths = taskPaths(goal);
+  const outputs = outputPaths(goal);
+  const sources = paths.filter((path) => !outputs.has(path));
+  const toolNodes = runPlan.workflow_graph.nodes.filter(
+    (node) => node.step_type === 'tool_call',
+  );
+  const currentIndex = toolNodes.findIndex(
+    (node) => node.step_id === targetStep,
+  );
+  const sameToolIndex = toolNodes
+    .slice(0, Math.max(0, currentIndex))
+    .filter((node) => node.tool_name === requiredTool).length;
+
+  if (requiredTool === 'read_file') {
+    const target = sources[sameToolIndex];
+    return target === undefined
+      ? ''
+      : ` The read path must be ${JSON.stringify(target)}.`;
+  }
+  if (requiredTool === 'edit_file') {
+    const target =
+      sources.find((path) => !isTestPath(path)) ?? sources[0];
+    return target === undefined
+      ? ''
+      : ` Edit only ${JSON.stringify(target)} using the content returned by the prior read; never edit a test/spec file and never submit a no-op replacement.`;
+  }
+  if (requiredTool === 'write_file') {
+    const target = [...outputs][0];
+    return target === undefined
+      ? ''
+      : ` The write path must be ${JSON.stringify(target)}.`;
+  }
+  if (requiredTool === 'execute_command') {
+    const command = goal.match(
+      /(?:\b(?:run|execute)\s+|运行\s*)(node|python3)\s+((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/iu,
+    );
+    return command === null
+      ? ''
+      : ` Run exactly argv ${JSON.stringify([command[1], command[2]])} with cwd "/workspace"; do not substitute a discovery command.`;
+  }
+  return '';
+}
+
 const SUPPORTED_STEP_TYPES = new Set<WorkflowNode['step_type']>([
   'model_call',
   'tool_call',
@@ -250,91 +332,163 @@ export async function runPlanExecute(
     }
 
     if (node.step_type === 'model_call' || node.step_type === 'decision') {
-      if (context.iterations >= context.config.max_iterations) {
-        context.terminate('iteration_limit');
-        return;
-      }
-      context.iterations += 1;
-      states.set(stepId, 'executing');
-      context.setStepState(stepId, 'executing');
-      const turn = await context.deps.modelCall(
-        messages,
-        context.iterations,
-        context.nextModelBudget(),
-      );
-      if (context.terminated) return;
-      const recorded = context.recordTurn(turn);
-      if (context.terminated) return;
-      if (turn.stop_reason === 'length') {
-        states.set(stepId, 'failed');
-        context.setStepState(stepId, 'failed', { reason: 'truncated model turn' });
-        context.terminate('malformed_response');
-        return;
-      }
-      if (turn.stop_reason === 'content_filter') {
-        states.set(stepId, 'failed');
-        context.setStepState(stepId, 'failed', { reason: 'model refusal' });
-        context.terminate('model_refusal');
-        return;
-      }
-      if (context.budgetExceeded()) {
-        states.set(stepId, 'failed');
-        context.setStepState(stepId, 'failed', { reason: 'budget exceeded' });
-        context.terminate('budget_exhausted');
-        return;
-      }
       const toolSuccessors = workflow.outgoing
         .get(stepId)!
         .filter(
           (successor) =>
             workflow.nodes.get(successor)!.step_type === 'tool_call',
         );
-      if (toolSuccessors.length === 1) {
-        const targetStep = toolSuccessors[0]!;
-        const expectedTool = workflow.nodes.get(targetStep)!.tool_name!;
+      const requiredTool =
+        toolSuccessors.length === 1
+          ? workflow.nodes.get(toolSuccessors[0]!)!.tool_name!
+          : undefined;
+      const actionInstruction =
+        requiredTool === undefined
+          ? ''
+          : planActionInstruction(
+              context.config.run_plan,
+              requiredTool,
+              toolSuccessors[0]!,
+            );
+      let turn: ModelTurn;
+      let recorded: LoopTurn;
+      let proposalAttempt = 0;
+      for (;;) {
+        if (context.iterations >= context.config.max_iterations) {
+          states.set(stepId, 'failed');
+          context.setStepState(stepId, 'failed', {
+            reason: 'model proposal retry budget exhausted',
+          });
+          context.terminate('iteration_limit');
+          return;
+        }
+        proposalAttempt += 1;
+        context.iterations += 1;
+        states.set(stepId, 'executing');
+        context.setStepState(stepId, 'executing', {
+          proposal_attempt: proposalAttempt,
+        });
+        turn = await context.deps.modelCall(
+          messages,
+          context.iterations,
+          context.nextModelBudget(),
+          requiredTool === undefined
+            ? {
+                system_instruction:
+                  'Plan+Execute synthesis step: use the completed tool observations to return the concise final result. Do not call another tool and never claim an unverified effect.',
+                allowed_tools: [],
+              }
+            : {
+                system_instruction: `Plan+Execute action step: call ${requiredTool} exactly once with schema-valid arguments that advance the user task.${actionInstruction} Do not call any other tool and do not return a final completion claim yet.`,
+                allowed_tools: [requiredTool],
+                required_tool: requiredTool,
+              },
+        );
+        if (context.terminated) return;
+        recorded = context.recordTurn(turn);
+        if (context.terminated) return;
         if (
-          !turn.tool_calls ||
-          turn.tool_calls.length !== 1 ||
-          turn.tool_calls[0]!.name !== expectedTool
+          turn.stop_reason === 'length' &&
+          (requiredTool !== undefined || turn.content.trim().length === 0)
         ) {
           states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
-            reason: `expected exactly one ${expectedTool} tool call`,
+            reason: 'truncated model turn',
           });
           context.terminate('malformed_response');
           return;
         }
-        const call = turn.tool_calls[0]!;
+        if (turn.stop_reason === 'content_filter') {
+          states.set(stepId, 'failed');
+          context.setStepState(stepId, 'failed', {
+            reason: 'model refusal',
+          });
+          context.terminate('model_refusal');
+          return;
+        }
+        if (context.budgetExceeded()) {
+          states.set(stepId, 'failed');
+          context.setStepState(stepId, 'failed', {
+            reason: 'budget exceeded',
+          });
+          context.terminate('budget_exhausted');
+          return;
+        }
+        const validProposal =
+          requiredTool === undefined
+            ? !turn.tool_calls || turn.tool_calls.length === 0
+            : turn.tool_calls?.length === 1 &&
+              turn.tool_calls[0]!.name === requiredTool;
+        if (validProposal) break;
+
+        const calls = turn.tool_calls ?? [];
+        messages.push({
+          role: 'assistant',
+          content: turn.content,
+          ...(turn.reasoning_content === undefined
+            ? {}
+            : { reasoning_content: turn.reasoning_content }),
+          decision_summary: turn.decision_summary,
+          ...(calls.length === 0 ? {} : { tool_calls: calls }),
+        });
+        for (const call of calls) {
+          context.recordToolCall(recorded, call, stepId);
+          const observation = context.recordObservation(
+            recorded,
+            call,
+            'rejected',
+            requiredTool === undefined
+              ? 'model step has no bound tool node'
+              : `expected exactly one ${requiredTool} tool call`,
+            stepId,
+          );
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: JSON.stringify(observation),
+          });
+        }
+        messages.push({
+          role: 'system',
+          content:
+            requiredTool === undefined
+              ? 'Correction: return the final answer without any tool call.'
+              : `Correction: call ${requiredTool} exactly once, not zero or multiple times.`,
+        });
+        if (proposalAttempt >= 2) {
+          states.set(stepId, 'failed');
+          context.setStepState(stepId, 'failed', {
+            reason:
+              requiredTool === undefined
+                ? 'model step has no bound tool node'
+                : `expected exactly one ${requiredTool} tool call`,
+          });
+          context.terminate('malformed_response');
+          return;
+        }
+      }
+      if (toolSuccessors.length === 1) {
+        const targetStep = toolSuccessors[0]!;
+        const call = turn.tool_calls![0]!;
         context.recordToolCall(recorded, call, targetStep);
         pendingCalls.set(targetStep, call);
         pendingTurns.set(targetStep, recorded);
         messages.push({
           role: 'assistant',
           content: turn.content,
+          ...(turn.reasoning_content === undefined
+            ? {}
+            : { reasoning_content: turn.reasoning_content }),
           decision_summary: turn.decision_summary,
           tool_calls: [call],
         });
-      } else if (turn.tool_calls && turn.tool_calls.length > 0) {
-        for (const call of turn.tool_calls) {
-          context.recordToolCall(recorded, call, stepId);
-          context.recordObservation(
-            recorded,
-            call,
-            'rejected',
-            'model step has no bound tool node',
-            stepId,
-          );
-        }
-        states.set(stepId, 'failed');
-        context.setStepState(stepId, 'failed', {
-          reason: 'unbound tool call',
-        });
-        context.terminate('malformed_response');
-        return;
       } else {
         messages.push({
           role: 'assistant',
           content: turn.content,
+          ...(turn.reasoning_content === undefined
+            ? {}
+            : { reasoning_content: turn.reasoning_content }),
           decision_summary: turn.decision_summary,
         });
       }

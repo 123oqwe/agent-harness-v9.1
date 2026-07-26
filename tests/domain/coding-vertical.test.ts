@@ -60,7 +60,6 @@ describe('AH-CODING-VERTICAL-001 coding vertical (thin adapter)', () => {
   it('delegates to Harness: reads, fixes, tests via unified pipeline', async () => {
     writeFileSync(join(tmp, 'bug.ts'), 'function add(a, b) { return a - b; }');
     const h = makeHarness(tmp, [
-      { content: 'inspect, edit, test' },
       { content: '', tool_calls: [{ id: 'read', name: 'read_file', arguments: { path: '/workspace/bug.ts' } }] },
       { content: '', tool_calls: [{ id: 'edit', name: 'edit_file', arguments: { path: '/workspace/bug.ts', find: 'a - b', replace: 'a + b' } }] },
       { content: '', tool_calls: [{ id: 'test', name: 'execute_command', arguments: { argv: ['/usr/bin/true'], cwd: '/workspace' } }] },

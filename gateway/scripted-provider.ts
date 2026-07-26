@@ -15,6 +15,8 @@ export interface ToolCall {
 export interface Message {
   readonly role: 'assistant' | 'system' | 'tool' | 'user';
   content: string;
+  /** Provider-private reasoning carried only in memory for interleaved tool use. */
+  readonly reasoning_content?: string;
   readonly tool_call_id?: string;
   readonly tool_calls?: readonly ToolCall[];
 }
@@ -26,6 +28,8 @@ export interface Usage {
 
 export interface ParsedResponse {
   readonly content: string;
+  /** Provider-private reasoning. Runtime must never persist or expose this field. */
+  readonly reasoning_content?: string;
   readonly tool_calls?: readonly ToolCall[];
   readonly stop_reason?: 'content_filter' | 'length' | 'stop' | 'tool_use';
   readonly usage?: Usage;
@@ -40,6 +44,13 @@ export type ProviderTool = Pick<ContractToolSpec, 'name'> &
 export interface ProviderRequest {
   readonly messages: readonly Message[];
   readonly tools?: readonly ProviderTool[];
+  readonly tool_choice?:
+    | 'auto'
+    | 'none'
+    | {
+        readonly type: 'function';
+        readonly function: { readonly name: string };
+      };
   readonly model?: string;
   readonly temperature?: number;
   readonly max_tokens?: number;
@@ -356,7 +367,7 @@ export class ScriptedTestProvider {
     if (!isPlainRecord(request)) throw new ProviderValidationError('request must be an object');
     assertKnownKeys(
       request,
-      ['max_tokens', 'messages', 'model', 'temperature', 'tools'],
+      ['max_tokens', 'messages', 'model', 'temperature', 'tool_choice', 'tools'],
       'request',
     );
     const messages = normalizeMessages(request.messages);
@@ -370,6 +381,20 @@ export class ScriptedTestProvider {
       nonEmptyString(tool.name, `request.tools[${index}].name`);
       return cloneAndFreeze(tool, `request.tools[${index}]`) as ProviderTool;
     });
+    if (
+      request.tool_choice !== undefined &&
+      request.tool_choice !== 'auto' &&
+      request.tool_choice !== 'none' &&
+      !(
+        isPlainRecord(request.tool_choice) &&
+        request.tool_choice.type === 'function' &&
+        isPlainRecord(request.tool_choice.function) &&
+        typeof request.tool_choice.function.name === 'string' &&
+        request.tool_choice.function.name.length > 0
+      )
+    ) {
+      throw new ProviderValidationError('request.tool_choice is unsupported');
+    }
     const model = nonEmptyString(request.model ?? this.model, 'request.model');
     const temperature = request.temperature ?? 0;
     if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
@@ -386,6 +411,9 @@ export class ScriptedTestProvider {
       model,
       messages,
       tools: deepFreeze(tools),
+      ...(request.tool_choice === undefined
+        ? {}
+        : { tool_choice: cloneAndFreeze(request.tool_choice) }),
       temperature,
       max_tokens: request.max_tokens ?? null,
     });
@@ -393,7 +421,18 @@ export class ScriptedTestProvider {
 
   parseResponse(raw: unknown): ParsedResponse {
     if (!isPlainRecord(raw)) throw new ProviderValidationError('response must be an object');
-    assertKnownKeys(raw, ['content', 'model', 'stop_reason', 'tool_calls', 'usage'], 'response');
+    assertKnownKeys(
+      raw,
+      [
+        'content',
+        'model',
+        'reasoning_content',
+        'stop_reason',
+        'tool_calls',
+        'usage',
+      ],
+      'response',
+    );
     if (typeof raw.content !== 'string') {
       throw new ProviderValidationError('response.content must be a string');
     }
@@ -410,6 +449,7 @@ export class ScriptedTestProvider {
 
     const normalized: {
       content: string;
+      reasoning_content?: string;
       tool_calls?: ToolCall[];
       stop_reason: NonNullable<ParsedResponse['stop_reason']>;
       usage?: Usage;
@@ -419,6 +459,12 @@ export class ScriptedTestProvider {
       stop_reason: stopReason as NonNullable<ParsedResponse['stop_reason']>,
       model: nonEmptyString(raw.model ?? this.model, 'response.model'),
     };
+    if (raw.reasoning_content !== undefined) {
+      normalized.reasoning_content = nonEmptyString(
+        raw.reasoning_content,
+        'response.reasoning_content',
+      );
+    }
     if (raw.tool_calls !== undefined) {
       normalized.tool_calls = raw.tool_calls.map((entry, index) =>
         normalizeToolCallValue(entry, `response.tool_calls[${index}]`),

@@ -15,12 +15,21 @@ export async function runDirect(
     messages,
     1,
     context.nextModelBudget(),
+    {
+      system_instruction:
+        'Direct mode: answer the user request in the visible response. For rewrites, preserve the original language, key factual terms, and meaning unless the user explicitly asks to change them. Do not call tools. Return only the requested final answer and never expose private reasoning.',
+      allowed_tools: [],
+    },
   );
   if (context.terminated) return;
   const recorded = context.recordTurn(turn);
   if (context.terminated) return;
 
-  if (turn.stop_reason === 'length') {
+  if (
+    turn.stop_reason === 'length' &&
+    (turn.content.trim().length === 0 ||
+      (turn.tool_calls?.length ?? 0) > 0)
+  ) {
     context.terminate('malformed_response');
     return;
   }

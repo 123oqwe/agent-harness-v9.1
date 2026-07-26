@@ -9,6 +9,7 @@ import {
   type LoopDeps,
   type ModelTurn,
 } from '../../runtime/loop.js';
+import { planActionInstruction } from '../../runtime/plan-execute.js';
 import { DurableSession } from '../../session/durable-session.js';
 
 type Node = RunPlan['workflow_graph']['nodes'][number];
@@ -118,6 +119,17 @@ describe('Direct strategy boundaries', () => {
       decision_summaries: ['finished'],
     });
     expect(runtimeDeps.modelCall).toHaveBeenCalledTimes(1);
+    expect(runtimeDeps.modelCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.any(Object),
+      expect.objectContaining({
+        allowed_tools: [],
+        system_instruction: expect.stringContaining(
+          'preserve the original language, key factual terms, and meaning',
+        ),
+      }),
+    );
   });
 
   it('rejects every tool call and records one strategy violation', async () => {
@@ -187,10 +199,24 @@ describe('Direct strategy boundaries', () => {
   ] as const)('maps the exact stop reason %s', async (stopReason, reason) => {
     const result = await new LoopEngine(
       config('direct'),
-      deps([{ ...answer, stop_reason: stopReason }]),
+      deps([
+        {
+          ...answer,
+          content: stopReason === 'length' ? '' : answer.content,
+          stop_reason: stopReason,
+        },
+      ]),
     ).run();
     expect(result.termination_reason).toBe(reason);
     expect(result.iterations).toBe(1);
+  });
+
+  it('lets verification judge a non-empty length-stopped direct answer', async () => {
+    const result = await new LoopEngine(
+      config('direct'),
+      deps([{ ...answer, stop_reason: 'length' }]),
+    ).run();
+    expect(result.termination_reason).toBe('completed');
   });
 
   it('treats an explicitly empty tool-call array as tool-free', async () => {
@@ -298,6 +324,34 @@ describe('Plan+Execute execution and recovery', () => {
     ],
     ['read_file'],
   );
+
+  it('narrows frozen edit and command nodes to task-derived targets', () => {
+    const plan = {
+      ...runPlan(
+        [
+          node('propose-edit', 'model_call'),
+          node('edit', 'tool_call', { tool_name: 'edit_file' }),
+          node('propose-command', 'model_call'),
+          node('command', 'tool_call', { tool_name: 'execute_command' }),
+        ],
+        [
+          { from_step: 'propose-edit', to_step: 'edit' },
+          { from_step: 'edit', to_step: 'propose-command' },
+          { from_step: 'propose-command', to_step: 'command' },
+        ],
+        ['edit_file', 'execute_command'],
+      ),
+      task: {
+        goal: "Change app.js to return 'new', run node failing-test.mjs, and do not edit failing-test.mjs.",
+      },
+    } as RunPlan;
+    expect(planActionInstruction(plan, 'edit_file', 'edit')).toContain(
+      'Edit only "app.js"',
+    );
+    expect(
+      planActionInstruction(plan, 'execute_command', 'command'),
+    ).toContain('["node","failing-test.mjs"]');
+  });
 
   function proposedTurn(changes: Partial<ModelTurn> = {}): ModelTurn {
     return {
@@ -425,6 +479,15 @@ describe('Plan+Execute execution and recovery', () => {
       runtimeDeps,
     ).run();
     expect(result.termination_reason).toBe('completed');
+    expect(runtimeDeps.modelCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.any(Object),
+      expect.objectContaining({
+        allowed_tools: ['read_file'],
+        required_tool: 'read_file',
+      }),
+    );
     expect(result.step_states).toEqual({
       propose: 'done',
       execute: 'done',
@@ -452,7 +515,8 @@ describe('Plan+Execute execution and recovery', () => {
     ] }, 'expected exactly one read_file tool call'],
     ['wrong tool', { tool_calls: [{ id: 'a', name: 'write_file', arguments: {} }] }, 'expected exactly one read_file tool call'],
   ])('rejects a proposal with $name', async (_name, changes, reason) => {
-    const runtimeDeps = deps([proposedTurn(changes as Partial<ModelTurn>)], {
+    const invalidTurn = proposedTurn(changes as Partial<ModelTurn>);
+    const runtimeDeps = deps([invalidTurn, invalidTurn], {
       toolExecute: vi.fn(async () => 'never'),
     });
     const result = await new LoopEngine(
@@ -471,11 +535,40 @@ describe('Plan+Execute execution and recovery', () => {
     ).toBe(true);
   });
 
+  it('rejects a multi-call proposal without effects, then retries the same frozen step once', async () => {
+    const multiple = proposedTurn({
+      tool_calls: [
+        { id: 'extra-a', name: 'read_file', arguments: { path: '/a' } },
+        { id: 'extra-b', name: 'read_file', arguments: { path: '/b' } },
+      ],
+    });
+    const toolExecute = vi.fn(async () => ({ content: 'ok' }));
+    const runtimeDeps = deps([multiple, proposedTurn()], { toolExecute });
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: graph }),
+      runtimeDeps,
+    ).run();
+    expect(result.termination_reason).toBe('completed');
+    expect(result.iterations).toBe(2);
+    expect(toolExecute).toHaveBeenCalledTimes(1);
+    expect(toolExecute).toHaveBeenCalledWith(
+      'read_file',
+      { path: '/x' },
+      expect.any(Object),
+    );
+    expect(result.turns[0]!.tool_observations).toHaveLength(2);
+    expect(
+      result.turns[0]!.tool_observations.every(
+        (observation) => observation.status === 'rejected',
+      ),
+    ).toBe(true);
+  });
+
   it('rejects unbound tool calls from a model-only node', async () => {
     const plan = runPlan([node('model', 'model_call')]);
     const result = await new LoopEngine(
       config('plan_execute', { run_plan: plan }),
-      deps([proposedTurn()]),
+      deps([proposedTurn(), proposedTurn()]),
     ).run();
     expect(result.termination_reason).toBe('malformed_response');
     expect(result.step_states.model).toBe('failed');
@@ -490,7 +583,13 @@ describe('Plan+Execute execution and recovery', () => {
     ['content_filter', 'model_refusal', 'model refusal'],
   ] as const)('fails model stop reason %s', async (stopReason, termination, reason) => {
     const plan = runPlan([node('model', 'model_call')]);
-    const runtimeDeps = deps([{ ...answer, stop_reason: stopReason }]);
+    const runtimeDeps = deps([
+      {
+        ...answer,
+        content: stopReason === 'length' ? '' : answer.content,
+        stop_reason: stopReason,
+      },
+    ]);
     const result = await new LoopEngine(
       config('plan_execute', { run_plan: plan }),
       runtimeDeps,
@@ -504,6 +603,16 @@ describe('Plan+Execute execution and recovery', () => {
           (event.data as { reason?: string }).reason === reason,
       ),
     ).toBe(true);
+  });
+
+  it('lets independent verification judge a non-empty length-stopped final answer', async () => {
+    const plan = runPlan([node('model', 'model_call')]);
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: plan }),
+      deps([{ ...answer, stop_reason: 'length' }]),
+    ).run();
+    expect(result.termination_reason).toBe('completed');
+    expect(result.step_states.model).toBe('done');
   });
 
   it('fails before execution when the actual model usage exceeds budget', async () => {
@@ -947,10 +1056,24 @@ describe('ReAct action/observation boundaries', () => {
   ] as const)('maps stop reason %s', async (stopReason, termination) => {
     const result = await new LoopEngine(
       config('react', { run_plan: plan }),
-      deps([{ ...answer, stop_reason: stopReason }]),
+      deps([
+        {
+          ...answer,
+          content: stopReason === 'length' ? '' : answer.content,
+          stop_reason: stopReason,
+        },
+      ]),
     ).run();
     expect(result.termination_reason).toBe(termination);
     expect(result.turns).toHaveLength(1);
+  });
+
+  it('lets verification judge a non-empty length-stopped ReAct answer', async () => {
+    const result = await new LoopEngine(
+      config('react', { run_plan: plan }),
+      deps([{ ...answer, stop_reason: 'length' }]),
+    ).run();
+    expect(result.termination_reason).toBe('completed');
   });
 
   it('rejects all proposed effects when actual usage exceeds budget', async () => {

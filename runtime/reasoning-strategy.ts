@@ -3,6 +3,7 @@ import type {
   LoopDeps,
   LoopTurn,
   ModelCallBudget,
+  ModelCallDirective,
   ModelTurn,
   RuntimeStepState,
   TerminationReason,
@@ -14,6 +15,7 @@ export type {
   LoopDeps,
   LoopTurn,
   ModelCallBudget,
+  ModelCallDirective,
   ModelTurn,
   TerminationReason,
 };

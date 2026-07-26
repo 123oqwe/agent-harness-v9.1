@@ -26,6 +26,7 @@ import {
 import {
   LoopEngine,
   type LoopResult,
+  type ModelCallDirective,
   type ToolCallExecutionContext,
 } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
@@ -57,6 +58,7 @@ import {
   deterministicRunId,
   extractToolReceipts,
   gatewayResultToModelTurn,
+  normalizeWorkspaceToolInput,
   recordTerminalFailure,
   restoreLoopResult,
   restoreVerificationReport,
@@ -120,6 +122,8 @@ export interface HarnessConfig {
   buildCommitSha?: string;
   /** Maximum declarative skill risk tier accepted for this composition. */
   maxSkillRiskTier?: 1 | 2 | 3 | 4;
+  /** Per-provider-call output ceiling; overall run budget remains separate. */
+  maxOutputTokensPerCall?: number;
 }
 
 export class Harness {
@@ -382,18 +386,34 @@ export class Harness {
         goal: goalWithSkill,
         data_dir: this.config.dataDir,
         budget_tokens: this.execCtx.budget.token_limit,
+        ...(this.config.maxOutputTokensPerCall === undefined
+          ? {}
+          : {
+              max_output_tokens_per_call:
+                this.config.maxOutputTokensPerCall,
+            }),
         run_plan: runPlan,
         clock: () => this.now(),
       },
       {
         session,
-        modelCall: async (messages: unknown[], _attempt: number, modelBudget) => {
+        modelCall: async (
+          messages: unknown[],
+          _attempt: number,
+          modelBudget,
+          directive?: ModelCallDirective,
+        ) => {
           const modelCallCount = (this._modelCallCount++) + 1;
           const plannedToolNames = new Set(
             runPlan.tool_grants.map((grant) => grant.tool),
           );
+          const directiveTools =
+            directive?.allowed_tools === undefined
+              ? plannedToolNames
+              : new Set(directive.allowed_tools);
           const selectedTools = this.toolSnapshot.tool_names
             .filter((name) => plannedToolNames.has(name))
+            .filter((name) => directiveTools.has(name))
             .filter((n) => this.config.policyEngine.snapshot.allowed_tools.includes(n))
             .map((n) => this.config.toolRegistry.loadProviderTool(n, this.toolSnapshot));
           const req = buildProviderSelectionRequest({
@@ -403,6 +423,7 @@ export class Harness {
             modelBudget,
             registrySnapshotHash: this.config.gateway.registrySnapshotHash,
             selectedTools,
+            ...(directive === undefined ? {} : { directive }),
           });
           const resolved = this.config.gateway.resolve(req);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
@@ -543,6 +564,7 @@ private async executeTool(
   session: DurableSession,
   effectJournal: SqliteSessionStore | null,
 ): Promise<unknown> {
+  const normalizedArgs = normalizeWorkspaceToolInput(name, args);
   const identity = canonicalHash(
     {
       run_id: this.execCtx!.run_id,
@@ -552,7 +574,7 @@ private async executeTool(
     },
     24,
   );
-  const inputIdentity = canonicalHash(args, 24);
+  const inputIdentity = canonicalHash(normalizedArgs, 24);
   // ExecutionContext is always set (required in HarnessConfig, set in run())
   const execCtxForTool = {
     tenant_id: this.execCtx!.tenant_id,
@@ -596,7 +618,10 @@ private async executeTool(
      executor,
      implementations,
    );
-   const dispatchResult = await dispatcher.dispatch({ tool_name: name, input: args });
+   const dispatchResult = await dispatcher.dispatch({
+     tool_name: name,
+     input: normalizedArgs,
+   });
    if (!dispatchResult.success) {
      throw new Error(dispatchResult.error ?? 'tool dispatch failed');
    }

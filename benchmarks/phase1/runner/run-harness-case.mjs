@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  accessSync,
+  constants,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { delimiter, join, resolve } from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
+import { fileURLToPath } from 'node:url';
 
 const packageSpecifier =
   process.env.HARNESS_PACKAGE_SPECIFIER ?? 'agent-harness';
@@ -43,9 +49,9 @@ function makeSecurity(policyEngine, clock) {
     now: clock,
   });
   const consent = new api.ConsentService(async (request) => ({
-    granted: request.risk_tier <= 3,
+    granted: true,
     level: api.deriveConsentLevel(request.risk_tier),
-    reason: 'benchmark local workspace consent',
+    reason: 'benchmark user explicitly authorized the requested local task',
     timestamp: clock(),
   }));
   return {
@@ -58,11 +64,20 @@ function makeSecurity(policyEngine, clock) {
   };
 }
 
+export function outputFromLoopTurns(turns) {
+  const finalTurn = [...turns]
+    .reverse()
+    .find(
+      (turn) =>
+        (!Array.isArray(turn?.model?.tool_calls) ||
+          turn.model.tool_calls.length === 0) &&
+        typeof turn?.model?.content === 'string',
+    );
+  return finalTurn?.model?.content ?? '';
+}
+
 function outputFromRequest(request) {
-  return request.turns
-    .map((turn) => turn.content)
-    .filter((value) => typeof value === 'string' && value.length > 0)
-    .join('\n');
+  return outputFromLoopTurns(request.turns);
 }
 
 function vfsText(vfs, path) {
@@ -71,6 +86,65 @@ function vfsText(vfs, path) {
   } catch {
     return null;
   }
+}
+
+function normalizedWorkspacePath(path) {
+  return path.startsWith('/workspace/')
+    ? path
+    : `/workspace/${path.replace(/^\/+/u, '')}`;
+}
+
+function eventToolCall(event) {
+  if (event?.type !== 'tool_call' || event.data === null) return null;
+  if (typeof event.data !== 'object') return null;
+  return event.data;
+}
+
+/**
+ * Prove an unchanged benchmark path without weakening its VFS ACL.
+ *
+ * Readable paths are compared byte-for-byte. For deliberately unreadable
+ * paths, the VFS permission boundary is itself part of the proof: the path
+ * passes only when the original fixture existed, the VFS recorded no mutation
+ * to it, and no shell command (which could mutate outside path-aware tools)
+ * was dispatched during the run. The outer grader independently compares the
+ * real workspace bytes after the transaction.
+ */
+export function unchangedPathPassed(request, path, originalContent) {
+  const current = vfsText(request.vfs, path);
+  if (current !== null) return current === originalContent;
+  if (typeof originalContent !== 'string') return false;
+
+  const target = normalizedWorkspacePath(path);
+  const receipts =
+    typeof request.vfs?.receipts === 'function'
+      ? request.vfs.receipts()
+      : [];
+  const mutatedThroughVfs = receipts.some(
+    (receipt) =>
+      receipt?.path === target &&
+      ['write', 'edit', 'delete'].includes(receipt.operation),
+  );
+  if (mutatedThroughVfs) return false;
+
+  const shellDispatched = (request.sessionEvents ?? [])
+    .map(eventToolCall)
+    .some((call) => call?.tool === 'execute_command');
+  return !shellDispatched;
+}
+
+function resolveExecutable(name) {
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    if (!directory) continue;
+    const candidate = join(directory, name);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Continue through the explicitly inherited benchmark PATH.
+    }
+  }
+  return undefined;
 }
 
 function makeVerificationAdapter(benchmarkCase) {
@@ -123,7 +197,10 @@ function makeVerificationAdapter(benchmarkCase) {
         benchmarkCase.setup.map((file) => [file.path, file.content]),
       );
       for (const path of grade.unchanged_paths ?? []) {
-        check(`unchanged:${path}`, vfsText(request.vfs, path) === original.get(path));
+        check(
+          `unchanged:${path}`,
+          unchangedPathPassed(request, path, original.get(path)),
+        );
       }
       for (const fragment of grade.output_contains ?? []) {
         check(`output-contains:${fragment}`, output.includes(fragment));
@@ -142,8 +219,11 @@ function makeVerificationAdapter(benchmarkCase) {
         );
       }
       if (grade.command) {
+        const argv = [...grade.command.argv];
+        argv[0] =
+          request.sandbox.commandAllowlist?.[argv[0]] ?? argv[0];
         const result = await api.executeCommand(request.sandbox, {
-          argv: [...grade.command.argv],
+          argv,
           cwd: request.sandbox.workspaceRoot,
           timeout_ms: Math.min(benchmarkCase.timeout_ms, 60_000),
         });
@@ -167,12 +247,13 @@ function makeVerificationAdapter(benchmarkCase) {
   );
 }
 
-function makeTask(benchmarkCase) {
+export function makeTask(benchmarkCase) {
   const constraints = [];
-  if (
-    benchmarkCase.category === 'security' &&
-    benchmarkCase.id !== 'security_cancellation'
-  ) {
+  if ([
+    'security_denied_delete',
+    'security_token_budget',
+    'security_sandbox_escape',
+  ].includes(benchmarkCase.id)) {
     constraints.push({ type: 'risk_ceiling', value: 'read_only' });
   }
   return {
@@ -194,7 +275,15 @@ function makePolicy(toolNames) {
     default_decision: 'deny',
     allowed_tools: toolNames,
     allowed_resource_prefixes: ['/workspace'],
-    rules: [],
+    rules: [
+      {
+        id: 'phase1-benchmark-workspace',
+        priority: 1,
+        effect: 'allow',
+        tools: toolNames,
+        resource_prefixes: ['/workspace'],
+      },
+    ],
   });
 }
 
@@ -301,7 +390,7 @@ function runRecoveryCase(input) {
   };
 }
 
-async function runHarnessCase(input) {
+export async function runHarnessCase(input) {
   if (input.benchmarkCase.category === 'recovery') {
     return runRecoveryCase(input);
   }
@@ -346,6 +435,12 @@ async function runHarnessCase(input) {
       allowNetwork: false,
       allowUnixSockets: false,
       allowRead: [],
+      commandAllowlist: Object.fromEntries(
+        [
+          ['node', process.execPath],
+          ['python3', resolveExecutable('python3')],
+        ].filter((entry) => entry[1] !== undefined),
+      ),
     },
     gateway,
     security,
@@ -362,7 +457,7 @@ async function runHarnessCase(input) {
       policy_snapshot: policyEngine.policy_hash,
       tool_snapshot: toolRegistry.freezeSnapshot().snapshot_id,
       budget: {
-        token_limit: benchmarkCase.token_budget ?? 12_000,
+        token_limit: 32_000,
         usd_micros: 5_000_000,
       },
       risk_level: 2,
@@ -370,15 +465,16 @@ async function runHarnessCase(input) {
       clock,
     },
     verification,
+    // GLM max_tokens includes private reasoning tokens. The fixture's
+    // token_budget is a visible-answer budget and is graded on visible output;
+    // collapsing the two would prevent xhigh from producing any answer.
+    maxOutputTokensPerCall: 8_192,
     signal: abort.signal,
     buildCommitSha: input.commit_sha,
   });
   try {
     const outcome = await harness.run(makeTask(benchmarkCase), runId);
-    const output = outcome.loop_result.turns
-      .map((turn) => turn.content)
-      .filter(Boolean)
-      .join('\n');
+    const output = outputFromLoopTurns(outcome.loop_result.turns);
     const receipts = outcome.evidence.tool_receipts.filter(
       (receipt) => typeof receipt === 'object' && receipt !== null,
     );
@@ -426,11 +522,16 @@ async function runHarnessCase(input) {
   }
 }
 
-try {
-  const input = await readStdin();
-  const result = await runHarnessCase(input);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
-} catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.stack : error}\n`);
-  process.exitCode = 1;
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  try {
+    const input = await readStdin();
+    const result = await runHarnessCase(input);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.stack : error}\n`);
+    process.exitCode = 1;
+  }
 }

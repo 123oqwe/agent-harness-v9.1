@@ -16,6 +16,7 @@ import type { WorkspaceChange } from '../vfs/workspace-transaction.js';
 import type {
   LoopResult,
   ModelCallBudget,
+  ModelCallDirective,
   ModelTurn,
 } from './loop.js';
 import type {
@@ -162,6 +163,47 @@ export function canonicalHash(value: unknown, length?: number): string {
   return length === undefined ? digest : digest.slice(0, length);
 }
 
+const WORKSPACE_PATH_FIELDS: Readonly<Record<string, string>> = Object.freeze({
+  create_artifact: 'path',
+  edit_file: 'path',
+  execute_command: 'cwd',
+  list_directory: 'path',
+  parse_document: 'path',
+  read_file: 'path',
+  search_files: 'root',
+  write_file: 'path',
+});
+
+/**
+ * Model-facing tools accept either `/workspace/...` or a safe workspace-
+ * relative path. Canonicalization happens before schema validation, Policy,
+ * capability issuance, idempotency hashing, and execution.
+ */
+export function normalizeWorkspaceToolInput(
+  toolName: string,
+  input: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const field = WORKSPACE_PATH_FIELDS[toolName];
+  if (field === undefined || typeof input[field] !== 'string') {
+    return { ...input };
+  }
+  const value = input[field];
+  if (value.startsWith('/') || /^[a-z]:[\\/]/iu.test(value)) {
+    return { ...input };
+  }
+  const segments = value
+    .split(/[\\/]+/u)
+    .filter((segment) => segment !== '' && segment !== '.');
+  if (segments.includes('..')) {
+    throw new Error('workspace-relative path must not contain ..');
+  }
+  return {
+    ...input,
+    [field]:
+      segments.length === 0 ? '/workspace' : `/workspace/${segments.join('/')}`,
+  };
+}
+
 export function terminalFailure(
   strategy: LoopResult['strategy'],
   terminationReason: LoopResult['termination_reason'],
@@ -210,12 +252,16 @@ export function sanitizeMessages(messages: readonly unknown[]): Message[] {
     const message = candidate as {
       role: Message['role'];
       content: string;
+      reasoning_content?: string;
       tool_call_id?: string;
       tool_calls?: Message['tool_calls'];
     };
     return {
       role: message.role,
       content: message.content,
+      ...(message.reasoning_content === undefined
+        ? {}
+        : { reasoning_content: message.reasoning_content }),
       ...(message.tool_call_id === undefined
         ? {}
         : { tool_call_id: message.tool_call_id }),
@@ -233,12 +279,33 @@ interface ProviderRequestInput {
   modelBudget: ModelCallBudget;
   registrySnapshotHash: string;
   selectedTools: readonly ProviderTool[];
+  directive?: ModelCallDirective;
 }
 
 export function buildProviderSelectionRequest(
   input: ProviderRequestInput,
 ): ProviderSelectionRequest {
-  const messages = sanitizeMessages(input.messages);
+  const messages = [
+    ...(input.directive === undefined
+      ? []
+      : [
+          {
+            role: 'system' as const,
+            content: input.directive.system_instruction,
+          },
+        ]),
+    ...sanitizeMessages(input.messages),
+  ];
+  if (
+    input.directive?.required_tool !== undefined &&
+    !input.selectedTools.some(
+      (tool) => tool.name === input.directive!.required_tool,
+    )
+  ) {
+    throw new Error(
+      `required model tool is not selected: ${input.directive.required_tool}`,
+    );
+  }
   const localOnly = input.task.constraints.some(
     (constraint) =>
       constraint.type === 'privacy' && constraint.value === 'local_only',
@@ -258,6 +325,18 @@ export function buildProviderSelectionRequest(
       ...(input.selectedTools.length === 0
         ? {}
         : { tools: input.selectedTools }),
+      ...(input.directive?.required_tool !== undefined
+        ? {
+            tool_choice: {
+              type: 'function' as const,
+              function: { name: input.directive.required_tool },
+            },
+          }
+        : input.directive?.allowed_tools?.length === 0
+          ? { tool_choice: 'none' as const }
+          : input.directive === undefined
+            ? {}
+            : { tool_choice: 'auto' as const }),
       max_tokens: input.modelBudget.max_output_tokens,
     },
     estimated_input_tokens: Math.min(
@@ -288,6 +367,7 @@ export function buildProviderSelectionRequest(
 export function gatewayResultToModelTurn(result: {
   response: {
     content: string;
+    reasoning_content?: string;
     tool_calls?: readonly {
       id: string;
       name: string;
@@ -299,6 +379,9 @@ export function gatewayResultToModelTurn(result: {
 }): ModelTurn {
   return {
     content: result.response.content,
+    ...(result.response.reasoning_content === undefined
+      ? {}
+      : { reasoning_content: result.response.reasoning_content }),
     decision_summary: result.response.content.slice(0, 200),
     ...(result.response.tool_calls === undefined
       ? {}

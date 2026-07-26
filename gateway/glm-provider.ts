@@ -22,6 +22,29 @@ export interface GlmProviderOptions {
   fetch?: typeof fetch;
 }
 
+const TOOL_DESCRIPTIONS: Readonly<Record<string, string>> = Object.freeze({
+  read_file: 'Read one local workspace file and return its contents. Use /workspace/... or a workspace-relative path.',
+  write_file: 'Create or replace one local workspace file with exact content. Use /workspace/... or a workspace-relative path.',
+  edit_file: 'Replace one exact text fragment in one local workspace file. Use /workspace/... or a workspace-relative path.',
+  list_directory: 'List entries in one local workspace directory. Use /workspace/... or a workspace-relative path.',
+  search_files: 'Search local workspace files for a literal text fragment. Use /workspace/... or a workspace-relative root.',
+  execute_command: 'Run one allowlisted local command inside the workspace sandbox. Use /workspace or a workspace-relative cwd.',
+  create_artifact: 'Create one local structured artifact under /workspace.',
+  ask_user: 'Request missing information from the user without taking other action.',
+  parse_document: 'Parse one local document under /workspace and return its extracted text.',
+});
+
+function toolDescription(
+  tool: NonNullable<ProviderRequest['tools']>[number],
+): string {
+  const declared = tool.risk_feature_extractor?.trim();
+  if (declared && declared !== 'default') return declared;
+  return (
+    TOOL_DESCRIPTIONS[tool.name] ??
+    `Invoke the local ${tool.name} tool with schema-valid arguments.`
+  );
+}
+
 function stopReason(
   reason: string | null | undefined,
 ): NonNullable<ParsedResponse['stop_reason']> {
@@ -53,26 +76,52 @@ export class GlmProvider {
     return {
       model: this.model,
       reasoning_effort: this.reasoningEffort,
-      messages: req.messages.map(m => ({ role: m.role, content: m.content })),
-      temperature: req.temperature ?? 0.1,
+      thinking: { type: 'enabled', clear_thinking: false },
+      messages: req.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+        ...(message.reasoning_content === undefined
+          ? {}
+          : { reasoning_content: message.reasoning_content }),
+        ...(message.tool_call_id === undefined
+          ? {}
+          : { tool_call_id: message.tool_call_id }),
+        ...(message.tool_calls === undefined
+          ? {}
+          : {
+              tool_calls: message.tool_calls.map((call) => ({
+                id: call.id,
+                type: 'function',
+                function: {
+                  name: call.name,
+                  arguments: JSON.stringify(call.arguments),
+                },
+              })),
+            }),
+      })),
+      temperature: req.temperature ?? 1,
       max_tokens: req.max_tokens ?? 4096,
       ...(req.tools && req.tools.length > 0
         ? {
+            parallel_tool_calls: false,
             tools: req.tools.map((tool) => ({
               type: 'function',
               function: {
                 name: tool.name,
-                description: tool.risk_feature_extractor ?? '',
+                description: toolDescription(tool),
                 parameters: tool.input_schema ?? {},
               },
             })),
           }
         : {}),
+      ...(req.tool_choice === undefined
+        ? {}
+        : { tool_choice: req.tool_choice }),
     };
   }
 
   parseResponse(raw: unknown): ParsedResponse {
-    const data = raw as { choices?: Array<{ message: { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }; finish_reason?: string }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; model?: string };
+    const data = raw as { choices?: Array<{ message: { content?: string; reasoning_content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }; finish_reason?: string }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; model?: string };
     const choice = data.choices?.[0];
     if (!choice) throw new GlmProviderError('GLM returned no choices');
     const tool_calls = choice.message.tool_calls?.map(tc => ({
@@ -84,6 +133,9 @@ export class GlmProvider {
     const usage = data.usage ? { input_tokens: data.usage.prompt_tokens, output_tokens: data.usage.completion_tokens } : { input_tokens: 0, output_tokens: 0 };
     return {
       content: choice.message.content ?? '',
+      ...(choice.message.reasoning_content === undefined
+        ? {}
+        : { reasoning_content: choice.message.reasoning_content }),
       ...(tool_calls && tool_calls.length > 0 ? { tool_calls } : {}),
       stop_reason,
       usage,

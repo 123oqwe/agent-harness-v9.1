@@ -12,6 +12,7 @@ import {
   deterministicRunId,
   extractToolReceipts,
   gatewayResultToModelTurn,
+  normalizeWorkspaceToolInput,
   recordTerminalFailure,
   restoreLoopResult,
   restoreVerificationReport,
@@ -63,6 +64,41 @@ function session(id = 'session-1'): DurableSession {
 }
 
 describe('Harness runtime support', () => {
+  it('normalizes safe model-relative workspace paths before authorization', () => {
+    expect(
+      normalizeWorkspaceToolInput('read_file', {
+        path: 'config/app.json',
+        max_bytes: 10,
+      }),
+    ).toEqual({ path: '/workspace/config/app.json', max_bytes: 10 });
+    expect(
+      normalizeWorkspaceToolInput('search_files', {
+        root: '.',
+        needle: 'TODO',
+      }),
+    ).toEqual({ root: '/workspace', needle: 'TODO' });
+    expect(
+      normalizeWorkspaceToolInput('execute_command', {
+        argv: ['node', 'test.mjs'],
+        cwd: 'src',
+      }),
+    ).toEqual({
+      argv: ['node', 'test.mjs'],
+      cwd: '/workspace/src',
+    });
+  });
+
+  it('does not rewrite absolute paths or accept relative traversal', () => {
+    expect(
+      normalizeWorkspaceToolInput('read_file', { path: '/tmp/outside' }),
+    ).toEqual({ path: '/tmp/outside' });
+    expect(() =>
+      normalizeWorkspaceToolInput('write_file', {
+        path: '../outside',
+        content: 'x',
+      }),
+    ).toThrow('workspace-relative path must not contain ..');
+  });
   it('creates an isolated default context and honors a caller clock', () => {
     const context = createDefaultExecutionContext('abc', () => CLOCK);
     expect(context).toEqual({
@@ -255,6 +291,7 @@ describe('Harness runtime support', () => {
         {
           role: 'assistant',
           content: 'tool',
+          reasoning_content: 'private and ephemeral',
           decision_summary: 'internal',
           tool_calls: [
             {
@@ -276,6 +313,7 @@ describe('Harness runtime support', () => {
       {
         role: 'assistant',
         content: 'tool',
+        reasoning_content: 'private and ephemeral',
         tool_calls: [
           {
             id: 'call-1',
@@ -357,6 +395,50 @@ describe('Harness runtime support', () => {
     });
   });
 
+  it('applies a model-call directive as a system instruction and exact tool choice', () => {
+    const selectedTools = [
+      { name: 'read_file' },
+    ] as readonly ProviderTool[];
+    const request = buildProviderSelectionRequest({
+      task: task(),
+      runPlan: plan('plan_execute'),
+      messages: [{ role: 'user', content: 'read config/app.json' }],
+      modelBudget: { remaining_tokens: 100, max_output_tokens: 40 },
+      registrySnapshotHash: 'registry-3',
+      selectedTools,
+      directive: {
+        system_instruction: 'Call read_file exactly once.',
+        allowed_tools: ['read_file'],
+        required_tool: 'read_file',
+      },
+    });
+    expect(request.request.messages[0]).toEqual({
+      role: 'system',
+      content: 'Call read_file exactly once.',
+    });
+    expect(request.request.tool_choice).toEqual({
+      type: 'function',
+      function: { name: 'read_file' },
+    });
+    expect(request.request.tools).toBe(selectedTools);
+  });
+
+  it('sets tool_choice none for a directive that forbids tools', () => {
+    const request = buildProviderSelectionRequest({
+      task: task(),
+      runPlan: plan('direct'),
+      messages: [{ role: 'user', content: 'rewrite this' }],
+      modelBudget: { remaining_tokens: 100, max_output_tokens: 40 },
+      registrySnapshotHash: 'registry-4',
+      selectedTools: [],
+      directive: {
+        system_instruction: 'Return only the final answer.',
+        allowed_tools: [],
+      },
+    });
+    expect(request.request.tool_choice).toBe('none');
+  });
+
   it('fails closed when a RunPlan has no model binding', () => {
     const invalid = { ...plan(), model_bindings: [] } as unknown as RunPlan;
     expect(() =>
@@ -386,6 +468,7 @@ describe('Harness runtime support', () => {
       gatewayResultToModelTurn({
         response: {
           content: long,
+          reasoning_content: 'private and ephemeral',
           tool_calls: [
             {
               id: '1',
@@ -399,6 +482,7 @@ describe('Harness runtime support', () => {
       }),
     ).toEqual({
       content: long,
+      reasoning_content: 'private and ephemeral',
       decision_summary: 'x'.repeat(200),
       tool_calls: [
         {

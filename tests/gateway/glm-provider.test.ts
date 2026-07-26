@@ -114,9 +114,11 @@ describe('GlmProvider dispatch adapter', () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       model: 'glm-5.2',
       reasoning_effort: 'xhigh',
+      thinking: { type: 'enabled', clear_thinking: false },
       messages: [{ role: 'user', content: 'hello' }],
-      temperature: 0.1,
+      temperature: 1,
       max_tokens: 4096,
+      parallel_tool_calls: false,
       tools: [
         {
           type: 'function',
@@ -182,9 +184,11 @@ describe('GlmProvider dispatch adapter', () => {
       fetch: vi.fn(),
     });
     const normalized = provider.normalizeRequest(request) as {
+      parallel_tool_calls: boolean;
       tools: Array<{ function: { name: string; description: string; parameters: unknown } }>;
     };
 
+    expect(normalized.parallel_tool_calls).toBe(false);
     expect(normalized.tools[0]).toEqual({
       type: 'function',
       function: {
@@ -193,6 +197,69 @@ describe('GlmProvider dispatch adapter', () => {
         parameters: request.tools![0]!.input_schema,
       },
     });
+  });
+
+  it('preserves interleaved-thinking tool history and replaces placeholder descriptions', () => {
+    const provider = new GlmProvider({
+      model: 'glm-5.2',
+      endpoint: 'https://provider.invalid/chat/completions',
+      fetch: vi.fn(),
+    });
+    const normalized = provider.normalizeRequest({
+      messages: [
+        { role: 'user', content: 'read the file' },
+        {
+          role: 'assistant',
+          content: '',
+          reasoning_content: 'private reasoning',
+          tool_calls: [
+            { id: 'call-1', name: 'read_file', arguments: { path: 'a.txt' } },
+          ],
+        },
+        {
+          role: 'tool',
+          content: '{"content":"ok"}',
+          tool_call_id: 'call-1',
+        },
+      ],
+      tools: [
+        {
+          name: 'read_file',
+          risk_feature_extractor: 'default',
+          input_schema: { type: 'object' },
+        },
+      ],
+    }) as {
+      messages: unknown[];
+      tools: Array<{ function: { description: string } }>;
+    };
+
+    expect(normalized.messages).toEqual([
+      { role: 'user', content: 'read the file' },
+      {
+        role: 'assistant',
+        content: '',
+        reasoning_content: 'private reasoning',
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'read_file',
+              arguments: '{"path":"a.txt"}',
+            },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        content: '{"content":"ok"}',
+        tool_call_id: 'call-1',
+      },
+    ]);
+    expect(normalized.tools[0]!.function.description).toContain(
+      'Read one local workspace file',
+    );
   });
 
   it('parses real incremental SSE content, tool calls and final usage', async () => {

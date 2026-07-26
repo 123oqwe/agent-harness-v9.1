@@ -40,11 +40,23 @@ export async function runReact(
       messages,
       context.iterations,
       budget,
+      {
+        system_instruction:
+          'ReAct mode: use workspace tools only when needed. Base each next action on prior tool observations. When complete, return the concise final answer without a tool call. Never expose private reasoning.',
+        allowed_tools:
+          context.config.run_plan?.tool_grants
+            .map((grant) => grant.tool)
+            .filter((tool): tool is string => typeof tool === 'string') ?? [],
+      },
     );
     if (context.terminated) return;
     const recorded = context.recordTurn(turn);
     if (context.terminated) return;
-    if (turn.stop_reason === 'length') {
+    if (
+      turn.stop_reason === 'length' &&
+      (turn.content.trim().length === 0 ||
+        (turn.tool_calls?.length ?? 0) > 0)
+    ) {
       context.terminate('malformed_response');
       return;
     }
@@ -76,6 +88,9 @@ export async function runReact(
     messages.push({
       role: 'assistant',
       content: turn.content,
+      ...(turn.reasoning_content === undefined
+        ? {}
+        : { reasoning_content: turn.reasoning_content }),
       decision_summary: turn.decision_summary,
       tool_calls: turn.tool_calls,
     });

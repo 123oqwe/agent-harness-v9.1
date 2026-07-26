@@ -187,6 +187,25 @@ describe('LocalToolHost', () => {
     });
   });
 
+  it('resolves only an explicitly allowlisted command name', async () => {
+    const setup = fixture();
+    setup.sandbox.commandAllowlist = {
+      node: '/trusted/bin/node',
+    };
+    await setup.host.execute(
+      'execute_command',
+      {
+        argv: ['node', 'test.mjs'],
+        cwd: '/workspace',
+      },
+      setup.vfs,
+    );
+    expect(setup.commandRunner).toHaveBeenCalledWith(setup.sandbox, {
+      argv: ['/trusted/bin/node', 'test.mjs'],
+      cwd: setup.root,
+    });
+  });
+
   it.each([
     { transaction: null, sandbox: {} as SandboxProfile },
     { transaction: {} as WorkspaceTransaction, sandbox: null },

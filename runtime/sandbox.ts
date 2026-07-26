@@ -61,6 +61,8 @@ export interface SandboxProfile {
   egressAllowlist?: EgressAllowRule[];
   /** Explicit non-secret variables exposed to the child. Host env is not inherited. */
   environment?: Readonly<Record<string, string>>;
+  /** Caller-approved command names mapped to absolute executable paths. */
+  commandAllowlist?: Readonly<Record<string, string>>;
 }
 
 export interface SandboxExecOptions {

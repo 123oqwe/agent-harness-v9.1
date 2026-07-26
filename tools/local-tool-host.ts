@@ -95,8 +95,12 @@ export class LocalToolHost {
       throw new Error('workspace transaction is not active');
     }
     const command = args as unknown as ExecCommandInput;
+    const executable =
+      workspace.sandbox.commandAllowlist?.[command.argv[0]!] ??
+      command.argv[0]!;
     return this.commandRunner(workspace.sandbox, {
       ...command,
+      argv: [executable, ...command.argv.slice(1)],
       cwd: workspace.transaction.mapCwd(command.cwd),
     });
   }
