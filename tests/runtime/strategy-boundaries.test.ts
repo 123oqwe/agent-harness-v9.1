@@ -607,6 +607,36 @@ describe('Plan+Execute execution and recovery', () => {
     ).toBe(true);
   });
 
+  it('retries one truncated bound proposal without executing a partial call', async () => {
+    const truncated: ModelTurn = {
+      content: '',
+      decision_summary: 'incomplete',
+      stop_reason: 'length',
+    };
+    const toolExecute = vi.fn(async () => ({ content: 'ok' }));
+    const runtimeDeps = deps([truncated, proposedTurn()], { toolExecute });
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: graph }),
+      runtimeDeps,
+    ).run();
+
+    expect(result.termination_reason).toBe('completed');
+    expect(result.iterations).toBe(2);
+    expect(toolExecute).toHaveBeenCalledTimes(1);
+    expect(toolExecute).toHaveBeenCalledWith(
+      'read_file',
+      { path: '/x' },
+      expect.any(Object),
+    );
+    expect(
+      runtimeDeps.session.getEvents().some(
+        (event) =>
+          event.type === 'system' &&
+          (event.data as { proposal_attempt?: number }).proposal_attempt === 2,
+      ),
+    ).toBe(true);
+  });
+
   it('rejects a task-unbound path before dispatch and accepts one corrected proposal', async () => {
     const boundPlan = {
       ...graph,

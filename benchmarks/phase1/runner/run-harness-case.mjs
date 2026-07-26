@@ -465,10 +465,10 @@ export async function runHarnessCase(input) {
       clock,
     },
     verification,
-    // GLM max_tokens includes private reasoning tokens. The fixture's
-    // token_budget is a visible-answer budget and is graded on visible output;
-    // collapsing the two would prevent xhigh from producing any answer.
-    maxOutputTokensPerCall: 8_192,
+    // GLM max_tokens includes private reasoning tokens. Keep the per-call cap
+    // separate from the fixture's visible-answer budget, while bounding xhigh
+    // reasoning tails so one proposal cannot consume the whole case deadline.
+    maxOutputTokensPerCall: 4_096,
     signal: abort.signal,
     buildCommitSha: input.commit_sha,
   });

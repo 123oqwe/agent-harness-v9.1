@@ -258,7 +258,7 @@ describe('Phase 1 live acceptance and comparison contract', () => {
     expect(adapter).toContain('user explicitly authorized');
     expect(adapter).toContain('GLM max_tokens includes private reasoning');
     expect(adapter).toContain('token_limit: 32_000');
-    expect(adapter).toContain('maxOutputTokensPerCall: 8_192');
+    expect(adapter).toContain('maxOutputTokensPerCall: 4_096');
   });
 
   it('grades filesystem, command, output, safety, and provenance deterministically', () => {

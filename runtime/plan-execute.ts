@@ -602,7 +602,8 @@ export async function runPlanExecute(
         if (context.terminated) return;
         if (
           turn.stop_reason === 'length' &&
-          (requiredTool !== undefined || turn.content.trim().length === 0)
+          requiredTool === undefined &&
+          turn.content.trim().length === 0
         ) {
           states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
@@ -628,8 +629,14 @@ export async function runPlanExecute(
           return;
         }
         const calls = turn.tool_calls ?? [];
-        let proposalError: string | undefined;
-        if (requiredTool === undefined) {
+        let proposalError =
+          turn.stop_reason === 'length' && requiredTool !== undefined
+            ? 'truncated model turn before the bound tool proposal completed'
+            : undefined;
+        if (proposalError !== undefined) {
+          // A length-stopped proposal is incomplete even if it contains a
+          // parseable call. It is never dispatched.
+        } else if (requiredTool === undefined) {
           if (calls.length > 0) {
             proposalError = 'model step has no bound tool node';
           }
