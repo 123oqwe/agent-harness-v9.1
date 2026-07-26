@@ -105,6 +105,15 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(i.requires_tests).toBe(true);
       expect(i.multi_step).toBe(true);
     });
+    it('recognizes an explicit absolute executable as a run action', () => {
+      expect(
+        profileIntent(
+          task(
+            'Read /workspace/bug.ts, fix it, then run /usr/bin/true',
+          ),
+        ).requires_tests,
+      ).toBe(true);
+    });
     it('routes an explicit file change and failed-test rollback as Plan+Execute', () => {
       const result = router.route(
         task(
@@ -121,6 +130,18 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
         'edit_file',
         'execute_command',
       ]);
+    });
+    it('does not mistake planning task IDs for test-execution verbs', () => {
+      const request = task(
+        'Create plan.json for build, test, and deploy so every task has an id and depends_on array, with test after build and deploy after test.',
+      );
+      expect(profileIntent(request).requires_tests).toBe(false);
+      const result = router.route(request);
+      expect(
+        result.run_plan!.workflow_graph.nodes
+          .filter((node) => node.step_type === 'tool_call')
+          .map((node) => node.tool_name),
+      ).toEqual(['write_file']);
     });
     it.each([
       'Search the workspace and report the match. Do not modify files.',

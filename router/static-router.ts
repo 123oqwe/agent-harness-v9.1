@@ -94,7 +94,17 @@ export function profileIntent(task: TaskContract): IntentProfile {
   const requires_writes =
     explicitFileWrite ||
     affirmativeMutation && (codeOrFileTarget || !pureWriting);
-  const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(affirmativeGoal);
+  const requires_tests =
+    /\b(?:test|verify|build|compile|lint|check|run)\s+(?:(?:the|this|that|my|our|a|an)\s+)?(?:function|output|project|code|source|results?|suite|tests?|build|compiler|lint|app|application|service|repo|repository|files?|fix)\b/iu.test(
+      affirmativeGoal,
+    ) ||
+    /\b(?:run|execute)\s+(?:node|python3|npm|pnpm|yarn|pytest|vitest|jest|cargo|go|(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.(?:mjs|cjs|js|py|sh))\b/iu.test(
+      affirmativeGoal,
+    ) ||
+    /\b(?:run|execute)\s+\/[a-z0-9_./-]+/iu.test(affirmativeGoal) ||
+    /(?:运行|执行)[^.。;；]{0,40}(?:测试|node|python|npm|脚本)|(?:测试|验证|构建|编译|检查)(?:这个|该|代码|项目|结果|修复)/u.test(
+      affirmativeGoal,
+    );
   const explicit_plan = /\b(plan|step by step|multi[- ]?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
   const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze|research|cite|source|reference)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析|研究|引用|来源|参考/u.test(goal);
   const requires_tools =

@@ -49,6 +49,41 @@ function isTestPath(path: string): boolean {
   );
 }
 
+function planningJsonInstruction(goal: string, target: string): string {
+  if (
+    !target.toLowerCase().endsWith('.json') ||
+    !/\bdepends_on\b/iu.test(goal)
+  ) {
+    return '';
+  }
+  const list = goal.match(
+    /\bfor\s+([a-z0-9_-]+(?:\s*,\s*[a-z0-9_-]+)*(?:\s*,?\s+and\s+[a-z0-9_-]+)?)\s+so\b/iu,
+  );
+  if (!list) {
+    return ' The JSON must be a top-level array of task objects, or an object with a tasks array; every task object must have a string id and a depends_on string array.';
+  }
+  const ids = list[1]!
+    .replace(/\s*,?\s+and\s+/giu, ',')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const dependencies = new Map(ids.map((id) => [id, [] as string[]]));
+  for (const relation of goal.matchAll(
+    /\b([a-z0-9_-]+)\s+after\s+([a-z0-9_-]+)\b/giu,
+  )) {
+    const task = relation[1]!;
+    const dependency = relation[2]!;
+    if (!dependencies.has(task)) dependencies.set(task, []);
+    if (!dependencies.has(dependency)) dependencies.set(dependency, []);
+    dependencies.get(task)!.push(dependency);
+  }
+  const tasks = [...dependencies].map(([id, depends_on]) => ({
+    id,
+    depends_on: [...new Set(depends_on)],
+  }));
+  return ` The JSON content must have this exact structural shape: ${JSON.stringify({ tasks })}.`;
+}
+
 /**
  * Narrow the current frozen tool node without putting untrusted task prose in
  * a system message. These are routing hints, not capabilities; Dispatcher,
@@ -90,15 +125,22 @@ export function planActionInstruction(
     const target = [...outputs][0];
     return target === undefined
       ? ''
-      : ` The write path must be ${JSON.stringify(target)}.`;
+      : ` The write path must be ${JSON.stringify(target)}.${planningJsonInstruction(goal, target)}`;
   }
   if (requiredTool === 'execute_command') {
     const command = goal.match(
       /(?:\b(?:run|execute)\s+|运行\s*)(node|python3)\s+((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/iu,
     );
-    return command === null
+    const absoluteCommand = goal.match(
+      /\b(?:run|execute)\s+(\/[a-z0-9_./-]+(?:\s+[a-z0-9_./-]+)*)\s*$/iu,
+    );
+    const argv =
+      command === null
+        ? absoluteCommand?.[1]?.trim().split(/\s+/u)
+        : [command[1]!, command[2]!];
+    return argv === undefined
       ? ''
-      : ` Run exactly argv ${JSON.stringify([command[1], command[2]])} with cwd "/workspace"; do not substitute a discovery command.`;
+      : ` Run exactly argv ${JSON.stringify(argv)} with cwd "/workspace"; do not substitute a discovery command.`;
   }
   return '';
 }

@@ -353,6 +353,49 @@ describe('Plan+Execute execution and recovery', () => {
     ).toContain('["node","failing-test.mjs"]');
   });
 
+  it('binds explicit planning dependencies to a stable JSON artifact shape', () => {
+    const plan = {
+      ...runPlan(
+        [
+          node('propose-write', 'model_call'),
+          node('write', 'tool_call', { tool_name: 'write_file' }),
+        ],
+        [{ from_step: 'propose-write', to_step: 'write' }],
+        ['write_file'],
+      ),
+      task: {
+        goal: 'Create plan.json for build, test, and deploy so every task has an id and depends_on array, with test after build and deploy after test.',
+      },
+    } as RunPlan;
+    const instruction = planActionInstruction(plan, 'write_file', 'write');
+    expect(instruction).toContain('"tasks"');
+    expect(instruction).toContain(
+      '{"id":"test","depends_on":["build"]}',
+    );
+    expect(instruction).toContain(
+      '{"id":"deploy","depends_on":["test"]}',
+    );
+  });
+
+  it('binds an explicit absolute executable to the command node', () => {
+    const plan = {
+      ...runPlan(
+        [
+          node('propose-command', 'model_call'),
+          node('command', 'tool_call', { tool_name: 'execute_command' }),
+        ],
+        [{ from_step: 'propose-command', to_step: 'command' }],
+        ['execute_command'],
+      ),
+      task: {
+        goal: 'Read /workspace/bug.ts, fix it, then run /usr/bin/true',
+      },
+    } as RunPlan;
+    expect(
+      planActionInstruction(plan, 'execute_command', 'command'),
+    ).toContain('["/usr/bin/true"]');
+  });
+
   function proposedTurn(changes: Partial<ModelTurn> = {}): ModelTurn {
     return {
       content: 'proposal',
