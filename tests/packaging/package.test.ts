@@ -72,6 +72,24 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(pkg.scripts.lint).toContain('benchmarks');
   });
 
+  it(
+    'keeps package-lock complete for a clean source-only npm ci checkout',
+    { timeout: 30_000 },
+    () => {
+      const cleanInstall = runNpm([
+        'ci',
+        '--dry-run',
+        '--ignore-scripts',
+        '--no-audit',
+        '--no-fund',
+      ]);
+      expect(
+        cleanInstall.status,
+        `${cleanInstall.stdout}\n${cleanInstall.stderr}`,
+      ).toBe(0);
+    },
+  );
+
   it('limits mutation to product source and cleans the sandbox even after failure', () => {
     const config = readJson('stryker.config.json') as {
       mutate: string[];
