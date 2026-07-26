@@ -19,7 +19,42 @@ describe('AH-TOOL-EDIT-001 edit_file', () => {
   });
   it('throws when pattern not found', async () => {
     writeFileSync(join(tmp, 'f.txt'), 'hello');
-    await expect(editFile(vfs, { path: '/workspace/f.txt', find: 'xyz', replace: 'q' })).rejects.toThrow();
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: 'xyz',
+        replace: 'q',
+      }),
+    ).rejects.toThrow(
+      'edit_file: pattern not found in /workspace/f.txt',
+    );
+    expect(vfs.readText('/workspace/f.txt')).toBe('hello');
+  });
+
+  it('rejects an empty find string before writing', async () => {
+    writeFileSync(join(tmp, 'f.txt'), 'hello');
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: '',
+        replace: 'x',
+      }),
+    ).rejects.toThrow('edit_file: find must not be empty');
+    expect(vfs.readText('/workspace/f.txt')).toBe('hello');
+  });
+
+  it('rejects a whitespace-only fallback with the exact path', async () => {
+    writeFileSync(join(tmp, 'f.txt'), 'hello');
+    await expect(
+      editFile(vfs, {
+        path: '/workspace/f.txt',
+        find: '   ',
+        replace: 'x',
+      }),
+    ).rejects.toThrow(
+      'edit_file: pattern not found in /workspace/f.txt',
+    );
+    expect(vfs.readText('/workspace/f.txt')).toBe('hello');
   });
 
   it('rejects exact and whitespace-fallback no-op replacements', async () => {

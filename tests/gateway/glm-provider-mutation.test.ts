@@ -398,4 +398,42 @@ describe('glm-gateway-bridge mutation-killing tests', () => {
     expect(meter.getRecords()).toHaveLength(1);
     expect(meter.getRecords()).not.toBe(meter.getRecords());
   });
+
+  it('tees every custom meter record into the immutable local audit view', async () => {
+    const externalRecord = vi.fn(async () => undefined);
+    const result = createGlmGateway({
+      model: 'glm-5.2',
+      reasoningEffort: 'xhigh',
+      fetch: vi.fn(),
+      secretsBroker: {
+        exchangeCredential: async ({ audience }) => ({
+          lease_id: 'lease',
+          audience,
+          expires_at: '2030-01-01T00:00:00.000Z',
+          secret: 'test-only-secret',
+        }),
+      },
+      egressPolicy: {
+        authorize: async () => ({ allowed: true }),
+      },
+      usageMeter: {
+        record: externalRecord,
+        getRecords: () => ['external-only'],
+      },
+    });
+    const record = {
+      provider_id: 'glm',
+      operation_id: 'operation-1',
+      usage: { input_tokens: 3, output_tokens: 5 },
+    };
+
+    await result.usageMeter.record(record);
+
+    expect(externalRecord).toHaveBeenCalledOnce();
+    expect(externalRecord).toHaveBeenCalledWith(record);
+    expect(result.usageMeter.getRecords()).toEqual([record]);
+    expect(result.usageMeter.getRecords()).not.toBe(
+      result.usageMeter.getRecords(),
+    );
+  });
 });

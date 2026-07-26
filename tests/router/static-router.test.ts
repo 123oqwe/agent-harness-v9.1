@@ -164,6 +164,87 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(intent.requires_writes).toBe(true);
       expect(intent.requires_tools).toBe(true);
     });
+
+    it.each([
+      ['Do not modify app.ts; read it.', false, false, true, 'react'],
+      ["Don't delete src/app.py; inspect it.", false, false, true, 'react'],
+      ['Never create result.json; analyze input.txt.', false, false, true, 'react'],
+      ['Without changing code, read src/main.rs.', false, false, true, 'react'],
+      ['不要修改 src/app.ts；读取它。', false, false, true, 'react'],
+      ['禁止删除 config.json；读取它。', false, false, true, 'react'],
+      ['Edit src/app.ts.', true, false, true, 'plan_execute'],
+      ['Create a file with the result.', true, false, true, 'plan_execute'],
+      ['Write the code into src/new-file.ts.', true, false, true, 'plan_execute'],
+      ['写入文件 output.txt。', true, false, true, 'plan_execute'],
+      ['新建模块 src/new.ts。', true, false, true, 'plan_execute'],
+      ['Refactor the repository module.', true, false, true, 'plan_execute'],
+      ['Remove the obsolete function.', true, false, true, 'plan_execute'],
+      ['Run the test suite.', false, true, true, 'react'],
+      ['Verify the project output.', false, true, true, 'react'],
+      ['Execute python3 scripts/check.py.', false, true, true, 'react'],
+      ['Run /usr/bin/true.', false, true, true, 'react'],
+      ['执行 node scripts/check.mjs。', false, true, true, 'react'],
+      ['构建这个项目。', false, true, true, 'react'],
+      ['Plan the workflow.', false, false, false, 'plan_execute'],
+      ['Use a multi-step sequence.', false, false, false, 'plan_execute'],
+      ['制定依赖计划。', false, false, false, 'plan_execute'],
+      ['Search for references.', false, false, true, 'react'],
+      ['Parse report.pdf.', false, false, true, 'react'],
+      ['研究并引用来源。', false, false, true, 'react'],
+    ] as const)(
+      'profiles lexical boundary %s',
+      (goal, writes, tests, tools, strategy) => {
+        const intent = profileIntent(task(goal));
+        expect({
+          writes: intent.requires_writes,
+          tests: intent.requires_tests,
+          tools: intent.requires_tools,
+          strategy: selectStrategy(intent),
+        }).toEqual({ writes, tests, tools, strategy });
+      },
+    );
+
+    it.each([
+      ['src/app.c', 'coding'],
+      ['src/app.cpp', 'coding'],
+      ['src/app.go', 'coding'],
+      ['src/app.java', 'coding'],
+      ['src/app.jsx', 'coding'],
+      ['src/app.py', 'coding'],
+      ['src/app.rs', 'coding'],
+      ['src/app.swift', 'coding'],
+      ['src/app.tsx', 'coding'],
+      ['docs/readme.md', 'documents'],
+      ['docs/report.docx', 'documents'],
+      ['docs/report.pdf', 'documents'],
+      ['notes/值_1.txt', 'documents'],
+      ['Draft an article.', 'writing'],
+      ['Create a dependency DAG.', 'planning'],
+      ['Research citations and sources.', 'research'],
+    ] as const)('classifies the exact domain for %s', (goal, domain) => {
+      const intent = profileIntent(task(`Read ${goal}`));
+      expect(intent.domains).toContain(domain);
+      expect(intent.domains).not.toEqual([]);
+    });
+
+    it('preserves exact ambiguity and success-criteria metadata', () => {
+      expect(profileIntent(task('read file.txt'))).toMatchObject({
+        ambiguity: 'low',
+        missing_info: [],
+        success_criteria_count: 1,
+      });
+      expect(
+        profileIntent(
+          task('read file.txt', {
+            success_criteria: [] as TaskContract['success_criteria'],
+          }),
+        ),
+      ).toMatchObject({
+        ambiguity: 'high',
+        missing_info: ['success_criteria_empty'],
+        success_criteria_count: 0,
+      });
+    });
   });
 
   describe('selectStrategy', () => {

@@ -68,8 +68,15 @@ export function profileIntent(task: TaskContract): IntentProfile {
   // their clause before classifying mutations so "read X; do not modify it"
   // stays a read-only ReAct task instead of becoming Plan+Execute.
   const affirmativeGoal = goal
-    .replace(/\b(?:do\s+not|don't|never|without)\b[^.。;；]*/gu, '')
-    .replace(/(?:不要|禁止)[^.。;；]*/gu, '')
+    .replace(
+      /\b(?:do\s+not|don't|never|without)\b.*?(?:\.(?=\s+\p{L})|[。;；]|$)/giu,
+      '',
+    )
+    .replace(
+      /(?:不要|禁止).*?(?:\.(?=\s+\p{L})|[。;；]|$)/giu,
+      '',
+    )
+    .replace(/^\s*[;；,，]\s*/u, '')
     .replace(/[;；,，]\s*(?=[.。]?\s*$)/u, '');
   const pureWriting = /\b(rewrite|polish|draft|essay|article|copyedit)\b|润色|改写|优化文案|写作|文章|草稿/u.test(goal);
   const hasFilePath =
