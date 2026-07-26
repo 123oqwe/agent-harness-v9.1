@@ -607,6 +607,258 @@ describe('Plan+Execute execution and recovery', () => {
     ).toBe(true);
   });
 
+  it('rejects a task-unbound path before dispatch and accepts one corrected proposal', async () => {
+    const boundPlan = {
+      ...graph,
+      task: {
+        goal: 'Read source.js and report what it contains.',
+      },
+    } as RunPlan;
+    const wrongPath = proposedTurn({
+      tool_calls: [
+        {
+          id: 'wrong-path',
+          name: 'read_file',
+          arguments: { path: 'other.js' },
+        },
+      ],
+    });
+    const corrected = proposedTurn({
+      tool_calls: [
+        {
+          id: 'correct-path',
+          name: 'read_file',
+          arguments: { path: 'source.js' },
+        },
+      ],
+    });
+    const toolExecute = vi.fn(async () => ({ content: 'source' }));
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: boundPlan }),
+      deps([wrongPath, corrected], { toolExecute }),
+    ).run();
+
+    expect(result.termination_reason).toBe('completed');
+    expect(result.iterations).toBe(2);
+    expect(toolExecute).toHaveBeenCalledTimes(1);
+    expect(toolExecute).toHaveBeenCalledWith(
+      'read_file',
+      { path: 'source.js' },
+      expect.objectContaining({ attempt_index: 1 }),
+    );
+    expect(result.turns[0]!.tool_observations[0]).toMatchObject({
+      tool_call_id: 'wrong-path',
+      status: 'rejected',
+      error: expect.stringContaining('frozen task path'),
+    });
+  });
+
+  it('rejects an edit pattern absent from the prior read before any write', async () => {
+    const editPlan = {
+      ...runPlan(
+        [
+          node('propose-read', 'model_call'),
+          node('read', 'tool_call', { tool_name: 'read_file' }),
+          node('propose-edit', 'model_call'),
+          node('edit', 'tool_call', { tool_name: 'edit_file' }),
+        ],
+        [
+          { from_step: 'propose-read', to_step: 'read' },
+          { from_step: 'read', to_step: 'propose-edit' },
+          { from_step: 'propose-edit', to_step: 'edit' },
+        ],
+        ['read_file', 'edit_file'],
+      ),
+      task: {
+        goal: 'Inspect validator.js and fix the inverted validation.',
+      },
+    } as RunPlan;
+    const read = proposedTurn({
+      tool_calls: [
+        {
+          id: 'read-source',
+          name: 'read_file',
+          arguments: { path: 'validator.js' },
+        },
+      ],
+    });
+    const wrongEdit: ModelTurn = {
+      content: 'edit',
+      decision_summary: 'edit',
+      tool_calls: [
+        {
+          id: 'wrong-edit',
+          name: 'edit_file',
+          arguments: {
+            path: 'validator.js',
+            find: 'content that is not present',
+            replace: 'replacement',
+          },
+        },
+      ],
+    };
+    const correctedEdit: ModelTurn = {
+      ...wrongEdit,
+      tool_calls: [
+        {
+          id: 'correct-edit',
+          name: 'edit_file',
+          arguments: {
+            path: 'validator.js',
+            find: "!value.includes('@')",
+            replace: "value.includes('@')",
+          },
+        },
+      ],
+    };
+    const toolExecute = vi.fn(async (name: string) =>
+      name === 'read_file'
+        ? {
+            path: '/workspace/validator.js',
+            content: "export const valid = value => !value.includes('@');\n",
+          }
+        : { replacements: 1 },
+    );
+    const result = await new LoopEngine(
+      config('plan_execute', {
+        run_plan: editPlan,
+        max_iterations: 5,
+      }),
+      deps([read, wrongEdit, correctedEdit], { toolExecute }),
+    ).run();
+
+    expect(result.termination_reason).toBe('completed');
+    expect(toolExecute).toHaveBeenCalledTimes(2);
+    expect(toolExecute.mock.calls.map((call) => call[0])).toEqual([
+      'read_file',
+      'edit_file',
+    ]);
+    expect(result.turns[1]!.tool_observations[0]).toMatchObject({
+      tool_call_id: 'wrong-edit',
+      status: 'rejected',
+      error: expect.stringContaining('prior read observation'),
+    });
+  });
+
+  it('rejects a substituted command before dispatch and runs only the frozen argv', async () => {
+    const commandPlan = {
+      ...runPlan(
+        [
+          node('propose-command', 'model_call'),
+          node('command', 'tool_call', { tool_name: 'execute_command' }),
+        ],
+        [{ from_step: 'propose-command', to_step: 'command' }],
+        ['execute_command'],
+      ),
+      task: {
+        goal: 'Run node test.mjs.',
+      },
+    } as RunPlan;
+    const commandTurn = (id: string, argv: string[]): ModelTurn => ({
+      content: 'run',
+      decision_summary: 'run',
+      tool_calls: [
+        {
+          id,
+          name: 'execute_command',
+          arguments: { argv, cwd: '/workspace' },
+        },
+      ],
+    });
+    const toolExecute = vi.fn(async () => ({ exit_code: 0 }));
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: commandPlan }),
+      deps(
+        [
+          commandTurn('wrong-command', ['node', '--version']),
+          commandTurn('correct-command', ['node', 'test.mjs']),
+        ],
+        { toolExecute },
+      ),
+    ).run();
+
+    expect(result.termination_reason).toBe('completed');
+    expect(toolExecute).toHaveBeenCalledTimes(1);
+    expect(toolExecute).toHaveBeenCalledWith(
+      'execute_command',
+      { argv: ['node', 'test.mjs'], cwd: '/workspace' },
+      expect.any(Object),
+    );
+    expect(result.turns[0]!.tool_observations[0]).toMatchObject({
+      status: 'rejected',
+      error: expect.stringContaining('frozen task argv'),
+    });
+  });
+
+  it('rejects a planning artifact with dependency drift before writing it', async () => {
+    const planningPlan = {
+      ...runPlan(
+        [
+          node('propose-write', 'model_call'),
+          node('write', 'tool_call', { tool_name: 'write_file' }),
+        ],
+        [{ from_step: 'propose-write', to_step: 'write' }],
+        ['write_file'],
+      ),
+      task: {
+        goal: 'Create plan.json for build, test, and deploy so every task has an id and depends_on array, with test after build and deploy after test.',
+      },
+    } as RunPlan;
+    const writeTurn = (id: string, content: unknown): ModelTurn => ({
+      content: 'write plan',
+      decision_summary: 'write plan',
+      tool_calls: [
+        {
+          id,
+          name: 'write_file',
+          arguments: {
+            path: 'plan.json',
+            content:
+              typeof content === 'string'
+                ? content
+                : JSON.stringify(content),
+          },
+        },
+      ],
+    });
+    const expected = {
+      tasks: [
+        { id: 'build', depends_on: [] },
+        { id: 'test', depends_on: ['build'] },
+        { id: 'deploy', depends_on: ['test'] },
+      ],
+    };
+    const toolExecute = vi.fn(async () => ({ bytes: 1 }));
+    const result = await new LoopEngine(
+      config('plan_execute', { run_plan: planningPlan }),
+      deps(
+        [
+          writeTurn('wrong-plan', {
+            tasks: [
+              { id: 'build', depends_on: [] },
+              { id: 'test', depends_on: [] },
+              { id: 'deploy', depends_on: [] },
+            ],
+          }),
+          writeTurn('correct-plan', expected),
+        ],
+        { toolExecute },
+      ),
+    ).run();
+
+    expect(result.termination_reason).toBe('completed');
+    expect(toolExecute).toHaveBeenCalledTimes(1);
+    expect(toolExecute).toHaveBeenCalledWith(
+      'write_file',
+      { path: 'plan.json', content: JSON.stringify(expected) },
+      expect.any(Object),
+    );
+    expect(result.turns[0]!.tool_observations[0]).toMatchObject({
+      status: 'rejected',
+      error: expect.stringContaining('frozen dependency structure'),
+    });
+  });
+
   it('rejects unbound tool calls from a model-only node', async () => {
     const plan = runPlan([node('model', 'model_call')]);
     const result = await new LoopEngine(

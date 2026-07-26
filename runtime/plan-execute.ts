@@ -21,14 +21,22 @@ interface ValidatedWorkflow {
   outgoing: ReadonlyMap<string, readonly string[]>;
 }
 
+interface PlanActionBinding {
+  readonly path?: string;
+  readonly argv?: readonly string[];
+}
+
 function taskPaths(goal: string): string[] {
   return [
     ...new Set(
       [
         ...goal.matchAll(
-          /(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/giu,
+          /\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/giu,
         ),
-      ].map((match) => match[0]!),
+      ].map(
+        (match) =>
+          comparableWorkspacePath(match[0]!) ?? match[0]!,
+      ),
     ),
   ];
 }
@@ -36,9 +44,9 @@ function taskPaths(goal: string): string[] {
 function outputPaths(goal: string): Set<string> {
   const paths = new Set<string>();
   for (const match of goal.matchAll(
-    /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)((?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/giu,
+    /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)(\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/giu,
   )) {
-    paths.add(match[1]!);
+    paths.add(comparableWorkspacePath(match[1]!) ?? match[1]!);
   }
   return paths;
 }
@@ -49,51 +57,11 @@ function isTestPath(path: string): boolean {
   );
 }
 
-function planningJsonInstruction(goal: string, target: string): string {
-  if (
-    !target.toLowerCase().endsWith('.json') ||
-    !/\bdepends_on\b/iu.test(goal)
-  ) {
-    return '';
-  }
-  const list = goal.match(
-    /\bfor\s+([a-z0-9_-]+(?:\s*,\s*[a-z0-9_-]+)*(?:\s*,?\s+and\s+[a-z0-9_-]+)?)\s+so\b/iu,
-  );
-  if (!list) {
-    return ' The JSON must be a top-level array of task objects, or an object with a tasks array; every task object must have a string id and a depends_on string array.';
-  }
-  const ids = list[1]!
-    .replace(/\s*,?\s+and\s+/giu, ',')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
-  const dependencies = new Map(ids.map((id) => [id, [] as string[]]));
-  for (const relation of goal.matchAll(
-    /\b([a-z0-9_-]+)\s+after\s+([a-z0-9_-]+)\b/giu,
-  )) {
-    const task = relation[1]!;
-    const dependency = relation[2]!;
-    if (!dependencies.has(task)) dependencies.set(task, []);
-    if (!dependencies.has(dependency)) dependencies.set(dependency, []);
-    dependencies.get(task)!.push(dependency);
-  }
-  const tasks = [...dependencies].map(([id, depends_on]) => ({
-    id,
-    depends_on: [...new Set(depends_on)],
-  }));
-  return ` The JSON content must have this exact structural shape: ${JSON.stringify({ tasks })}.`;
-}
-
-/**
- * Narrow the current frozen tool node without putting untrusted task prose in
- * a system message. These are routing hints, not capabilities; Dispatcher,
- * Policy and VFS remain the execution authorities.
- */
-export function planActionInstruction(
+function planActionBinding(
   runPlan: Readonly<RunPlan>,
   requiredTool: string,
   targetStep: string,
-): string {
+): PlanActionBinding {
   const goal = runPlan.task?.goal ?? '';
   const paths = taskPaths(goal);
   const outputs = outputPaths(goal);
@@ -109,23 +77,17 @@ export function planActionInstruction(
     .filter((node) => node.tool_name === requiredTool).length;
 
   if (requiredTool === 'read_file') {
-    const target = sources[sameToolIndex];
-    return target === undefined
-      ? ''
-      : ` The read path must be ${JSON.stringify(target)}.`;
+    const path = sources[sameToolIndex];
+    return path === undefined ? {} : { path };
   }
   if (requiredTool === 'edit_file') {
-    const target =
-      sources.find((path) => !isTestPath(path)) ?? sources[0];
-    return target === undefined
-      ? ''
-      : ` Edit only ${JSON.stringify(target)} using the content returned by the prior read; never edit a test/spec file and never submit a no-op replacement.`;
+    const path = sources.find((candidate) => !isTestPath(candidate)) ??
+      sources[0];
+    return path === undefined ? {} : { path };
   }
   if (requiredTool === 'write_file') {
-    const target = [...outputs][0];
-    return target === undefined
-      ? ''
-      : ` The write path must be ${JSON.stringify(target)}.${planningJsonInstruction(goal, target)}`;
+    const path = [...outputs][0];
+    return path === undefined ? {} : { path };
   }
   if (requiredTool === 'execute_command') {
     const command = goal.match(
@@ -138,11 +100,220 @@ export function planActionInstruction(
       command === null
         ? absoluteCommand?.[1]?.trim().split(/\s+/u)
         : [command[1]!, command[2]!];
+    return argv === undefined ? {} : { argv };
+  }
+  return {};
+}
+
+function planningTasks(
+  goal: string,
+  target: string,
+): Array<{ id: string; depends_on: string[] }> | undefined {
+  if (
+    !target.toLowerCase().endsWith('.json') ||
+    !/\bdepends_on\b/iu.test(goal)
+  ) {
+    return undefined;
+  }
+  const list = goal.match(
+    /\bfor\s+([a-z0-9_-]+(?:\s*,\s*[a-z0-9_-]+)*(?:\s*,?\s+and\s+[a-z0-9_-]+)?)\s+so\b/iu,
+  );
+  if (!list) return undefined;
+  const ids = list[1]!
+    .replace(/\s*,?\s+and\s+/giu, ',')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const dependencies = new Map(ids.map((id) => [id, [] as string[]]));
+  for (const relation of goal.matchAll(
+    /\b([a-z0-9_-]+)\s+after\s+([a-z0-9_-]+)\b/giu,
+  )) {
+    const task = relation[1]!;
+    const dependency = relation[2]!;
+    if (!dependencies.has(task)) dependencies.set(task, []);
+    if (!dependencies.has(dependency)) dependencies.set(dependency, []);
+    dependencies.get(task)!.push(dependency);
+  }
+  return [...dependencies].map(([id, depends_on]) => ({
+    id,
+    depends_on: [...new Set(depends_on)],
+  }));
+}
+
+function planningJsonInstruction(goal: string, target: string): string {
+  if (
+    !target.toLowerCase().endsWith('.json') ||
+    !/\bdepends_on\b/iu.test(goal)
+  ) {
+    return '';
+  }
+  const tasks = planningTasks(goal, target);
+  return tasks === undefined
+    ? ' The JSON must be a top-level array of task objects, or an object with a tasks array; every task object must have a string id and a depends_on string array.'
+    : ` The JSON content must have this exact structural shape: ${JSON.stringify({ tasks })}.`;
+}
+
+/**
+ * Narrow the current frozen tool node without putting untrusted task prose in
+ * a system message. These are routing hints, not capabilities; Dispatcher,
+ * Policy and VFS remain the execution authorities.
+ */
+export function planActionInstruction(
+  runPlan: Readonly<RunPlan>,
+  requiredTool: string,
+  targetStep: string,
+): string {
+  const goal = runPlan.task?.goal ?? '';
+  const binding = planActionBinding(runPlan, requiredTool, targetStep);
+
+  if (requiredTool === 'read_file') {
+    const target = binding.path;
+    return target === undefined
+      ? ''
+      : ` The read path must be ${JSON.stringify(target)}.`;
+  }
+  if (requiredTool === 'edit_file') {
+    const target = binding.path;
+    return target === undefined
+      ? ''
+      : ` Edit only ${JSON.stringify(target)} using the content returned by the prior read; never edit a test/spec file and never submit a no-op replacement.`;
+  }
+  if (requiredTool === 'write_file') {
+    const target = binding.path;
+    return target === undefined
+      ? ''
+      : ` The write path must be ${JSON.stringify(target)}.${planningJsonInstruction(goal, target)}`;
+  }
+  if (requiredTool === 'execute_command') {
+    const argv = binding.argv;
     return argv === undefined
       ? ''
       : ` Run exactly argv ${JSON.stringify(argv)} with cwd "/workspace"; do not substitute a discovery command.`;
   }
   return '';
+}
+
+function comparableWorkspacePath(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const trimmed = value.replace(/^\.\//u, '');
+  if (trimmed === '/workspace') return '';
+  if (trimmed.startsWith('/workspace/')) {
+    return trimmed.slice('/workspace/'.length);
+  }
+  return trimmed.startsWith('/') ? undefined : trimmed;
+}
+
+function latestReadContent(
+  messages: readonly unknown[],
+  expectedPath: string,
+): string | undefined {
+  for (const message of [...messages].reverse()) {
+    if (
+      message === null ||
+      typeof message !== 'object' ||
+      (message as { role?: unknown }).role !== 'tool' ||
+      typeof (message as { content?: unknown }).content !== 'string'
+    ) {
+      continue;
+    }
+    try {
+      const observation = JSON.parse(
+        (message as { content: string }).content,
+      ) as {
+        name?: unknown;
+        status?: unknown;
+        arguments?: { path?: unknown };
+        result?: { path?: unknown; content?: unknown };
+      };
+      if (
+        observation.name === 'read_file' &&
+        observation.status === 'ok' &&
+        typeof observation.result?.content === 'string' &&
+        (comparableWorkspacePath(observation.arguments?.path) ===
+          expectedPath ||
+          comparableWorkspacePath(observation.result.path) === expectedPath)
+      ) {
+        return observation.result.content;
+      }
+    } catch {
+      // Ignore non-observation tool messages.
+    }
+  }
+  return undefined;
+}
+
+function planToolArgumentError(
+  runPlan: Readonly<RunPlan>,
+  requiredTool: string,
+  targetStep: string,
+  args: Readonly<Record<string, unknown>>,
+  messages: readonly unknown[],
+): string | undefined {
+  const binding = planActionBinding(runPlan, requiredTool, targetStep);
+  if (
+    binding.path !== undefined &&
+    comparableWorkspacePath(args.path) !== binding.path
+  ) {
+    return `${requiredTool} path must match frozen task path ${JSON.stringify(binding.path)}`;
+  }
+  if (binding.argv !== undefined) {
+    if (
+      !Array.isArray(args.argv) ||
+      args.argv.some((value) => typeof value !== 'string') ||
+      JSON.stringify(args.argv) !== JSON.stringify(binding.argv) ||
+      args.cwd !== '/workspace'
+    ) {
+      return `execute_command must match frozen task argv ${JSON.stringify(binding.argv)} with cwd "/workspace"`;
+    }
+  }
+  if (requiredTool === 'edit_file' && binding.path !== undefined) {
+    if (
+      typeof args.find !== 'string' ||
+      typeof args.replace !== 'string' ||
+      args.find === args.replace
+    ) {
+      return 'edit_file requires distinct string find and replace arguments';
+    }
+    const priorContent = latestReadContent(messages, binding.path);
+    if (priorContent === undefined) {
+      return `edit_file requires a successful prior read observation for ${JSON.stringify(binding.path)}`;
+    }
+    const normalizeWhitespace = (value: string) =>
+      value.replace(/\s+/gu, ' ').trim();
+    if (
+      !priorContent.includes(args.find) &&
+      !normalizeWhitespace(priorContent).includes(
+        normalizeWhitespace(args.find),
+      )
+    ) {
+      return `edit_file find must exist in the prior read observation for ${JSON.stringify(binding.path)}`;
+    }
+  }
+  if (requiredTool === 'write_file' && binding.path !== undefined) {
+    const tasks = planningTasks(runPlan.task?.goal ?? '', binding.path);
+    if (tasks !== undefined) {
+      let parsed: unknown;
+      try {
+        parsed =
+          typeof args.content === 'string'
+            ? JSON.parse(args.content)
+            : undefined;
+      } catch {
+        parsed = undefined;
+      }
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed) ||
+        JSON.stringify(
+          (parsed as { tasks?: unknown }).tasks,
+        ) !== JSON.stringify(tasks)
+      ) {
+        return `write_file content must preserve the frozen dependency structure ${JSON.stringify({ tasks })}`;
+      }
+    }
+  }
+  return undefined;
 }
 
 const SUPPORTED_STEP_TYPES = new Set<WorkflowNode['step_type']>([
@@ -456,14 +627,28 @@ export async function runPlanExecute(
           context.terminate('budget_exhausted');
           return;
         }
-        const validProposal =
-          requiredTool === undefined
-            ? !turn.tool_calls || turn.tool_calls.length === 0
-            : turn.tool_calls?.length === 1 &&
-              turn.tool_calls[0]!.name === requiredTool;
-        if (validProposal) break;
-
         const calls = turn.tool_calls ?? [];
+        let proposalError: string | undefined;
+        if (requiredTool === undefined) {
+          if (calls.length > 0) {
+            proposalError = 'model step has no bound tool node';
+          }
+        } else if (
+          calls.length !== 1 ||
+          calls[0]!.name !== requiredTool
+        ) {
+          proposalError = `expected exactly one ${requiredTool} tool call`;
+        } else {
+          proposalError = planToolArgumentError(
+            context.config.run_plan,
+            requiredTool,
+            toolSuccessors[0]!,
+            calls[0]!.arguments,
+            messages,
+          );
+        }
+        if (proposalError === undefined) break;
+
         messages.push({
           role: 'assistant',
           content: turn.content,
@@ -479,9 +664,7 @@ export async function runPlanExecute(
             recorded,
             call,
             'rejected',
-            requiredTool === undefined
-              ? 'model step has no bound tool node'
-              : `expected exactly one ${requiredTool} tool call`,
+            proposalError,
             stepId,
           );
           messages.push({
@@ -495,15 +678,12 @@ export async function runPlanExecute(
           content:
             requiredTool === undefined
               ? 'Correction: return the final answer without any tool call.'
-              : `Correction: call ${requiredTool} exactly once, not zero or multiple times.`,
+              : `Correction: ${proposalError}. Call ${requiredTool} exactly once with corrected arguments.${actionInstruction}`,
         });
         if (proposalAttempt >= 2) {
           states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
-            reason:
-              requiredTool === undefined
-                ? 'model step has no bound tool node'
-                : `expected exactly one ${requiredTool} tool call`,
+            reason: proposalError,
           });
           context.terminate('malformed_response');
           return;

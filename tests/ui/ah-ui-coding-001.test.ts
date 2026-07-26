@@ -48,7 +48,7 @@ describe('AH-UI-CODING-001 coding workspace (via Harness)', () => {
     const gw = createScriptedGateway([
       { content: '', tool_calls: [{ id: 'read', name: 'read_file', arguments: { path: '/workspace/f.ts' } }] },
       { content: '', tool_calls: [{ id: 'edit', name: 'edit_file', arguments: { path: '/workspace/f.ts', find: 'BUG', replace: 'FIXED' } }] },
-      { content: '', tool_calls: [{ id: 'test', name: 'execute_command', arguments: { argv: ['/usr/bin/true'], cwd: '/workspace' } }] },
+      { content: '', tool_calls: [{ id: 'test', name: 'execute_command', arguments: { argv: ['/bin/echo', 'ok'], cwd: '/workspace' } }] },
       { content: 'ready for independent verification' },
     ]);
     const h = new Harness({ toolRegistry: tr, skillRegistry: sr, policyEngine: pe, vfs, sandbox, gateway: gw.gateway, security: createTestSecurityDeps(pe, () => new Date().toISOString()), verification: createTestVerificationEngine(), executionContext: createDefaultExecutionContext('test-run') });
