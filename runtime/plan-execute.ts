@@ -31,7 +31,7 @@ function taskPaths(goal: string): string[] {
     ...new Set(
       [
         ...goal.matchAll(
-          /\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+/giu,
+          /\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+(?:\.[a-z0-9]+)+/giu,
         ),
       ].map(
         (match) =>
@@ -44,7 +44,7 @@ function taskPaths(goal: string): string[] {
 function outputPaths(goal: string): Set<string> {
   const paths = new Set<string>();
   for (const match of goal.matchAll(
-    /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)(\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+)/giu,
+    /(?:\b(?:write|create)\s+|\b(?:into|as)\s+|(?:写入|创建|新建)\s*)(\/?(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+(?:\.[a-z0-9]+)+)/giu,
   )) {
     paths.add(comparableWorkspacePath(match[1]!) ?? match[1]!);
   }
@@ -229,8 +229,9 @@ function latestReadContent(
         observation.name === 'read_file' &&
         observation.status === 'ok' &&
         typeof observation.result?.content === 'string' &&
-        (comparableWorkspacePath(observation.arguments?.path) ===
-          expectedPath ||
+        comparableWorkspacePath(observation.arguments?.path) ===
+          expectedPath &&
+        (observation.result.path === undefined ||
           comparableWorkspacePath(observation.result.path) === expectedPath)
       ) {
         return observation.result.content;
@@ -259,7 +260,6 @@ function planToolArgumentError(
   if (binding.argv !== undefined) {
     if (
       !Array.isArray(args.argv) ||
-      args.argv.some((value) => typeof value !== 'string') ||
       JSON.stringify(args.argv) !== JSON.stringify(binding.argv) ||
       args.cwd !== '/workspace'
     ) {
@@ -539,7 +539,6 @@ export async function runPlanExecute(
     const node = workflow.nodes.get(stepId)!;
 
     if (node.step_type === 'verification') {
-      states.set(stepId, 'awaiting_verification');
       context.setStepState(stepId, 'awaiting_verification');
       continue;
     }
@@ -568,7 +567,6 @@ export async function runPlanExecute(
       let proposalAttempt = 0;
       for (;;) {
         if (context.iterations >= context.config.max_iterations) {
-          states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
             reason: 'model proposal retry budget exhausted',
           });
@@ -577,7 +575,6 @@ export async function runPlanExecute(
         }
         proposalAttempt += 1;
         context.iterations += 1;
-        states.set(stepId, 'executing');
         context.setStepState(stepId, 'executing', {
           proposal_attempt: proposalAttempt,
         });
@@ -605,7 +602,6 @@ export async function runPlanExecute(
           requiredTool === undefined &&
           turn.content.trim().length === 0
         ) {
-          states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
             reason: 'truncated model turn',
           });
@@ -613,7 +609,6 @@ export async function runPlanExecute(
           return;
         }
         if (turn.stop_reason === 'content_filter') {
-          states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
             reason: 'model refusal',
           });
@@ -621,7 +616,6 @@ export async function runPlanExecute(
           return;
         }
         if (context.budgetExceeded()) {
-          states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
             reason: 'budget exceeded',
           });
@@ -633,26 +627,25 @@ export async function runPlanExecute(
           turn.stop_reason === 'length' && requiredTool !== undefined
             ? 'truncated model turn before the bound tool proposal completed'
             : undefined;
-        if (proposalError !== undefined) {
-          // A length-stopped proposal is incomplete even if it contains a
-          // parseable call. It is never dispatched.
-        } else if (requiredTool === undefined) {
-          if (calls.length > 0) {
-            proposalError = 'model step has no bound tool node';
+        if (proposalError === undefined) {
+          if (requiredTool === undefined) {
+            if (calls.length > 0) {
+              proposalError = 'model step has no bound tool node';
+            }
+          } else if (
+            calls.length !== 1 ||
+            calls[0]!.name !== requiredTool
+          ) {
+            proposalError = `expected exactly one ${requiredTool} tool call`;
+          } else {
+            proposalError = planToolArgumentError(
+              context.config.run_plan,
+              requiredTool,
+              toolSuccessors[0]!,
+              calls[0]!.arguments,
+              messages,
+            );
           }
-        } else if (
-          calls.length !== 1 ||
-          calls[0]!.name !== requiredTool
-        ) {
-          proposalError = `expected exactly one ${requiredTool} tool call`;
-        } else {
-          proposalError = planToolArgumentError(
-            context.config.run_plan,
-            requiredTool,
-            toolSuccessors[0]!,
-            calls[0]!.arguments,
-            messages,
-          );
         }
         if (proposalError === undefined) break;
 
@@ -688,7 +681,6 @@ export async function runPlanExecute(
               : `Correction: ${proposalError}. Call ${requiredTool} exactly once with corrected arguments.${actionInstruction}`,
         });
         if (proposalAttempt >= 2) {
-          states.set(stepId, 'failed');
           context.setStepState(stepId, 'failed', {
             reason: proposalError,
           });
@@ -728,7 +720,6 @@ export async function runPlanExecute(
 
     const call = pendingCalls.get(stepId);
     if (!call || call.name !== node.tool_name) {
-      states.set(stepId, 'failed');
       context.setStepState(stepId, 'failed', {
         reason: 'matching pending tool call missing',
       });
@@ -736,14 +727,12 @@ export async function runPlanExecute(
       return;
     }
     if (!context.deps.toolExecute) {
-      states.set(stepId, 'failed');
       context.setStepState(stepId, 'failed', {
         reason: 'tool executor unavailable',
       });
       context.terminate('malformed_response');
       return;
     }
-    states.set(stepId, 'executing');
     context.setStepState(stepId, 'executing');
     try {
       const result = await context.deps.toolExecute(
@@ -788,7 +777,6 @@ export async function runPlanExecute(
           stepId,
         );
       }
-      states.set(stepId, 'failed');
       context.setStepState(stepId, 'failed', { reason: message });
       context.terminate(
         error instanceof LoopError ? 'malformed_response' : 'tool_failure',

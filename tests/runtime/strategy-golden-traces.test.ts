@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { RunPlan } from '../../contracts/index.js';
 import {
   LoopEngine,
+  LoopError,
   type LoopConfig,
   type LoopDeps,
   type ModelTurn,
@@ -501,6 +502,61 @@ describe('Plan+Execute golden behavior', () => {
     ).toEqual([reason, reason]);
   });
 
+  it('does not authorize an edit from a read receipt for a different result path', async () => {
+    const editPlan = plan(
+      [
+        node('propose-read', 'model_call'),
+        node('read-source', 'tool_call', { tool_name: 'read_file' }),
+        node('propose-edit', 'model_call'),
+        node('edit-source', 'tool_call', { tool_name: 'edit_file' }),
+      ],
+      [
+        { from_step: 'propose-read', to_step: 'read-source' },
+        { from_step: 'read-source', to_step: 'propose-edit' },
+        { from_step: 'propose-edit', to_step: 'edit-source' },
+      ],
+      ['read_file', 'edit_file'],
+      'Read app.js and change old to new.',
+    );
+    const readTurn: ModelTurn = {
+      content: 'read',
+      decision_summary: 'read source',
+      tool_calls: [call('read', 'read_file', { path: 'app.js' })],
+    };
+    const editTurn: ModelTurn = {
+      content: 'edit',
+      decision_summary: 'edit source',
+      tool_calls: [
+        call('edit', 'edit_file', {
+          path: 'app.js',
+          find: 'old',
+          replace: 'new',
+        }),
+      ],
+    };
+    const runtimeDeps = scriptedDeps([readTurn, editTurn, editTurn], {
+      toolExecute: vi.fn(async () => ({
+        path: '/workspace/other.js',
+        content: 'old',
+      })),
+    });
+
+    const result = await new LoopEngine(
+      config('plan_execute', editPlan),
+      runtimeDeps,
+    ).run();
+
+    const reason =
+      'edit_file requires a successful prior read observation for "app.js"';
+    expect(result.termination_reason).toBe('malformed_response');
+    expect(runtimeDeps.toolExecute).toHaveBeenCalledTimes(1);
+    expect(
+      result.turns.slice(1).map(
+        (turn) => turn.tool_observations[0]?.error,
+      ),
+    ).toEqual([reason, reason]);
+  });
+
   it.each([
     ['non-string content', 42],
     ['malformed JSON', '{"tasks":'],
@@ -552,6 +608,277 @@ describe('Plan+Execute golden behavior', () => {
     expect(
       result.turns.map((turn) => turn.tool_observations[0]?.error),
     ).toEqual([reason, reason]);
+  });
+
+  it('preserves an exact tool-free decision message for its successor', async () => {
+    const decisionPlan = plan(
+      [
+        node('analyze', 'decision'),
+        node('answer', 'decision'),
+      ],
+      [{ from_step: 'analyze', to_step: 'answer' }],
+      [],
+      'Explain the verified result.',
+    );
+    const requests: unknown[][] = [];
+    const turns: ModelTurn[] = [
+      {
+        content: 'Analysis based on the available evidence.',
+        reasoning_content: 'private synthesis',
+        decision_summary: 'analyze evidence',
+      },
+      {
+        content: 'Verified result.',
+        decision_summary: 'answer',
+      },
+    ];
+    const runtimeDeps = scriptedDeps(turns, {
+      modelCall: vi.fn(async (messages, attempt, _budget, directive) => {
+        requests.push(structuredClone(messages));
+        expect(directive).toEqual({
+          system_instruction:
+            'Plan+Execute synthesis step: use the completed tool observations to return the concise final result. Do not call another tool and never claim an unverified effect.',
+          allowed_tools: [],
+        });
+        return turns[attempt - 1]!;
+      }),
+    });
+
+    const result = await new LoopEngine(
+      config('plan_execute', decisionPlan),
+      runtimeDeps,
+    ).run();
+
+    expect(requests[1]).toEqual([
+      { role: 'user', content: decisionPlan.task!.goal },
+      {
+        role: 'assistant',
+        content: 'Analysis based on the available evidence.',
+        reasoning_content: 'private synthesis',
+        decision_summary: 'analyze evidence',
+      },
+    ]);
+    expect(result.termination_reason).toBe('completed');
+    expect(result.step_states).toEqual({
+      analyze: 'done',
+      answer: 'done',
+    });
+  });
+
+  it('moves a verification-only plan to the exact pending-verification terminal state', async () => {
+    const verificationPlan = plan(
+      [node('verify', 'verification')],
+      [],
+      [],
+      'Verify the supplied evidence.',
+    );
+    const runtimeDeps = scriptedDeps([]);
+
+    const result = await new LoopEngine(
+      config('plan_execute', verificationPlan),
+      runtimeDeps,
+    ).run();
+
+    expect(runtimeDeps.modelCall).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      iterations: 0,
+      termination_reason: 'completed',
+      step_states: { verify: 'awaiting_verification' },
+    });
+    expect(eventData(runtimeDeps.session, 'system')).toEqual([
+      {
+        event: 'step_state',
+        step: 'verify',
+        status: 'awaiting_verification',
+      },
+      {
+        event: 'run_terminated',
+        termination_reason: 'completed',
+        iterations: 0,
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+        },
+      },
+    ]);
+  });
+
+  it('records the exact failed proposal state at a zero iteration limit', async () => {
+    const limitedPlan = plan(
+      [node('model', 'model_call')],
+      [],
+      [],
+      'Return a result.',
+    );
+    const runtimeDeps = scriptedDeps([]);
+
+    const result = await new LoopEngine(
+      config('plan_execute', limitedPlan, { max_iterations: 0 }),
+      runtimeDeps,
+    ).run();
+
+    expect(runtimeDeps.modelCall).not.toHaveBeenCalled();
+    expect(result.termination_reason).toBe('iteration_limit');
+    expect(result.step_states).toEqual({ model: 'failed' });
+    expect(eventData(runtimeDeps.session, 'system')).toEqual([
+      {
+        event: 'step_state',
+        step: 'model',
+        status: 'failed',
+        reason: 'model proposal retry budget exhausted',
+      },
+      {
+        event: 'run_terminated',
+        termination_reason: 'iteration_limit',
+        iterations: 0,
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+        },
+      },
+    ]);
+  });
+
+  it('terminates before any step transition when preflight is cancelled', async () => {
+    const cancelledPlan = plan(
+      [node('model', 'model_call')],
+      [],
+      [],
+      'Return a result.',
+    );
+    const runtimeDeps = scriptedDeps([], {
+      signal: AbortSignal.abort(),
+    });
+
+    const result = await new LoopEngine(
+      config('plan_execute', cancelledPlan),
+      runtimeDeps,
+    ).run();
+
+    expect(runtimeDeps.modelCall).not.toHaveBeenCalled();
+    expect(result.termination_reason).toBe('user_cancel');
+    expect(result.step_states).toEqual({});
+    expect(eventData(runtimeDeps.session, 'system')).toEqual([
+      {
+        event: 'run_terminated',
+        termination_reason: 'user_cancel',
+        iterations: 0,
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+        },
+      },
+    ]);
+  });
+
+  it.each(['failed', 'blocked'] as const)(
+    'restores a %s dependency and blocks its uneffected descendant',
+    async (restoredStatus) => {
+      const recoveryPlan = plan(
+        [
+          node('proposal', 'model_call'),
+          node('effect', 'tool_call', { tool_name: 'read_file' }),
+        ],
+        [{ from_step: 'proposal', to_step: 'effect' }],
+        ['read_file'],
+        'Read source.js.',
+      );
+      const runtimeDeps = scriptedDeps([], {
+        toolExecute: vi.fn(async () => ({ content: 'never' })),
+      });
+      runtimeDeps.session.acquireWriter();
+      runtimeDeps.session.append('system', {
+        event: 'step_state',
+        step: 'proposal',
+        status: restoredStatus,
+      });
+      runtimeDeps.session.releaseWriter();
+
+      const result = await new LoopEngine(
+        config('plan_execute', recoveryPlan),
+        runtimeDeps,
+      ).run();
+
+      expect(runtimeDeps.modelCall).not.toHaveBeenCalled();
+      expect(runtimeDeps.toolExecute).not.toHaveBeenCalled();
+      expect(result.termination_reason).toBe('tool_failure');
+      expect(result.step_states).toEqual({ effect: 'blocked' });
+      expect(eventData(runtimeDeps.session, 'system').at(-2)).toEqual({
+        event: 'step_state',
+        step: 'effect',
+        status: 'blocked',
+        reason: 'dependency failed',
+      });
+    },
+  );
+
+  it.each([
+    {
+      name: 'ordinary tool error',
+      error: new Error('disk unavailable'),
+      termination: 'tool_failure',
+      reason: 'disk unavailable',
+    },
+    {
+      name: 'runtime contract error',
+      error: new LoopError('receipt mismatch'),
+      termination: 'malformed_response',
+      reason: 'receipt mismatch',
+    },
+    {
+      name: 'non-Error rejection',
+      error: 'unknown failure',
+      termination: 'tool_failure',
+      reason: 'tool execution failed',
+    },
+  ])('records exact failure state for $name', async (testCase) => {
+    const failurePlan = plan(
+      [
+        node('proposal', 'model_call'),
+        node('effect', 'tool_call', { tool_name: 'read_file' }),
+      ],
+      [{ from_step: 'proposal', to_step: 'effect' }],
+      ['read_file'],
+      'Read source.js.',
+    );
+    const readTurn: ModelTurn = {
+      content: 'read',
+      decision_summary: 'read source',
+      tool_calls: [
+        call('read-failure', 'read_file', { path: 'source.js' }),
+      ],
+    };
+    const runtimeDeps = scriptedDeps([readTurn], {
+      toolExecute: vi.fn(async () => {
+        throw testCase.error;
+      }),
+    });
+
+    const result = await new LoopEngine(
+      config('plan_execute', failurePlan),
+      runtimeDeps,
+    ).run();
+
+    expect(result.termination_reason).toBe(testCase.termination);
+    expect(result.step_states).toEqual({
+      proposal: 'done',
+      effect: 'failed',
+    });
+    expect(result.turns[0]!.tool_observations[0]).toMatchObject({
+      tool_call_id: 'read-failure',
+      name: 'read_file',
+      status: 'error',
+      error: testCase.reason,
+    });
+    expect(eventData(runtimeDeps.session, 'system').at(-2)).toEqual({
+      event: 'step_state',
+      step: 'effect',
+      status: 'failed',
+      reason: testCase.reason,
+    });
   });
 });
 

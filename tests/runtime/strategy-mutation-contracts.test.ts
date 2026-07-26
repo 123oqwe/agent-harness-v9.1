@@ -107,6 +107,7 @@ describe('reasoning strategy mutation contracts', () => {
       ['写入 资料/结果.json。', '资料/结果.json'],
       ['创建 output/result.md。', 'output/result.md'],
       ['新建 result.txt。', 'result.txt'],
+      ['创建result-without-space.md。', 'result-without-space.md'],
     ])('binds the exact output path for %s', (goal, target) => {
       const runPlan = plan(goal, [
         { proposal: 'p', step: 'w', tool: 'write_file' },
@@ -123,6 +124,36 @@ describe('reasoning strategy mutation contracts', () => {
       );
       expect(planActionInstruction(runPlan, 'edit_file', 'e')).toBe(
         ' Edit only "src/app.ts" using the content returned by the prior read; never edit a test/spec file and never submit a no-op replacement.',
+      );
+    });
+
+    it.each([
+      [
+        'Change test.ts and src/app.ts.',
+        'src/app.ts',
+      ],
+      [
+        'Change spec.js and src/service.js.',
+        'src/service.js',
+      ],
+      [
+        'Change src/app.spec.ts and src/app.ts.',
+        'src/app.ts',
+      ],
+      [
+        'Change src/app-test.ts and src/app.ts.',
+        'src/app.ts',
+      ],
+      [
+        'Change src/testing.test.ts and src/app.ts.',
+        'src/app.ts',
+      ],
+    ])('never selects the test/spec path in %s', (goal, source) => {
+      const runPlan = plan(goal, [
+        { proposal: 'p', step: 'e', tool: 'edit_file' },
+      ]);
+      expect(planActionInstruction(runPlan, 'edit_file', 'e')).toContain(
+        JSON.stringify(source),
       );
     });
 
@@ -178,6 +209,36 @@ describe('reasoning strategy mutation contracts', () => {
       );
     });
 
+    it.each([
+      [
+        'Create plan.json for build so every task has an id and depends_on array.',
+        [{ id: 'build', depends_on: [] }],
+      ],
+      [
+        'Create plan.json for build,test and deploy so every task has an id and depends_on array, with test  after  build and deploy after test.',
+        [
+          { id: 'build', depends_on: [] },
+          { id: 'test', depends_on: ['build'] },
+          { id: 'deploy', depends_on: ['test'] },
+        ],
+      ],
+      [
+        'Create plan.json for build and deploy so every task has an id and depends_on array, with test after build.',
+        [
+          { id: 'build', depends_on: [] },
+          { id: 'deploy', depends_on: [] },
+          { id: 'test', depends_on: ['build'] },
+        ],
+      ],
+    ])('freezes dependency grammar boundary in %s', (goal, tasks) => {
+      const runPlan = plan(goal, [
+        { proposal: 'p', step: 'w', tool: 'write_file' },
+      ]);
+      expect(planActionInstruction(runPlan, 'write_file', 'w')).toBe(
+        ` The write path must be "plan.json". The JSON content must have this exact structural shape: ${JSON.stringify({ tasks })}.`,
+      );
+    });
+
     it('emits the generic JSON contract when dependency IDs are not explicit', () => {
       const runPlan = plan(
         'Create plan.json so every item has id and depends_on fields.',
@@ -193,6 +254,7 @@ describe('reasoning strategy mutation contracts', () => {
       ['write_file', 'Create an artifact without naming a file.'],
       ['execute_command', 'Run the appropriate check.'],
       ['unknown_tool', 'Read src/app.ts.'],
+      ['execute_command', 'Runnode scripts/check.mjs.'],
     ])('returns no narrowing when %s has no deterministic binding', (tool, goal) => {
       const runPlan = plan(goal, [
         { proposal: 'p', step: 's', tool },

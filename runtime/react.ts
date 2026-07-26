@@ -73,6 +73,11 @@ export async function runReact(
   messages: unknown[],
 ): Promise<void> {
   const callCounts = new Map<string, number>();
+  const allowedTools =
+    context.config.run_plan?.tool_grants
+      .map((grant) => grant.tool)
+      .filter((tool): tool is string => typeof tool === 'string') ?? [];
+  const allowedToolSet = new Set(allowedTools);
   const outputLimitInstruction = explicitOutputLimitInstruction(
     context.config.run_plan?.task?.goal ?? context.config.goal,
   );
@@ -97,10 +102,7 @@ export async function runReact(
       budget,
       {
         system_instruction: `ReAct mode: use workspace tools only when needed. Base each next action on prior tool observations. When complete, return the concise final answer without a tool call.${outputLimitInstruction} Never expose private reasoning.`,
-        allowed_tools:
-          context.config.run_plan?.tool_grants
-            .map((grant) => grant.tool)
-            .filter((tool): tool is string => typeof tool === 'string') ?? [],
+        allowed_tools: allowedTools,
       },
     );
     if (context.terminated) return;
@@ -157,38 +159,25 @@ export async function runReact(
     for (const call of turn.tool_calls) {
       const stepId = `react-${context.iterations}`;
       context.recordToolCall(recorded, call, stepId);
-      const allowedTools = new Set(
-        context.config.run_plan?.tool_grants.map((grant) => grant.tool) ?? [],
-      );
-      if (!allowedTools.has(call.name)) {
-        const observation = context.recordObservation(
+      if (!allowedToolSet.has(call.name)) {
+        context.recordObservation(
           recorded,
           call,
           'rejected',
           'tool is not bound by the frozen RunPlan',
           stepId,
         );
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
         context.terminate('malformed_response');
         return;
       }
       if (duplicateIds.has(call.id)) {
-        const observation = context.recordObservation(
+        context.recordObservation(
           recorded,
           call,
           'rejected',
           'duplicate tool_call id in one model turn',
           stepId,
         );
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
         context.terminate('malformed_response');
         return;
       }
@@ -197,34 +186,24 @@ export async function runReact(
       const count = (callCounts.get(key) ?? 0) + 1;
       callCounts.set(key, count);
       if (count >= 3) {
-        const observation = context.recordObservation(
+        context.recordObservation(
           recorded,
           call,
           'rejected',
           'repeated tool call oscillation',
           stepId,
         );
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
         context.terminate('tool_oscillation');
         return;
       }
       if (!context.deps.toolExecute) {
-        const observation = context.recordObservation(
+        context.recordObservation(
           recorded,
           call,
           'rejected',
           'tool executor unavailable',
           stepId,
         );
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
         context.terminate('malformed_response');
         return;
       }
