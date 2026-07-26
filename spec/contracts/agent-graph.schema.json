@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentGraph",
+  "description": "Agent topology graph. Defines which agents participate and how they communicate.",
+  "type": "object",
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "execution_mode": {
+      "enum": [
+        "static_dag",
+        "routing_slip",
+        "workflow_script"
+      ],
+      "description": "FG7/FG9. static_dag = frozen AgentGraph (default). routing_slip = itinerary travels with message, agents may insert steps (open missions). workflow_script = orchestration is a script holding intermediate results out-of-context (large fan-out)."
+    },
+    "routing_slip": {
+      "type": "object",
+      "description": "FG7. Present only when execution_mode=routing_slip. Itinerary + executed log + compensation log + inserted_steps count.",
+      "properties": {
+        "itinerary": {
+          "type": "array"
+        },
+        "executed": {
+          "type": "array"
+        },
+        "compensations": {
+          "type": "array"
+        },
+        "inserted_steps": {
+          "type": "integer"
+        },
+        "insert_limit": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "message_security": {
+      "type": "object",
+      "description": "FG8. Cross-process message integrity. Applied to communication/result_handoff edges when agents run in separate processes.",
+      "properties": {
+        "obo_token_required": {
+          "type": "boolean"
+        },
+        "jws_signature_required": {
+          "type": "boolean"
+        },
+        "jwe_optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "role",
+          "model_binding_ref",
+          "budget_ceiling",
+          "status"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Unique agent identifier"
+          },
+          "role": {
+            "enum": [
+              "supervisor",
+              "worker",
+              "verifier",
+              "planner",
+              "specialist"
+            ],
+            "description": "Agent role in topology"
+          },
+          "model_binding_ref": {
+            "type": "string",
+            "description": "Reference to ModelBinding in RunPlan.model_bindings"
+          },
+          "budget_ceiling": {
+            "type": "object",
+            "required": [
+              "token_limit",
+              "usd_micros"
+            ],
+            "properties": {
+              "token_limit": {
+                "type": "string"
+              },
+              "usd_micros": {
+                "type": "string"
+              }
+            }
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "parent_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Parent agent for subagent delegation"
+          },
+          "delegation_depth": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 for root agent, decremented for children"
+          },
+          "tool_grant_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "References to ToolGrant IDs in RunPlan.tool_grants"
+          },
+          "skill_binding_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isolation": {
+            "type": "string",
+            "enum": [
+              "process",
+              "worktree",
+              "sandbox",
+              "none"
+            ],
+            "default": "process",
+            "description": "G-CC1. Execution isolation level. process=separate process; worktree=git worktree + separate process; sandbox=OS sandbox (G-OS1); none=same process (Phase 1 default, not for Phase 3+ workers)"
+          },
+          "hooks_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "G-CC1. Reference to HookConfig ID; null = inherit parent hooks."
+          },
+          "memory_scope": {
+            "type": "string",
+            "enum": [
+              "inherit",
+              "isolated",
+              "scoped"
+            ],
+            "default": "isolated",
+            "description": "G-CC1. inherit=share parent memory store; isolated=own store, no cross-read; scoped=own store + explicitly shared items (maps to 7 context topologies)"
+          },
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "medium",
+            "description": "G-CC1. Reasoning effort for this node. Distinct from model_binding_ref: same model may run at different effort per node."
+          },
+          "disallowed_tool_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "G-CC1. Tools explicitly denied to this node even if in tool_grant_refs. deny wins (deny-by-default)."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_agent",
+          "to_agent",
+          "edge_type"
+        ],
+        "properties": {
+          "from_agent": {
+            "type": "string"
+          },
+          "to_agent": {
+            "type": "string"
+          },
+          "edge_type": {
+            "enum": [
+              "dependency",
+              "communication",
+              "delegation",
+              "result_handoff"
+            ],
+            "description": "dependency=wait for, communication=send message, delegation=parent-child, result_handoff=artifact transfer"
+          },
+          "artifact_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What artifact types flow on this edge"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

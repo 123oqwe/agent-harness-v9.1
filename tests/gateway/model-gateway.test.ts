@@ -22,10 +22,7 @@ import {
   scriptedProviderContract,
   type ParsedResponse,
 } from '../../gateway/scripted-provider.js';
-
-const SPEC_ROOT = process.env.HARNESS_SPEC_ROOT
-  ? resolve(process.env.HARNESS_SPEC_ROOT)
-  : resolve(import.meta.dirname, '../../../spec');
+import { SPEC_ROOT } from '../helpers/repository-paths.js';
 
 function makeRuntime(
   response: ParsedResponse = {

@@ -1,0 +1,16 @@
+# Control to Test Mapping
+CTRL-REVALIDATE-001: harness/tests/security/toctou.test.ts
+CTRL-EGRESS-001: harness/tests/security/ssrf.test.ts
+CTRL-TAINT-001: harness/tests/security/injection.test.ts
+CTRL-MEMORY-VERIFY-001: harness/tests/security/memory-poison.test.ts
+CTRL-PLUGIN-SIGN-001: harness/tests/security/tool-poison.test.ts
+CTRL-CAPABILITY-SINGLE-USE-001: harness/tests/security/capability-replay.test.ts
+CTRL-CONTEXT-ISOLATION-001: harness/tests/security/context-leak.test.ts
+CTRL-BUDGET-PEP-001: harness/tests/security/budget-bypass.test.ts
+CTRL-EGRESS-002: harness/tests/security/network-exfil.test.ts
+CTRL-SCREEN-ISOLATION-001: harness/tests/security/screen-injection.test.ts
+CTRL-RUNPHASE-001: harness/tests/security/cred-reach.test.ts
+CTRL-CRED-REACH-001: harness/tests/security/cred-reach.test.ts
+CTRL-MSG-INTEGRITY-001: harness/tests/security/msg-tamper.test.ts
+CTRL-TOOL-MASK-001: harness/tests/gateway/cache-invalidation.test.ts
+CTRL-VFS-001: harness/tests/security/context-leak.test.ts

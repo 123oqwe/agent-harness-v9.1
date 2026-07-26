@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskContract",
+  "description": "User's task definition. The root input to the Router.",
+  "type": "object",
+  "required": [
+    "goal",
+    "success_criteria",
+    "constraints"
+  ],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "description": "What the user wants to achieve"
+    },
+    "success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "criterion",
+          "verification_method"
+        ],
+        "properties": {
+          "criterion": {
+            "type": "string"
+          },
+          "verification_method": {
+            "enum": [
+              "deterministic",
+              "test",
+              "human_review",
+              "semantic"
+            ],
+            "description": "How to verify this criterion is met"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "budget",
+              "time",
+              "risk_ceiling",
+              "privacy",
+              "tool_restriction",
+              "model_restriction"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "description": "Constraint value (e.g., '5000000' for $5 budget, 'local_only' for privacy)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "deadline": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "priority": {
+      "enum": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "description": "Agent can use for scheduling"
+    }
+  },
+  "additionalProperties": false
+}

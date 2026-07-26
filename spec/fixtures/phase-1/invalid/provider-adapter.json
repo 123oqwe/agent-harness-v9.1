@@ -1,0 +1,10 @@
+{
+  "provider_type": "scripted_test",
+  "normalize_request": true,
+  "normalize_tool_call": true,
+  "stream_events": true,
+  "map_error": true,
+  "meter_usage": true,
+  "check_health": true,
+  "validate_data_policy": true
+}

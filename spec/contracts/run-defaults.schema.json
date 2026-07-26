@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RunDefaults",
+  "description": "Default values for RunPlan fields. NOT an execution contract. RunPlan is the only normative execution contract. These defaults feed into Router as input.",
+  "type": "object",
+  "required": [
+    "default_model",
+    "default_tools",
+    "default_budget"
+  ],
+  "properties": {
+    "default_model": {
+      "type": "object",
+      "required": [
+        "provider",
+        "model_id"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model_id": {
+          "type": "string"
+        },
+        "fallback_model_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered fallback list"
+        }
+      },
+      "additionalProperties": false
+    },
+    "default_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "tool_name",
+          "enabled"
+        ],
+        "properties": {
+          "tool_name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "risk_ceiling": {
+            "type": "string",
+            "description": "Max risk tier for this tool"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "default_budget": {
+      "type": "object",
+      "required": [
+        "token_limit",
+        "usd_micros"
+      ],
+      "properties": {
+        "token_limit": {
+          "type": "string",
+          "description": "Decimal string"
+        },
+        "usd_micros": {
+          "type": "string",
+          "description": "Decimal string, e.g., '5000000' = $5.00"
+        }
+      },
+      "additionalProperties": false
+    },
+    "default_reasoning_strategy": {
+      "enum": [
+        "direct",
+        "react",
+        "plan_execute",
+        "rewoo",
+        "iterative_refinement"
+      ]
+    },
+    "default_agent_topology": {
+      "enum": [
+        "single_agent",
+        "supervisor_workers",
+        "planner_executor_verifier"
+      ]
+    },
+    "default_context_topology": {
+      "enum": [
+        "shared_selective",
+        "isolated",
+        "parent_child"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

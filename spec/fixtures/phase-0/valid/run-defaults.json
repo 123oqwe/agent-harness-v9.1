@@ -1,0 +1,14 @@
+{
+  "default_model": {
+    "provider": "openai",
+    "model_id": "gpt-4o",
+    "fallback_model_ids": [
+      "gpt-4o-mini"
+    ]
+  },
+  "default_tools": [],
+  "default_budget": {
+    "token_limit": "100000",
+    "usd_micros": "5000000"
+  }
+}

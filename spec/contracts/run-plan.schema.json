@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RunPlan",
+  "description": "The only normative execution contract. Router outputs this; Runtime Core executes it.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "revision",
+    "run_plan_hash",
+    "task",
+    "experience_profile",
+    "reasoning_strategy",
+    "workflow_graph",
+    "agent_graph",
+    "context_graph",
+    "verification_graph",
+    "model_bindings",
+    "tool_grants",
+    "skill_bindings",
+    "environment_bindings",
+    "policy_snapshot_ref",
+    "registry_snapshot_refs",
+    "derived_risk_assessment",
+    "required_consent",
+    "budget_allocation",
+    "persistence_policy",
+    "cancellation_policy",
+    "fallback_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "run-plan.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_plan_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "previous_revision_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "task": {
+      "$ref": "task-contract.schema.json"
+    },
+    "experience_profile": {
+      "type": "string"
+    },
+    "reasoning_strategy": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "react",
+        "plan_execute"
+      ],
+      "description": "Frozen Phase 1 reasoning strategy. Changing strategy requires a new RunPlan revision."
+    },
+    "workflow_graph": {
+      "$ref": "workflow-graph.schema.json"
+    },
+    "agent_graph": {
+      "$ref": "agent-graph.schema.json"
+    },
+    "context_graph": {
+      "$ref": "context-graph.schema.json"
+    },
+    "verification_graph": {
+      "$ref": "verification-graph.schema.json"
+    },
+    "model_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "model-binding.schema.json"
+      }
+    },
+    "tool_grants": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "skill_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "environment_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "schedule_binding": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "policy_snapshot_ref": {
+      "type": "string",
+      "description": "Referenced, not output by Router"
+    },
+    "registry_snapshot_refs": {
+      "type": "object"
+    },
+    "derived_risk_assessment": {
+      "type": "object",
+      "description": "Router outputs risk ASSESSMENT, not risk POLICY"
+    },
+    "required_consent": {
+      "type": "object",
+      "description": "Router outputs consent REQUIREMENT, not consent POLICY"
+    },
+    "budget_allocation": {
+      "type": "object"
+    },
+    "persistence_policy": {
+      "type": "object"
+    },
+    "cancellation_policy": {
+      "type": "object"
+    },
+    "fallback_policy": {
+      "type": "object"
+    },
+    "run_phase": {
+      "type": "object",
+      "description": "FG2 two-phase runtime configuration. Defines setup (network-enabled) and agent (offline-by-default, credentials stripped) phases.",
+      "properties": {
+        "setup": {
+          "type": "object",
+          "description": "Network-enabled phase for dependency install. egress_policy.mode may be open/allowlist."
+        },
+        "agent": {
+          "type": "object",
+          "description": "Offline-by-default phase. egress_policy.mode = disabled unless explicit allowlist. Credentials stripped from env; single-exchange at dispatch."
+        }
+      },
+      "additionalProperties": false
+    },
+    "context_strategy": {
+      "type": "object",
+      "description": "FG5/FG10/FG11 context engineering knobs. cache_breakpoints, offload_token_threshold, summarize_at_window_ratio, tool_masking.",
+      "properties": {
+        "cache_breakpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offload_token_threshold": {
+          "type": "integer"
+        },
+        "summarize_at_window_ratio": {
+          "type": "number",
+          "minimum": 0.4,
+          "maximum": 0.85,
+          "default": 0.7,
+          "description": "Lossy compaction boundary after VFS offload; 0.40 is the offload boundary and 0.85 is the hard context_reset boundary."
+        },
+        "tool_masking": {
+          "type": "boolean"
+        },
+        "active_plan_injection": {
+          "type": "boolean",
+          "description": "G-MAN1: inject active plan (current step, remaining steps) into context at each turn. Default true."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "active_plan_injection"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

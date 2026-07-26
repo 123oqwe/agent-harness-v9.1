@@ -1,0 +1,13 @@
+{
+  "locality": "local",
+  "operation": "read",
+  "reversibility": "guaranteed",
+  "data_egress": "none",
+  "network_access": true,
+  "credential_access": true,
+  "blast_radius": "single_resource",
+  "financial_impact_usd_micros": "valid-financial_impact_usd_micros",
+  "human_impact": "none",
+  "external_visibility": "private",
+  "regulatory_sensitivity": []
+}

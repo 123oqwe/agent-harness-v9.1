@@ -1,0 +1,73 @@
+errors:
+  - code: AH_ERR_POLICY_DENIED
+    http_status: 403
+    message: "Action denied by policy"
+    retry: never
+  - code: AH_ERR_CAPABILITY_EXPIRED
+    http_status: 401
+    message: "Capability token expired"
+    retry: never
+  - code: AH_ERR_CAPABILITY_USED
+    http_status: 401
+    message: "Capability token already used (single-use enforced)"
+    retry: never
+  - code: AH_ERR_CAPABILITY_REPLAY
+    http_status: 401
+    message: "Capability token replay attempt detected"
+    retry: never
+  - code: AH_ERR_BUDGET_EXCEEDED
+    http_status: 402
+    message: "Budget exceeded"
+    retry: never
+  - code: AH_ERR_SANDBOX_VIOLATION
+    http_status: 403
+    message: "Sandbox security violation"
+    retry: never
+  - code: AH_ERR_EFFECT_UNKNOWN
+    http_status: 409
+    message: "Effect state unknown, reconciliation required"
+    retry: reconcile_first
+  - code: AH_ERR_PROVIDER_UNAVAILABLE
+    http_status: 503
+    message: "Model provider unavailable"
+    retry: automatic
+  - code: AH_ERR_MALFORMED_RESPONSE
+    http_status: 502
+    message: "Provider returned malformed response"
+    retry: automatic
+  - code: AH_ERR_TOOL_NOT_FOUND
+    http_status: 404
+    message: "Requested tool not in registry"
+    retry: never
+  - code: AH_ERR_SCHEMA_VALIDATION
+    http_status: 400
+    message: "Input failed schema validation"
+    retry: never
+  - code: AH_ERR_CONSENT_REQUIRED
+    http_status: 202
+    message: "Human consent required"
+    retry: never
+  - code: AH_ERR_COMPENSATION_UNAVAILABLE
+    http_status: 409
+    message: "Compensation not available for this effect"
+    retry: never
+  - code: AH_ERR_CASCADE_FAILURE
+    http_status: 503
+    message: "All model providers unavailable (cascade failure)"
+    retry: automatic
+  - code: AH_ERR_CONTEXT_WINDOW_EXCEEDED
+    http_status: 413
+    message: "Context window exceeded, compaction required"
+    retry: never
+  - code: AH_ERR_TENANT_ISOLATION
+    http_status: 403
+    message: "Cross-tenant access denied"
+    retry: never
+  - code: AH_ERR_RATE_LIMITED
+    http_status: 429
+    message: "Rate limit exceeded"
+    retry: automatic
+  - code: AH_ERR_COMPENSATION_FAILED
+    http_status: 409
+    message: "Compensation failed, remediation required"
+    retry: human_required

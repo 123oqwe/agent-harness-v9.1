@@ -16,10 +16,11 @@ import {
   writeEvidence,
   type EvidencePackage,
 } from '../../verification/evidence.js';
+import { SPEC_ROOT } from '../helpers/repository-paths.js';
 
 const node = process.execPath;
 const schemaPath = join(
-  process.env.HARNESS_SPEC_ROOT ?? join(process.cwd(), '..', 'spec'),
+  SPEC_ROOT,
   'contracts',
   'evidence-package.schema.json',
 );

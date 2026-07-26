@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContextGraph",
+  "description": "Context sharing topology. Defines how context flows between agents.",
+  "type": "object",
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "agent_id_ref",
+          "context_scope"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "agent_id_ref": {
+            "type": "string",
+            "description": "Reference to AgentGraph node agent_id"
+          },
+          "context_scope": {
+            "enum": [
+              "full",
+              "selective",
+              "isolated"
+            ],
+            "description": "How much context this agent has access to"
+          },
+          "allowed_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For selective scope: which fields are shared"
+          },
+          "sensitivity_ceiling": {
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "secret"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_node",
+          "to_node",
+          "mode"
+        ],
+        "properties": {
+          "from_node": {
+            "type": "string"
+          },
+          "to_node": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "full",
+              "selective",
+              "artifact_only",
+              "blackboard",
+              "none"
+            ]
+          },
+          "allowed_artifact_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For artifact_only mode: JSON, Patch, EvidenceBundle, TestReport, PlanArtifact, DecisionRecord"
+          },
+          "retention": {
+            "type": "string",
+            "description": "How long shared context is retained (e.g., 'task', 'session', 'mission')"
+          },
+          "provenance_required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

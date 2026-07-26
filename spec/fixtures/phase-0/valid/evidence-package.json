@@ -1,0 +1,12 @@
+{
+  "requirement_id": "valid-requirement_id",
+  "commit_sha": "valid-commit_sha",
+  "source_files": [],
+  "tests_added": [],
+  "commands_run": [],
+  "exit_codes": [],
+  "test_results": {},
+  "coverage": {},
+  "security_checks": {},
+  "verifier_result": "pass"
+}

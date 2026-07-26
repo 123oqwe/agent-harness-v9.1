@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Review PR #42",
+      "duration_min": 30,
+      "priority": "high"
+    },
+    {
+      "id": "T2",
+      "title": "Write weekly summary",
+      "duration_min": 45,
+      "priority": "medium"
+    },
+    {
+      "id": "T3",
+      "title": "Reply to 3 emails",
+      "duration_min": 20,
+      "priority": "high"
+    },
+    {
+      "id": "T4",
+      "title": "Review competitor analysis",
+      "duration_min": 60,
+      "priority": "low"
+    },
+    {
+      "id": "T5",
+      "title": "Update project board",
+      "duration_min": 15,
+      "priority": "medium"
+    }
+  ],
+  "available_hours": 4,
+  "constraints": [
+    "No external actions",
+    "High priority first",
+    "Include breaks"
+  ]
+}

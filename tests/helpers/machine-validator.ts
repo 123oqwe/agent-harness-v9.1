@@ -1,5 +1,6 @@
  import * as fs from 'fs';
  import * as path from 'path';
+ import { SPEC_ROOT } from './repository-paths.js';
  
  export interface StateMachine {
    name: string;
@@ -10,7 +11,7 @@
  }
  
  export function loadMachine(machineFile: string): StateMachine {
-   const machinePath = path.resolve(__dirname, `../../../spec/state-machines/${machineFile}`);
+   const machinePath = path.resolve(SPEC_ROOT, 'state-machines', machineFile);
    return JSON.parse(fs.readFileSync(machinePath, 'utf-8'));
  }
  

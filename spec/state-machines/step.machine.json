@@ -1,0 +1,114 @@
+{
+  "name": "StepStateMachine",
+  "description": "Individual plan step lifecycle within a Run.",
+  "states": [
+    {
+      "name": "PENDING",
+      "terminal": false
+    },
+    {
+      "name": "DISPATCHED",
+      "terminal": false
+    },
+    {
+      "name": "EXECUTING",
+      "terminal": false
+    },
+    {
+      "name": "VERIFYING",
+      "terminal": false
+    },
+    {
+      "name": "DONE",
+      "terminal": true
+    },
+    {
+      "name": "FAILED",
+      "terminal": false
+    },
+    {
+      "name": "BLOCKED",
+      "terminal": false
+    }
+  ],
+  "transitions": [
+    {
+      "source": "PENDING",
+      "target": "DISPATCHED",
+      "actor": "scheduler",
+      "guard": "dependencies_done",
+      "event": "StepDispatched",
+      "retry_rule": "never"
+    },
+    {
+      "source": "PENDING",
+      "target": "BLOCKED",
+      "actor": "scheduler",
+      "guard": "dependency_failed",
+      "event": "StepBlocked",
+      "retry_rule": "never"
+    },
+    {
+      "source": "DISPATCHED",
+      "target": "EXECUTING",
+      "actor": "runtime",
+      "guard": "agent_started",
+      "event": "StepExecuting",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EXECUTING",
+      "target": "VERIFYING",
+      "actor": "runtime",
+      "guard": "execution_completed",
+      "event": "StepVerifying",
+      "retry_rule": "never"
+    },
+    {
+      "source": "EXECUTING",
+      "target": "FAILED",
+      "actor": "runtime",
+      "guard": "execution_error OR timeout",
+      "event": "StepFailed",
+      "retry_rule": "automatic_if_retryable"
+    },
+    {
+      "source": "VERIFYING",
+      "target": "DONE",
+      "actor": "verifier",
+      "guard": "verification_passed",
+      "event": "StepDone",
+      "retry_rule": "never"
+    },
+    {
+      "source": "VERIFYING",
+      "target": "FAILED",
+      "actor": "verifier",
+      "guard": "verification_failed",
+      "event": "StepVerificationFailed",
+      "retry_rule": "escalate_verification"
+    },
+    {
+      "source": "FAILED",
+      "target": "PENDING",
+      "actor": "controller",
+      "guard": "retry_allowed AND retry_count < max_retries",
+      "event": "StepRetryScheduled",
+      "retry_rule": "automatic"
+    },
+    {
+      "source": "BLOCKED",
+      "target": "PENDING",
+      "actor": "controller",
+      "guard": "blocker_resolved",
+      "event": "StepUnblocked",
+      "retry_rule": "never"
+    }
+  ],
+  "invariants": [
+    "Cannot skip VERIFYING for T2+ operations",
+    "BLOCKED propagates to dependent steps",
+    "DONE is terminal \u2014 cannot re-execute",
+    "Retry generates new attempt_id and new CapabilityToken"
+  ]
+}

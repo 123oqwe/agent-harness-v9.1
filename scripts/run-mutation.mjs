@@ -23,6 +23,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
 import { strykerBase } from '../mutation/stryker.base.mjs';
+import { resolveSpecRoot } from './repository-paths.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const harnessRoot = resolve(dirname(scriptPath), '..');
@@ -39,6 +40,7 @@ const mutationAuthorityFiles = [
   'vitest.mutation.config.ts',
   'scripts/run-mutation.mjs',
   'scripts/check-mutation-thresholds.mjs',
+  'scripts/repository-paths.mjs',
 ];
 const securityCriticalModules = new Set([
   'router',
@@ -797,7 +799,7 @@ function runModule(moduleName, context) {
       env: {
         ...process.env,
         STRYKER: 'true',
-        HARNESS_SPEC_ROOT: resolve(harnessRoot, '..', 'spec'),
+        HARNESS_SPEC_ROOT: resolveSpecRoot(),
       },
     });
     if (run.error) {

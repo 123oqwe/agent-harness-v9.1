@@ -3,12 +3,16 @@
  * Fails when schema and generated types drift.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { resolve, join, relative } from 'node:path';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import {
+  PACKAGE_ROOT,
+  SPEC_ROOT,
+} from '../helpers/repository-paths.js';
 
-const schemaDir = resolve(import.meta.dirname, '..', '..', '..', 'spec', 'contracts');
+const schemaDir = resolve(SPEC_ROOT, 'contracts');
 const generatedDir = resolve(import.meta.dirname, '..', '..', 'contracts', 'generated');
 
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -22,7 +26,44 @@ for (const file of schemaFiles) {
   try { ajv.addSchema(schema, file); } catch { /* ref already added */ }
 }
 
+function filesBelow(root: string, current = root): string[] {
+  return readdirSync(current)
+    .sort()
+    .flatMap((name) => {
+      const absolute = join(current, name);
+      return statSync(absolute).isDirectory()
+        ? filesBelow(root, absolute)
+        : [relative(root, absolute)];
+    });
+}
+
 describe('Contract parity', () => {
+  it('ships a complete source-only spec bundle without monorepo drift', () => {
+    const bundled = resolve(PACKAGE_ROOT, 'spec');
+    const files = filesBelow(bundled);
+    expect(files.length).toBeGreaterThanOrEqual(80);
+    for (const required of [
+      'contracts/run-plan.schema.json',
+      'fixtures/phase-0/valid/run-plan.json',
+      'fixtures/phase-1/valid/provider-adapter.json',
+      'state-machines/operation.machine.json',
+      'api/openapi.yaml',
+      'threat-model/controls.yaml',
+    ]) {
+      expect(files).toContain(required);
+    }
+
+    const monorepoSpec = resolve(PACKAGE_ROOT, '..', 'spec');
+    if (existsSync(resolve(monorepoSpec, 'contracts'))) {
+      for (const file of files) {
+        expect(
+          readFileSync(resolve(bundled, file)),
+          `bundled spec drift: ${file}`,
+        ).toEqual(readFileSync(resolve(monorepoSpec, file)));
+      }
+    }
+  });
+
   it('should have generated types for every schema', () => {
     for (const file of schemaFiles) {
       const baseName = file.replace('.schema.json', '').replace(/-/g, '_');

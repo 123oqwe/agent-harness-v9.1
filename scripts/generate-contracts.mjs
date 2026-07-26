@@ -7,10 +7,11 @@ import { writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileFromFile } from 'json-schema-to-typescript';
+import { resolveSpecRoot } from './repository-paths.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(__dirname, '..');
-const schemaDir = resolve(harnessRoot, '..', 'spec', 'contracts');
+const schemaDir = resolve(resolveSpecRoot(), 'contracts');
 const outDir = join(harnessRoot, 'contracts', 'generated');
 
 mkdirSync(outDir, { recursive: true });

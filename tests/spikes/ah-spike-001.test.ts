@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PACKAGE_ROOT } from '../helpers/repository-paths.js';
 
 // Spike ah-spike-001: Turborepo monorepo
 // Verifies the specific technology dependency is present and importable.
 describe('ah-spike-001: Turborepo monorepo', () => {
   it('turborepo is in dependencies', () => {
-    const pkgPath = path.resolve(__dirname, '../../../harness/package.json');
+    const pkgPath = path.resolve(PACKAGE_ROOT, 'package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
     // Verify turbo is available via npx (CLI tool, not importable)

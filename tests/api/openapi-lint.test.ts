@@ -1,8 +1,9 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import { SPEC_ROOT } from '../helpers/repository-paths.js';
 
-const apiPath = path.resolve(__dirname, '../../../spec/api/openapi.yaml');
+const apiPath = path.resolve(SPEC_ROOT, 'api/openapi.yaml');
 
 describe('AH-SPEC-API-001: OpenAPI contract', () => {
   it('passes a real OpenAPI parser and reference validator', async () => {

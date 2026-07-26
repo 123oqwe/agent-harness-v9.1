@@ -16,6 +16,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/.stryker-tmp/**',
+      '**/spec/**',
       'coverage/**',
       // Coverage-mirror tests excluded: mutation acceptance must be earned
       // by behavioral unit, integration, and security tests.

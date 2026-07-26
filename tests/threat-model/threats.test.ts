@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SPEC_ROOT } from '../helpers/repository-paths.js';
 
-const threatsPath = path.resolve(__dirname, '../../../spec/threat-model/threats.yaml');
-const controlsPath = path.resolve(__dirname, '../../../spec/threat-model/controls.yaml');
-const controlTestMapPath = path.resolve(__dirname, '../../../spec/threat-model/control-test-map.yaml');
+const threatsPath = path.resolve(SPEC_ROOT, 'threat-model/threats.yaml');
+const controlsPath = path.resolve(SPEC_ROOT, 'threat-model/controls.yaml');
+const controlTestMapPath = path.resolve(SPEC_ROOT, 'threat-model/control-test-map.yaml');
 
 describe('AH-THREAT-001: threat model', () => {
   it('threats.yaml exists and is non-empty', () => {

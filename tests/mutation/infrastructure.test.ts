@@ -542,6 +542,10 @@ describe('Phase 1 mutation report integrity', () => {
       join(root, 'scripts', 'check-mutation-thresholds.mjs'),
       'checker',
     );
+    writeFileSync(
+      join(root, 'scripts', 'repository-paths.mjs'),
+      'paths',
+    );
     writeFileSync(join(root, 'vitest.mutation.config.ts'), 'vitest');
 
     const first = computeMutationConfigurationHash(root);

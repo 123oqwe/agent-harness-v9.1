@@ -1,0 +1,147 @@
+{
+  "name": "RunStateMachine",
+  "description": "Top-level task execution lifecycle",
+  "states": [
+    {
+      "name": "CREATED",
+      "terminal": false
+    },
+    {
+      "name": "PLANNING",
+      "terminal": false
+    },
+    {
+      "name": "RUNNING",
+      "terminal": false
+    },
+    {
+      "name": "PAUSED",
+      "terminal": false
+    },
+    {
+      "name": "COMPLETED",
+      "terminal": true
+    },
+    {
+      "name": "FAILED",
+      "terminal": true
+    },
+    {
+      "name": "CANCELLED",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "source": "CREATED",
+      "target": "PLANNING",
+      "actor": "router",
+      "guard": "RunPlan frozen",
+      "effects": [
+        "create_run_record"
+      ],
+      "event": "RunStarted",
+      "timeout_ms": 30000,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "PLANNING",
+      "target": "RUNNING",
+      "actor": "runtime",
+      "guard": "RunPlan valid",
+      "effects": [
+        "start_execution"
+      ],
+      "event": "ExecutionStarted",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "RUNNING",
+      "target": "PAUSED",
+      "actor": "user_or_system",
+      "guard": "pause_requested",
+      "effects": [
+        "save_snapshot",
+        "check_effect_state"
+      ],
+      "event": "RunPaused",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "PAUSED",
+      "target": "RUNNING",
+      "actor": "runtime",
+      "guard": "effect_state_determined",
+      "effects": [
+        "effect_state_aware_resume"
+      ],
+      "event": "RunResumed",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "RUNNING",
+      "target": "COMPLETED",
+      "actor": "runtime",
+      "guard": "all_steps_done and verification_passed",
+      "effects": [
+        "generate_outcome_package"
+      ],
+      "event": "RunCompleted",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "RUNNING",
+      "target": "FAILED",
+      "actor": "runtime",
+      "guard": "terminal_failure",
+      "effects": [
+        "preserve_partial_results"
+      ],
+      "event": "RunFailed",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "RUNNING",
+      "target": "CANCELLED",
+      "actor": "user",
+      "guard": "cancel_requested",
+      "effects": [
+        "cleanup",
+        "reconcile_if_in_flight"
+      ],
+      "event": "RunCancelled",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    },
+    {
+      "source": "PAUSED",
+      "target": "CANCELLED",
+      "actor": "user",
+      "guard": "cancel_requested",
+      "effects": [
+        "cleanup"
+      ],
+      "event": "RunCancelled",
+      "timeout_ms": null,
+      "retry_rule": "never",
+      "invalid_transition_behavior": "error"
+    }
+  ],
+  "invariants": [
+    "Terminal states (COMPLETED, FAILED, CANCELLED) are not re-enterable",
+    "Cannot execute without valid RunPlan",
+    "Pause during IN_FLIGHT external effect must check effect state before resume"
+  ]
+}

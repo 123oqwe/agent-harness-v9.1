@@ -37,11 +37,9 @@ import {
   type ParsedResponse,
   type ProviderRequest,
 } from '../../gateway/scripted-provider';
+import { SPEC_ROOT } from '../helpers/repository-paths.js';
 
-const specRoot = process.env.HARNESS_SPEC_ROOT
-  ? path.resolve(process.env.HARNESS_SPEC_ROOT)
-  : path.resolve(import.meta.dirname, '../../../spec');
-const schemaPath = path.join(specRoot, 'contracts/provider-adapter.schema.json');
+const schemaPath = path.join(SPEC_ROOT, 'contracts/provider-adapter.schema.json');
 
 function msg(role: Message['role'], content: string): Message {
   return { role, content };
@@ -63,10 +61,10 @@ describe('AH-GATEWAY-TESTPROVIDER-001: generated ProviderAdapter contract', () =
       properties: { provider_type: { enum: string[] } };
     };
     const valid = JSON.parse(
-      fs.readFileSync(path.join(specRoot, 'fixtures/phase-1/valid/provider-adapter.json'), 'utf8'),
+      fs.readFileSync(path.join(SPEC_ROOT, 'fixtures/phase-1/valid/provider-adapter.json'), 'utf8'),
     ) as Record<string, unknown>;
     const invalid = JSON.parse(
-      fs.readFileSync(path.join(specRoot, 'fixtures/phase-1/invalid/provider-adapter.json'), 'utf8'),
+      fs.readFileSync(path.join(SPEC_ROOT, 'fixtures/phase-1/invalid/provider-adapter.json'), 'utf8'),
     ) as Record<string, unknown>;
 
     expect(schema.properties.provider_type.enum).toContain('scripted_test');

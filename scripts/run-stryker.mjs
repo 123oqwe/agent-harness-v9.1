@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { resolveSpecRoot } from './repository-paths.mjs';
 
 const args = process.argv.slice(2);
 
@@ -8,7 +9,7 @@ const args = process.argv.slice(2);
 const strykerBin = resolve(process.cwd(), 'node_modules', '.bin', 'stryker');
 
 // Set spec root for schema file resolution inside Stryker sandbox
-const specRoot = resolve(process.cwd(), '..', 'spec');
+const specRoot = resolveSpecRoot();
 process.env.HARNESS_SPEC_ROOT = specRoot;
 
 const result = spawnSync(strykerBin, ['run', ...args], {

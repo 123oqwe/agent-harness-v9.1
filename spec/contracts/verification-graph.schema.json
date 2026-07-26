@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationGraph",
+  "description": "Verification plan. Defines how each step's output is verified.",
+  "type": "object",
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "verification_id",
+          "step_id_ref",
+          "verification_type",
+          "strictness"
+        ],
+        "properties": {
+          "verification_id": {
+            "type": "string"
+          },
+          "step_id_ref": {
+            "type": "string",
+            "description": "Which WorkflowGraph step this verifies"
+          },
+          "verification_type": {
+            "enum": [
+              "deterministic",
+              "schema_validation",
+              "test_execution",
+              "read_back",
+              "blind_verification",
+              "independent_verifier",
+              "human_review"
+            ]
+          },
+          "strictness": {
+            "enum": [
+              "fast",
+              "standard",
+              "strict",
+              "paranoid"
+            ],
+            "description": "Agent can tune: fast=skip optional checks, paranoid=independent verifier + human review"
+          },
+          "verifier_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For independent_verifier: which agent verifies"
+          },
+          "acceptance_criteria_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Which acceptance criteria this verification checks"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "from_verification",
+          "to_verification"
+        ],
+        "properties": {
+          "from_verification": {
+            "type": "string"
+          },
+          "to_verification": {
+            "type": "string"
+          },
+          "escalation": {
+            "type": "boolean",
+            "description": "True if this edge represents verification escalation (e.g., deterministic \u2192 blind \u2192 independent)"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

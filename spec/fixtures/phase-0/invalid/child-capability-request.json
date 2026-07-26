@@ -1,0 +1,7 @@
+{
+  "parent_delegation_proof": "valid-parent_delegation_proof",
+  "budget_ceiling": {},
+  "tool_grants": [],
+  "resource_grants": [],
+  "delegation_depth": 1
+}

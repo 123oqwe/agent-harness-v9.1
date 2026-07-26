@@ -1,0 +1,94 @@
+{
+  "name": "ApprovalStateMachine",
+  "description": "Human approval flow for operations.",
+  "states": [
+    {
+      "name": "CONSENT_EXEMPT",
+      "terminal": false
+    },
+    {
+      "name": "CONSENT_REQUIRED",
+      "terminal": false
+    },
+    {
+      "name": "HUMAN_APPROVED",
+      "terminal": true,
+      "description": "Approval granted — terminal, OperationStateMachine takes over"
+    },
+    {
+      "name": "HUMAN_REJECTED",
+      "terminal": true
+    },
+    {
+      "name": "EXPIRED",
+      "terminal": true
+    },
+    {
+      "name": "AWAITING_HUMAN",
+      "terminal": false,
+      "description": "Non-terminal \u2014 human can resolve"
+    },
+    {
+      "name": "REMEDIATION_REQUIRED",
+      "terminal": true,
+      "description": "Terminal \u2014 needs new Run or human process"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "CONSENT_EXEMPT",
+      "target": "HUMAN_APPROVED",
+      "actor": "policy_engine",
+      "guard": "auto_approved_low_risk",
+      "event": "AutoApproved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_REQUIRED",
+      "target": "HUMAN_APPROVED",
+      "actor": "user",
+      "guard": "user_approves",
+      "event": "HumanApproved",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_REQUIRED",
+      "target": "HUMAN_REJECTED",
+      "actor": "user",
+      "guard": "user_rejects",
+      "event": "HumanRejected",
+      "retry_rule": "never"
+    },
+    {
+      "source": "CONSENT_REQUIRED",
+      "target": "EXPIRED",
+      "actor": "system",
+      "guard": "timeout_5min",
+      "event": "ConsentExpired",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "HUMAN_APPROVED",
+      "actor": "user",
+      "guard": "human_confirms",
+      "event": "HumanConfirmed",
+      "retry_rule": "never"
+    },
+    {
+      "source": "AWAITING_HUMAN",
+      "target": "REMEDIATION_REQUIRED",
+      "actor": "user",
+      "guard": "human_cannot_resolve",
+      "event": "RemediationRequired",
+      "retry_rule": "never"
+    }
+  ],
+  "invariants": [
+    "No execution without approval for T2+ operations",
+    "AWAITING_HUMAN is non-terminal \u2014 human can resolve and continue",
+    "REMEDIATION_REQUIRED is terminal \u2014 requires new Run or human process",
+    "HUMAN_REJECTED is terminal \u2014 cannot retry",
+    "EXPIRED is terminal \u2014 must create new operation"
+  ]
+}

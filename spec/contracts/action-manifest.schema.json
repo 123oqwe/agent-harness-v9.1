@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionManifest",
+  "type": "object",
+  "required": [
+    "task_id",
+    "plan_id",
+    "step_id",
+    "tool_name",
+    "tool_version",
+    "schema_hash",
+    "canonical_args",
+    "resource_ids",
+    "resource_versions",
+    "preconditions",
+    "expected_postconditions",
+    "reads",
+    "writes",
+    "external_effects",
+    "side_effect_class",
+    "credential_scope",
+    "max_attempts",
+    "max_cost",
+    "expires_at",
+    "compensation_plan",
+    "policy_version",
+    "manifest_hash"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "step_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "schema_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "canonical_args": {
+      "type": "object"
+    },
+    "resource_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resource_versions": {
+      "type": "object"
+    },
+    "preconditions": {
+      "type": "object"
+    },
+    "expected_postconditions": {
+      "type": "object"
+    },
+    "reads": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "writes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_effects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "side_effect_class": {
+      "enum": [
+        "pure",
+        "read_only",
+        "idempotent_write",
+        "non_idempotent_write",
+        "irreversible"
+      ]
+    },
+    "credential_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_cost": {
+      "type": "object",
+      "required": [
+        "token_limit",
+        "usd_micros",
+        "currency"
+      ]
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "compensation_plan": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Excluded from hash payload"
+    }
+  },
+  "additionalProperties": false
+}

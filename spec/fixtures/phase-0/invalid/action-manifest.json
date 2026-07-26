@@ -1,0 +1,23 @@
+{
+  "plan_id": "valid-plan_id",
+  "step_id": "valid-step_id",
+  "tool_name": "valid-tool_name",
+  "tool_version": "valid-tool_version",
+  "schema_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "canonical_args": {},
+  "resource_ids": [],
+  "resource_versions": {},
+  "preconditions": {},
+  "expected_postconditions": {},
+  "reads": [],
+  "writes": [],
+  "external_effects": [],
+  "side_effect_class": "pure",
+  "credential_scope": [],
+  "max_attempts": 1,
+  "max_cost": {},
+  "expires_at": "2026-01-01T00:00:00Z",
+  "compensation_plan": "valid-compensation_plan",
+  "policy_version": "valid-policy_version",
+  "manifest_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

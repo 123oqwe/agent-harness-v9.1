@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidencePackage",
+  "required": [
+    "requirement_id",
+    "commit_sha",
+    "source_files",
+    "tests_added",
+    "commands_run",
+    "exit_codes",
+    "test_results",
+    "coverage",
+    "security_checks",
+    "verifier_result"
+  ],
+  "properties": {
+    "requirement_id": {
+      "type": "string"
+    },
+    "commit_sha": {
+      "type": "string"
+    },
+    "source_files": {
+      "type": "array"
+    },
+    "tests_added": {
+      "type": "array"
+    },
+    "commands_run": {
+      "type": "array"
+    },
+    "exit_codes": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "test_results": {
+      "type": "object"
+    },
+    "coverage": {
+      "type": "object"
+    },
+    "security_checks": {
+      "type": "object"
+    },
+    "verifier_result": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "verifier_model": {
+      "type": "string"
+    },
+    "test_output": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Raw stdout from running the test suite (npm test -- --run). Collected by evidence-collector when product code exists. Used by verifier Check 9/10."
+    },
+    "test_output_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "SHA-256 hash of test_output (first 16 chars). Proves test output was not tampered."
+    }
+  },
+  "type": "object",
+  "additionalProperties": false
+}

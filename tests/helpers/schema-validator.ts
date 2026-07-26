@@ -2,10 +2,9 @@
  import addFormats from 'ajv-formats';
  import * as fs from 'fs';
  import * as path from 'path';
+ import { SPEC_ROOT } from './repository-paths.js';
 
- const contractsDir = process.env.HARNESS_SPEC_ROOT
-  ? path.resolve(process.env.HARNESS_SPEC_ROOT, 'contracts')
-  : path.resolve(__dirname, '../../../spec/contracts');
+ const contractsDir = path.resolve(SPEC_ROOT, 'contracts');
 
  // Cache compiled validators
  const validatorCache = new Map<string, Ajv>();
@@ -52,7 +51,7 @@
  }
 
  export function loadFixture(phase: string, type: 'valid' | 'invalid', name: string): unknown {
-   const fixturePath = path.resolve(__dirname, `../../../spec/fixtures/phase-${phase}/${type}/${name}`);
+   const fixturePath = path.resolve(SPEC_ROOT, `fixtures/phase-${phase}/${type}/${name}`);
    return JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
  }
 

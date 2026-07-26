@@ -1,0 +1,65 @@
+{
+  "schema_version": "run-plan.v1",
+  "run_id": "00000000-0000-0000-0000-000000000001",
+  "revision": 1,
+  "run_plan_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reasoning_strategy": "plan_execute",
+  "task": {
+    "goal": "Fix the off-by-one bug in calculate.ts",
+    "success_criteria": [
+      {
+        "criterion": "npm test passes",
+        "verification_method": "test"
+      },
+      {
+        "criterion": "diff only modifies calculate.ts",
+        "verification_method": "deterministic"
+      }
+    ],
+    "constraints": [
+      {
+        "type": "tool_restriction",
+        "value": "no external dependencies"
+      }
+    ]
+  },
+  "experience_profile": "valid-experience_profile",
+  "workflow_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "agent_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "context_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "verification_graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "model_bindings": [
+    {
+      "provider": "openai",
+      "model_id": "gpt-4o",
+      "modality_role": "reasoning",
+      "capability_match_score": 0.95
+    }
+  ],
+  "tool_grants": [],
+  "skill_bindings": [],
+  "environment_bindings": [],
+  "policy_snapshot_ref": "valid-policy_snapshot_ref",
+  "registry_snapshot_refs": {},
+  "derived_risk_assessment": {},
+  "required_consent": {},
+  "budget_allocation": {},
+  "persistence_policy": {},
+  "cancellation_policy": {},
+  "fallback_policy": {},
+  "context_strategy": {
+    "active_plan_injection": true
+  }
+}

@@ -1,0 +1,5 @@
+Page 1: The Agent Harness is a runtime system for AI agents.
+Page 2: It contains 14 modules including Router, Runtime Core, and Memory.
+Page 3: The Router generates a RunPlan with 4 graphs: workflow, agent, context, verification.
+Page 4: Phase 1 implements 9 tools: read_file, write_file, edit_file, execute_command, search_files, list_directory, parse_document, create_artifact, ask_user.
+Page 5: The security model uses CapabilityToken with use_limit=1 (atomic single-use).
