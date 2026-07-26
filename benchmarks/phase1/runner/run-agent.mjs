@@ -99,7 +99,7 @@ function sanitizedEnvironment() {
   );
 }
 
-function commandFor(
+export function commandFor(
   agent,
   workspace,
   benchmarkCase,
@@ -138,9 +138,8 @@ function commandFor(
           '--safe-mode',
           '--allowedTools',
           'Read,Write,Edit,Bash,Glob,Grep',
-          prompt,
         ],
-        stdin: '',
+        stdin: prompt,
       };
     case 'pi':
       return {
@@ -242,7 +241,19 @@ function runCommand(spec, options) {
   });
 }
 
-function outputFromAgent(agent, execution) {
+function textContent(content) {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter(
+      (part) =>
+        part?.type === 'text' && typeof part.text === 'string',
+    )
+    .map((part) => part.text)
+    .join('');
+}
+
+export function outputFromAgent(agent, execution) {
   if (agent === 'codex') {
     const events = execution.stdout
       .split(/\r?\n/u)
@@ -259,7 +270,7 @@ function outputFromAgent(agent, execution) {
       .filter((value) => typeof value === 'string');
     return messages.at(-1) ?? execution.stdout;
   }
-  if (agent === 'claude' || agent === 'pi') {
+  if (agent === 'claude') {
     try {
       const parsed = JSON.parse(execution.stdout);
       return String(
@@ -271,6 +282,36 @@ function outputFromAgent(agent, execution) {
     } catch {
       return execution.stdout;
     }
+  }
+  if (agent === 'pi') {
+    const events = execution.stdout
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line)];
+        } catch {
+          return [];
+        }
+      });
+    const completedMessages = events
+      .filter(
+        (event) =>
+          event?.type === 'message_end' &&
+          event?.message?.role === 'assistant',
+      )
+      .map((event) => textContent(event.message.content))
+      .filter(Boolean);
+    if (completedMessages.length > 0) {
+      return completedMessages.at(-1);
+    }
+    const finalMessages = events
+      .filter((event) => event?.type === 'agent_end')
+      .flatMap((event) => event.messages ?? [])
+      .filter((message) => message?.role === 'assistant')
+      .map((message) => textContent(message.content))
+      .filter(Boolean);
+    return finalMessages.at(-1) ?? execution.stdout;
   }
   if (agent === 'harness') {
     const lines = execution.stdout.split(/\r?\n/u).filter(Boolean);
@@ -472,7 +513,14 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : error}\n`,
+    );
+    process.exitCode = 1;
+  });
+}

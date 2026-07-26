@@ -6,6 +6,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
@@ -96,6 +97,50 @@ describe('Phase 1 live acceptance and comparison contract', () => {
     expect(runner).toContain('raw_output_sha256');
     expect(runner).toContain('entry.execution_id');
     expect(runner).not.toMatch(/score\s*=\s*(?:100|1(?:\.0+)?)\b/u);
+  });
+
+  it('adapts current Claude Code and pi CLI protocols without grading transport JSON', async () => {
+    const moduleUrl = pathToFileURL(
+      resolve(root, 'benchmarks/phase1/runner/run-agent.mjs'),
+    ).href;
+    const runner = (await import(moduleUrl)) as {
+      commandFor: (
+        agent: string,
+        workspace: string,
+        benchmarkCase: { prompt: string },
+        fixtureVersion: string,
+        commitSha: string,
+      ) => { args: string[]; stdin: string };
+      outputFromAgent: (
+        agent: string,
+        execution: { stdout: string },
+      ) => string;
+    };
+    const prompt = 'Return only: launch';
+    const claude = runner.commandFor(
+      'claude',
+      '/tmp/fixture',
+      { prompt },
+      'phase1-24-v1',
+      'a'.repeat(40),
+    );
+    expect(claude.stdin).toBe(prompt);
+    expect(claude.args).not.toContain(prompt);
+
+    const piOutput = [
+      JSON.stringify({ type: 'agent_start' }),
+      JSON.stringify({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'launch' }],
+        },
+      }),
+      JSON.stringify({ type: 'agent_settled' }),
+    ].join('\n');
+    expect(
+      runner.outputFromAgent('pi', { stdout: piOutput }),
+    ).toBe('launch');
   });
 
   it('grades filesystem, command, output, safety, and provenance deterministically', () => {
