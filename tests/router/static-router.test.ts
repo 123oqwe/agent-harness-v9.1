@@ -654,10 +654,23 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(ba.max_iterations).toBe(1);
     });
 
-    it('budget_allocation max_iterations is 3 for react', () => {
+    it('budgets ReAct for discovery actions plus a final-answer turn', () => {
       const r = router.route(task('read the file'));
       const ba = (r.run_plan as unknown as { budget_allocation: { max_iterations: number } }).budget_allocation;
-      expect(ba.max_iterations).toBe(3);
+      expect(ba.max_iterations).toBe(5);
+    });
+
+    it('gives search, read, and final answer enough bounded ReAct turns', () => {
+      const r = router.route(
+        task(
+          'Search the workspace and report the TypeScript file containing TODO_BENCHMARK. Do not modify files.',
+        ),
+      );
+      expect(r.strategy).toBe('react');
+      expect(
+        (r.run_plan!.budget_allocation as { max_iterations: number })
+          .max_iterations,
+      ).toBe(5);
     });
 
     it('persistence_policy has event_log true and snapshot true', () => {

@@ -515,7 +515,10 @@ export class StaticRouter {
             ? 1
             : strategy === 'plan_execute'
               ? (workflowTools.length + 1) * 2
-              : 3,
+              : Math.min(
+                  8,
+                  Math.max(4, requiredTools.length + 2),
+                ),
       },
       persistence_policy: { event_log: true, snapshot: true },
       cancellation_policy: { abortable: true },
