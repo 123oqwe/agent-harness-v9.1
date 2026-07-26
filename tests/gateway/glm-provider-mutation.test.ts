@@ -139,6 +139,51 @@ describe('GlmProvider mutation-killing tests', () => {
     ).not.toHaveProperty('tools');
   });
 
+  it('preserves exact built-in descriptions when no tool description is declared', () => {
+    const descriptions = {
+      read_file:
+        'Read one local workspace file and return its contents. Use /workspace/... or a workspace-relative path.',
+      write_file:
+        'Create or replace one local workspace file with exact content. Use /workspace/... or a workspace-relative path.',
+      edit_file:
+        'Replace one exact text fragment in one local workspace file. Use /workspace/... or a workspace-relative path.',
+      list_directory:
+        'List entries in one local workspace directory. Use /workspace/... or a workspace-relative path.',
+      search_files:
+        'Search local workspace files for a literal text fragment. Use /workspace/... or a workspace-relative root.',
+      execute_command:
+        'Run one allowlisted local command inside the workspace sandbox. Use /workspace or a workspace-relative cwd.',
+      create_artifact:
+        'Create one local structured artifact under /workspace.',
+      ask_user:
+        'Request missing information from the user without taking other action.',
+      parse_document:
+        'Parse one local document under /workspace and return its extracted text.',
+    } as const;
+    const tools = Object.keys(descriptions).map((name) => ({
+      name,
+      risk_feature_extractor: 'default',
+      input_schema: { type: 'object' },
+    }));
+    const normalized = provider().normalizeRequest({
+      messages: [],
+      tools,
+    }) as {
+      tools: Array<{
+        function: { name: keyof typeof descriptions; description: string };
+      }>;
+    };
+
+    expect(
+      Object.fromEntries(
+        normalized.tools.map(({ function: tool }) => [
+          tool.name,
+          tool.description,
+        ]),
+      ),
+    ).toEqual(descriptions);
+  });
+
   it('parses text, usage, model and finish reasons', () => {
     const parsed = provider().parseResponse({
       choices: [
