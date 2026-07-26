@@ -1,6 +1,58 @@
 /** ReAct: persisted action/observation loop with bounded effects and budgets. */
 import type { StrategyContext } from './reasoning-strategy.js';
 
+const NUMBER_WORDS: Readonly<Record<string, number>> = Object.freeze({
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+});
+
+export function explicitOutputLimitInstruction(goal: string): string {
+  const wordLimit = goal.match(
+    /\b(?:at most|no more than|maximum(?: of)?)\s+(\d+|[a-z]+)\s+words?\b/iu,
+  );
+  if (wordLimit) {
+    const parsed = /^\d+$/u.test(wordLimit[1]!)
+      ? Number(wordLimit[1])
+      : NUMBER_WORDS[wordLimit[1]!.toLowerCase()];
+    if (
+      parsed !== undefined &&
+      Number.isSafeInteger(parsed) &&
+      parsed > 0 &&
+      parsed <= 10_000
+    ) {
+      return ` The final visible answer must contain at most ${parsed} whitespace-separated words.`;
+    }
+  }
+  const characterLimit = goal.match(
+    /(?:不超过|至多)\s*(\d+)\s*个?(?:字|字符)/u,
+  );
+  if (characterLimit) {
+    const parsed = Number(characterLimit[1]);
+    if (Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 100_000) {
+      return ` The final visible answer must contain at most ${parsed} characters.`;
+    }
+  }
+  return '';
+}
+
 function canonical(value: unknown): string {
   const normalize = (input: unknown): unknown => {
     if (Array.isArray(input)) return input.map(normalize);
@@ -21,6 +73,9 @@ export async function runReact(
   messages: unknown[],
 ): Promise<void> {
   const callCounts = new Map<string, number>();
+  const outputLimitInstruction = explicitOutputLimitInstruction(
+    context.config.run_plan?.task?.goal ?? context.config.goal,
+  );
   while (
     context.iterations < context.config.max_iterations &&
     !context.terminated
@@ -41,8 +96,7 @@ export async function runReact(
       context.iterations,
       budget,
       {
-        system_instruction:
-          'ReAct mode: use workspace tools only when needed. Base each next action on prior tool observations. When complete, return the concise final answer without a tool call. Never expose private reasoning.',
+        system_instruction: `ReAct mode: use workspace tools only when needed. Base each next action on prior tool observations. When complete, return the concise final answer without a tool call.${outputLimitInstruction} Never expose private reasoning.`,
         allowed_tools:
           context.config.run_plan?.tool_grants
             .map((grant) => grant.tool)

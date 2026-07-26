@@ -80,6 +80,25 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(document.requires_writes).toBe(false);
       expect(document.domains).toContain('documents');
     });
+    it('routes an explicit read-only file path through ReAct tools', () => {
+      const request = task(
+        'Explain the single fact in fact.txt in at most twelve words and do not modify the workspace.',
+      );
+      const intent = profileIntent(request);
+      expect(intent).toMatchObject({
+        requires_tools: true,
+        requires_writes: false,
+      });
+      expect(intent.domains).toContain('documents');
+      const result = router.route(request);
+      expect(result.strategy).toBe('react');
+      expect(result.run_plan!.tool_grants.map((grant) => grant.tool)).toContain(
+        'read_file',
+      );
+      expect(
+        result.run_plan!.tool_grants.map((grant) => grant.tool),
+      ).not.toContain('write_file');
+    });
     it('detects writes and tests', () => {
       const i = profileIntent(task('fix the bug and run the tests'));
       expect(i.requires_writes).toBe(true);

@@ -840,6 +840,30 @@ describe('ReAct action/observation boundaries', () => {
     arguments: args,
   });
 
+  it('binds an explicit user word limit into the final-answer directive', async () => {
+    const limitedPlan = {
+      ...plan,
+      task: {
+        goal: 'Explain fact.txt in at most twelve words.',
+      },
+    } as RunPlan;
+    const runtimeDeps = deps([answer]);
+    await new LoopEngine(
+      config('react', { run_plan: limitedPlan }),
+      runtimeDeps,
+    ).run();
+    expect(runtimeDeps.modelCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.any(Object),
+      expect.objectContaining({
+        system_instruction: expect.stringContaining(
+          'at most 12 whitespace-separated words',
+        ),
+      }),
+    );
+  });
+
   it.each([
     {
       name: 'cancellation',

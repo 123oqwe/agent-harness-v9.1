@@ -72,6 +72,10 @@ export function profileIntent(task: TaskContract): IntentProfile {
     .replace(/(?:不要|禁止)[^.。;；]*/gu, '')
     .replace(/[;；,，]\s*(?=[.。]?\s*$)/u, '');
   const pureWriting = /\b(rewrite|polish|draft|essay|article|copyedit)\b|润色|改写|优化文案|写作|文章|草稿/u.test(goal);
+  const hasFilePath =
+    /(?:^|[\s("'，。；])(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.[a-z0-9]+\b/iu.test(
+      goal,
+    );
   const hasCodePath =
     /(?:^|[\s("'，。；])(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.(?:c|cc|cpp|cs|go|h|hpp|java|js|jsx|mjs|cjs|kt|php|py|rb|rs|sh|swift|ts|tsx)\b/iu.test(
       goal,
@@ -93,7 +97,8 @@ export function profileIntent(task: TaskContract): IntentProfile {
   const requires_tests = /\b(test|verify|run|build|compile|lint|check)\b|测试|验证|运行|构建|编译|检查/u.test(affirmativeGoal);
   const explicit_plan = /\b(plan|step by step|multi[- ]?step|pipeline|workflow|sequence)\b|计划|分步骤|多步骤|流程|工作流|依赖/u.test(goal);
   const observationTools = /\b(read|list|search|find|explore|execute|run|parse|summarize|analyze|research|cite|source|reference)\b|读取|列出|搜索|查找|浏览|执行|解析|总结|分析|研究|引用|来源|参考/u.test(goal);
-  const requires_tools = requires_writes || requires_tests || observationTools;
+  const requires_tools =
+    requires_writes || requires_tests || observationTools || hasFilePath;
   const stepMarkers = (affirmativeGoal.match(/\bthen\b|\bafter\b|\bnext\b|\bfinally\b|\b->\b|;\s|然后|之后|接着|再|最后/gu) || []).length;
   const multi_step = explicit_plan || stepMarkers >= 1 || (requires_writes && requires_tests);
   const missing_info: string[] = [];
@@ -104,7 +109,12 @@ export function profileIntent(task: TaskContract): IntentProfile {
     hasCodePath ||
     /\b(code|bug|function|repo|typescript|javascript|python|build)\b|代码|缺陷|函数|仓库|构建|编译/u.test(goal)
   ) domains.push('coding');
-  if (/\b(document|pdf|page|file|summary|summarize|summarise)\b|文档|文件|页面|总结|摘要/u.test(goal)) domains.push('documents');
+  if (
+    /(?:[\p{L}\p{N}_-]+\/)*[\p{L}\p{N}_-]+\.(?:docx?|md|pdf|rtf|txt)\b/iu.test(
+      goal,
+    ) ||
+    /\b(document|pdf|page|file|summary|summarize|summarise)\b|文档|文件|页面|总结|摘要/u.test(goal)
+  ) domains.push('documents');
   if (/\b(research|citations?|sources?|references?)\b|研究|引用|来源|参考/u.test(goal)) domains.push('research');
   if (pureWriting) domains.push('writing');
   if (/\b(plan|schedule|dependency|dag|task)\b|计划|排期|依赖|任务/u.test(goal)) domains.push('planning');
