@@ -611,7 +611,7 @@ function resourceAllowed(resourceIds: string[], prefixes: readonly string[]): bo
   return resourceIds.length > 0 && resourceIds.every((resource) =>
     prefixes.some((prefix) =>
       resource === prefix ||
-      ((prefix.endsWith('/') || prefix.endsWith('://')) && resource.startsWith(prefix)) ||
+      (prefix.endsWith('/') && resource.startsWith(prefix)) ||
       resource.startsWith(`${prefix}/`),
     ),
   );
