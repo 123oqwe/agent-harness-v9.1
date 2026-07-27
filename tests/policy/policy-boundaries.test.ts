@@ -538,6 +538,44 @@ describe('PolicyEngine evaluation ordering and resource boundaries', () => {
     expect(evaluate('/workspace-evil/secret.txt').reason_code).toBe('resource_not_allowed');
   });
 
+  it('allows a resource that matches any one of multiple segment-bounded prefixes', () => {
+    const prefixes = ['/workspace', '/archive'];
+    const engine = new PolicyEngine(
+      policy({
+        allowed_resource_prefixes: prefixes,
+        rules: [allowRule({ resource_prefixes: prefixes })],
+      }),
+    );
+    const evaluate = (resource_id: string) =>
+      engine.evaluate({
+        tool_name: 'read_file',
+        resource_ids: [resource_id],
+        risk: risk(),
+        context: context(),
+      });
+
+    expect(evaluate('/workspace/file.txt').reason_code).toBe('allowed');
+    expect(evaluate('/archive/file.txt').reason_code).toBe('allowed');
+  });
+
+  it('treats a URI scheme root as an explicit resource prefix', () => {
+    const engine = new PolicyEngine(
+      policy({
+        allowed_resource_prefixes: ['workspace://'],
+        rules: [allowRule({ resource_prefixes: ['workspace://'] })],
+      }),
+    );
+
+    expect(
+      engine.evaluate({
+        tool_name: 'read_file',
+        resource_ids: ['workspace://project/file.txt'],
+        risk: risk(),
+        context: context(),
+      }).reason_code,
+    ).toBe('allowed');
+  });
+
   it('selects the highest-priority matching allow rule and alphabetic ID on ties', () => {
     const high = new PolicyEngine(
       policy({
