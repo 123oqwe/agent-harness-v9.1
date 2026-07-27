@@ -12,6 +12,7 @@ export const strykerBase = {
   vitest: {
     configFile: 'vitest.mutation.config.ts',
   },
+  ignorePatterns: ['/reports', '.stryker-tmp'],
   thresholds: {
     high: 80,
     low: 70,

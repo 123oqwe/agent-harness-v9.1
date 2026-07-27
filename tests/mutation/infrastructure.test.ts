@@ -151,6 +151,12 @@ describe('Phase 1 mutation manifest', () => {
     expect(strykerBase.concurrency).toBe(4);
   });
 
+  it('keeps generated mutation state out of every Stryker sandbox', () => {
+    expect(strykerBase.ignorePatterns).toEqual(
+      expect.arrayContaining(['/reports', '.stryker-tmp']),
+    );
+  });
+
   it('keeps static mutants static when a testFiles filter narrows the suite', () => {
     const patch = readFileSync(
       join(
