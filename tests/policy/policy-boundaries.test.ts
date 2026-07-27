@@ -518,6 +518,26 @@ describe('PolicyEngine evaluation ordering and resource boundaries', () => {
     );
   });
 
+  it('does not allow a sibling resource that only shares a lexical prefix', () => {
+    const engine = new PolicyEngine(
+      policy({
+        allowed_resource_prefixes: ['/workspace'],
+        rules: [allowRule({ resource_prefixes: ['/workspace'] })],
+      }),
+    );
+    const evaluate = (resource_id: string) =>
+      engine.evaluate({
+        tool_name: 'read_file',
+        resource_ids: [resource_id],
+        risk: risk(),
+        context: context(),
+      });
+
+    expect(evaluate('/workspace').reason_code).toBe('allowed');
+    expect(evaluate('/workspace/file.txt').reason_code).toBe('allowed');
+    expect(evaluate('/workspace-evil/secret.txt').reason_code).toBe('resource_not_allowed');
+  });
+
   it('selects the highest-priority matching allow rule and alphabetic ID on ties', () => {
     const high = new PolicyEngine(
       policy({

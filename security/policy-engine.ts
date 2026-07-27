@@ -608,7 +608,13 @@ export async function validateEgressTarget(input: {
 }
 
 function resourceAllowed(resourceIds: string[], prefixes: readonly string[]): boolean {
-  return resourceIds.length > 0 && resourceIds.every((resource) => prefixes.some((prefix) => resource.startsWith(prefix)));
+  return resourceIds.length > 0 && resourceIds.every((resource) =>
+    prefixes.some((prefix) =>
+      resource === prefix ||
+      ((prefix.endsWith('/') || prefix.endsWith('://')) && resource.startsWith(prefix)) ||
+      resource.startsWith(`${prefix}/`),
+    ),
+  );
 }
 
 function ruleMatches(rule: Readonly<PolicyRule>, request: PolicyEvaluationRequest): boolean {
