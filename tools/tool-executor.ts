@@ -16,7 +16,7 @@
 import { createHash } from 'node:crypto';
 // Ed25519 keypair is injected by composition root, not self-generated
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
-import type { SandboxProfile } from '../runtime/sandbox.js';
+import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import type { ToolRegistry, RegistrySnapshot } from './tool-registry.js';
 import type { ToolSpec } from '../contracts/index.js';
 import type { PolicyEngine } from '../security/policy-engine.js';

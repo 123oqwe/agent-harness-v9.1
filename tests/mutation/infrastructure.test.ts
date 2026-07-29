@@ -190,7 +190,7 @@ describe('Phase 1 mutation manifest', () => {
     const executableSources = [
       'harness.ts',
       ...globSync(
-        '{gateway,router,tools,skills,security,vfs,runtime,session,verification,domains,ingestion,research,writing,planning,personal_assistant,ui}/**/*.ts',
+        '{gateway,router,tools,skills,security,vfs,runtime,sandbox,session,verification,domains,ingestion,ui}/**/*.ts',
         { cwd: harnessRoot },
       ),
     ]

@@ -1,5 +1,5 @@
 import { parseDocument } from '../ingestion/parse-document.js';
-import type { SandboxProfile } from '../runtime/sandbox.js';
+import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 import type { WorkspaceTransaction } from '../vfs/workspace-transaction.js';
 import { createArtifact } from './create-artifact.js';

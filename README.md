@@ -1,0 +1,139 @@
+# Agent Harness
+
+Agent Harness is a security-first TypeScript runtime for routed, tool-using AI
+agents. This repository branch contains the Phase 1 harness source only; the
+Factory is not part of the runtime or release package.
+
+## Phase 1 execution path
+
+```text
+TaskContract
+  -> Policy + StaticRouter
+  -> frozen RunPlan (direct | react | plan_execute)
+  -> ModelGateway
+  -> Tool/Skill search and activation
+  -> ToolDispatcher
+  -> Authorization + Capability + PEP
+  -> VFS / OS process sandbox
+  -> durable Session
+  -> independent Verification
+  -> Evidence + Outcome
+```
+
+The model cannot call a host tool directly. `ToolDispatcher` is deliberately an
+internal composition detail: the public `Harness` wires search, schema
+validation, authorization, capability consumption, execution, receipts,
+verification, and evidence into one path.
+
+## Included in Phase 1
+
+- Three reasoning strategies: `direct`, `react`, and DAG-based `plan_execute`.
+- A model gateway with provider selection, cancellation, retries, usage, and
+  provider error normalization.
+- Nine local tools: file read/write/edit/search/list, command execution,
+  artifact creation, user questions, and document parsing.
+- Eight declarative skills with registry search, risk-tier checks, dependency
+  validation, activation, and progressive instruction loading.
+- Policy, authorization, capability, consent, PEP, audit, and secrets controls.
+- Transactional VFS, platform-aware process sandboxing, and deny-by-default
+  network profiles.
+- Durable encrypted sessions, crash recovery, idempotency, receipts, and
+  evidence generation.
+- Coding, documents, research, writing, planning, and personal-assistant
+  vertical adapters.
+
+Long-term memory/RAG, cron jobs, cross-run personalization, agent capability
+self-evolution, and multi-agent orchestration belong to later phases. They are
+not silently simulated by this Phase 1 package.
+
+## Install and verify
+
+Node.js 20 or newer is required.
+
+```bash
+npm ci
+npm run typecheck
+npm run check:cycles
+npm run build
+npm test
+npm run test:coverage
+```
+
+Production dependency audit:
+
+```bash
+npm audit --omit=dev --audit-level=high
+```
+
+Mutation testing is intentionally separate because it is substantially slower:
+
+```bash
+npm run test:mutation:phase1
+```
+
+Live GLM acceptance is never run implicitly or in pull-request CI. It requires
+an explicitly supplied `GLM_API_KEY`, `GLM_MODEL=glm-5.2`,
+`GLM_REASONING_EFFORT=xhigh`, and `GLM_ALLOW_REMOTE=1`.
+
+## Registry smoke example
+
+```ts
+import {
+  SkillLoader,
+  SkillRegistry,
+  ToolRegistry,
+  createPhase1ToolDefinitions,
+} from 'agent-harness';
+
+const tools = new ToolRegistry();
+const definitions = createPhase1ToolDefinitions();
+for (const definition of definitions) tools.register(definition);
+
+const skills = new SkillRegistry();
+skills.loadBaseSkills();
+const snapshot = skills.freezeSnapshot();
+const effects = Object.fromEntries(
+  definitions.map((definition) => [
+    definition.name,
+    definition.effect_model.operation,
+  ]),
+);
+const loader = new SkillLoader(
+  skills,
+  snapshot,
+  tools.listNames(),
+  2,
+  undefined,
+  effects,
+);
+
+const candidates = skills.skill_search('repository');
+const activated = await loader.activate('repository-exploration');
+```
+
+Constructing `Harness` additionally requires the caller to inject real policy,
+gateway, verification, identity, capability, audit, VFS, and sandbox
+authorities. The package does not create permissive security defaults.
+
+## Source layout
+
+```text
+gateway/       model providers and the only model-call gateway
+router/        task normalization and deterministic routing
+runtime/       loop lifecycle and reasoning strategies
+tools/         tool registry, definitions, dispatcher, and local hosts
+skills/        skill registry, declarative skills, and activation
+security/      policy, identity, capabilities, consent, PEP, audit, secrets
+vfs/           virtual and transactional workspace boundaries
+sandbox/       OS process isolation
+session/       durable event log, snapshots, and recovery
+verification/  independent checks and evidence
+domains/       six thin product vertical adapters
+ingestion/     document ingestion capability
+contracts/     generated TypeScript contracts
+spec/          authoritative schemas, APIs, state machines, and threat model
+tests/         unit, integration, security, packaging, and acceptance tests
+```
+
+The package is private and `UNLICENSED`; no open-source license grant is
+implied. See [SECURITY.md](SECURITY.md) for vulnerability reporting.

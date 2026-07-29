@@ -210,9 +210,14 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
         expect(paths).toContain(`dist/resources/${reference}`);
       }
     }
-    expect(paths.every((entry) => entry === 'package.json' || entry.startsWith('dist/'))).toBe(
-      true,
-    );
+    expect(
+      paths.every(
+        (entry) =>
+          entry === 'package.json' ||
+          entry === 'README.md' ||
+          entry.startsWith('dist/'),
+      ),
+    ).toBe(true);
     expect(
       paths.some((entry) =>
         /(?:^|\/)(?:node_modules|coverage|\.stryker-tmp|tests)(?:\/|$)|(?:^|\/)\.env(?:\.|$)|credentials?|api[-_]?keys?/iu.test(

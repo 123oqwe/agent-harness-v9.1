@@ -14,7 +14,7 @@ import type {
   LoopResult,
   LoopTurn,
 } from '../runtime/loop.js';
-import type { SandboxProfile } from '../runtime/sandbox.js';
+import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import { executeCommand } from '../tools/execute-command.js';
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 import type { SessionEvent } from '../session/durable-session.js';

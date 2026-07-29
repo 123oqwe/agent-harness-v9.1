@@ -38,7 +38,7 @@ import type {
   OverlayBackend,
   VirtualFilesystem,
 } from './virtual-filesystem.js';
-import type { SandboxProfile } from '../runtime/sandbox.js';
+import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 
 type ManifestEntry =
   | { kind: 'file'; sha256: string; mode: number }

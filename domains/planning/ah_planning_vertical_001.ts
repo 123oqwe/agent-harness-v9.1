@@ -1,6 +1,6 @@
 /** AH-PLANNING-VERTICAL-001: thin adapter. Goal+constraints → plan → validate DAG. */
-import type { TaskContract } from '../contracts/index.js';
-import type { Harness, HarnessOutcome } from '../harness.js';
+import type { TaskContract } from '../../contracts/index.js';
+import type { Harness, HarnessOutcome } from '../../harness.js';
 
 export interface PlanningVerticalInput { goal: string; tasks: { id: string; depends_on: string[] }[] }
 export interface PlanningVerticalOutput {

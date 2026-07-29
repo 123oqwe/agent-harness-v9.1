@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { SandboxProfile } from '../../runtime/sandbox.js';
+import type { SandboxProfile } from '../../sandbox/process-sandbox.js';
 import {
   LocalBackend,
   VirtualFilesystem,

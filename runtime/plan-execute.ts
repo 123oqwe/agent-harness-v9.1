@@ -8,7 +8,7 @@ import type {
   ModelTurn,
   RuntimeStepState,
 } from './loop.js';
-import { LoopError } from './loop.js';
+import { LoopError } from './errors.js';
 import type { StrategyContext } from './reasoning-strategy.js';
 
 type WorkflowNode = WorkflowGraph['nodes'][number];

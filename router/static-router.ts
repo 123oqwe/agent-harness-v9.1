@@ -14,7 +14,7 @@ import type { TaskContract } from '../contracts/index.js';
 import type { RunPlan } from '../contracts/index.js';
 export type { RunPlan };
 import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
-import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
+import type { SkillRegistry, SkillRegistrySnapshot } from '../skills/skill-registry.js';
 import type { PolicyEngine } from '../security/policy-engine.js';
 import {
   ProviderResolutionError,

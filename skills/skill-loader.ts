@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SkillRegistry, SkillRegistrySnapshot } from '../tools/skill-registry.js';
+import type { SkillRegistry, SkillRegistrySnapshot } from './skill-registry.js';
 import type { SkillSpec } from '../contracts/index.js';
 
 export interface SkillActivationResult {

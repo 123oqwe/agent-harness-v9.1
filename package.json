@@ -1,7 +1,24 @@
 {
   "name": "agent-harness",
   "version": "0.1.0",
+  "description": "A security-first TypeScript harness for routed, tool-using AI agents.",
   "private": true,
+  "license": "UNLICENSED",
+  "keywords": [
+    "agent",
+    "agent-harness",
+    "llm",
+    "security",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/123oqwe/agentharness91.git"
+  },
+  "homepage": "https://github.com/123oqwe/agentharness91/tree/codex/phase1-harness-realization",
+  "bugs": {
+    "url": "https://github.com/123oqwe/agentharness91/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -22,11 +39,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "check:cycles": "node scripts/check-cycles.mjs",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
-    "lint": "eslint gateway security runtime router session tools ui verification vfs domains ingestion research writing planning personal_assistant harness.ts index.ts scripts benchmarks",
+    "lint": "eslint gateway security runtime router sandbox session skills tools ui verification vfs domains ingestion harness.ts index.ts scripts benchmarks",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contracts tests/api tests/packaging",
+    "test:architecture": "vitest run tests/architecture",
     "test:unit": "vitest run tests/gateway tests/policy tests/security tests/capability tests/state-machines tests/runtime tests/router tests/vfs tests/session tests/tools tests/evidence tests/verification tests/ingestion tests/packaging",
     "test:integration": "vitest run tests/integration tests/domain tests/tools/tool-executor.test.ts tests/session/file-persistence.test.ts",
     "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security tests/capability tests/sandbox tests/tools/execute-command-security.test.ts tests/tools/read-file-security.test.ts",
@@ -39,7 +58,7 @@
     "test:mutation:check": "node scripts/check-mutation-thresholds.mjs",
     "test:glm:live": "node scripts/run-glm-acceptance.mjs",
     "benchmark:phase1": "node benchmarks/phase1/runner/run-agent.mjs",
-    "verify:phase1:local": "npm run typecheck && npm run build && npm run lint && npm test && npm run test:coverage && npm run test:mutation:phase1",
+    "verify:phase1:local": "npm run typecheck && npm run check:cycles && npm run build && npm run lint && npm test && npm run test:coverage && npm run test:mutation:phase1",
     "generate:contracts": "node scripts/generate-contracts.mjs",
     "prepare": "patch-package"
   },

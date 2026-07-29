@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSandboxed, detectMechanism, type SandboxProfile } from '../../runtime/sandbox.js';
+import {
+  detectMechanism,
+  execSandboxed,
+  type SandboxProfile,
+} from '../../sandbox/process-sandbox.js';
 
 const mechanism = detectMechanism();
 const hasSandbox = mechanism !== 'none';

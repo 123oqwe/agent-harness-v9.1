@@ -1,5 +1,5 @@
 /**
- * AH-SANDBOX-001: OS-native sandbox for tool command execution.
+ * AH-SANDBOX-001: canonical OS-native sandbox for tool command execution.
  *
  * Uses macOS Seatbelt (sandbox-exec -p) on Darwin and Linux bubblewrap (bwrap)
  * where available. Profile = workspace-write + network deny-by-default; unix

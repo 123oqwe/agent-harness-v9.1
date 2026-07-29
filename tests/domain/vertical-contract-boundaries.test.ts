@@ -7,24 +7,24 @@ import {
 import {
   docTaskContract,
   runDocVertical,
-} from '../../ingestion/ah_doc_vertical_001.js';
+} from '../../domains/documents/ah_doc_vertical_001.js';
 import {
   paTaskContract,
   runPAVertical,
-} from '../../personal_assistant/ah_pa_vertical_001.js';
+} from '../../domains/personal-assistant/ah_pa_vertical_001.js';
 import {
   PlanningInputError,
   planningTaskContract,
   runPlanningVertical,
-} from '../../planning/ah_planning_vertical_001.js';
+} from '../../domains/planning/ah_planning_vertical_001.js';
 import {
   researchTaskContract,
   runResearchVertical,
-} from '../../research/ah_research_vertical_001.js';
+} from '../../domains/research/ah_research_vertical_001.js';
 import {
   runWritingVertical,
   writingTaskContract,
-} from '../../writing/ah_writing_vertical_001.js';
+} from '../../domains/writing/ah_writing_vertical_001.js';
 
 function outcome(
   overrides: Record<string, unknown> = {},

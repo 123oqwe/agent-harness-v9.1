@@ -12,18 +12,18 @@ import { Harness } from '../../harness.js';
 
 import { ToolRegistry } from '../../tools/tool-registry.js';
 
-import { SkillRegistry } from '../../tools/skill-registry.js';
+import { SkillRegistry } from '../../skills/skill-registry.js';
 
 import { VirtualFilesystem, LocalBackend } from '../../vfs/virtual-filesystem.js';
 
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 
-import type { SandboxProfile } from '../../runtime/sandbox.js';
+import type { SandboxProfile } from '../../sandbox/process-sandbox.js';
 
 import type { ToolSpec } from '../../contracts/index.js';
 import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 
-import { runResearchVertical } from '../../research/ah_research_vertical_001.js';
+import { runResearchVertical } from '../../domains/research/ah_research_vertical_001.js';
 
 
 function toolSpec(name: string): ToolSpec {

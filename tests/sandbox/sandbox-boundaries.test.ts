@@ -28,11 +28,11 @@ import {
   parseProcessTable,
   runSandboxedText,
   SandboxError,
-} from '../../runtime/sandbox.js';
+} from '../../sandbox/process-sandbox.js';
 import type {
   SandboxExecOptions,
   SandboxProfile,
-} from '../../runtime/sandbox.js';
+} from '../../sandbox/process-sandbox.js';
 
 const temporaryDirectories: string[] = [];
 const originalPath = process.env.PATH;

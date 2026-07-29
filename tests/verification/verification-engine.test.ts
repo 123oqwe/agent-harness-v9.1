@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { RunPlan, TaskContract } from '../../contracts/index.js';
 import type { LoopResult } from '../../runtime/loop.js';
-import type { SandboxProfile } from '../../runtime/sandbox.js';
+import type { SandboxProfile } from '../../sandbox/process-sandbox.js';
 import {
   CallbackVerificationAdapter,
   JsonSchemaVerificationAdapter,

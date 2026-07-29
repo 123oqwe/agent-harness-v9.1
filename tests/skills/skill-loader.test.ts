@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SkillRegistry, baseSkills } from '../../tools/skill-registry.js';
+import { SkillRegistry, baseSkills } from '../../skills/skill-registry.js';
 import { SkillLoader, SkillLoaderError } from '../../skills/skill-loader.js';
 import type { SkillSpec } from '../../contracts/index.js';
 

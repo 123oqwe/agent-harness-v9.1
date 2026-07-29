@@ -1,5 +1,9 @@
 /** AH-TOOL-EXEC-001: execute_command tool. Runs via OS sandbox. */
-import { execSandboxed, type SandboxProfile, type SandboxLimits } from '../runtime/sandbox.js';
+import {
+  execSandboxed,
+  type SandboxProfile,
+  type SandboxLimits,
+} from '../sandbox/process-sandbox.js';
 
 export interface ExecCommandInput {
   argv: string[];

@@ -18,11 +18,26 @@ export * from './security/action-executor.js';
 // VFS + Sandbox
 export * from './vfs/virtual-filesystem.js';
 export * from './vfs/workspace-transaction.js';
-export * from './runtime/sandbox.js';
+export {
+  assertWithinWorkspace,
+  DEFAULT_LIMITS,
+  detectMechanism,
+  execSandboxed,
+  SandboxError,
+  type EgressAllowRule,
+  type SandboxExecOptions,
+  type SandboxLimits,
+  type SandboxMechanism,
+  type SandboxMechanismDetection,
+  type SandboxProfile,
+  type SandboxResult,
+  type SandboxRuntimeDependencies,
+  type SandboxSpawnOptions,
+} from './sandbox/process-sandbox.js';
 // Tools
 export * from './tools/tool-registry.js';
 export * from './tools/tool-definitions.js';
-export * from './tools/skill-registry.js';
+export * from './skills/skill-registry.js';
 export * from './skills/skill-loader.js';
 export * from './tools/list-directory.js';
 export * from './tools/read-file.js';
@@ -39,7 +54,22 @@ export * from './router/task-normalizer.js';
 export * from './session/durable-session.js';
 export * from './session/session-store.js';
 export * from './session/sqlite-session-store.js';
-export * from './runtime/loop.js';
+export {
+  LoopEngine,
+  LoopError,
+  type LoopConfig,
+  type LoopDeps,
+  type LoopResult,
+  type LoopStrategy,
+  type LoopTurn,
+  type ModelCallBudget,
+  type ModelCallDirective,
+  type ModelTurn,
+  type RuntimeStepState,
+  type TerminationReason,
+  type ToolCallExecutionContext,
+  type ToolObservation,
+} from './runtime/loop.js';
 export * from './runtime/retry.js';
 export * from './runtime/notifications.js';
 // Verification
@@ -50,11 +80,11 @@ export * from './verification/verification-engine.js';
 export * from './ingestion/parse-document.js';
 // Verticals (explicit re-exports to avoid ModelCallFn name conflicts)
 export { runCodingVertical, type CodingVerticalInput, type CodingVerticalOutput } from './domains/coding/ah_coding_vertical_001.js';
-export { runDocVertical, type DocVerticalInput, type DocVerticalOutput } from './ingestion/ah_doc_vertical_001.js';
-export { runResearchVertical, type ResearchVerticalInput, type ResearchVerticalOutput } from './research/ah_research_vertical_001.js';
-export { runWritingVertical, type WritingVerticalInput, type WritingVerticalOutput } from './writing/ah_writing_vertical_001.js';
-export { runPlanningVertical, type PlanningVerticalInput, type PlanningVerticalOutput } from './planning/ah_planning_vertical_001.js';
-export { runPAVertical, type PAVerticalInput, type PAVerticalOutput } from './personal_assistant/ah_pa_vertical_001.js';
+export { runDocVertical, type DocVerticalInput, type DocVerticalOutput } from './domains/documents/ah_doc_vertical_001.js';
+export { runResearchVertical, type ResearchVerticalInput, type ResearchVerticalOutput } from './domains/research/ah_research_vertical_001.js';
+export { runWritingVertical, type WritingVerticalInput, type WritingVerticalOutput } from './domains/writing/ah_writing_vertical_001.js';
+export { runPlanningVertical, type PlanningVerticalInput, type PlanningVerticalOutput } from './domains/planning/ah_planning_vertical_001.js';
+export { runPAVertical, type PAVerticalInput, type PAVerticalOutput } from './domains/personal-assistant/ah_pa_vertical_001.js';
 // UI
 export * from './ui/ui-state.js';
 export * from './ui/ah_ui_onboarding_001.js';

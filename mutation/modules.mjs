@@ -46,7 +46,7 @@ export const mutationModules = {
     perFileMinimum: 80,
   },
   skills: {
-    mutate: ['skills/skill-loader.ts', 'tools/skill-registry.ts'],
+    mutate: ['skills/skill-loader.ts', 'skills/skill-registry.ts'],
     minimum: 85,
   },
   strategies: {
@@ -82,7 +82,7 @@ export const mutationModules = {
     minimum: 90,
   },
   sandbox: {
-    mutate: ['runtime/sandbox.ts'],
+    mutate: ['sandbox/process-sandbox.ts'],
     minimum: 90,
   },
   session: {
@@ -97,6 +97,7 @@ export const mutationModules = {
   runtime: {
     mutate: [
       'harness.ts',
+      'runtime/errors.ts',
       'runtime/harness-support.ts',
       'runtime/loop.ts',
       'runtime/retry.ts',
@@ -115,11 +116,11 @@ export const mutationModules = {
   verticals: {
     mutate: [
       'domains/coding/ah_coding_vertical_001.ts',
-      'ingestion/ah_doc_vertical_001.ts',
-      'research/ah_research_vertical_001.ts',
-      'writing/ah_writing_vertical_001.ts',
-      'planning/ah_planning_vertical_001.ts',
-      'personal_assistant/ah_pa_vertical_001.ts',
+      'domains/documents/ah_doc_vertical_001.ts',
+      'domains/research/ah_research_vertical_001.ts',
+      'domains/writing/ah_writing_vertical_001.ts',
+      'domains/planning/ah_planning_vertical_001.ts',
+      'domains/personal-assistant/ah_pa_vertical_001.ts',
     ],
     minimum: 85,
     perFileMinimum: 80,

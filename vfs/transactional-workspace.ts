@@ -1,4 +1,4 @@
-import type { SandboxProfile } from '../runtime/sandbox.js';
+import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import {
   OverlayBackend,
   type VirtualFilesystem,

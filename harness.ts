@@ -17,7 +17,7 @@ import type { TaskContract } from './contracts/index.js';
 import type { RunPlan } from './router/static-router.js';
 import { StaticRouter, type RoutingResult } from './router/static-router.js';
 import type { ToolRegistry, RegistrySnapshot } from './tools/tool-registry.js';
-import type { SkillRegistry, SkillRegistrySnapshot } from './tools/skill-registry.js';
+import type { SkillRegistry, SkillRegistrySnapshot } from './skills/skill-registry.js';
 import type { PolicyEngine } from './security/policy-engine.js';
 import {
   persistSession,
@@ -30,7 +30,7 @@ import {
   type ToolCallExecutionContext,
 } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
-import type { SandboxProfile } from './runtime/sandbox.js';
+import type { SandboxProfile } from './sandbox/process-sandbox.js';
 import { ActionExecutor } from './security/action-executor.js';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import { LocalToolHost } from './tools/local-tool-host.js';

@@ -12,7 +12,7 @@ import {
   execSandboxed,
   SandboxError,
   DEFAULT_LIMITS,
-} from '../../runtime/sandbox.js';
+} from '../../sandbox/process-sandbox.js';
 
 describe('AH-SANDBOX-001 unit-level mutation tests', () => {
   const cleanup: string[] = [];

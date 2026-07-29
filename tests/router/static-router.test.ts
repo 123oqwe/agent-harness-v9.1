@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { StaticRouter, profileIntent, selectStrategy } from '../../router/static-router.js';
 import { ToolRegistry } from '../../tools/tool-registry.js';
-import { SkillRegistry } from '../../tools/skill-registry.js';
+import { SkillRegistry } from '../../skills/skill-registry.js';
 import { PolicyEngine, type Policy } from '../../security/policy-engine.js';
 import type { ToolSpec } from '../../contracts/index.js';
 import type { TaskContract } from '../../contracts/index.js';

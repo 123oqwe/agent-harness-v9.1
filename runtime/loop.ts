@@ -11,9 +11,12 @@ import { writeProgressAtomic } from '../session/progress-store.js';
 import type { DurableSession } from '../session/durable-session.js';
 import type { RunPlan } from '../contracts/index.js';
 import type { StrategyContext } from './reasoning-strategy.js';
+import { LoopError } from './errors.js';
 import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
+
+export { LoopError } from './errors.js';
 
 export type TerminationReason =
   | 'iteration_limit'
@@ -145,14 +148,6 @@ export interface ToolCallExecutionContext {
   readonly tool_call_id: string;
   readonly step_id: string;
   readonly attempt_index: number;
-}
-
-export class LoopError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'LoopError';
-    Object.setPrototypeOf(this, LoopError.prototype);
-  }
 }
 
 /** Explicit utility retained for setup processes. LoopEngine never mutates the

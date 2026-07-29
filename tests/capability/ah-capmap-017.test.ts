@@ -11,7 +11,7 @@ import {
   baseSkills,
   SkillRegistry,
   SkillValidationError,
-} from '../../tools/skill-registry.js';
+} from '../../skills/skill-registry.js';
 import type { SkillSpec } from '../../contracts/index.js';
 
 function validSkill(name: string): SkillSpec {
@@ -111,7 +111,7 @@ describe('AH-CAPMAP-017 Skill Registry', () => {
 
 
   it('does not embed a copied JSON Schema in source code', () => {
-    const source = readFileSync(join(__dirname, '../../tools/skill-registry.ts'), 'utf8');
+    const source = readFileSync(join(__dirname, '../../skills/skill-registry.ts'), 'utf8');
     expect(source).not.toMatch(/SKILL_SPEC_SCHEMA\s*=\s*\{/);
     expect(source).not.toMatch(/as object/);
   });

@@ -1,5 +1,5 @@
 /**
- * AH-CAPMAP-017: Skill Registry, skill_search and base skill catalog.
+ * AH-CAPMAP-017: canonical Skill Registry, skill_search and base skill catalog.
  *
  * Skills are declarative only (no executable code in skill YAML). One
  * authoritative registry snapshot is shared by Router and Runtime for the

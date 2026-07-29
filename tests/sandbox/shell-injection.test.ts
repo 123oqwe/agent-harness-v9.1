@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSandboxed, type SandboxProfile } from '../../runtime/sandbox.js';
+import { execSandboxed, type SandboxProfile } from '../../sandbox/process-sandbox.js';
 
 function ws(tmp: string): SandboxProfile {
   return { workspaceRoot: tmp, allowNetwork: false, allowUnixSockets: false, allowRead: [] };

@@ -1,6 +1,6 @@
 /** AH-PA-VERTICAL-001: thin adapter. Task list → daily plan (no external action). */
-import type { TaskContract } from '../contracts/index.js';
-import type { Harness, HarnessOutcome } from '../harness.js';
+import type { TaskContract } from '../../contracts/index.js';
+import type { Harness, HarnessOutcome } from '../../harness.js';
 
 export interface PAVerticalInput {
   tasks: { id: string; title: string; priority: 'high' | 'normal' | 'low'; duration_min: number }[];
