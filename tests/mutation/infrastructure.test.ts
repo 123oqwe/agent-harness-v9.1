@@ -1,13 +1,13 @@
 import {
-  globSync,
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 const {
   acquireRunLock,
@@ -46,6 +46,15 @@ function temporaryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'ah-mutation-infra-'));
   temporaryRoots.push(root);
   return root;
+}
+
+function listTypeScriptSources(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return listTypeScriptSources(path);
+    if (!entry.isFile() || !entry.name.endsWith('.ts')) return [];
+    return [relative(harnessRoot, path).split(sep).join('/')];
+  });
 }
 
 function zeroCounts() {
@@ -189,9 +198,22 @@ describe('Phase 1 mutation manifest', () => {
 
     const executableSources = [
       'harness.ts',
-      ...globSync(
-        '{gateway,router,tools,skills,security,vfs,runtime,sandbox,session,verification,domains,ingestion,ui}/**/*.ts',
-        { cwd: harnessRoot },
+      ...[
+        'gateway',
+        'router',
+        'tools',
+        'skills',
+        'security',
+        'vfs',
+        'runtime',
+        'sandbox',
+        'session',
+        'verification',
+        'domains',
+        'ingestion',
+        'ui',
+      ].flatMap((directory) =>
+        listTypeScriptSources(join(harnessRoot, directory)),
       ),
     ]
       .filter(

@@ -35,7 +35,35 @@ function runNpmIn(cwd: string, args: string[], timeout = 120_000) {
   });
 }
 
+function parseNpmJson<T>(stdout: string): T {
+  const lineStarts = [
+    0,
+    ...[...stdout.matchAll(/\n/gu)].map((match) => match.index + 1),
+  ].reverse();
+  for (const start of lineStarts) {
+    const candidate = stdout.slice(start).trim();
+    if (!candidate.startsWith('[') && !candidate.startsWith('{')) continue;
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      // npm lifecycle output may precede the final JSON document.
+    }
+  }
+  throw new SyntaxError('npm output did not contain a trailing JSON document');
+}
+
 describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
+  it('parses npm JSON after lifecycle output without accepting non-JSON tails', () => {
+    expect(
+      parseNpmJson<Array<{ filename: string }>>(
+        'patch-package 8.0.1\nApplying patches...\n[{"filename":"agent-harness.tgz"}]\n',
+      ),
+    ).toEqual([{ filename: 'agent-harness.tgz' }]);
+    expect(() => parseNpmJson('patch-package only')).toThrow(
+      /trailing JSON document/u,
+    );
+  });
+
   it('defines real, separate build, typecheck and test gate scripts', () => {
     const pkg = readJson('package.json') as {
       scripts: Record<string, string>;
@@ -181,7 +209,9 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
     const packed = runNpm(['pack', '--dry-run', '--json', '--ignore-scripts']);
     expect(packed.status, `${packed.stdout}\n${packed.stderr}`).toBe(0);
-    const report = JSON.parse(packed.stdout) as Array<{ files: Array<{ path: string }> }>;
+    const report = parseNpmJson<Array<{ files: Array<{ path: string }> }>>(
+      packed.stdout,
+    );
     const paths = report[0]!.files.map((file) => file.path).sort();
 
     expect(paths).toContain('package.json');
@@ -238,7 +268,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
 
         const packed = runNpm(['pack', '--json', '--ignore-scripts']);
         expect(packed.status, `${packed.stdout}\n${packed.stderr}`).toBe(0);
-        const report = JSON.parse(packed.stdout) as Array<{ filename: string }>;
+        const report = parseNpmJson<Array<{ filename: string }>>(packed.stdout);
         const tarball = join(harnessRoot, report[0]!.filename);
 
         writeFileSync(

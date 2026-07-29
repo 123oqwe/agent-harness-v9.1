@@ -459,7 +459,7 @@ describe('WorkspaceTransaction authority bindings', () => {
     expect(transaction.sandboxProfile(profile)).toEqual({
       ...profile,
       workspaceRoot: transaction.workspaceRoot,
-      allowRead: [root, '/usr/lib', realpathSync(root)],
+      allowRead: [...new Set([root, '/usr/lib', realpathSync(root)])],
     });
     expect(profile).toEqual({
       workspaceRoot: root,
