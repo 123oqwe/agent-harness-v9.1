@@ -7,10 +7,12 @@
  * path for execute_command tools — there is no unsandboxed fallback on the
  * active path.
  *
- * Enforced limits: timeout, memory (RLIMIT_AS/ulimit -v), output size, process
- * count. stdin hang prevented by closing stdin when not provided. Cancellation
- * via AbortSignal. Shell injection blocked by argv (no shell) for the wrapped
- * command. Path traversal/symlink escape blocked by VFS before reaching here.
+ * Enforced limits: timeout, memory (RLIMIT_AS), output size, process count.
+ * Linux applies memory/process limits through prlimit before exec; the runtime
+ * monitor independently observes the complete process tree. stdin hang is
+ * prevented by closing stdin when not provided. Cancellation uses AbortSignal.
+ * Shell injection is blocked by argv (no shell) for the wrapped command. Path
+ * traversal/symlink escape is blocked by VFS before reaching here.
  */
 import { spawn, execFileSync } from 'node:child_process';
 import {
@@ -404,6 +406,8 @@ export function buildSandboxArgv(
     return ['sandbox-exec', '-f', profileFile, '--', ...opts.argv];
   }
   if (mech === 'bubblewrap') {
+    const addressSpaceBytes =
+      (BigInt(limits.memoryMb) * 1024n * 1024n).toString();
     const args = [
       'bwrap',
       '--unshare-all',
@@ -419,11 +423,10 @@ export function buildSandboxArgv(
       '--die-with-parent',
       '--hostname', 'sandbox',
       '--',
-      '/bin/sh', '-c',
-      'ulimit -v "$1" && ulimit -u "$2" && shift 2 && exec "$@"',
+      '/usr/bin/prlimit',
+      `--as=${addressSpaceBytes}`,
+      `--nproc=${limits.processLimit}`,
       '--',
-      String(limits.memoryMb * 1024),
-      String(limits.processLimit),
       ...opts.argv,
     ];
     return args;

@@ -15,8 +15,8 @@ jobs:
       - name: Install Linux sandbox authority
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bubblewrap
-          bwrap --ro-bind / / -- /bin/true
+          sudo apt-get install --yes bubblewrap util-linux
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
       - uses: actions/setup-node@v4
         with:
           node-version: 20

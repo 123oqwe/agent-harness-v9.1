@@ -49,6 +49,9 @@ not silently simulated by this Phase 1 package.
 ## Install and verify
 
 Node.js 20 or newer is required.
+Linux command execution additionally requires Bubblewrap and the util-linux
+`prlimit` utility. The harness fails closed when an OS sandbox authority is
+unavailable.
 
 ```bash
 npm ci

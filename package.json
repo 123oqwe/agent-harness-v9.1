@@ -40,7 +40,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "check:cycles": "node scripts/check-cycles.mjs",
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
     "lint": "eslint gateway security runtime router sandbox session skills tools ui verification vfs domains ingestion harness.ts index.ts scripts benchmarks",
     "test": "vitest run",
     "test:watch": "vitest",

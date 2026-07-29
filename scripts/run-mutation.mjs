@@ -11,15 +11,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
-  globSync,
   mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
 import { strykerBase } from '../mutation/stryker.base.mjs';
@@ -259,21 +259,40 @@ export function loadEquivalentMutants(path, commitSha, configurationHash) {
 function resolveMutationFiles(patterns, root = harnessRoot) {
   const files = new Set();
   for (const pattern of patterns) {
-    for (const match of globSync(pattern, { cwd: root })) {
-      if (
-        match.endsWith('index.ts') ||
-        match.endsWith('.d.ts') ||
-        match.endsWith('.test.ts') ||
-        match.endsWith('.spec.ts') ||
-        match.startsWith('contracts/') ||
-        match.startsWith('tests/') ||
-        match.startsWith('dist/') ||
-        match.startsWith('node_modules/')
-      ) {
-        continue;
-      }
-      files.add(match);
+    if (typeof pattern !== 'string' || pattern.length === 0) {
+      throw new Error('mutation source path must be a non-empty string');
     }
+    if (/[*?[\]{}]/u.test(pattern)) {
+      throw new Error(
+        `mutation source path must be explicit, not a glob: ${pattern}`,
+      );
+    }
+    const absolutePath = resolve(root, pattern);
+    const match = relative(root, absolutePath).split(sep).join('/');
+    if (
+      match === '' ||
+      match === '..' ||
+      match.startsWith('../') ||
+      isAbsolute(match)
+    ) {
+      throw new Error(`mutation source path escapes the harness root: ${pattern}`);
+    }
+    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+      throw new Error(`mutation source file is missing: ${match}`);
+    }
+    if (
+      match.endsWith('index.ts') ||
+      match.endsWith('.d.ts') ||
+      match.endsWith('.test.ts') ||
+      match.endsWith('.spec.ts') ||
+      match.startsWith('contracts/') ||
+      match.startsWith('tests/') ||
+      match.startsWith('dist/') ||
+      match.startsWith('node_modules/')
+    ) {
+      continue;
+    }
+    files.add(match);
   }
   return [...files].sort();
 }

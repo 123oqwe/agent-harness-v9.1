@@ -220,6 +220,17 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     expect(paths).toContain('dist/resources/contracts/tool-spec.schema.json');
     expect(paths).toContain('dist/resources/contracts/skill-spec.schema.json');
     expect(paths).toContain('dist/resources/schemas/receipt.json');
+    expect(paths).not.toEqual(
+      expect.arrayContaining([
+        'dist/runtime/sandbox.js',
+        'dist/tools/skill-registry.js',
+        'dist/ingestion/ah_doc_vertical_001.js',
+        'dist/research/ah_research_vertical_001.js',
+        'dist/writing/ah_writing_vertical_001.js',
+        'dist/planning/ah_planning_vertical_001.js',
+        'dist/personal_assistant/ah_pa_vertical_001.js',
+      ]),
+    );
     for (const filename of fs.readdirSync(path.join(harnessRoot, 'skills'))) {
       if (!filename.endsWith('.json')) continue;
       const skill = readJson(path.join('skills', filename)) as {
