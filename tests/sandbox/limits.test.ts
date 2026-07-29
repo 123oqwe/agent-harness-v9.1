@@ -42,8 +42,9 @@ describe('AH-SANDBOX-001 limits enforced', () => {
   }, 10000);
 
   it('binary output captured as Buffer', async () => {
+    const bytes = String.raw`\000\001\002`;
     const r = await execSandboxed({
-      argv: ['/bin/sh', '-c', 'printf "' + String.fromCharCode(92) + 'x00' + String.fromCharCode(92) + 'x01' + String.fromCharCode(92) + 'x02"'],
+      argv: ['/bin/sh', '-c', `printf '${bytes}'`],
       cwd: tmp, profile: ws(tmp), limits: { timeoutMs: 5000 },
     });
     expect(Buffer.isBuffer(r.stdout)).toBe(true);
