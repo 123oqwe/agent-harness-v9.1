@@ -318,6 +318,10 @@ describe('Phase 1 mutation manifest', () => {
     expect(workflow).toContain(
       'node scripts/run-mutation.mjs "$MUTATION_TARGET"',
     );
+    expect(workflow).toContain(
+      'name: mutation-${{ inputs.target }}-${{ github.sha }}',
+    );
+    expect(workflow).not.toContain('name: phase1-mutation-${{ github.sha }}');
   });
 });
 
