@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -9,6 +10,7 @@ import {
   readdirSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -23,6 +25,8 @@ import {
   writeAtomicGateReport,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/run-command.mjs";
+// @ts-expect-error The production gate intentionally ships as plain Node ESM.
+import { securePublish } from "../../../scripts/gates/secure-publish.mjs";
 import {
   collectGateBindings,
   phase2CommandGraph,
@@ -126,6 +130,11 @@ const createSecurePublicationRepository = () => {
 const helperAuthority = (root: string) => ({
   repositoryRoot: root,
   treeSha: git(root, "rev-parse", "HEAD^{tree}"),
+});
+
+const secureRequest = (root: string, request: Record<string, unknown>) => ({
+  ...request,
+  authority: helperAuthority(root),
 });
 
 const passedRunner = async (command: {
@@ -560,6 +569,227 @@ describe("Phase 2 gate command orchestration", () => {
     expect(existsSync(marker)).toBe(false);
   });
 
+  it("forces publication root to the helper authority repository and forbids .git", () => {
+    const authorityRoot = createSecurePublicationRepository();
+    const attackerRoot = mkdtempSync(join(tmpdir(), "phase2-cross-root-"));
+    expect(() =>
+      securePublish({
+        operation: "write_file_atomic",
+        root: attackerRoot,
+        path: "reports/phase2/cross-root.json",
+        contentBase64: Buffer.from("forbidden").toString("base64"),
+        authority: helperAuthority(authorityRoot),
+      }),
+    ).toThrow(/root|authority|repository/u);
+    expect(existsSync(join(attackerRoot, "reports"))).toBe(false);
+    expect(() =>
+      securePublish(
+        secureRequest(authorityRoot, {
+          operation: "write_file_atomic",
+          path: ".git/owned-by-helper",
+          contentBase64: Buffer.from("forbidden").toString("base64"),
+        }),
+      ),
+    ).toThrow(/reports\/phase2|forbidden|unsafe/u);
+    expect(existsSync(join(authorityRoot, ".git/owned-by-helper"))).toBe(false);
+  });
+
+  it("anchors publication to the opened authority repository when its pathname is swapped", () => {
+    const root = createSecurePublicationRepository();
+    const moved = `${root}.owned`;
+    const attackerRoot = mkdtempSync(join(tmpdir(), "phase2-root-swap-attacker-"));
+    let swapped = false;
+    const previous = process.env.PHASE2_SECURE_PUBLISH_TESTING;
+    process.env.PHASE2_SECURE_PUBLISH_TESTING = "1";
+    try {
+      securePublish({
+        ...secureRequest(root, {
+          operation: "write_file_atomic",
+          path: "reports/phase2/root-anchored.json",
+          contentBase64: "e30=",
+        }),
+        testAfterAuthorityOpen: () => {
+          renameSync(root, moved);
+          symlinkSync(attackerRoot, root);
+          swapped = true;
+        },
+      });
+      expect(swapped).toBe(true);
+      expect(existsSync(join(attackerRoot, "reports"))).toBe(false);
+      expect(
+        JSON.parse(readFileSync(join(moved, "reports/phase2/root-anchored.json"), "utf8")),
+      ).toEqual({});
+    } finally {
+      if (previous === undefined)
+        delete process.env.PHASE2_SECURE_PUBLISH_TESTING;
+      else process.env.PHASE2_SECURE_PUBLISH_TESTING = previous;
+    }
+  });
+
+  it("validates the full operation before creating directories", () => {
+    const root = createSecurePublicationRepository();
+    expect(() =>
+      securePublish(
+        secureRequest(root, {
+          operation: "publish_tree",
+          temporary: "reports/phase2/.invalid.tmp",
+          final: "reports/phase2/evidence/invalid",
+          files: [
+            { path: "a.json", contentBase64: "%%%invalid%%%" },
+            { path: "a.json", contentBase64: "" },
+          ],
+          unexpected: true,
+        }),
+      ),
+    ).toThrow(/schema|base64|duplicate|unknown/u);
+    expect(existsSync(join(root, "reports"))).toBe(false);
+  });
+
+  it("requires an exact decimal-string ownership receipt before removal", () => {
+    const root = createSecurePublicationRepository();
+    mkdirSync(join(root, "reports/phase2/remove-me"), { recursive: true });
+    writeFileSync(join(root, "reports/phase2/remove-me/sentinel"), "keep\n");
+    expect(() =>
+      securePublish(
+        secureRequest(root, {
+          operation: "remove_tree",
+          path: "reports/phase2/remove-me",
+          expected: null,
+        }),
+      ),
+    ).toThrow(/expected|ownership|decimal/u);
+    expect(readFileSync(join(root, "reports/phase2/remove-me/sentinel"), "utf8"))
+      .toBe("keep\n");
+  });
+
+  it("never replaces an existing final directory", () => {
+    const root = createSecurePublicationRepository();
+    const final = join(root, "reports/phase2/evidence/existing");
+    mkdirSync(final, { recursive: true });
+    const before = statSync(final);
+    expect(() =>
+      securePublish(
+        secureRequest(root, {
+          operation: "publish_tree",
+          temporary: "reports/phase2/.existing.tmp",
+          final: "reports/phase2/evidence/existing",
+          files: [],
+        }),
+      ),
+    ).toThrow(/exist|replace|no.?replace/u);
+    const after = statSync(final);
+    expect([after.dev, after.ino]).toEqual([before.dev, before.ino]);
+  });
+
+  it("removes the owned final after a post-rename fsync failure and preserves cleanup errors", () => {
+    const root = createSecurePublicationRepository();
+    const previous = process.env.PHASE2_SECURE_PUBLISH_TESTING;
+    process.env.PHASE2_SECURE_PUBLISH_TESTING = "1";
+    try {
+      expect(() =>
+        securePublish(
+          secureRequest(root, {
+            operation: "publish_tree",
+            temporary: "reports/phase2/.fsync.tmp",
+            final: "reports/phase2/evidence/fsync-failed",
+            files: [{ path: "a.json", contentBase64: "e30=" }],
+            testFailAfterRenameFsync: true,
+            testFailCleanup: true,
+          }),
+        ),
+      ).toThrow(/fsync[\s\S]*cleanup/u);
+      expect(existsSync(join(root, "reports/phase2/evidence/fsync-failed"))).toBe(
+        false,
+      );
+    } finally {
+      if (previous === undefined)
+        delete process.env.PHASE2_SECURE_PUBLISH_TESTING;
+      else process.env.PHASE2_SECURE_PUBLISH_TESTING = previous;
+    }
+  });
+
+  it("returns ownership identities as lossless decimal strings", () => {
+    const root = createSecurePublicationRepository();
+    const previous = process.env.PHASE2_SECURE_PUBLISH_TESTING;
+    process.env.PHASE2_SECURE_PUBLISH_TESTING = "1";
+    try {
+      const result = securePublish(
+        secureRequest(root, {
+          operation: "publish_tree",
+          temporary: "reports/phase2/.large-identity.tmp",
+          final: "reports/phase2/evidence/large-identity",
+          files: [],
+          testIdentity: {
+            dev: "9007199254740993",
+            ino: "9007199254740995",
+          },
+        }),
+      );
+      expect(result).toMatchObject({
+        dev: "9007199254740993",
+        ino: "9007199254740995",
+      });
+    } finally {
+      if (previous === undefined)
+        delete process.env.PHASE2_SECURE_PUBLISH_TESTING;
+      else process.env.PHASE2_SECURE_PUBLISH_TESTING = previous;
+    }
+  });
+
+  it("does not execute git or python3 supplied through PATH", () => {
+    const root = createSecurePublicationRepository();
+    const authority = helperAuthority(root);
+    const bin = mkdtempSync(join(tmpdir(), "phase2-path-spoof-"));
+    const marker = join(bin, "spoof-ran");
+    for (const name of ["git", "python3"]) {
+      const executable = join(bin, name);
+      writeFileSync(
+        executable,
+        `#!/bin/sh\nprintf ran > ${JSON.stringify(marker)}\nexit 99\n`,
+      );
+      chmodSync(executable, 0o755);
+    }
+    const previous = process.env.PATH;
+    process.env.PATH = `${bin}:${previous ?? ""}`;
+    try {
+      expect(() =>
+        securePublish(
+          {
+            operation: "write_file_atomic",
+            path: "reports/phase2/path-safe.json",
+            contentBase64: "e30=",
+            authority,
+          },
+        ),
+      ).not.toThrow();
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.PATH;
+      else process.env.PATH = previous;
+    }
+  });
+
+  it("reads Evidence trees descriptor-relatively with stable hashes", () => {
+    const root = createSecurePublicationRepository();
+    mkdirSync(join(root, "reports/phase2/evidence/readable"), {
+      recursive: true,
+    });
+    writeFileSync(join(root, "reports/phase2/evidence/readable/a.json"), "{}\n");
+    const result = securePublish(
+      secureRequest(root, {
+        operation: "read_tree",
+        path: "reports/phase2/evidence/readable",
+      }),
+    );
+    expect(result.files).toEqual([
+      expect.objectContaining({
+        path: "a.json",
+        contentBase64: Buffer.from("{}\n").toString("base64"),
+        sha256: sha256("{}\n"),
+      }),
+    ]);
+  });
+
   it("keeps zero external effects when an ancestor is swapped after the helper opens the trusted root descriptor", async () => {
     const root = mkdtempSync(join(tmpdir(), "phase2-openat-swap-root-"));
     const external = mkdtempSync(join(tmpdir(), "phase2-openat-swap-external-"));
@@ -612,6 +842,68 @@ describe("Phase 2 gate command orchestration", () => {
     expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
       "unchanged\n",
     );
+  });
+
+  it("rejects an Evidence read ancestor swap after opening the trusted root descriptor", async () => {
+    const root = createSecurePublicationRepository();
+    mkdirSync(join(root, "reports/phase2/evidence/readable"), {
+      recursive: true,
+    });
+    writeFileSync(join(root, "reports/phase2/evidence/readable/a.json"), "{}\n");
+    const external = mkdtempSync(join(tmpdir(), "phase2-read-swap-external-"));
+    mkdirSync(join(external, "phase2/evidence/readable"), { recursive: true });
+    writeFileSync(
+      join(external, "phase2/evidence/readable/a.json"),
+      '{"external":true}\n',
+    );
+    const helper = spawnSync(
+      "git",
+      [
+        "cat-file",
+        "blob",
+        `${git(root, "rev-parse", "HEAD^{tree}")}:scripts/gates/secure-publish.py`,
+      ],
+      { cwd: root, encoding: "utf8", shell: false },
+    );
+    expect(helper.status, helper.stderr).toBe(0);
+    const child = spawn("python3", ["-I", "-B", "-c", helper.stdout], {
+      shell: false,
+      env: { ...process.env, PHASE2_SECURE_PUBLISH_TESTING: "1" },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    const ready = new Promise<void>((resolveReady, rejectReady) => {
+      const timeout = setTimeout(
+        () => rejectReady(new Error("secure helper did not emit read marker")),
+        2_000,
+      );
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        if (!chunk.includes("SECURE_ROOT_OPEN")) return;
+        clearTimeout(timeout);
+        resolveReady();
+      });
+    });
+    child.stdin.end(
+      JSON.stringify({
+        operation: "read_tree",
+        root,
+        path: "reports/phase2/evidence/readable",
+        testPauseAfterRootOpenMs: 1_000,
+      }),
+    );
+    await ready;
+    renameSync(join(root, "reports"), join(root, "reports.owned"));
+    symlinkSync(external, join(root, "reports"));
+    const exitCode = await new Promise<number | null>((resolveExit) =>
+      child.once("close", resolveExit),
+    );
+    expect(exitCode).not.toBe(0);
+    expect(JSON.parse(stdout).error).toMatch(/not a directory|symlink/u);
   });
 
   it(
@@ -787,7 +1079,7 @@ describe("Phase 2 gate command orchestration", () => {
     });
     expect(report.blockers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
+        expect.objectContaining({ code: "non_authoritative_export" }),
       ]),
     );
   });
@@ -810,7 +1102,50 @@ describe("Phase 2 gate command orchestration", () => {
     expect(report.claims).toEqual({ requirementsVerified: 0, evidencePassed: 0 });
     expect(report.blockers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
+        expect.objectContaining({ code: "non_authoritative_export" }),
+      ]),
+    );
+  });
+
+  it("keeps the exported verifier non-authoritative for prototype-inherited dependencies", async () => {
+    const { root } = createCompletePhase2Repository();
+    const inherited = Object.create({
+      runner: passedRunner,
+      identityCollector: () => ({
+        errors: [],
+        dirty: false,
+        bindings: fixtureBindings(root),
+      }),
+      evidencePublisher: publishPhase2Evidence,
+    });
+    Object.assign(inherited, {
+      repositoryRoot: root,
+      mode: "local",
+      reportPath: join(root, "reports/phase2/gate.json"),
+    });
+    const report = await verifyPhase2(inherited);
+    expect(report.releaseReady).toBe(false);
+    expect(report.claims).toEqual({ requirementsVerified: 0, evidencePassed: 0 });
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "non_authoritative_export" }),
+      ]),
+    );
+  });
+
+  it("treats evidenceFailureInjector alone as a non-authoritative option", async () => {
+    const { root } = createCompletePhase2Repository();
+    const report = await verifyPhase2({
+      repositoryRoot: root,
+      mode: "local",
+      reportPath: join(root, "reports/phase2/gate.json"),
+      evidenceFailureInjector: () => {},
+    });
+    expect(report.releaseReady).toBe(false);
+    expect(report.claims).toEqual({ requirementsVerified: 0, evidencePassed: 0 });
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "non_authoritative_export" }),
       ]),
     );
   });
@@ -838,7 +1173,7 @@ describe("Phase 2 gate command orchestration", () => {
     expect(report.claims.evidencePassed).toBe(0);
     expect(report.blockers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
+        expect.objectContaining({ code: "non_authoritative_export" }),
       ]),
     );
     const evidenceRoot = join(root, "reports/phase2/evidence");
@@ -915,4 +1250,32 @@ describe("Phase 2 gate command orchestration", () => {
       }
     },
   );
+
+  it("never verifies Evidence through a swapped pathname ancestor", () => {
+    const { root } = createCompletePhase2Repository();
+    const bindings = fixtureBindings(root);
+    const commands = syntheticPassedResults(root);
+    const published = publishPhase2Evidence({
+      repositoryRoot: root,
+      currentBindings: bindings,
+      commandResults: commands,
+    });
+    const external = mkdtempSync(join(tmpdir(), "phase2-verify-read-external-"));
+    let swapped = false;
+    const checked = verifyEvidenceBundle({
+      repositoryRoot: root,
+      directory: published.directory,
+      expected: published,
+      currentBindings: bindings,
+      commandResults: commands,
+      readFailureInjector: () => {
+        renameSync(join(root, "reports"), join(root, "reports.owned"));
+        symlinkSync(external, join(root, "reports"));
+        swapped = true;
+      },
+    });
+    expect(swapped).toBe(true);
+    expect(checked.ok).toBe(false);
+    expect(readdirSync(external)).toEqual([]);
+  });
 });

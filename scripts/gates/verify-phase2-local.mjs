@@ -4,18 +4,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import {
-  closeSync,
-  constants,
   existsSync,
-  fstatSync,
-  lstatSync,
-  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
   statSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkPhase2ContractDrift } from "./check-contract-drift.mjs";
@@ -337,43 +332,6 @@ const safeRelativePath = (path) =>
   !path.split(/[\\/]/u).includes("..") &&
   path.split(/[\\/]/u).every(Boolean);
 
-const staysInside = (root, candidate) => {
-  const relation = relative(root, candidate);
-  return (
-    relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))
-  );
-};
-
-const secureEvidenceDirectory = (root, directory, errors) => {
-  const normalized = String(directory).replaceAll("\\", "/");
-  if (
-    !safeRelativePath(normalized) ||
-    !normalized.startsWith("reports/phase2/")
-  ) {
-    errors.push(`unsafe Evidence directory ${String(directory)}`);
-    return null;
-  }
-  let current = root;
-  for (const segment of normalized.split("/")) {
-    current = join(current, segment);
-    if (!existsSync(current)) {
-      errors.push(`missing Evidence directory ${normalized}`);
-      return null;
-    }
-    if (lstatSync(current).isSymbolicLink()) {
-      errors.push(`symlink is forbidden in Evidence directory ${normalized}`);
-      return null;
-    }
-  }
-  const actualRoot = realpathSync(root);
-  const actual = realpathSync(current);
-  if (!staysInside(actualRoot, actual) || !statSync(actual).isDirectory()) {
-    errors.push(`Evidence directory escapes repository ${normalized}`);
-    return null;
-  }
-  return { absolute: actual, relative: normalized };
-};
-
 const evidenceSet = (entries) => {
   const hash = createHash("sha256");
   const files = [];
@@ -392,51 +350,45 @@ const evidenceSet = (entries) => {
   return { count: files.length, setSha256: hash.digest("hex"), files };
 };
 
-const readRegularFileNoFollow = (path) => {
-  const descriptor = openSync(
-    path,
-    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
-  );
-  try {
-    const opened = fstatSync(descriptor);
-    const namedBefore = lstatSync(path);
-    if (
-      !opened.isFile() ||
-      namedBefore.isSymbolicLink() ||
-      opened.dev !== namedBefore.dev ||
-      opened.ino !== namedBefore.ino
-    ) {
-      throw new Error(`unsafe or changed regular file: ${path}`);
-    }
-    const bytes = readFileSync(descriptor);
-    const namedAfter = lstatSync(path);
-    const openedAfter = fstatSync(descriptor);
-    if (
-      namedAfter.isSymbolicLink() ||
-      namedAfter.dev !== openedAfter.dev ||
-      namedAfter.ino !== openedAfter.ino
-    ) {
-      throw new Error(`regular file changed while reading: ${path}`);
-    }
-    return bytes;
-  } finally {
-    closeSync(descriptor);
-  }
-};
-
 export const verifyEvidenceBundle = ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   directory,
   expected,
   currentBindings,
   commandResults,
+  readFailureInjector,
 } = {}) => {
   const root = resolve(repositoryRoot);
   const errors = [];
   const authority = loadPhase2Authority({ repositoryRoot: root });
   errors.push(...authority.errors);
-  const bundle = secureEvidenceDirectory(root, directory, errors);
-  if (!authority.manifest?.requirements || !bundle) {
+  const normalized = String(directory).replaceAll("\\", "/");
+  let tree = null;
+  if (
+    !safeRelativePath(normalized) ||
+    !normalized.startsWith("reports/phase2/")
+  ) {
+    errors.push(`unsafe Evidence directory ${String(directory)}`);
+  } else {
+    try {
+      tree = securePublish({
+        operation: "read_tree",
+        path: normalized,
+        authority: {
+          repositoryRoot: root,
+          treeSha: currentBindings?.treeSha,
+        },
+        ...(readFailureInjector
+          ? { testAfterAuthorityOpen: readFailureInjector }
+          : {}),
+      });
+    } catch (error) {
+      errors.push(
+        `descriptor-relative Evidence read failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  if (!authority.manifest?.requirements || !tree) {
     return {
       ok: false,
       errors,
@@ -449,42 +401,28 @@ export const verifyEvidenceBundle = ({
   const expectedPaths = authority.manifest.requirements
     .map((requirement) => requirement.evidence_path)
     .sort();
-  const actualPaths = [];
-  const visit = (path) => {
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      const child = join(path, entry.name);
-      if (entry.isSymbolicLink()) {
-        errors.push(
-          `symlink is forbidden in Evidence bundle ${relative(bundle.absolute, child)}`,
-        );
-      } else if (entry.isDirectory()) visit(child);
-      else if (entry.isFile())
-        actualPaths.push(
-          relative(bundle.absolute, child).replaceAll("\\", "/"),
-        );
-      else errors.push(`non-file entry in Evidence bundle ${entry.name}`);
-    }
-  };
-  visit(bundle.absolute);
-  actualPaths.sort();
+  const actualPaths = tree.files.map((entry) => entry.path).sort();
   if (stableJson(actualPaths) !== stableJson(expectedPaths)) {
     errors.push("Evidence bundle file set does not match authority");
   }
   const records = [];
   const entries = [];
+  const byPath = new Map(tree.files.map((entry) => [entry.path, entry]));
   for (const logicalPath of expectedPaths) {
     if (!safeRelativePath(logicalPath)) {
       errors.push(`unsafe logical Evidence path ${String(logicalPath)}`);
       continue;
     }
-    const absolute = join(bundle.absolute, logicalPath);
-    if (!existsSync(absolute) || lstatSync(absolute).isSymbolicLink()) {
-      errors.push(`missing or symlinked Evidence file ${logicalPath}`);
+    const entry = byPath.get(logicalPath);
+    if (!entry) {
+      errors.push(`missing Evidence file ${logicalPath}`);
       continue;
     }
     let bytes;
     try {
-      bytes = readRegularFileNoFollow(absolute);
+      bytes = Buffer.from(entry.contentBase64, "base64");
+      if (sha256(bytes) !== entry.sha256 || bytes.length !== entry.bytes)
+        throw new Error(`descriptor Evidence hash mismatch ${logicalPath}`);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
       continue;
@@ -516,7 +454,7 @@ export const verifyEvidenceBundle = ({
     ok: errors.length === 0 && readiness.releaseReady,
     errors,
     ...summary,
-    directory: bundle.relative,
+    directory: normalized,
   };
 };
 
@@ -590,7 +528,6 @@ export const publishPhase2Evidence = ({
     failureInjector("before-descriptor-publish");
     publishedOwnership = securePublish({
       operation: "publish_tree",
-      root,
       temporary: temporaryRelative,
       final: finalRelative,
       files: files.map((entry) => ({
@@ -630,7 +567,6 @@ export const publishPhase2Evidence = ({
       try {
         securePublish({
           operation: "remove_tree",
-          root,
           path: finalRelative,
           expected: {
             dev: publishedOwnership.dev,
@@ -657,11 +593,6 @@ export const publishPhase2Evidence = ({
 };
 
 const RELEASE_AUTHORITY = Symbol("phase2-release-authority");
-const AUTHORITY_DEPENDENCY_KEYS = [
-  "runner",
-  "identityCollector",
-  "evidencePublisher",
-];
 
 const verifyPhase2Implementation = async ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
@@ -687,7 +618,7 @@ const verifyPhase2Implementation = async ({
   const blockers = [];
   const hasReleaseAuthority = authorityToken === RELEASE_AUTHORITY;
   if (mode === "local" && !hasReleaseAuthority) {
-    blockers.push({ code: "non_authoritative_gate_dependencies" });
+    blockers.push({ code: "non_authoritative_export" });
   }
   let execution = { ok: false, results: [] };
   if (mode === "local" && identity.dirty) {
@@ -810,7 +741,6 @@ const verifyPhase2Implementation = async ({
           try {
             securePublish({
               operation: "remove_tree",
-              root,
               path: publishedDirectory,
               expected: ownership,
               authority: {
@@ -885,13 +815,10 @@ const verifyPhase2Implementation = async ({
 export const verifyPhase2 = (options = {}) => {
   if (!options || typeof options !== "object" || Array.isArray(options))
     throw new TypeError("Phase 2 gate options must be an object");
-  const dependenciesInjected = AUTHORITY_DEPENDENCY_KEYS.some((key) =>
-    Object.hasOwn(options, key),
+  const ownOptions = Object.fromEntries(
+    Object.keys(options).map((key) => [key, options[key]]),
   );
-  return verifyPhase2Implementation(
-    options,
-    dependenciesInjected ? undefined : RELEASE_AUTHORITY,
-  );
+  return verifyPhase2Implementation(ownOptions, undefined);
 };
 
 const parseMode = (argv) => {
@@ -919,7 +846,10 @@ const isMain = (() => {
 if (isMain) {
   let report;
   try {
-    report = await verifyPhase2({ mode: parseMode(process.argv.slice(2)) });
+    report = await verifyPhase2Implementation(
+      { mode: parseMode(process.argv.slice(2)) },
+      RELEASE_AUTHORITY,
+    );
   } catch (error) {
     report = {
       schemaVersion: RUNNER_VERSION,

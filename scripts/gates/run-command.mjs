@@ -411,7 +411,6 @@ export const writeAtomicGateReport = (
   failureInjector("before-descriptor-publish");
   securePublish({
     operation: "write_file_atomic",
-    root,
     path: relative(root, target).split(sep).join("/"),
     contentBase64: Buffer.from(`${JSON.stringify(report, null, 2)}\n`).toString(
       "base64",

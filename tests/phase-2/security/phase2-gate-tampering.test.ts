@@ -97,6 +97,9 @@ const createFakeEvidenceRepository = () => {
   const manifestPath = join(root, "verification/gates/phase2-gate.json");
   mkdirSync(dirname(manifestPath), { recursive: true });
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const helperPath = "scripts/gates/secure-publish.py";
+  mkdirSync(join(root, dirname(helperPath)), { recursive: true });
+  cpSync(join(repositoryRoot, helperPath), join(root, helperPath));
   for (const requirement of manifest.requirements) {
     const sourcePath = `${requirement.owner}/src/${requirement.id.toLowerCase()}.ts`;
     const absoluteSource = join(root, sourcePath);
@@ -254,11 +257,16 @@ describe("Phase 2 gate tamper resistance", () => {
         '"requirement_id":"DUPLICATE","requirement_id":',
       );
       writeFileSync(duplicatePath, duplicateSource);
+      const duplicateTreeSha = spawnSync(
+        "git",
+        ["rev-parse", "HEAD^{tree}"],
+        { cwd: duplicateRoot, encoding: "utf8", shell: false },
+      ).stdout.trim();
       expect(
         verifyEvidenceBundle({
           repositoryRoot: duplicateRoot,
           directory: "reports/phase2/evidence/duplicate-test",
-          currentBindings: bindingValue,
+          currentBindings: { ...bindingValue, treeSha: duplicateTreeSha },
           commandResults,
         }).errors.join("\n"),
       ).toMatch(/duplicate object key/u);
