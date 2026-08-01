@@ -6,6 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { hostname, tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -17,6 +18,8 @@ const {
   mergeChunkReports,
   planMutationChunks,
   releaseRunLock,
+  resolveChunkTimeoutMs,
+  resolveMutationTarget,
   validatePhase1Report,
 } = await import(
   // @ts-expect-error The production runner is intentionally plain ESM for Node.
@@ -38,6 +41,7 @@ interface MutationModule {
   mutate: string[];
   minimum: number;
   perFileMinimum?: number;
+  chunkTimeoutMs?: number;
 }
 const mutationModules = rawMutationModules as Record<string, MutationModule>;
 const phase1Minimum = rawPhase1Minimum as number;
@@ -267,6 +271,53 @@ describe('Phase 1 mutation manifest', () => {
     }
     expect(mutationModules.toolsLeaf!.perFileMinimum).toBe(80);
     expect(mutationModules.verticals!.perFileMinimum).toBe(80);
+  });
+
+  it('gives only the known heavy modules a 30-minute chunk timeout', () => {
+    expect(resolveChunkTimeoutMs('gateway')).toBe(30 * 60 * 1000);
+    expect(resolveChunkTimeoutMs('router')).toBe(30 * 60 * 1000);
+    for (const moduleName of Object.keys(mutationModules).filter(
+      (name) => name !== 'gateway' && name !== 'router',
+    )) {
+      expect(resolveChunkTimeoutMs(moduleName), moduleName).toBe(
+        15 * 60 * 1000,
+      );
+    }
+    expect(() => resolveChunkTimeoutMs('toString')).toThrow(/unknown/u);
+  });
+
+  it('rejects unknown mutation targets before creating a run', () => {
+    expect(() => resolveMutationTarget('unknown-module')).toThrow(
+      /unknown mutation target/u,
+    );
+    expect(() => resolveMutationTarget('toString')).toThrow(
+      /unknown mutation target/u,
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/run-mutation.mjs', 'unknown-module'],
+      { cwd: harnessRoot, encoding: 'utf8', shell: false },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'FATAL: unknown mutation target: unknown-module',
+    );
+  });
+
+  it('offers phase1 and every single module as dispatch targets', () => {
+    const workflow = readFileSync(
+      join(harnessRoot, '.github', 'workflows', 'mutation.yml'),
+      'utf8',
+    );
+    expect(workflow).toContain('target:');
+    expect(workflow).toContain('type: choice');
+    for (const target of ['phase1', ...Object.keys(mutationModules)]) {
+      expect(workflow, target).toContain(`- ${target}`);
+    }
+    expect(workflow).toContain(
+      'node scripts/run-mutation.mjs "$MUTATION_TARGET"',
+    );
   });
 });
 
@@ -577,7 +628,10 @@ describe('Phase 1 mutation report integrity', () => {
     writeFileSync(join(root, 'vitest.mutation.config.ts'), 'vitest');
 
     const first = computeMutationConfigurationHash(root);
-    writeFileSync(join(root, 'vitest.mutation.config.ts'), 'changed');
+    writeFileSync(
+      join(root, 'mutation', 'modules.mjs'),
+      'modules-a\nexport const gatewayChunkTimeoutMs = 1800000;',
+    );
     expect(computeMutationConfigurationHash(root)).not.toBe(first);
   });
 
@@ -615,6 +669,16 @@ describe('Phase 1 mutation report integrity', () => {
     expect(() =>
       validatePhase1Report(mixed, { runId, commitSha, configurationHash }),
     ).toThrow(/commit/u);
+
+    const mixedConfiguration = structuredClone(report);
+    mixedConfiguration.modules[0]!.configuration_hash = 'e'.repeat(64);
+    expect(() =>
+      validatePhase1Report(mixedConfiguration, {
+        runId,
+        commitSha,
+        configurationHash,
+      }),
+    ).toThrow(/config/u);
   });
 
   it('fails aggregate acceptance when a per-file floor fails', () => {

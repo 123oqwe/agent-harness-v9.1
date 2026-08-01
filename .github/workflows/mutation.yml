@@ -2,6 +2,29 @@ name: Phase 1 Mutation
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Mutation target to run
+        required: true
+        default: phase1
+        type: choice
+        options:
+          - phase1
+          - gateway
+          - router
+          - toolsRegistry
+          - toolsLeaf
+          - skills
+          - strategies
+          - actionControl
+          - identitySecrets
+          - vfs
+          - sandbox
+          - session
+          - runtime
+          - verification
+          - verticals
+          - uiAdapters
 
 permissions:
   contents: read
@@ -22,7 +45,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run test:mutation:phase1
+      - name: Run mutation target
+        env:
+          MUTATION_TARGET: ${{ inputs.target }}
+        run: node scripts/run-mutation.mjs "$MUTATION_TARGET"
       - name: Upload mutation evidence
         if: always()
         uses: actions/upload-artifact@v4

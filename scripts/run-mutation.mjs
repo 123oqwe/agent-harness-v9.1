@@ -52,6 +52,29 @@ const securityCriticalModules = new Set([
   'session',
   'runtime',
 ]);
+const defaultChunkTimeoutMs = 15 * 60 * 1000;
+
+export function resolveChunkTimeoutMs(moduleName) {
+  if (!Object.hasOwn(mutationModules, moduleName)) {
+    throw new Error(`unknown mutation module: ${moduleName}`);
+  }
+  const module = mutationModules[moduleName];
+  const timeoutMs = module.chunkTimeoutMs ?? defaultChunkTimeoutMs;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+    throw new Error(`invalid chunk timeout for mutation module: ${moduleName}`);
+  }
+  return timeoutMs;
+}
+
+export function resolveMutationTarget(target) {
+  if (!target) {
+    throw new Error('usage: node scripts/run-mutation.mjs <module|phase1>');
+  }
+  if (target !== 'phase1' && !Object.hasOwn(mutationModules, target)) {
+    throw new Error(`unknown mutation target: ${target}`);
+  }
+  return target;
+}
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -772,11 +795,13 @@ function runModule(moduleName, context) {
   mkdirSync(moduleRoot, { recursive: true });
   const rawReportPath = join(moduleRoot, 'mutation.json');
   const chunks = planMutationChunks(sourceFiles, harnessRoot, 150);
+  const chunkTimeoutMs = resolveChunkTimeoutMs(moduleName);
 
   console.log(`\n=== Mutation: ${moduleName} ===`);
   console.log(`Run: ${context.runId}`);
   console.log(`Files: ${sourceFiles.join(', ')}`);
   console.log(`Chunks: ${chunks.length} (complete 150-line ranges)`);
+  console.log(`Chunk timeout: ${chunkTimeoutMs}ms`);
   const stryker = join(harnessRoot, 'node_modules', '.bin', 'stryker');
   const chunkReports = [];
   for (const [index, chunk] of chunks.entries()) {
@@ -814,7 +839,7 @@ function runModule(moduleName, context) {
       cwd: harnessRoot,
       stdio: 'inherit',
       shell: false,
-      timeout: 15 * 60 * 1000,
+      timeout: chunkTimeoutMs,
       env: {
         ...process.env,
         STRYKER: 'true',
@@ -944,13 +969,7 @@ function runPhase1(context) {
 }
 
 async function main() {
-  const target = process.argv[2];
-  if (!target) {
-    throw new Error('usage: node scripts/run-mutation.mjs <module|phase1>');
-  }
-  if (target !== 'phase1' && !mutationModules[target]) {
-    throw new Error(`unknown mutation target: ${target}`);
-  }
+  const target = resolveMutationTarget(process.argv[2]);
   const context = createRunContext(target === 'phase1');
   const lockPath = join(reportsDir, '.phase1.lock');
   acquireRunLock(lockPath, {

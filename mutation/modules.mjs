@@ -15,10 +15,12 @@ export const mutationModules = {
       'gateway/scripted-provider.ts',
     ],
     minimum: 85,
+    chunkTimeoutMs: 30 * 60 * 1000,
   },
   router: {
     mutate: ['router/static-router.ts', 'router/task-normalizer.ts'],
     minimum: 90,
+    chunkTimeoutMs: 30 * 60 * 1000,
   },
   toolsRegistry: {
     mutate: [
