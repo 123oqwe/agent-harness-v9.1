@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0.0",
   "kind": "synthetic",
+  "execution_runner_status": "not_implemented",
   "dataset": {
     "id": "phase2-synthetic-contract-v1",
     "availability": "available",
@@ -17,6 +18,10 @@
     },
     "path": "fixtures/phase-2/assets/data/synthetic.json",
     "tenant": "phase2-fixture-synthetic",
-    "expected_runner": "scripts/gates/check-phase2-assets.mjs"
+    "contract_checker": {
+      "path": "scripts/gates/check-phase2-assets.mjs",
+      "sha256": "330ff7a1b7501ea25b40a23a44186a982d646c46d809ccce3eb031b99396dc5f",
+      "role": "asset-contract-validator"
+    }
   }
 }

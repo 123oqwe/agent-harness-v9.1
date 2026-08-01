@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   cpSync,
   mkdtempSync,
   mkdirSync,
+  openSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -51,6 +53,9 @@ const readJson = (path: string) =>
 const writeJson = (path: string, value: unknown) =>
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 
+const fileSha256 = (path: string) =>
+  createHash("sha256").update(readFileSync(path)).digest("hex");
+
 const runChecker = (root: string, mode: "bootstrap" | "release") =>
   spawnSync(process.execPath, [checkerPath, "--root", root, "--mode", mode], {
     encoding: "utf8",
@@ -97,6 +102,30 @@ describe("Phase 2 executable asset contracts", () => {
     expect(result.errors).toContain(
       "public-benchmarks dataset is bootstrap-only; release verification remains blocked",
     );
+    expect(result.errors).toContain(
+      "Phase 2 data execution runner status is not_implemented; release verification remains blocked",
+    );
+  });
+
+  it("declares the data execution runner honestly and binds the contract checker bytes", () => {
+    const checksum = fileSha256(checkerPath);
+    for (const kind of [
+      "synthetic",
+      "public-benchmarks",
+      "consented-staging",
+    ]) {
+      const manifest = readJson(
+        resolve(`data-tests/${kind}/phase-2/manifest.json`),
+      );
+      expect(manifest.execution_runner_status).toBe("not_implemented");
+      expect(
+        (manifest.dataset as Record<string, unknown>).contract_checker,
+      ).toEqual({
+        path: "scripts/gates/check-phase2-assets.mjs",
+        sha256: checksum,
+        role: "asset-contract-validator",
+      });
+    }
   });
 
   it.each([
@@ -174,6 +203,72 @@ describe("Phase 2 executable asset contracts", () => {
       ).toBe(true);
     },
   );
+
+  it.each([
+    [
+      "authority",
+      "verification/gates/phase2-gate.json",
+      '"phase": 2',
+      '"phase": 99, "phase": 2',
+      'duplicate object key "phase"',
+    ],
+    [
+      "eval",
+      "evals/writing/phase-2.yaml",
+      '"path": "fixtures/phase-2/assets/evals/writing.json"',
+      '"path": "../outside.json", "path": "fixtures/phase-2/assets/evals/writing.json"',
+      'duplicate object key "path"',
+    ],
+    [
+      "data",
+      "data-tests/synthetic/phase-2/manifest.json",
+      '"license": "CC0-1.0"',
+      '"license": "UNLICENSED", "license": "CC0-1.0"',
+      'duplicate object key "license"',
+    ],
+  ])(
+    "rejects malicious-then-legal duplicate JSON keys in %s assets",
+    (_kind, relativePath, search, replacement, expected) => {
+      const root = createRepositoryCopy();
+      const path = resolve(root, relativePath);
+      const source = readFileSync(path, "utf8");
+      expect(source).toContain(search);
+      writeFileSync(path, source.replace(search, replacement), "utf8");
+
+      expect(
+        checkPhase2Assets({
+          mode: "bootstrap",
+          repositoryRoot: root,
+        }).errors.some((error: string) => error.includes(expected)),
+      ).toBe(true);
+    },
+  );
+
+  it("enforces JSON asset size and nesting limits before parsing", () => {
+    const root = createRepositoryCopy();
+    const writingPath = resolve(root, "evals/writing/phase-2.yaml");
+    writeFileSync(
+      writingPath,
+      JSON.stringify({ padding: "x".repeat(1_048_577) }),
+      "utf8",
+    );
+    expect(
+      checkPhase2Assets({ mode: "bootstrap", repositoryRoot: root }).errors,
+    ).toContain(
+      "invalid safe YAML/JSON at evals/writing/phase-2.yaml: asset exceeds 1048576 byte limit",
+    );
+
+    const deep = `${'{"nested":'.repeat(65)}null${"}".repeat(65)}`;
+    writeFileSync(writingPath, deep, "utf8");
+    expect(
+      checkPhase2Assets({
+        mode: "bootstrap",
+        repositoryRoot: root,
+      }).errors.some((error: string) =>
+        error.includes("JSON nesting exceeds 64"),
+      ),
+    ).toBe(true);
+  });
 
   it("rejects duplicate requirement links and incomplete deterministic graders", () => {
     const root = createRepositoryCopy();
@@ -321,7 +416,7 @@ describe("Phase 2 executable asset contracts", () => {
       "runner",
       "scripts/gates/check-phase2-assets.mjs",
       "scripts/gates/check-phase2-assets-runner-copy.mjs",
-      "data-tests/synthetic/phase-2/manifest.json expected_runner contains forbidden symlink: scripts/gates/check-phase2-assets.mjs",
+      "data-tests/synthetic/phase-2/manifest.json contract_checker contains forbidden symlink: scripts/gates/check-phase2-assets.mjs",
     ],
   ])(
     "rejects repository-internal %s symlinks",
@@ -338,6 +433,39 @@ describe("Phase 2 executable asset contracts", () => {
       ).toContain(message);
     },
   );
+
+  it("rejects a symlink swap injected between path validation and fd open", () => {
+    const root = createRepositoryCopy();
+    const target = resolve(root, "fixtures/phase-2/assets/evals/writing.json");
+    const replacement = resolve(
+      root,
+      "fixtures/phase-2/assets/evals/planning.json",
+    );
+    let injected = false;
+    const result = checkPhase2Assets({
+      mode: "bootstrap",
+      repositoryRoot: root,
+      fileSystem: {
+        openSync(path: string, flags: number) {
+          if (path === target && !injected) {
+            rmSync(path);
+            symlinkSync(replacement, path);
+            injected = true;
+          }
+          return openSync(path, flags);
+        },
+      },
+    });
+
+    expect(injected).toBe(true);
+    expect(
+      result.errors.some((error: string) =>
+        error.startsWith(
+          "cannot securely open input fixtures/phase-2/assets/evals/writing.json:",
+        ),
+      ),
+    ).toBe(true);
+  });
 
   it.each([
     ["synthetic", "UNLICENSED", "CC0-1.0"],
@@ -422,16 +550,77 @@ describe("Phase 2 executable asset contracts", () => {
     ).toBe(true);
   });
 
-  it("rejects non-executable expected runners", () => {
+  it("rejects non-executable contract checkers", () => {
     const root = createRepositoryCopy();
     const runner = resolve(root, "scripts/gates/check-phase2-assets.mjs");
     chmodSync(runner, 0o644);
     expect(
       checkPhase2Assets({ mode: "bootstrap", repositoryRoot: root }).errors,
     ).toContain(
-      "data-tests/synthetic/phase-2/manifest.json expected_runner is not executable: scripts/gates/check-phase2-assets.mjs",
+      "data-tests/synthetic/phase-2/manifest.json contract_checker is not executable: scripts/gates/check-phase2-assets.mjs",
     );
   });
+
+  it("requires operating-system X_OK access for the contract checker", () => {
+    const root = createRepositoryCopy();
+    const result = checkPhase2Assets({
+      mode: "bootstrap",
+      repositoryRoot: root,
+      fileSystem: {
+        accessSync(path: string) {
+          if (path.endsWith("scripts/gates/check-phase2-assets.mjs")) {
+            throw new Error("EACCES");
+          }
+        },
+      },
+    });
+
+    expect(result.errors).toContain(
+      "data-tests/synthetic/phase-2/manifest.json contract_checker is not executable: scripts/gates/check-phase2-assets.mjs",
+    );
+  });
+
+  it.each(["path", "sha256", "role"])(
+    "rejects a tampered contract checker %s",
+    (field) => {
+      const root = createRepositoryCopy();
+      const manifestPath = resolve(
+        root,
+        "data-tests/synthetic/phase-2/manifest.json",
+      );
+      const manifest = readJson(manifestPath);
+      const dataset = manifest.dataset as Record<string, unknown>;
+      const fakePath = "fixtures/phase-2/assets/data/executable-fake.json";
+      const fakeAbsolute = resolve(root, fakePath);
+      writeFileSync(fakeAbsolute, '{"not":"a contract checker"}\n', "utf8");
+      chmodSync(fakeAbsolute, 0o755);
+      const contractChecker = {
+        path: "scripts/gates/check-phase2-assets.mjs",
+        sha256: fileSha256(
+          resolve(root, "scripts/gates/check-phase2-assets.mjs"),
+        ),
+        role: "asset-contract-validator",
+      };
+      if (field === "path") {
+        contractChecker.path = fakePath;
+        contractChecker.sha256 = fileSha256(fakeAbsolute);
+      } else if (field === "sha256") contractChecker.sha256 = "0".repeat(64);
+      else contractChecker.role = "data-eval-runner";
+      dataset.contract_checker = contractChecker;
+      manifest.execution_runner_status = "not_implemented";
+      writeJson(manifestPath, manifest);
+
+      const errors = checkPhase2Assets({
+        mode: "bootstrap",
+        repositoryRoot: root,
+      }).errors;
+      expect(
+        errors.some((error: string) =>
+          error.includes(`contract_checker ${field}`),
+        ),
+      ).toBe(true);
+    },
+  );
 
   it.each(["../outside.json", "/tmp/outside.json"])(
     "rejects unsafe asset path %s",
@@ -487,6 +676,42 @@ describe("Phase 2 executable asset contracts", () => {
     expect(release.status).toBe(1);
     expect(JSON.parse(release.stdout).errors).toContain(
       "consented-staging dataset is unavailable; release verification remains blocked",
+    );
+  });
+
+  it("runs as the CLI through a symlink and rejects duplicate flags", () => {
+    const root = createRepositoryCopy();
+    const linkedChecker = resolve(root, "phase2-assets-checker-link.mjs");
+    symlinkSync(checkerPath, linkedChecker);
+    const linkedRelease = spawnSync(
+      process.execPath,
+      [linkedChecker, "--root", root, "--mode", "release"],
+      { encoding: "utf8", shell: false, timeout: 10_000 },
+    );
+    expect(linkedRelease.status).toBe(1);
+    expect(JSON.parse(linkedRelease.stdout)).toMatchObject({
+      mode: "release",
+      releaseReady: false,
+    });
+
+    const duplicateMode = spawnSync(
+      process.execPath,
+      [checkerPath, "--root", root, "--mode", "release", "--mode", "bootstrap"],
+      { encoding: "utf8", shell: false, timeout: 10_000 },
+    );
+    expect(duplicateMode.status).toBe(1);
+    expect(JSON.parse(duplicateMode.stdout).errors).toContain(
+      "duplicate argument: --mode",
+    );
+
+    const duplicateRoot = spawnSync(
+      process.execPath,
+      [checkerPath, "--root", root, "--root", root, "--mode", "release"],
+      { encoding: "utf8", shell: false, timeout: 10_000 },
+    );
+    expect(duplicateRoot.status).toBe(1);
+    expect(JSON.parse(duplicateRoot.stdout).errors).toContain(
+      "duplicate argument: --root",
     );
   });
 

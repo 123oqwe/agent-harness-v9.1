@@ -4,19 +4,35 @@ import { createHash } from "node:crypto";
 import {
   constants,
   accessSync,
+  closeSync,
   existsSync,
+  fstatSync,
   lstatSync,
+  openSync,
   readFileSync,
   realpathSync,
   statSync,
 } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { validatePhase2Manifest } from "./check-phase2-manifest.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
+const DEFAULT_FILE_SYSTEM = {
+  accessSync,
+  closeSync,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+};
+const MAX_JSON_BYTES = 1_048_576;
+const MAX_JSON_DEPTH = 64;
 
 const EVALUATIONS = [
   "coding",
@@ -56,6 +72,7 @@ const DATA_ROOT_KEYS = new Set([
   "kind",
   "dataset",
   "external_contract",
+  "execution_runner_status",
 ]);
 const DATASET_KEYS = new Set([
   "id",
@@ -65,9 +82,10 @@ const DATASET_KEYS = new Set([
   "checksum",
   "path",
   "tenant",
-  "expected_runner",
+  "contract_checker",
 ]);
 const PUBLIC_DATASET_KEYS = new Set([...DATASET_KEYS, "release_ready"]);
+const CONTRACT_CHECKER_KEYS = new Set(["path", "sha256", "role"]);
 const PROVENANCE_KEYS = new Set([
   "publisher",
   "source_uri",
@@ -166,6 +184,7 @@ const staysInside = (root, candidate) => {
 };
 
 const readRepositoryAsset = ({
+  fileSystem,
   repositoryRoot,
   relativePath,
   label,
@@ -185,60 +204,233 @@ const readRepositoryAsset = ({
     );
     return null;
   }
-  let currentPath = repositoryRoot;
-  const traversed = [];
-  for (const segment of relativePath.split(/[\\/]/u)) {
-    traversed.push(segment);
-    currentPath = resolve(currentPath, segment);
-    let component;
-    try {
-      component = lstatSync(currentPath);
-    } catch {
-      errors.push(`missing required asset: ${relativePath}`);
-      return null;
+  const validateComponents = () => {
+    let currentPath = repositoryRoot;
+    const traversed = [];
+    for (const segment of relativePath.split(/[\\/]/u)) {
+      traversed.push(segment);
+      currentPath = resolve(currentPath, segment);
+      let component;
+      try {
+        component = fileSystem.lstatSync(currentPath);
+      } catch {
+        errors.push(`missing required asset: ${relativePath}`);
+        return false;
+      }
+      if (component.isSymbolicLink()) {
+        errors.push(
+          `${label} contains forbidden symlink: ${traversed.join("/")}`,
+        );
+        return false;
+      }
     }
-    if (component.isSymbolicLink()) {
+    return true;
+  };
+
+  const validateOpenedPath = (fdStats) => {
+    if (!validateComponents()) return null;
+    let actualPath;
+    let pathStats;
+    try {
+      actualPath = fileSystem.realpathSync(absolutePath);
+      pathStats = fileSystem.statSync(absolutePath);
+    } catch (error) {
       errors.push(
-        `${label} contains forbidden symlink: ${traversed.join("/")}`,
+        `cannot revalidate ${pathKind} ${relativePath}: ${error.message}`,
       );
       return null;
     }
-  }
-  let actualPath;
+    const realRoot = fileSystem.realpathSync(repositoryRoot);
+    if (!staysInside(realRoot, actualPath)) {
+      errors.push(`${label} escapes repository: ${relativePath}`);
+      return null;
+    }
+    if (pathStats.dev !== fdStats.dev || pathStats.ino !== fdStats.ino) {
+      errors.push(`${label} changed during secure read: ${relativePath}`);
+      return null;
+    }
+    return actualPath;
+  };
+
+  if (!validateComponents()) return null;
+  let descriptor;
   try {
-    actualPath = realpathSync(absolutePath);
+    descriptor = fileSystem.openSync(
+      absolutePath,
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
   } catch (error) {
-    errors.push(`cannot resolve ${pathKind} ${relativePath}: ${error.message}`);
+    errors.push(
+      `cannot securely open ${pathKind} ${relativePath}: ${error.message}`,
+    );
     return null;
   }
-  const realRoot = realpathSync(repositoryRoot);
-  if (!staysInside(realRoot, actualPath)) {
-    errors.push(`${label} escapes repository through symlink: ${relativePath}`);
-    return null;
-  }
-  let stats;
   try {
-    stats = statSync(actualPath);
+    const descriptorStats = fileSystem.fstatSync(descriptor);
+    if (!descriptorStats.isFile()) {
+      errors.push(`${relativePath} is not a regular file`);
+      return null;
+    }
+    let actualPath = validateOpenedPath(descriptorStats);
+    if (!actualPath) return null;
+    const bytes = fileSystem.readFileSync(descriptor);
+    actualPath = validateOpenedPath(descriptorStats);
+    if (!actualPath) return null;
+    if (bytes.length === 0) {
+      errors.push(`empty asset: ${relativePath}`);
+      return null;
+    }
+    return {
+      absolutePath: actualPath,
+      bytes,
+      mode: descriptorStats.mode,
+    };
   } catch (error) {
-    errors.push(`cannot stat ${pathKind} ${relativePath}: ${error.message}`);
+    errors.push(
+      `cannot securely read ${pathKind} ${relativePath}: ${error.message}`,
+    );
     return null;
+  } finally {
+    try {
+      fileSystem.closeSync(descriptor);
+    } catch (error) {
+      errors.push(`cannot close ${pathKind} ${relativePath}: ${error.message}`);
+    }
   }
-  if (!stats.isFile()) {
-    errors.push(`${relativePath} is not a regular file`);
-    return null;
-  }
-  const bytes = readFileSync(actualPath);
-  if (bytes.length === 0) {
-    errors.push(`empty asset: ${relativePath}`);
-    return null;
-  }
-  return { absolutePath: actualPath, bytes };
+};
+
+const parseStrictJsonSubset = (source) => {
+  let offset = 0;
+  const fail = (message) => {
+    throw new SyntaxError(`${message} at byte ${offset}`);
+  };
+  const whitespace = () => {
+    while (["\t", "\n", "\r", " "].includes(source[offset] ?? "")) offset += 1;
+  };
+  const parseString = () => {
+    if (source[offset] !== '"') fail("expected string");
+    offset += 1;
+    let value = "";
+    while (offset < source.length) {
+      const character = source[offset];
+      offset += 1;
+      if (character === '"') return value;
+      if (character.charCodeAt(0) < 0x20) fail("unescaped control character");
+      if (character !== "\\") {
+        value += character;
+        continue;
+      }
+      const escape = source[offset];
+      offset += 1;
+      const simple = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
+      if (Object.hasOwn(simple, escape)) {
+        value += simple[escape];
+      } else if (escape === "u") {
+        const hex = source.slice(offset, offset + 4);
+        if (!/^[a-fA-F0-9]{4}$/u.test(hex)) fail("invalid unicode escape");
+        value += String.fromCharCode(Number.parseInt(hex, 16));
+        offset += 4;
+      } else fail("invalid string escape");
+    }
+    fail("unterminated string");
+  };
+  const parseValue = (depth) => {
+    if (depth > MAX_JSON_DEPTH) {
+      fail(`JSON nesting exceeds ${MAX_JSON_DEPTH}`);
+    }
+    whitespace();
+    if (source[offset] === "{") {
+      offset += 1;
+      const object = Object.create(null);
+      const keys = new Set();
+      whitespace();
+      if (source[offset] === "}") {
+        offset += 1;
+        return object;
+      }
+      while (offset < source.length) {
+        whitespace();
+        const key = parseString();
+        if (keys.has(key)) fail(`duplicate object key ${JSON.stringify(key)}`);
+        keys.add(key);
+        whitespace();
+        if (source[offset] !== ":") fail("expected colon");
+        offset += 1;
+        object[key] = parseValue(depth + 1);
+        whitespace();
+        if (source[offset] === "}") {
+          offset += 1;
+          return object;
+        }
+        if (source[offset] !== ",") fail("expected comma or object end");
+        offset += 1;
+      }
+      fail("unterminated object");
+    }
+    if (source[offset] === "[") {
+      offset += 1;
+      const array = [];
+      whitespace();
+      if (source[offset] === "]") {
+        offset += 1;
+        return array;
+      }
+      while (offset < source.length) {
+        array.push(parseValue(depth + 1));
+        whitespace();
+        if (source[offset] === "]") {
+          offset += 1;
+          return array;
+        }
+        if (source[offset] !== ",") fail("expected comma or array end");
+        offset += 1;
+      }
+      fail("unterminated array");
+    }
+    if (source[offset] === '"') return parseString();
+    for (const [token, value] of [
+      ["true", true],
+      ["false", false],
+      ["null", null],
+    ]) {
+      if (source.startsWith(token, offset)) {
+        offset += token.length;
+        return value;
+      }
+    }
+    const number = source
+      .slice(offset)
+      .match(/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/u)?.[0];
+    if (number !== undefined) {
+      offset += number.length;
+      const value = Number(number);
+      if (!Number.isFinite(value)) fail("non-finite number");
+      return value;
+    }
+    fail("unexpected JSON token");
+  };
+  const value = parseValue(0);
+  whitespace();
+  if (offset !== source.length) fail("unexpected trailing content");
+  return value;
 };
 
 const parseSafeJsonSubset = (asset, relativePath, errors) => {
   if (!asset) return null;
   try {
-    return JSON.parse(asset.bytes.toString("utf8"));
+    if (asset.bytes.length > MAX_JSON_BYTES) {
+      throw new SyntaxError(`asset exceeds ${MAX_JSON_BYTES} byte limit`);
+    }
+    return parseStrictJsonSubset(asset.bytes.toString("utf8"));
   } catch (error) {
     errors.push(`invalid safe YAML/JSON at ${relativePath}: ${error.message}`);
     return null;
@@ -253,12 +445,14 @@ const getAssertionValue = (value, path) => {
 };
 
 const validateEvaluation = ({
+  fileSystem,
   repositoryRoot,
   definition,
   expectedRequirementIds,
   errors,
 }) => {
   const asset = readRepositoryAsset({
+    fileSystem,
     repositoryRoot,
     relativePath: definition.path,
     label: definition.path,
@@ -309,6 +503,7 @@ const validateEvaluation = ({
       errors,
     );
     const inputAsset = readRepositoryAsset({
+      fileSystem,
       repositoryRoot,
       relativePath: evaluation.input.path,
       label: `${definition.path} input`,
@@ -432,6 +627,7 @@ const validateEvaluation = ({
 };
 
 const validateDataManifest = ({
+  fileSystem,
   repositoryRoot,
   definition,
   mode,
@@ -439,6 +635,7 @@ const validateDataManifest = ({
   warnings,
 }) => {
   const asset = readRepositoryAsset({
+    fileSystem,
     repositoryRoot,
     relativePath: definition.path,
     label: definition.path,
@@ -456,6 +653,11 @@ const validateDataManifest = ({
     manifest.kind !== definition.kind
   ) {
     errors.push(`${definition.path} identity is invalid`);
+  }
+  if (manifest.execution_runner_status !== "not_implemented") {
+    errors.push(
+      `${definition.path} execution_runner_status must be not_implemented`,
+    );
   }
   if (!isRecord(manifest.dataset)) {
     errors.push(`${definition.path} dataset must be an object`);
@@ -512,20 +714,57 @@ const validateDataManifest = ({
     }
   }
 
-  const runnerAsset = readRepositoryAsset({
-    repositoryRoot,
-    relativePath: dataset.expected_runner,
-    label: `${definition.path} expected_runner`,
-    errors,
-    pathKind: "expected_runner",
-  });
-  if (runnerAsset) {
-    try {
-      accessSync(runnerAsset.absolutePath, constants.X_OK);
-    } catch {
+  const contractChecker = dataset.contract_checker;
+  if (!isRecord(contractChecker)) {
+    errors.push(`${definition.path} contract_checker must be an object`);
+  } else {
+    addUnknownKeyErrors(
+      contractChecker,
+      CONTRACT_CHECKER_KEYS,
+      `${definition.path} contract_checker`,
+      errors,
+    );
+    const expectedCheckerPath = "scripts/gates/check-phase2-assets.mjs";
+    if (contractChecker.path !== expectedCheckerPath) {
       errors.push(
-        `${definition.path} expected_runner is not executable: ${dataset.expected_runner}`,
+        `${definition.path} contract_checker path must be ${expectedCheckerPath}`,
       );
+    }
+    if (contractChecker.role !== "asset-contract-validator") {
+      errors.push(
+        `${definition.path} contract_checker role must be asset-contract-validator`,
+      );
+    }
+    const checkerAsset = readRepositoryAsset({
+      fileSystem,
+      repositoryRoot,
+      relativePath: contractChecker.path,
+      label: `${definition.path} contract_checker`,
+      errors,
+      pathKind: "contract_checker",
+    });
+    if (!SHA256_PATTERN.test(contractChecker.sha256 ?? "")) {
+      errors.push(`${definition.path} contract_checker sha256 is invalid`);
+    } else if (
+      checkerAsset &&
+      sha256(checkerAsset.bytes) !== contractChecker.sha256
+    ) {
+      errors.push(
+        `${definition.path} contract_checker sha256 does not match checker bytes`,
+      );
+    }
+    if (checkerAsset) {
+      let executable = (checkerAsset.mode & 0o111) !== 0;
+      try {
+        fileSystem.accessSync(checkerAsset.absolutePath, constants.X_OK);
+      } catch {
+        executable = false;
+      }
+      if (!executable) {
+        errors.push(
+          `${definition.path} contract_checker is not executable: ${contractChecker.path}`,
+        );
+      }
     }
   }
 
@@ -584,6 +823,7 @@ const validateDataManifest = ({
     errors.push(`${definition.path} dataset availability must be available`);
   }
   const dataAsset = readRepositoryAsset({
+    fileSystem,
     repositoryRoot,
     relativePath: dataset.path,
     label: `${definition.path} dataset path`,
@@ -600,9 +840,10 @@ const validateDataManifest = ({
   return true;
 };
 
-const loadAuthorityLinks = (repositoryRoot, errors) => {
+const loadAuthorityLinks = (fileSystem, repositoryRoot, errors) => {
   const path = "verification/gates/phase2-gate.json";
   const asset = readRepositoryAsset({
+    fileSystem,
     repositoryRoot,
     relativePath: path,
     label: path,
@@ -648,6 +889,7 @@ const loadAuthorityLinks = (repositoryRoot, errors) => {
 export const checkPhase2Assets = ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   mode = "bootstrap",
+  fileSystem: fileSystemOverrides = {},
 } = {}) => {
   if (!new Set(["bootstrap", "release"]).has(mode)) {
     return {
@@ -661,9 +903,13 @@ export const checkPhase2Assets = ({
     };
   }
   const root = resolve(repositoryRoot);
+  const fileSystem = { ...DEFAULT_FILE_SYSTEM, ...fileSystemOverrides };
   const errors = [];
   const warnings = [];
-  if (!existsSync(root) || !lstatSync(root).isDirectory()) {
+  if (
+    !fileSystem.existsSync(root) ||
+    !fileSystem.lstatSync(root).isDirectory()
+  ) {
     errors.push(`repository root is not a directory: ${root}`);
     return {
       mode,
@@ -676,9 +922,10 @@ export const checkPhase2Assets = ({
     };
   }
 
-  const authorityLinks = loadAuthorityLinks(root, errors);
+  const authorityLinks = loadAuthorityLinks(fileSystem, root, errors);
   for (const definition of EVALUATIONS) {
     validateEvaluation({
+      fileSystem,
       repositoryRoot: root,
       definition,
       expectedRequirementIds: authorityLinks?.get(definition.path) ?? null,
@@ -688,6 +935,7 @@ export const checkPhase2Assets = ({
   let stagingReady = false;
   for (const definition of DATA_MANIFESTS) {
     const ready = validateDataManifest({
+      fileSystem,
       repositoryRoot: root,
       definition,
       mode,
@@ -696,6 +944,11 @@ export const checkPhase2Assets = ({
     });
     if (definition.kind === "consented-staging") stagingReady = ready;
   }
+
+  const runnerBlocked =
+    "Phase 2 data execution runner status is not_implemented; release verification remains blocked";
+  if (mode === "release") errors.push(runnerBlocked);
+  else warnings.push(runnerBlocked);
 
   return {
     mode,
@@ -711,10 +964,13 @@ export const checkPhase2Assets = ({
 const parseArguments = (argv) => {
   let repositoryRoot = DEFAULT_REPOSITORY_ROOT;
   let mode = "bootstrap";
+  const seen = new Set();
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
     if (value === undefined) throw new Error(`missing value for ${flag}`);
+    if (seen.has(flag)) throw new Error(`duplicate argument: ${flag}`);
+    seen.add(flag);
     if (flag === "--root") repositoryRoot = value;
     else if (flag === "--mode") mode = value;
     else throw new Error(`unknown argument: ${flag}`);
@@ -722,9 +978,17 @@ const parseArguments = (argv) => {
   return { repositoryRoot, mode };
 };
 
-const isMain =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+const isMain = (() => {
+  if (process.argv[1] === undefined) return false;
+  try {
+    return (
+      realpathSync(fileURLToPath(import.meta.url)) ===
+      realpathSync(resolve(process.argv[1]))
+    );
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   let result;

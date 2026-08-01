@@ -1,6 +1,7 @@
 {
   "schema_version": "1.0.0",
   "kind": "consented-staging",
+  "execution_runner_status": "not_implemented",
   "dataset": {
     "id": "phase2-consented-staging-v1",
     "availability": "unavailable",
@@ -17,7 +18,11 @@
     },
     "path": null,
     "tenant": "external-authorized-tenant-required",
-    "expected_runner": "scripts/gates/check-phase2-assets.mjs"
+    "contract_checker": {
+      "path": "scripts/gates/check-phase2-assets.mjs",
+      "sha256": "330ff7a1b7501ea25b40a23a44186a982d646c46d809ccce3eb031b99396dc5f",
+      "role": "asset-contract-validator"
+    }
   },
   "external_contract": {
     "required_environment": "PHASE2_CONSENTED_STAGING_MANIFEST",
