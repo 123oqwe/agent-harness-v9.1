@@ -76,6 +76,7 @@ const copyAssetAuthority = () => {
   for (const path of [
     "verification/gates/phase2-gate.json",
     "scripts/gates/check-phase2-assets.mjs",
+    "scripts/gates/secure-publish.py",
     "evals",
     "data-tests",
     "fixtures/phase-2/assets",

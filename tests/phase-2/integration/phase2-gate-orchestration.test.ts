@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -64,6 +64,9 @@ const createCompletePhase2Repository = () => {
   );
   mkdirSync(join(root, dirname(manifestPath)), { recursive: true });
   cpSync(join(repositoryRoot, manifestPath), join(root, manifestPath));
+  const helperPath = "scripts/gates/secure-publish.py";
+  mkdirSync(join(root, dirname(helperPath)), { recursive: true });
+  cpSync(join(repositoryRoot, helperPath), join(root, helperPath));
   for (const requirement of manifest.requirements) {
     const source = join(
       root,
@@ -99,6 +102,31 @@ const createCompletePhase2Repository = () => {
   );
   return { root, manifest };
 };
+
+const createSecurePublicationRepository = () => {
+  const root = mkdtempSync(join(tmpdir(), "phase2-secure-publication-"));
+  const helperPath = "scripts/gates/secure-publish.py";
+  mkdirSync(join(root, dirname(helperPath)), { recursive: true });
+  cpSync(join(repositoryRoot, helperPath), join(root, helperPath));
+  git(root, "init");
+  git(root, "add", ".");
+  git(
+    root,
+    "-c",
+    "user.name=Phase2 Test",
+    "-c",
+    "user.email=phase2@example.invalid",
+    "commit",
+    "-m",
+    "secure publication authority",
+  );
+  return root;
+};
+
+const helperAuthority = (root: string) => ({
+  repositoryRoot: root,
+  treeSha: git(root, "rev-parse", "HEAD^{tree}"),
+});
 
 const passedRunner = async (command: {
   id: string;
@@ -169,6 +197,24 @@ const syntheticPassedResults = (root: string) =>
   );
 
 describe("Phase 2 gate command orchestration", () => {
+  it("binds both descriptor-relative helpers into the release runner identity", async () => {
+    const gateModule = await import(
+      // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+      "../../../scripts/gates/verify-phase2-local.mjs"
+    );
+    expect(gateModule.RUNNER_BINDING_PATHS).toEqual(
+      expect.arrayContaining([
+        "scripts/gates/secure-publish.mjs",
+        "scripts/gates/secure-publish.py",
+      ]),
+    );
+    const identity = collectGateBindings(repositoryRoot);
+    expect(identity.bindings.runnerFiles).toBe(
+      gateModule.RUNNER_BINDING_PATHS.length,
+    );
+    expect(identity.bindings.runnerSha256).toMatch(/^[a-f0-9]{64}$/u);
+  });
+
   it("runs argv commands in order and fails fast without shell strings", async () => {
     const visited: string[] = [];
     const commands = ["manifest", "assets", "unit"].map((id) => ({
@@ -243,6 +289,25 @@ describe("Phase 2 gate command orchestration", () => {
         runner: passedRunner,
       }),
     ).rejects.toThrow(/duplicate command id/u);
+  });
+
+  it("loops until every byte is written when the underlying writer short-writes", async () => {
+    const gateModule = await import(
+      // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+      "../../../scripts/gates/run-command.mjs"
+    );
+    const received: number[] = [];
+    expect(typeof gateModule.writeAllSync).toBe("function");
+    gateModule.writeAllSync(
+      7,
+      Buffer.from("abcdef"),
+      (_descriptor: number, bytes: Buffer, offset: number, length: number) => {
+        const written = Math.min(2, length);
+        received.push(...bytes.subarray(offset, offset + written));
+        return written;
+      },
+    );
+    expect(Buffer.from(received).toString("utf8")).toBe("abcdef");
   });
 
   it("bounds output while hashing all stdout and stderr bytes", async () => {
@@ -394,7 +459,7 @@ describe("Phase 2 gate command orchestration", () => {
   );
 
   it("publishes reports through a temporary file, fsync, and rename", () => {
-    const root = mkdtempSync(join(tmpdir(), "phase2-gate-report-"));
+    const root = createSecurePublicationRepository();
     const reportPath = join(root, "reports", "phase2", "gate.json");
     const report = {
       schemaVersion: "1.0.0",
@@ -402,18 +467,24 @@ describe("Phase 2 gate command orchestration", () => {
       claims: { requirementsVerified: 0, evidencePassed: 0 },
     };
 
-    writeAtomicGateReport(reportPath, report, { allowedRoot: root });
+    writeAtomicGateReport(reportPath, report, {
+      allowedRoot: root,
+      helperAuthority: helperAuthority(root),
+    });
 
     expect(JSON.parse(readFileSync(reportPath, "utf8"))).toEqual(report);
   });
 
   it("removes the temporary report if atomic publication fails", () => {
-    const root = mkdtempSync(join(tmpdir(), "phase2-gate-report-failure-"));
+    const root = createSecurePublicationRepository();
     const reportPath = join(root, "gate.json");
     mkdirSync(reportPath);
 
     expect(() =>
-      writeAtomicGateReport(reportPath, { success: true }, { allowedRoot: root }),
+      writeAtomicGateReport(reportPath, { success: true }, {
+        allowedRoot: root,
+        helperAuthority: helperAuthority(root),
+      }),
     ).toThrow();
     expect(readdirSync(root).filter((name) => name.endsWith(".tmp"))).toEqual(
       [],
@@ -421,7 +492,7 @@ describe("Phase 2 gate command orchestration", () => {
   });
 
   it("never follows a report ancestor symlink into an external directory", () => {
-    const root = mkdtempSync(join(tmpdir(), "phase2-report-symlink-root-"));
+    const root = createSecurePublicationRepository();
     const external = mkdtempSync(
       join(tmpdir(), "phase2-report-symlink-external-"),
     );
@@ -431,9 +502,112 @@ describe("Phase 2 gate command orchestration", () => {
       writeAtomicGateReport(
         join(root, "reports/phase2/gate.json"),
         { success: false },
-        { allowedRoot: root },
+        { allowedRoot: root, helperAuthority: helperAuthority(root) },
       ),
-    ).toThrow(/symlink|no.?follow|unsafe/u);
+    ).toThrow(/symlink|no.?follow|unsafe|descriptor|not a directory/u);
+    expect(readdirSync(external)).toEqual(["sentinel"]);
+    expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
+      "unchanged\n",
+    );
+  });
+
+  it("does not write externally when the report ancestor is swapped immediately before descriptor publication", () => {
+    const root = createSecurePublicationRepository();
+    const external = mkdtempSync(join(tmpdir(), "phase2-report-swap-external-"));
+    mkdirSync(join(root, "reports"));
+    writeFileSync(join(external, "sentinel"), "unchanged\n");
+    let swapped = false;
+    expect(() =>
+      writeAtomicGateReport(
+        join(root, "reports/phase2/gate.json"),
+        { success: false },
+        {
+          allowedRoot: root,
+          helperAuthority: helperAuthority(root),
+          failureInjector: (stage: string) => {
+            if (stage !== "before-descriptor-publish") return;
+            renameSync(join(root, "reports"), join(root, "reports.owned"));
+            symlinkSync(external, join(root, "reports"));
+            swapped = true;
+          },
+        },
+      ),
+    ).toThrow(/symlink|no.?follow|unsafe|descriptor/u);
+    expect(swapped).toBe(true);
+    expect(readdirSync(external)).toEqual(["sentinel"]);
+  });
+
+  it("executes helper bytes from the bound Git tree when the helper pathname is swapped", () => {
+    const root = createSecurePublicationRepository();
+    const external = mkdtempSync(join(tmpdir(), "phase2-helper-swap-external-"));
+    const marker = join(external, "malicious-helper-ran");
+    writeFileSync(
+      join(root, "scripts/gates/secure-publish.py"),
+      `from pathlib import Path\nPath(${JSON.stringify(marker)}).write_text("ran")\n`,
+    );
+    const reportPath = join(root, "reports/phase2/gate.json");
+    writeAtomicGateReport(
+      reportPath,
+      { success: false },
+      {
+        allowedRoot: root,
+        helperAuthority: helperAuthority(root),
+      },
+    );
+    expect(JSON.parse(readFileSync(reportPath, "utf8"))).toEqual({
+      success: false,
+    });
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("keeps zero external effects when an ancestor is swapped after the helper opens the trusted root descriptor", async () => {
+    const root = mkdtempSync(join(tmpdir(), "phase2-openat-swap-root-"));
+    const external = mkdtempSync(join(tmpdir(), "phase2-openat-swap-external-"));
+    mkdirSync(join(root, "reports"));
+    writeFileSync(join(external, "sentinel"), "unchanged\n");
+    const child = spawn(
+      "python3",
+      ["-B", join(repositoryRoot, "scripts/gates/secure-publish.py")],
+      {
+        shell: false,
+        env: { ...process.env, PHASE2_SECURE_PUBLISH_TESTING: "1" },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    let stdout = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    const ready = new Promise<void>((resolveReady, rejectReady) => {
+      const timeout = setTimeout(
+        () => rejectReady(new Error("secure helper did not emit root-open marker")),
+        2_000,
+      );
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        if (!chunk.includes("SECURE_ROOT_OPEN")) return;
+        clearTimeout(timeout);
+        resolveReady();
+      });
+    });
+    child.stdin.end(
+      JSON.stringify({
+        operation: "write_file_atomic",
+        root,
+        path: "reports/phase2/gate.json",
+        contentBase64: Buffer.from("outside forbidden\n").toString("base64"),
+        testPauseAfterRootOpenMs: 1_000,
+      }),
+    );
+    await ready;
+    renameSync(join(root, "reports"), join(root, "reports.owned"));
+    symlinkSync(external, join(root, "reports"));
+    const exitCode = await new Promise<number | null>((resolveExit) =>
+      child.once("close", resolveExit),
+    );
+    expect(exitCode).not.toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false });
     expect(readdirSync(external)).toEqual(["sentinel"]);
     expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
       "unchanged\n",
@@ -447,32 +621,24 @@ describe("Phase 2 gate command orchestration", () => {
       const { root, manifest } = createCompletePhase2Repository();
       try {
         expect(collectGateBindings(root).dirty).toBe(false);
-        const report = await verifyPhase2({
+        const bindings = fixtureBindings(root);
+        const commands = syntheticPassedResults(root);
+        const report = publishPhase2Evidence({
           repositoryRoot: root,
-          mode: "local",
-          reportPath: join(root, "reports/phase2/gate.json"),
-          identityCollector: () => ({
-            errors: [],
-            dirty: false,
-            bindings: fixtureBindings(root),
-          }),
-          runner: passedRunner,
+          currentBindings: bindings,
+          commandResults: commands,
         });
         expect(report, JSON.stringify(report.errors, null, 2)).toMatchObject({
-          success: true,
-          releaseReady: true,
-          claims: { requirementsVerified: 64, evidencePassed: 64 },
-          evidence: {
-            count: 64,
-            setSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
-            directory: expect.stringMatching(
-              /^reports\/phase2\/evidence\/[a-f0-9]{40}-[a-f0-9-]+$/u,
-            ),
-          },
+          ok: true,
+          count: 64,
+          setSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+          directory: expect.stringMatching(
+            /^reports\/phase2\/evidence\/[a-f0-9]{40}-[a-f0-9-]+$/u,
+          ),
         });
-        expect(report.evidence.files).toHaveLength(64);
+        expect(report.files).toHaveLength(64);
         expect(
-          report.evidence.files.map(
+          report.files.map(
             (file: { logicalPath: string }) => file.logicalPath,
           ),
         ).toEqual(
@@ -483,7 +649,7 @@ describe("Phase 2 gate command orchestration", () => {
             )
             .sort(),
         );
-        const published = join(root, report.evidence.directory);
+        const published = join(root, report.directory);
         expect(existsSync(published)).toBe(true);
         const firstEvidence = JSON.parse(
           readFileSync(
@@ -529,60 +695,45 @@ describe("Phase 2 gate command orchestration", () => {
         commandResults: syntheticPassedResults(root),
         runId: "e11dece",
       }),
-    ).toThrow(/symlink|no.?follow|unsafe/u);
+    ).toThrow(/symlink|no.?follow|unsafe|descriptor|not a directory/u);
     expect(readdirSync(external)).toEqual(["sentinel"]);
     expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
       "unchanged\n",
     );
   });
 
-  it.each([
-    ["write", "deadbeef-01"],
-    ["validate", "deadbeef-02"],
-    ["rename", "deadbeef-03"],
-  ])(
-    "fails closed when an attacker swaps an owned pathname at %s",
-    (stage, runId) => {
+  it(
+    "fails closed when an attacker swaps the Evidence ancestor before descriptor publication",
+    () => {
       const { root } = createCompletePhase2Repository();
       const external = mkdtempSync(
-        join(tmpdir(), `phase2-evidence-swap-${stage}-`),
+        join(tmpdir(), "phase2-evidence-swap-"),
       );
       writeFileSync(join(external, "sentinel"), "unchanged\n");
+      mkdirSync(join(root, "reports"));
       let swapped = false;
       expect(() =>
         publishPhase2Evidence({
           repositoryRoot: root,
           currentBindings: fixtureBindings(root),
           commandResults: syntheticPassedResults(root),
-          runId,
+          runId: "deadbeef-01",
           failureInjector: (currentStage: string) => {
-            if (swapped || currentStage !== stage) return;
+            if (
+              swapped ||
+              currentStage !== "before-descriptor-publish"
+            )
+              return;
             swapped = true;
-            if (stage === "rename") {
-              const evidenceRoot = join(root, "reports/phase2/evidence");
-              renameSync(evidenceRoot, `${evidenceRoot}.owned`);
-              symlinkSync(external, evidenceRoot);
-            } else {
-              const temporary = join(
-                root,
-                `reports/phase2/.evidence-${runId}.tmp`,
-              );
-              renameSync(temporary, `${temporary}.owned`);
-              symlinkSync(external, temporary);
-            }
+            renameSync(join(root, "reports"), join(root, "reports.owned"));
+            symlinkSync(external, join(root, "reports"));
           },
         }),
-      ).toThrow(/symlink|inode|ownership|changed|unsafe/u);
+      ).toThrow(/descriptor|not a directory|symlink|unsafe/u);
       expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
         "unchanged\n",
       );
       expect(readdirSync(external)).toEqual(["sentinel"]);
-      const reports = join(root, "reports/phase2");
-      expect(
-        existsSync(reports)
-          ? readdirSync(reports).filter((name) => name.includes(".owned"))
-          : [],
-      ).toEqual([]);
     },
     90_000,
   );
@@ -596,7 +747,8 @@ describe("Phase 2 gate command orchestration", () => {
         commandResults: syntheticPassedResults(root),
         runId: "c1ea0f",
         failureInjector: (stage: string) => {
-          if (stage === "write") throw new Error("primary publication error");
+          if (stage === "before-descriptor-publish")
+            throw new Error("primary publication error");
           if (stage === "cleanup") throw new Error("cleanup error");
         },
       }),
@@ -633,11 +785,38 @@ describe("Phase 2 gate command orchestration", () => {
       requirementsVerified: 0,
       evidencePassed: 0,
     });
-    expect(report.errors.join("\n")).toMatch(/publisher|bundle|missing/u);
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
+      ]),
+    );
   });
 
-  it("rechecks repository identity after publication and removes the bundle on mutation", async () => {
-    const { root, manifest } = createCompletePhase2Repository();
+  it("never grants release authority to exact-shaped injected gate dependencies", async () => {
+    const { root } = createCompletePhase2Repository();
+    const report = await verifyPhase2({
+      repositoryRoot: root,
+      mode: "local",
+      reportPath: join(root, "reports/phase2/gate.json"),
+      identityCollector: () => ({
+        errors: [],
+        dirty: false,
+        bindings: fixtureBindings(root),
+      }),
+      runner: passedRunner,
+      evidencePublisher: publishPhase2Evidence,
+    });
+    expect(report.releaseReady).toBe(false);
+    expect(report.claims).toEqual({ requirementsVerified: 0, evidencePassed: 0 });
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
+      ]),
+    );
+  });
+
+  it("does not invoke injected identity a third time to create release claims", async () => {
+    const { root } = createCompletePhase2Repository();
     const bindings = fixtureBindings(root);
     let identityCalls = 0;
     const report = await verifyPhase2({
@@ -646,29 +825,20 @@ describe("Phase 2 gate command orchestration", () => {
       reportPath: join(root, "reports/phase2/gate.json"),
       identityCollector: () => {
         identityCalls += 1;
-        if (identityCalls === 3) {
-          const source = join(
-            root,
-            manifest.requirements[0].owner,
-            "src",
-            `${manifest.requirements[0].id.toLowerCase()}.ts`,
-          );
-          writeFileSync(source, "export const tampered = true;\n");
-        }
         return {
           errors: [],
-          dirty: identityCalls === 3,
+          dirty: false,
           bindings: structuredClone(bindings),
         };
       },
       runner: passedRunner,
     });
-    expect(identityCalls).toBe(3);
+    expect(identityCalls).toBe(2);
     expect(report.releaseReady).toBe(false);
     expect(report.claims.evidencePassed).toBe(0);
     expect(report.blockers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "repository_changed_after_evidence" }),
+        expect.objectContaining({ code: "non_authoritative_gate_dependencies" }),
       ]),
     );
     const evidenceRoot = join(root, "reports/phase2/evidence");
@@ -677,36 +847,22 @@ describe("Phase 2 gate command orchestration", () => {
     );
   });
 
-  it.each(["write", "validate", "rename"])(
-    "cleans temporary Evidence and publishes nothing when %s fails",
-    async (failureStage) => {
+  it(
+    "publishes no temporary Evidence when descriptor publication fails",
+    () => {
       const { root } = createCompletePhase2Repository();
       try {
-        const report = await verifyPhase2({
+        expect(() =>
+          publishPhase2Evidence({
           repositoryRoot: root,
-          mode: "local",
-          reportPath: join(root, "reports/phase2/gate.json"),
-          identityCollector: () => ({
-            errors: [],
-            dirty: false,
-            bindings: fixtureBindings(root),
-          }),
-          runner: passedRunner,
-          evidenceFailureInjector: (stage: string) => {
-            if (stage === failureStage)
-              throw new Error(`injected ${failureStage} failure`);
+          currentBindings: fixtureBindings(root),
+          commandResults: syntheticPassedResults(root),
+          failureInjector: (stage: string) => {
+            if (stage === "before-descriptor-publish")
+              throw new Error("injected descriptor failure");
           },
-        });
-        expect(report.releaseReady).toBe(false);
-        expect(report.claims).toEqual({
-          requirementsVerified: 0,
-          evidencePassed: 0,
-        });
-        expect(report.blockers).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ code: "evidence_publication_failed" }),
-          ]),
-        );
+          }),
+        ).toThrow(/injected descriptor failure/u);
         const phase2Reports = join(root, "reports/phase2");
         expect(
           existsSync(phase2Reports)
@@ -733,29 +889,24 @@ describe("Phase 2 gate command orchestration", () => {
       const { root } = createCompletePhase2Repository();
       const bindings = fixtureBindings(root);
       try {
-        const report = await verifyPhase2({
+        const commands = syntheticPassedResults(root);
+        const report = publishPhase2Evidence({
           repositoryRoot: root,
-          mode: "local",
-          reportPath: join(root, "reports/phase2/gate.json"),
-          identityCollector: () => ({
-            errors: [],
-            dirty: false,
-            bindings: structuredClone(bindings),
-          }),
-          runner: passedRunner,
+          currentBindings: bindings,
+          commandResults: commands,
         });
-        expect(report.releaseReady).toBe(true);
-        const first = report.evidence.files[0];
+        expect(report.ok).toBe(true);
+        const first = report.files[0];
         writeFileSync(
-          join(root, report.evidence.directory, first.logicalPath),
+          join(root, report.directory, first.logicalPath),
           '{"tampered":true}\n',
         );
         const checked = verifyEvidenceBundle({
           repositoryRoot: root,
-          directory: report.evidence.directory,
-          expected: report.evidence,
+          directory: report.directory,
+          expected: report,
           currentBindings: bindings,
-          commandResults: report.commands,
+          commandResults: commands,
         });
         expect(checked.ok).toBe(false);
         expect(checked.errors.join("\n")).toMatch(/hash|tamper|mismatch/u);

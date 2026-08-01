@@ -1,25 +1,14 @@
 #!/usr/bin/env node
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
-import {
-  closeSync,
-  constants,
-  existsSync,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeSync,
-} from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { writeSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { clearTimeout, setTimeout } from "node:timers";
+
+import { securePublish } from "./secure-publish.mjs";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
@@ -388,67 +377,45 @@ const within = (root, candidate) => {
   return relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`));
 };
 
-const snapshotDirectory = (path) => {
-  const descriptor = openSync(
-    path,
-    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_DIRECTORY ?? 0),
-  );
-  const opened = fstatSync(descriptor);
-  const named = lstatSync(path);
-  if (!opened.isDirectory() || named.isSymbolicLink() || opened.dev !== named.dev || opened.ino !== named.ino) {
-    closeSync(descriptor);
-    throw new Error(`unsafe or changed directory: ${path}`);
-  }
-  return { path, descriptor, dev: opened.dev, ino: opened.ino };
-};
-
-const assertSnapshot = (snapshot) => {
-  const opened = fstatSync(snapshot.descriptor);
-  const named = lstatSync(snapshot.path);
-  if (named.isSymbolicLink() || opened.dev !== snapshot.dev || opened.ino !== snapshot.ino || named.dev !== snapshot.dev || named.ino !== snapshot.ino)
-    throw new Error(`directory ownership changed: ${snapshot.path}`);
-};
-
-const ensureDirectoryNoFollow = (allowedRoot, directory) => {
-  const root = resolve(allowedRoot);
-  const target = resolve(directory);
-  if (!within(root, target)) throw new Error(`unsafe report path outside allowed root: ${target}`);
-  if (!statSync(root).isDirectory() || lstatSync(root).isSymbolicLink())
-    throw new Error(`unsafe allowed root: ${root}`);
-  let current = root;
-  for (const segment of relative(root, target).split(sep).filter(Boolean)) {
-    current = resolve(current, segment);
-    if (!existsSync(current)) mkdirSync(current, { mode: 0o700 });
-    if (lstatSync(current).isSymbolicLink() || !statSync(current).isDirectory())
-      throw new Error(`symlink or non-directory in report path: ${current}`);
-  }
-  return snapshotDirectory(target);
-};
-
-export const writeAtomicGateReport = (reportPath, report, { allowedRoot } = {}) => {
-  if (!isAbsolute(reportPath)) throw new Error("gate report path must be absolute");
-  const directory = dirname(resolve(reportPath));
-  const directorySnapshot = ensureDirectoryNoFollow(allowedRoot ?? directory, directory);
-  const temporaryPath = `${reportPath}.${process.pid}.${randomUUID()}.tmp`;
-  let fileDescriptor;
-  try {
-    assertSnapshot(directorySnapshot);
-    fileDescriptor = openSync(
-      temporaryPath,
-      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
-      0o600,
+export const writeAllSync = (
+  descriptor,
+  bytes,
+  writer = writeSync,
+) => {
+  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+  let offset = 0;
+  while (offset < buffer.length) {
+    const written = writer(
+      descriptor,
+      buffer,
+      offset,
+      buffer.length - offset,
     );
-    writeSync(fileDescriptor, `${JSON.stringify(report, null, 2)}\n`, null, "utf8");
-    fsyncSync(fileDescriptor);
-    closeSync(fileDescriptor);
-    fileDescriptor = undefined;
-    assertSnapshot(directorySnapshot);
-    renameSync(temporaryPath, reportPath);
-    assertSnapshot(directorySnapshot);
-    fsyncSync(directorySnapshot.descriptor);
-  } finally {
-    if (fileDescriptor !== undefined) closeSync(fileDescriptor);
-    if (existsSync(temporaryPath) && !lstatSync(temporaryPath).isSymbolicLink()) unlinkSync(temporaryPath);
-    closeSync(directorySnapshot.descriptor);
+    if (!Number.isSafeInteger(written) || written <= 0)
+      throw new Error("descriptor write made no progress");
+    offset += written;
   }
+};
+
+export const writeAtomicGateReport = (
+  reportPath,
+  report,
+  { allowedRoot, helperAuthority, failureInjector = () => {} } = {},
+) => {
+  if (!isAbsolute(reportPath)) throw new Error("gate report path must be absolute");
+  if (!allowedRoot) throw new Error("gate report publication requires allowedRoot");
+  const root = resolve(allowedRoot);
+  const target = resolve(reportPath);
+  if (!within(root, target))
+    throw new Error(`unsafe report path outside allowed root: ${target}`);
+  failureInjector("before-descriptor-publish");
+  securePublish({
+    operation: "write_file_atomic",
+    root,
+    path: relative(root, target).split(sep).join("/"),
+    contentBase64: Buffer.from(`${JSON.stringify(report, null, 2)}\n`).toString(
+      "base64",
+    ),
+    authority: helperAuthority,
+  });
 };

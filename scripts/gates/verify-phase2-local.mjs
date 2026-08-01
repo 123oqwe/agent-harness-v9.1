@@ -1,23 +1,19 @@
 #!/usr/bin/env node
 
 import { createHash, randomUUID } from "node:crypto";
+import { Buffer } from "node:buffer";
 import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants,
   existsSync,
   fstatSync,
-  fsyncSync,
   lstatSync,
-  mkdirSync,
   openSync,
   readdirSync,
   readFileSync,
   realpathSync,
-  renameSync,
-  rmSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,10 +31,24 @@ import {
   runCommand,
   writeAtomicGateReport,
 } from "./run-command.mjs";
+import { securePublish } from "./secure-publish.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
 export const RUNNER_VERSION = "phase2-gate-report/v1";
+export const RUNNER_BINDING_PATHS = Object.freeze([
+  "scripts/gates/check-phase2-manifest.mjs",
+  "scripts/gates/check-phase2-assets.mjs",
+  "scripts/gates/verify-phase2-local.mjs",
+  "scripts/gates/run-command.mjs",
+  "scripts/gates/secure-publish.mjs",
+  "scripts/gates/secure-publish.py",
+  "scripts/gates/check-active-stubs.mjs",
+  "scripts/gates/check-contract-drift.mjs",
+  "scripts/gates/run-phase2-evals.mjs",
+  "scripts/gates/run-phase2-data.mjs",
+  "scripts/gates/package-smoke.mjs",
+]);
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const EMPTY_SHA256 = sha256("");
@@ -295,17 +305,7 @@ export const collectGateBindings = (repositoryRoot) => {
     "scripts/run-mutation.mjs",
     "scripts/check-mutation-thresholds.mjs",
   ]);
-  const runner = hashPaths(root, [
-    "scripts/gates/check-phase2-manifest.mjs",
-    "scripts/gates/check-phase2-assets.mjs",
-    "scripts/gates/verify-phase2-local.mjs",
-    "scripts/gates/run-command.mjs",
-    "scripts/gates/check-active-stubs.mjs",
-    "scripts/gates/check-contract-drift.mjs",
-    "scripts/gates/run-phase2-evals.mjs",
-    "scripts/gates/run-phase2-data.mjs",
-    "scripts/gates/package-smoke.mjs",
-  ]);
+  const runner = hashPaths(root, RUNNER_BINDING_PATHS);
   const contracts = checkPhase2ContractDrift({ repositoryRoot: root });
   errors.push(...contracts.errors);
   if (!existsSync(join(root, "package-lock.json"))) {
@@ -342,105 +342,6 @@ const staysInside = (root, candidate) => {
   return (
     relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))
   );
-};
-
-const directorySnapshot = (path, created = false) => {
-  const descriptor = openSync(
-    path,
-    constants.O_RDONLY |
-      (constants.O_NOFOLLOW ?? 0) |
-      (constants.O_DIRECTORY ?? 0),
-  );
-  const opened = fstatSync(descriptor);
-  const named = lstatSync(path);
-  if (
-    !opened.isDirectory() ||
-    named.isSymbolicLink() ||
-    opened.dev !== named.dev ||
-    opened.ino !== named.ino
-  ) {
-    closeSync(descriptor);
-    throw new Error(`unsafe symlink or changed directory: ${path}`);
-  }
-  return { path, descriptor, dev: opened.dev, ino: opened.ino, created };
-};
-
-const assertDirectorySnapshot = (snapshot) => {
-  const opened = fstatSync(snapshot.descriptor);
-  const named = lstatSync(snapshot.path);
-  if (
-    named.isSymbolicLink() ||
-    opened.dev !== snapshot.dev ||
-    opened.ino !== snapshot.ino ||
-    named.dev !== snapshot.dev ||
-    named.ino !== snapshot.ino
-  ) {
-    throw new Error(`directory ownership changed: ${snapshot.path}`);
-  }
-};
-
-const ensureDirectoryNoFollow = (root, target) => {
-  const absoluteRoot = resolve(root);
-  const absoluteTarget = resolve(target);
-  if (!staysInside(absoluteRoot, absoluteTarget))
-    throw new Error(`unsafe directory outside repository: ${absoluteTarget}`);
-  const snapshots = [directorySnapshot(absoluteRoot, false)];
-  let current = absoluteRoot;
-  for (const segment of relative(absoluteRoot, absoluteTarget).split(sep).filter(Boolean)) {
-    current = join(current, segment);
-    let created = false;
-    if (!existsSync(current)) {
-      mkdirSync(current, { mode: 0o700 });
-      created = true;
-    }
-    if (lstatSync(current).isSymbolicLink())
-      throw new Error(`symlink is forbidden in directory path: ${current}`);
-    snapshots.push(directorySnapshot(current, created));
-  }
-  return snapshots;
-};
-
-const assertSnapshots = (snapshots) => {
-  for (const snapshot of snapshots) assertDirectorySnapshot(snapshot);
-};
-
-const closeSnapshots = (snapshots) => {
-  for (const snapshot of [...snapshots].reverse()) {
-    try {
-      closeSync(snapshot.descriptor);
-    } catch {
-      // Best effort only; no mutation occurs here.
-    }
-  }
-};
-
-const removeOwnedDirectory = (parent, ownership) => {
-  if (!ownership) return;
-  for (const entry of readdirSync(parent, { withFileTypes: true })) {
-    const candidate = join(parent, entry.name);
-    const stats = lstatSync(candidate);
-    if (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === ownership.dev &&
-      stats.ino === ownership.ino
-    ) {
-      const quarantine = join(parent, `.cleanup-${randomUUID()}`);
-      renameSync(candidate, quarantine);
-      const quarantined = lstatSync(quarantine);
-      if (
-        quarantined.isSymbolicLink() ||
-        !quarantined.isDirectory() ||
-        quarantined.dev !== ownership.dev ||
-        quarantined.ino !== ownership.ino
-      ) {
-        throw new Error(`cleanup ownership changed: ${candidate}`);
-      }
-      rmSync(quarantine, { recursive: true, force: false });
-      fsyncFile(parent);
-      return;
-    }
-  }
 };
 
 const secureEvidenceDirectory = (root, directory, errors) => {
@@ -491,15 +392,6 @@ const evidenceSet = (entries) => {
   return { count: files.length, setSha256: hash.digest("hex"), files };
 };
 
-const fsyncFile = (path) => {
-  const descriptor = openSync(path, "r");
-  try {
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
-  }
-};
-
 const readRegularFileNoFollow = (path) => {
   const descriptor = openSync(
     path,
@@ -530,18 +422,6 @@ const readRegularFileNoFollow = (path) => {
   } finally {
     closeSync(descriptor);
   }
-};
-
-const fsyncDirectoryTree = (directory) => {
-  const directories = [];
-  const visit = (path) => {
-    directories.push(path);
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      if (entry.isDirectory()) visit(join(path, entry.name));
-    }
-  };
-  visit(directory);
-  for (const path of directories.reverse()) fsyncFile(path);
 };
 
 export const verifyEvidenceBundle = ({
@@ -640,6 +520,8 @@ export const verifyEvidenceBundle = ({
   };
 };
 
+const publishedEvidenceOwnership = new Map();
+
 export const publishPhase2Evidence = ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   currentBindings,
@@ -678,21 +560,10 @@ export const publishPhase2Evidence = ({
   const evidenceRoot = join(reportsRoot, "evidence");
   const temporary = join(reportsRoot, `.evidence-${runId}.tmp`);
   const final = join(evidenceRoot, `${commitSha}-${runId}`);
+  const temporaryRelative = relative(root, temporary).replaceAll("\\", "/");
   const finalRelative = relative(root, final).replaceAll("\\", "/");
-  let renamed = false;
-  let reportsSnapshots = [];
-  let evidenceSnapshots = [];
-  let temporarySnapshots = [];
-  let temporaryOwnership = null;
-  let evidenceOwnership = null;
+  let publishedOwnership = null;
   try {
-    reportsSnapshots = ensureDirectoryNoFollow(root, reportsRoot);
-    evidenceSnapshots = ensureDirectoryNoFollow(root, evidenceRoot);
-    evidenceOwnership = evidenceSnapshots.at(-1);
-    assertSnapshots([...reportsSnapshots, ...evidenceSnapshots]);
-    mkdirSync(temporary, { mode: 0o700 });
-    temporarySnapshots = ensureDirectoryNoFollow(root, temporary);
-    temporaryOwnership = temporarySnapshots.at(-1);
     const authority = loadPhase2Authority({ repositoryRoot: root });
     if (authority.errors.length > 0 || !authority.manifest?.requirements)
       throw new Error(
@@ -704,61 +575,37 @@ export const publishPhase2Evidence = ({
         requirement.evidence_path,
       ]),
     );
-    const writeAt = Math.floor(generated.records.length / 2);
-    for (const [index, record] of generated.records.entries()) {
-      if (index === writeAt) failureInjector("write");
-      assertSnapshots([
-        ...reportsSnapshots,
-        ...evidenceSnapshots,
-        ...temporarySnapshots,
-      ]);
+    const files = generated.records.map((record) => {
       const logicalPath = pathsById.get(record.requirement_id);
       if (!safeRelativePath(logicalPath))
         throw new Error(`unsafe logical Evidence path ${String(logicalPath)}`);
-      const path = join(temporary, logicalPath);
-      const parentSnapshots = ensureDirectoryNoFollow(root, dirname(path));
-      assertSnapshots([...temporarySnapshots, ...parentSnapshots]);
-      writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-        flag: "wx",
-      });
-      fsyncFile(path);
-      closeSnapshots(parentSnapshots);
-    }
-    failureInjector("validate");
-    assertSnapshots([
-      ...reportsSnapshots,
-      ...evidenceSnapshots,
-      ...temporarySnapshots,
-    ]);
-    const temporaryRelative = relative(root, temporary).replaceAll("\\", "/");
-    const checked = verifyEvidenceBundle({
-      repositoryRoot: root,
-      directory: temporaryRelative,
-      currentBindings,
-      commandResults,
+      return {
+        path: logicalPath,
+        bytes: Buffer.from(`${JSON.stringify(record, null, 2)}\n`),
+      };
     });
-    if (!checked.ok)
-      throw new Error(
-        `written Evidence validation failed: ${checked.errors.join("; ")}`,
-      );
-    fsyncDirectoryTree(temporary);
-    if (existsSync(final))
-      throw new Error("Evidence version directory already exists");
-    failureInjector("rename");
-    assertSnapshots([
-      ...reportsSnapshots,
-      ...evidenceSnapshots,
-      ...temporarySnapshots,
-    ]);
-    renameSync(temporary, final);
-    renamed = true;
-    fsyncFile(evidenceRoot);
+    const expected = evidenceSet(
+      files.map((entry) => ({ logicalPath: entry.path, bytes: entry.bytes })),
+    );
+    failureInjector("before-descriptor-publish");
+    publishedOwnership = securePublish({
+      operation: "publish_tree",
+      root,
+      temporary: temporaryRelative,
+      final: finalRelative,
+      files: files.map((entry) => ({
+        path: entry.path,
+        contentBase64: entry.bytes.toString("base64"),
+      })),
+      authority: {
+        repositoryRoot: root,
+        treeSha: currentBindings.treeSha,
+      },
+    });
     const published = verifyEvidenceBundle({
       repositoryRoot: root,
       directory: finalRelative,
-      expected: checked,
+      expected,
       currentBindings,
       commandResults,
     });
@@ -766,45 +613,38 @@ export const publishPhase2Evidence = ({
       throw new Error(
         `published Evidence validation failed: ${published.errors.join("; ")}`,
       );
-    closeSnapshots(temporarySnapshots);
-    closeSnapshots(evidenceSnapshots);
-    closeSnapshots(reportsSnapshots);
+    publishedEvidenceOwnership.set(finalRelative, {
+      dev: publishedOwnership.dev,
+      ino: publishedOwnership.ino,
+    });
     return published;
   } catch (error) {
+    publishedEvidenceOwnership.delete(finalRelative);
     const cleanupErrors = [];
     try {
       failureInjector("cleanup");
     } catch (cleanupError) {
       cleanupErrors.push(cleanupError);
     }
-    try {
-      const trustedReports = reportsSnapshots.find(
-        (snapshot) => snapshot.path === reportsRoot,
-      );
-      if (trustedReports) {
-        const parent = trustedReports.path;
-        const opened = fstatSync(trustedReports.descriptor);
-        if (opened.dev === trustedReports.dev && opened.ino === trustedReports.ino) {
-          removeOwnedDirectory(parent, temporaryOwnership);
-          if (evidenceOwnership?.created)
-            removeOwnedDirectory(parent, evidenceOwnership);
-        }
+    if (publishedOwnership) {
+      try {
+        securePublish({
+          operation: "remove_tree",
+          root,
+          path: finalRelative,
+          expected: {
+            dev: publishedOwnership.dev,
+            ino: publishedOwnership.ino,
+          },
+          authority: {
+            repositoryRoot: root,
+            treeSha: currentBindings.treeSha,
+          },
+        });
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
       }
-      if (renamed && evidenceOwnership) {
-        const evidenceParent = evidenceOwnership.path;
-        try {
-          assertDirectorySnapshot(evidenceOwnership);
-          removeOwnedDirectory(evidenceParent, temporaryOwnership);
-        } catch (cleanupError) {
-          cleanupErrors.push(cleanupError);
-        }
-      }
-    } catch (cleanupError) {
-      cleanupErrors.push(cleanupError);
     }
-    closeSnapshots(temporarySnapshots);
-    closeSnapshots(evidenceSnapshots);
-    closeSnapshots(reportsSnapshots);
     if (cleanupErrors.length > 0) {
       throw new AggregateError(
         [error, ...cleanupErrors],
@@ -816,7 +656,14 @@ export const publishPhase2Evidence = ({
   }
 };
 
-export const verifyPhase2 = async ({
+const RELEASE_AUTHORITY = Symbol("phase2-release-authority");
+const AUTHORITY_DEPENDENCY_KEYS = [
+  "runner",
+  "identityCollector",
+  "evidencePublisher",
+];
+
+const verifyPhase2Implementation = async ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   mode = "dev",
   runner = runCommand,
@@ -825,13 +672,23 @@ export const verifyPhase2 = async ({
   evidenceFailureInjector,
   reportPath,
   signal,
-} = {}) => {
+} = {}, authorityToken) => {
   if (!new Set(["dev", "local"]).has(mode))
     throw new Error(`unsupported Phase 2 gate mode: ${String(mode)}`);
   const root = resolve(repositoryRoot);
+  let trustedHelperTreeSha = null;
+  try {
+    trustedHelperTreeSha = git(root, ["rev-parse", "HEAD^{tree}"]);
+  } catch {
+    // Report publication below fails closed when no committed helper exists.
+  }
   const identity = identityCollector(root);
   const errors = [...identity.errors];
   const blockers = [];
+  const hasReleaseAuthority = authorityToken === RELEASE_AUTHORITY;
+  if (mode === "local" && !hasReleaseAuthority) {
+    blockers.push({ code: "non_authoritative_gate_dependencies" });
+  }
   let execution = { ok: false, results: [] };
   if (mode === "local" && identity.dirty) {
     errors.push("release gate requires a clean committed worktree");
@@ -879,6 +736,7 @@ export const verifyPhase2 = async ({
   let publishedDirectory = null;
   if (
     mode === "local" &&
+    hasReleaseAuthority &&
     execution.ok &&
     !identity.dirty &&
     identityStable &&
@@ -947,18 +805,28 @@ export const verifyPhase2 = async ({
       errors.push(...finalIdentity.errors);
       blockers.push({ code: "repository_changed_after_evidence" });
       if (publishedDirectory) {
-        const cleanupErrors = [];
-        const secured = secureEvidenceDirectory(root, publishedDirectory, cleanupErrors);
-        if (secured && cleanupErrors.length === 0) {
-          const ownership = directorySnapshot(secured.absolute);
+        const ownership = publishedEvidenceOwnership.get(publishedDirectory);
+        if (ownership) {
           try {
-            removeOwnedDirectory(dirname(secured.absolute), ownership);
-          } finally {
-            closeSnapshots([ownership]);
+            securePublish({
+              operation: "remove_tree",
+              root,
+              path: publishedDirectory,
+              expected: ownership,
+              authority: {
+                repositoryRoot: root,
+                treeSha: postIdentity.bindings.treeSha,
+              },
+            });
+          } catch (cleanupError) {
+            errors.push(
+              `Evidence cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+            );
           }
         } else {
-          errors.push(...cleanupErrors.map((error) => `Evidence cleanup: ${error}`));
+          errors.push("Evidence cleanup: missing descriptor ownership receipt");
         }
+        publishedEvidenceOwnership.delete(publishedDirectory);
       }
       evidence = {
         count: 0,
@@ -967,6 +835,8 @@ export const verifyPhase2 = async ({
         directory: null,
       };
       claims = { requirementsVerified: 0, evidencePassed: 0 };
+    } else if (publishedDirectory) {
+      publishedEvidenceOwnership.delete(publishedDirectory);
     }
   }
   if (mode === "local" && evidence.count !== 64) {
@@ -979,6 +849,7 @@ export const verifyPhase2 = async ({
   }
   const releaseReady =
     mode === "local" &&
+    hasReleaseAuthority &&
     execution.ok &&
     evidence.count === 64 &&
     errors.length === 0;
@@ -1001,8 +872,26 @@ export const verifyPhase2 = async ({
   };
   const destination =
     reportPath ?? join(root, "reports", "phase2", `gate-report.${mode}.json`);
-  writeAtomicGateReport(destination, report, { allowedRoot: root });
+  writeAtomicGateReport(destination, report, {
+    allowedRoot: root,
+    helperAuthority: {
+      repositoryRoot: root,
+      treeSha: trustedHelperTreeSha,
+    },
+  });
   return report;
+};
+
+export const verifyPhase2 = (options = {}) => {
+  if (!options || typeof options !== "object" || Array.isArray(options))
+    throw new TypeError("Phase 2 gate options must be an object");
+  const dependenciesInjected = AUTHORITY_DEPENDENCY_KEYS.some((key) =>
+    Object.hasOwn(options, key),
+  );
+  return verifyPhase2Implementation(
+    options,
+    dependenciesInjected ? undefined : RELEASE_AUTHORITY,
+  );
 };
 
 const parseMode = (argv) => {

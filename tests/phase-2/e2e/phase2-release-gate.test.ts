@@ -43,6 +43,28 @@ const runScript = (script: string) =>
   });
 
 describe("Phase 2 real release gate", () => {
+  it("never includes Python bytecode caches in the packed Harness", () => {
+    const packed = spawnSync(
+      "npm",
+      ["pack", "--dry-run", "--json", "--ignore-scripts"],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        shell: false,
+        timeout: 120_000,
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
+    expect(packed.status, packed.stderr).toBe(0);
+    const paths = JSON.parse(packed.stdout)[0].files.map(
+      (entry: { path: string }) => entry.path,
+    );
+    expect(paths.some((path: string) => path.includes("__pycache__"))).toBe(
+      false,
+    );
+    expect(paths.some((path: string) => path.endsWith(".pyc"))).toBe(false);
+  });
+
   it(
     "allows the dirty-tree development gate but makes zero release claims",
     { timeout: 30_000 },
