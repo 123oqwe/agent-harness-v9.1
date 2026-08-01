@@ -155,6 +155,132 @@ describe("Phase 2 release-gate manifest", () => {
     });
   });
 
+  it("rejects extra and symbol keys on the requirements array", () => {
+    const valid = loadFixture("valid", "phase2-gate.json");
+    const validHash = computePhase2CanonicalSha256(valid);
+
+    const extraKey = clone(valid);
+    (extraKey.requirements as unknown as Record<string, unknown>).evil = "PASS";
+    expect(() => computePhase2CanonicalSha256(extraKey)).toThrowError(
+      "unsupported array property evil at $.requirements",
+    );
+    expect(validatePhase2Manifest(extraKey)).toContain(
+      "manifest canonicalization failed: unsupported array property evil at $.requirements",
+    );
+
+    const symbolKey = clone(valid);
+    const evil = Symbol("evil");
+    (symbolKey.requirements as unknown as Record<PropertyKey, unknown>)[evil] =
+      "PASS";
+    expect(() => computePhase2CanonicalSha256(symbolKey)).toThrowError(
+      "unsupported symbol key at $.requirements",
+    );
+    expect(validatePhase2Manifest(symbolKey)).toContain(
+      "manifest canonicalization failed: unsupported symbol key at $.requirements",
+    );
+    expect(computePhase2CanonicalSha256(valid)).toBe(validHash);
+  });
+
+  it("requires dense data properties on arrays", () => {
+    const hole = loadFixture("valid", "phase2-gate.json");
+    delete hole.requirements[0];
+    expect(validatePhase2Manifest(hole)).toContain(
+      "manifest canonicalization failed: unsupported undefined at $.requirements[0]",
+    );
+
+    const accessor = loadFixture("valid", "phase2-gate.json");
+    Object.defineProperty(accessor.requirements, "evil", {
+      enumerable: true,
+      get() {
+        throw new Error("getter must not execute");
+      },
+    });
+    expect(validatePhase2Manifest(accessor)).toContain(
+      "manifest canonicalization failed: accessor property at $.requirements.evil",
+    );
+
+    const nonEnumerable = loadFixture("valid", "phase2-gate.json");
+    Object.defineProperty(nonEnumerable.requirements, "evil", {
+      enumerable: false,
+      value: "PASS",
+    });
+    expect(validatePhase2Manifest(nonEnumerable)).toContain(
+      "manifest canonicalization failed: non-enumerable property at $.requirements.evil",
+    );
+  });
+
+  it("rejects symbol, accessor, and non-enumerable keys on plain objects", () => {
+    const symbolKey = loadFixture("valid", "phase2-gate.json");
+    const evil = Symbol("evil");
+    (symbolKey.baseline as unknown as Record<PropertyKey, unknown>)[evil] =
+      "PASS";
+    expect(validatePhase2Manifest(symbolKey)).toContain(
+      "manifest canonicalization failed: unsupported symbol key at $.baseline",
+    );
+
+    const accessor = loadFixture("valid", "phase2-gate.json");
+    Object.defineProperty(accessor.baseline, "region", {
+      enumerable: true,
+      get() {
+        throw new Error("getter must not execute");
+      },
+    });
+    expect(validatePhase2Manifest(accessor)).toContain(
+      "manifest canonicalization failed: accessor property at $.baseline.region",
+    );
+
+    const nonEnumerable = loadFixture("valid", "phase2-gate.json");
+    Object.defineProperty(nonEnumerable.baseline, "region", {
+      enumerable: false,
+      value: "local",
+    });
+    expect(validatePhase2Manifest(nonEnumerable)).toContain(
+      "manifest canonicalization failed: non-enumerable property at $.baseline.region",
+    );
+  });
+
+  it("wraps unexpected proxy failures as typed canonical errors with cause", () => {
+    const ownKeysFailure = new Error("ownKeys exploded");
+    const hostile = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw ownKeysFailure;
+        },
+      },
+    );
+    let thrown: unknown;
+    try {
+      computePhase2CanonicalSha256(hostile);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      name: "CanonicalJsonError",
+      code: "ERR_INVALID_CANONICAL_JSON",
+      message: "unexpected canonicalization error: ownKeys exploded",
+      cause: ownKeysFailure,
+    });
+
+    let errors: string[] = [];
+    expect(() => {
+      errors = validatePhase2Manifest(hostile);
+    }).not.toThrow();
+    expect(errors).toContain(
+      "manifest canonicalization failed: unexpected canonicalization error: ownKeys exploded",
+    );
+
+    const revocable = Proxy.revocable({}, {});
+    revocable.revoke();
+    expect(() => computePhase2CanonicalSha256(revocable.proxy)).toThrowError(
+      expect.objectContaining({
+        name: "CanonicalJsonError",
+        code: "ERR_INVALID_CANONICAL_JSON",
+      }),
+    );
+    expect(() => validatePhase2Manifest(revocable.proxy)).not.toThrow();
+  });
+
   it("exercises the real CLI without a shell", () => {
     const valid = runCheckerCli();
     expect(valid.error).toBeUndefined();

@@ -247,8 +247,8 @@ const isPlainObject = (value) => {
 };
 
 export class CanonicalJsonError extends TypeError {
-  constructor(message) {
-    super(message);
+  constructor(message, options) {
+    super(message, options);
     this.name = "CanonicalJsonError";
     this.code = "ERR_INVALID_CANONICAL_JSON";
   }
@@ -258,6 +258,28 @@ const childPath = (path, key) =>
   /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
     ? `${path}.${key}`
     : `${path}[${JSON.stringify(key)}]`;
+
+const stableErrorMessage = (error) => {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return "unknown validation error";
+  }
+};
+
+const dataDescriptorValue = (value, key, path) => {
+  const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+  if (!descriptor) {
+    throw new CanonicalJsonError(`missing property descriptor at ${path}`);
+  }
+  if ("get" in descriptor || "set" in descriptor) {
+    throw new CanonicalJsonError(`accessor property at ${path}`);
+  }
+  if (!descriptor.enumerable) {
+    throw new CanonicalJsonError(`non-enumerable property at ${path}`);
+  }
+  return descriptor.value;
+};
 
 const canonicalJson = (value, path = "$", ancestors = new Set()) => {
   if (
@@ -286,13 +308,37 @@ const canonicalJson = (value, path = "$", ancestors = new Set()) => {
 
   if (Array.isArray(value)) {
     try {
+      const descriptors = new Map();
+      for (const key of Reflect.ownKeys(value)) {
+        if (typeof key === "symbol") {
+          throw new CanonicalJsonError(`unsupported symbol key at ${path}`);
+        }
+        if (key === "length") continue;
+        const keyPath = childPath(path, key);
+        const descriptorValue = dataDescriptorValue(value, key, keyPath);
+        const index = Number(key);
+        if (
+          !Number.isSafeInteger(index) ||
+          index < 0 ||
+          String(index) !== key ||
+          index >= value.length
+        ) {
+          throw new CanonicalJsonError(
+            `unsupported array property ${key} at ${path}`,
+          );
+        }
+        descriptors.set(index, descriptorValue);
+      }
+
       const entries = [];
       for (let index = 0; index < value.length; index += 1) {
         const entryPath = `${path}[${index}]`;
-        if (!Object.hasOwn(value, index)) {
+        if (!descriptors.has(index)) {
           throw new CanonicalJsonError(`unsupported undefined at ${entryPath}`);
         }
-        entries.push(canonicalJson(value[index], entryPath, ancestors));
+        entries.push(
+          canonicalJson(descriptors.get(index), entryPath, ancestors),
+        );
       }
       return `[${entries.join(",")}]`;
     } finally {
@@ -309,15 +355,21 @@ const canonicalJson = (value, path = "$", ancestors = new Set()) => {
   }
 
   try {
-    const symbolKeys = Object.getOwnPropertySymbols(value);
-    if (symbolKeys.length > 0) {
-      throw new CanonicalJsonError(`unsupported symbol key at ${path}`);
+    const keys = Reflect.ownKeys(value);
+    for (const key of keys) {
+      if (typeof key === "symbol") {
+        throw new CanonicalJsonError(`unsupported symbol key at ${path}`);
+      }
     }
-    return `{${Object.keys(value)
+    return `{${keys
       .sort()
       .map(
         (key) =>
-          `${JSON.stringify(key)}:${canonicalJson(value[key], childPath(path, key), ancestors)}`,
+          `${JSON.stringify(key)}:${canonicalJson(
+            dataDescriptorValue(value, key, childPath(path, key)),
+            childPath(path, key),
+            ancestors,
+          )}`,
       )
       .join(",")}}`;
   } finally {
@@ -325,8 +377,17 @@ const canonicalJson = (value, path = "$", ancestors = new Set()) => {
   }
 };
 
-export const computePhase2CanonicalSha256 = (manifest) =>
-  createHash("sha256").update(canonicalJson(manifest)).digest("hex");
+export const computePhase2CanonicalSha256 = (manifest) => {
+  try {
+    return createHash("sha256").update(canonicalJson(manifest)).digest("hex");
+  } catch (error) {
+    if (error instanceof CanonicalJsonError) throw error;
+    throw new CanonicalJsonError(
+      `unexpected canonicalization error: ${stableErrorMessage(error)}`,
+      { cause: error },
+    );
+  }
+};
 
 const addUnexpectedFieldErrors = (errors, value, allowedKeys, label) => {
   if (!isRecord(value)) return;
@@ -681,17 +742,11 @@ const validatePhase2ManifestInternal = (manifest, manifestCanonicalHash) => {
   return errors;
 };
 
-const stableErrorMessage = (error) => {
-  try {
-    return error instanceof Error ? error.message : String(error);
-  } catch {
-    return "unknown validation error";
-  }
-};
-
 export const validatePhase2Manifest = (manifest) => {
   try {
-    if (!isRecord(manifest)) return ["manifest must be a JSON object"];
+    if (manifest === null || typeof manifest !== "object") {
+      return ["manifest must be a JSON object"];
+    }
 
     let manifestCanonicalHash;
     try {
@@ -699,6 +754,7 @@ export const validatePhase2Manifest = (manifest) => {
     } catch (error) {
       return [`manifest canonicalization failed: ${stableErrorMessage(error)}`];
     }
+    if (!isRecord(manifest)) return ["manifest must be a JSON object"];
     return validatePhase2ManifestInternal(manifest, manifestCanonicalHash);
   } catch (error) {
     return [`manifest validation failed: ${stableErrorMessage(error)}`];
