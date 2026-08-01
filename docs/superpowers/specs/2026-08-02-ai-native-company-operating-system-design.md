@@ -199,6 +199,29 @@ status: pending
 
 Evidence contains provenance, immutable artifact hashes, command or provider receipts, observed result, collector identity, and collection time. A model-written summary without the underlying receipt is not completion evidence.
 
+### 5.6 HumanInteraction
+
+```yaml
+interaction_id: HI-2026-000081
+actor: human.ceo
+surface: feishu
+mode: exploration
+state: clarifying
+intent_text_ref: encrypted://interactions/HI-2026-000081
+interpreted_objective: Diagnose the decline in qualified leads
+assumptions:
+  - The initial scope is the last eight weeks
+unknowns:
+  - Whether product-led and outbound leads should be analyzed together
+allowed_effects: [analytics.read, crm.read, report.write]
+prohibited_effects: [website.write, price.change, customer.contact]
+confirmation_required: true
+attention_priority: P2
+correlation_id: WI-2026-000044
+```
+
+HumanInteraction is the authority for what a human said, what the system understood, which assumptions remain, which interaction mode applies, and whether an executable objective was actually confirmed. Chat text by itself is not authorization.
+
 ## 6. Trigger model
 
 All triggers create or update a WorkItem; they never invoke unrestricted tools directly.
@@ -303,7 +326,144 @@ Model routing uses small models for extraction/classification, medium models for
 
 GitHub is the engineering source of truth. Feishu/DingTalk is the command, approval, exception, and report surface; decisions made in chat are copied to the Decision Registry. Cloud infrastructure hosts the gateway, event bus, workflow engine, policy service, PostgreSQL, object storage, retrieval, secrets, workers, monitoring, and audit services.
 
-## 11. Failure handling and observability
+## 11. Human-machine interaction protocol
+
+Human attention, comprehension, correction, and takeover are first-class system resources. The interface must not reduce the founders to approval operators or force them to inspect raw agent conversations.
+
+### 11.1 Three interaction spaces
+
+**Conversation space** is for expressing ambiguous intent, exploring opportunities, comparing strategies, explaining anomalies, and revising assumptions. It is non-effectful by default. Ordinary messages such as “continue,” “looks good,” or “handle it” do not authorize payment, production release, customer promises, permission changes, or other external effects.
+
+**Work space** is the structured project room. It shows the objective, success metrics, constraints, DRI, state, next action, budget, risk, artifacts, evidence, decisions, and stop/takeover controls. It is the authority for operational progress; chat history is not.
+
+**Decision space** contains time-bounded decision and approval cards. Only an explicit control, signed command, or valid approval endpoint can authorize an approval-gated action.
+
+### 11.2 Intent compilation
+
+Human intent passes through a visible compilation process:
+
+```text
+natural-language intent
+  -> system restatement
+  -> ambiguity and assumption detection
+  -> one consequential clarification at a time
+  -> proposed Objective Contract
+  -> explicit confirmation
+  -> authorized WorkItem creation
+```
+
+The Objective Contract states the problem, target user, desired outcome, metric, deadline, budget, allowed actions, prohibited actions, and actions that require renewed confirmation. The system asks only questions whose answers materially change scope, risk, cost, or success. Each question explains why the answer matters.
+
+For an ambiguous request such as “find out why acquisition is weak,” the system may propose a bounded read-only investigation, show expected time and cost, and state that it will not change pricing, publish content, edit the website, or contact customers. Execution begins only after the user starts that investigation or has previously delegated an exactly matching workflow.
+
+### 11.3 Collaboration modes
+
+Every interaction and project declares one of four modes:
+
+| Mode | Human role | Agent authority | Exit condition |
+|---|---|---|---|
+| Exploration | Frames meaning and evaluates alternatives | Research and draft only | Objective Contract confirmed or exploration closed |
+| Delegation | Sets outcome and boundaries | Plans and executes within delegated policy | Outcome verified, boundary change, or exception |
+| Pairing | Co-edits and makes frequent judgments | Suggests, previews, and applies confirmed changes | Artifact accepted or work delegated |
+| Takeover | Directly controls the work | Paused; preserves context and assists read-only | Human explicitly returns control |
+
+Mode changes are explicit events. Entering takeover immediately revokes the affected agent's write capabilities. Returning to delegation requires a scope and state summary so the human knows what will resume.
+
+### 11.4 Interaction state machine
+
+```text
+captured -> interpreting -> clarifying -> proposed -> confirmed
+-> executing -> checkpoint -> verifying -> reported
+-> accepted | corrected | taken_over
+```
+
+Invariants:
+
+- No external effect is allowed while `clarifying` or `proposed`.
+- `proposed` is not authorization; silence is never approval.
+- A material change in objective, audience, budget, data scope, risk, or public promise returns the interaction to `proposed`.
+- A human can pause, narrow, correct, or take over at any time.
+- `reported` is not completion without evidence or explicit human acceptance where the outcome is subjective.
+- Correction appends a new record and never overwrites the original instruction or result.
+
+### 11.5 Progressive disclosure
+
+Important responses have three information layers:
+
+1. **Five-second summary:** conclusion, reason, whether human action is needed.
+2. **Decision context:** evidence, alternatives, recommendation, uncertainty, impact, and non-action consequence.
+3. **Full trace:** source data, artifact versions, model/configuration, tool receipts, tests, and audit events.
+
+The interface exposes rather than dumps deeper layers. CEO views emphasize customer, revenue, cash, strategy, and decisions. CTO views emphasize production, architecture, security, model behavior, cost, and recovery.
+
+The interface displays evidence strength independently from model confidence. “High confidence, weak evidence” must be visually distinguishable from “high confidence, strong evidence.” Historical accuracy for the workflow is shown where available.
+
+### 11.6 Decision-card contract
+
+A decision card includes:
+
+- the exact decision and why it is needed now;
+- current state, evidence, sample size, and observation window;
+- known unknowns and dissent;
+- two or three materially distinct choices;
+- the system recommendation and calibrated confidence;
+- cost, risk, reversibility, and consequences of each choice;
+- the safe default if no response is received;
+- expiry time and exact scope of the resulting authority;
+- `approve`, alternative-choice, `reject`, `ask`, `open evidence`, and `take over` controls as applicable.
+
+Approval is bound to action, target, version, scope, and expiry. A stale card cannot execute. A card must not use deceptive urgency, preselected consent, ambiguous destructive controls, or color alone to convey risk.
+
+### 11.7 Attention and interruption budget
+
+Notifications are classified independently from action risk:
+
+| Priority | Delivery | Examples |
+|---|---|---|
+| P0 | Immediate interruption and repeated escalation | Active breach, severe production incident, imminent material funds risk |
+| P1 | Decision inbox plus deadline alert | High-risk release, material customer or legal decision |
+| P2 | Batched at two scheduled windows per day | Ordinary exceptions and budget reallocations |
+| P3 | Daily brief | Progress, learning, completed reversible actions |
+| P4 | Project room only | Routine agent activity and diagnostics |
+
+One Incident Commander owns each root cause. The system deduplicates correlated alerts, prevents multiple agents from notifying the same human, respects focus hours for P2-P4, and measures founder interruptions, response time, and time spent. Reducing unnecessary human attention is an operating metric, not merely a UI preference.
+
+### 11.8 Correction and learning scope
+
+When a human corrects the system, the interface asks for the smallest necessary applicability:
+
+```text
+this occurrence only
+this WorkItem
+this workflow
+company-wide rule
+```
+
+A correction records the original behavior, corrected behavior, reason, applicability, re-execution requirement, owner, expiry, and review date. One conversational remark cannot silently become a company-wide policy. Workflow and company rules require explicit confirmation and regression evaluation before activation.
+
+### 11.9 Control and recoverability
+
+Every effectful screen exposes its current mode and automation state. Pause, cancel, undo/rollback when feasible, and takeover are always reachable without navigating through agent-generated content. Before destructive or irreversible action, the interface shows the exact object, scope, consequence, recovery possibility, and required approvers.
+
+On takeover, the system produces a handoff packet containing current state, completed effects, uncommitted work, outstanding risks, credentials revoked, and safe next actions. It preserves the execution trail and does not attempt to continue in the background.
+
+### 11.10 Required interaction surfaces
+
+The first release requires five coherent surfaces, to be specified visually after this logical protocol is accepted:
+
+1. CEO cockpit for objectives, customer/revenue/cash health, risks, and at most three priority decisions.
+2. CTO control center for releases, incidents, security, model/provider health, cost, and permission requests.
+3. Decision inbox ordered by business impact, urgency, and expiry rather than arrival time.
+4. Project room containing objective, state, swarm, artifacts, evidence, budget, timeline, and control actions.
+5. Daily brief showing what changed, what was learned, what the system handled, what is next, and what requires attention.
+
+GitHub remains authoritative for engineering artifacts. The human interface shows summaries and deep links rather than creating a competing copy of code, tests, or PR state.
+
+### 11.11 Human-machine interaction metrics
+
+Measure decision completion time, clarification rounds, false or unnecessary escalations, ignored-notification rate, founder minutes per completed outcome, takeover rate, correction rate, correction recurrence, approval reversals, evidence-open rate, and comprehension errors found in usability tests. Optimization must not suppress legitimate risk alerts merely to improve interruption metrics.
+
+## 12. Failure handling and observability
 
 Workflows are durable, idempotent, pausable, and compensatable. Model timeout uses bounded retry and compatible fallback. Invalid structured output is rejected. Effects such as payment or deployment are never blindly retried. Permission refusal enters approval rather than self-escalation. Loop, cost, and time limits stop non-progress. Partial effects invoke reconciliation or an explicit recovery runbook.
 
@@ -311,7 +471,7 @@ Emergency controls stop a single task, identity, domain, or all execution. Globa
 
 The operating dashboard reports goals, active projects/agents, pending decisions, costs, incidents, evidence completeness, success rate, first-pass rate, human rework, time-to-outcome, cost-per-outcome, factual-error rate, escalation rate, rollback rate, and customer/business impact.
 
-## 12. Initial agent manifests
+## 13. Initial agent manifests
 
 The first four agents are sufficient for the control-plane milestone.
 
@@ -340,7 +500,7 @@ agents:
 
 Engineering and growth agents are added only after the control plane passes its gates.
 
-## 13. Ninety-day rollout
+## 14. Ninety-day rollout
 
 | Days | Deliverable | Maximum autonomy |
 |---|---|---|
@@ -354,7 +514,7 @@ Engineering and growth agents are added only after the control plane passes its 
 
 Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy, L3 supervised end-to-end autonomy, and L4 exception-only supervision. Promotion is per workflow after at least 20 successful runs, complete evidence, acceptable rework/cost, no unresolved severe incident, and passed adversarial tests. Severe incidents cause automatic demotion.
 
-## 14. First-week execution checklist
+## 15. First-week execution checklist
 
 ### Day 1: board contract
 
@@ -376,6 +536,8 @@ Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy
 
 - Connect signed Feishu/DingTalk commands and approval cards.
 - Implement `/goal`, `/project`, `/status`, `/decision`, `/approve`, `/reject`, `/stop`, and `/brief`.
+- Implement conversation, work, and decision-space boundaries so ordinary chat cannot authorize effects.
+- Implement Objective Contract preview and explicit confirmation before WorkItem authorization.
 
 ### Day 5: durable orchestration
 
@@ -391,21 +553,22 @@ Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy
 ### Day 7: first operating review
 
 - Run one real, low-risk WorkItem end to end.
-- Inspect evidence, founder interruptions, cost, rework, and failure modes.
+- Inspect evidence, clarification rounds, founder interruptions, takeover usability, cost, rework, and failure modes.
 - Fix control-plane weaknesses before creating engineering or growth swarms.
 
-## 15. Verification plan
+## 16. Verification plan
 
 Verification has four layers:
 
 1. Unit: schemas, policy decisions, transitions, budgets, idempotency, and capability attenuation.
 2. Workflow: product release, marketing experiment, customer complaint, refund proposal, contract review, and incident recovery.
-3. Adversarial: prompt injection, forged approval, privilege escalation, secret exfiltration, self-review, audit deletion, and runaway child creation.
-4. Business: time-to-release, human rework, cost-per-outcome, product activation, qualified leads, paid conversion, retention, and gross margin.
+3. Interaction: ambiguous intent, ordinary-chat non-authorization, safe silence, decision comprehension, correction scope, pause/takeover, progressive disclosure, keyboard access, and notification deduplication.
+4. Adversarial: prompt injection, forged approval, stale decision card, privilege escalation, secret exfiltration, self-review, audit deletion, dark-pattern consent, and runaway child creation.
+5. Business: time-to-release, founder minutes per outcome, human rework, cost-per-outcome, product activation, qualified leads, paid conversion, retention, and gross margin.
 
-The initial release gate requires traceable evidence for every state change, effective emergency stop, no self-approval path, safe duplicate-event handling, inability to exceed delegated permission/budget, and one real low-risk workflow completed end to end.
+The initial release gate requires traceable evidence for every state change, effective emergency stop and takeover, no self-approval path, no external effect from unconfirmed conversation, safe duplicate-event handling, safe non-response defaults, inability to exceed delegated permission/budget, and one real low-risk workflow completed end to end.
 
-## 16. Deferred decisions
+## 17. Deferred decisions
 
 These choices are intentionally deferred to the implementation plan because they depend on the repository's existing runtime and deployment constraints:
 
@@ -414,10 +577,11 @@ These choices are intentionally deferred to the implementation plan because they
 - CRM and analytics vendors.
 - Model providers and routing thresholds.
 - Exact database table and API layouts derived from the schemas above.
+- Visual language and final responsive layouts, which will be decided through clickable prototypes while preserving this interaction protocol.
 
 Deferral does not change responsibility, security, state, or approval semantics defined by this design.
 
-## 17. Acceptance criteria
+## 18. Acceptance criteria
 
 This design is implemented only when:
 
@@ -427,6 +591,13 @@ This design is implemented only when:
 - Growth work can progress from evidence to attributable lead/revenue learning.
 - Customer, finance, and legal-support signals feed the operating loop without giving agents regulated or irreversible authority.
 - CEO and CTO receive decisions and exceptions rather than routine status traffic.
+- Humans can distinguish conversation, work, and authorization states without interpreting model prose.
+- Ambiguous intent is restated and compiled into a visible Objective Contract before execution.
+- Silence, casual agreement, and stale decision cards never authorize an effect.
+- Every important decision exposes evidence, uncertainty, alternatives, non-action behavior, and exact authority scope.
+- Humans can pause, correct, constrain, or take over work without losing execution history.
+- Corrections have explicit applicability and cannot silently become company policy.
+- Notifications are deduplicated, prioritized, measurable, and bounded by an attention budget.
 - No agent can approve itself, expand its own authority, alter governance, or cross the seven hard prohibitions.
 - Workflows recover from interruption and duplicate delivery without duplicated external effects.
 - Autonomy increases only from measured workflow performance and decreases after severe failure.
