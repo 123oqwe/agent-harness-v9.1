@@ -240,18 +240,89 @@ const display = (value) =>
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-const canonicalJson = (value) => {
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+const isPlainObject = (value) => {
+  if (!isRecord(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+export class CanonicalJsonError extends TypeError {
+  constructor(message) {
+    super(message);
+    this.name = "CanonicalJsonError";
+    this.code = "ERR_INVALID_CANONICAL_JSON";
   }
-  if (isRecord(value)) {
+}
+
+const childPath = (path, key) =>
+  /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
+    ? `${path}.${key}`
+    : `${path}[${JSON.stringify(key)}]`;
+
+const canonicalJson = (value, path = "$", ancestors = new Set()) => {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "string"
+  ) {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new CanonicalJsonError(
+        `non-finite number ${String(value)} at ${path}`,
+      );
+    }
+    return JSON.stringify(value);
+  }
+  if (["undefined", "bigint", "function", "symbol"].includes(typeof value)) {
+    throw new CanonicalJsonError(`unsupported ${typeof value} at ${path}`);
+  }
+
+  if (ancestors.has(value)) {
+    throw new CanonicalJsonError(`circular reference at ${path}`);
+  }
+  ancestors.add(value);
+
+  if (Array.isArray(value)) {
+    try {
+      const entries = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const entryPath = `${path}[${index}]`;
+        if (!Object.hasOwn(value, index)) {
+          throw new CanonicalJsonError(`unsupported undefined at ${entryPath}`);
+        }
+        entries.push(canonicalJson(value[index], entryPath, ancestors));
+      }
+      return `[${entries.join(",")}]`;
+    } finally {
+      ancestors.delete(value);
+    }
+  }
+
+  if (!isPlainObject(value)) {
+    ancestors.delete(value);
+    const constructorName = value?.constructor?.name ?? "unknown";
+    throw new CanonicalJsonError(
+      `non-plain object ${constructorName} at ${path}`,
+    );
+  }
+
+  try {
+    const symbolKeys = Object.getOwnPropertySymbols(value);
+    if (symbolKeys.length > 0) {
+      throw new CanonicalJsonError(`unsupported symbol key at ${path}`);
+    }
     return `{${Object.keys(value)
       .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${canonicalJson(value[key], childPath(path, key), ancestors)}`,
+      )
       .join(",")}}`;
+  } finally {
+    ancestors.delete(value);
   }
-  const serialized = JSON.stringify(value);
-  return serialized === undefined ? "null" : serialized;
 };
 
 export const computePhase2CanonicalSha256 = (manifest) =>
@@ -266,24 +337,38 @@ const addUnexpectedFieldErrors = (errors, value, allowedKeys, label) => {
   }
 };
 
-const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
+let frozenAuthorityCache;
+
+const loadFrozenAuthority = () => {
+  if (frozenAuthorityCache) return frozenAuthorityCache;
+
   let authority;
   try {
     authority = JSON.parse(readFileSync(DEFAULT_MANIFEST_PATH, "utf8"));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    errors.push(`unable to load frozen Phase 2 authority: ${message}`);
-    return;
+    throw new Error(`unable to load frozen Phase 2 authority: ${message}`, {
+      cause: error,
+    });
   }
 
-  const authorityHash = computePhase2CanonicalSha256(authority);
+  let authorityHash;
+  try {
+    authorityHash = computePhase2CanonicalSha256(authority);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `unable to canonicalize frozen Phase 2 authority: ${message}`,
+      { cause: error },
+    );
+  }
   if (authorityHash !== AUTHORITY_CANONICAL_SHA256) {
-    errors.push(
+    throw new Error(
       `frozen authority snapshot canonical SHA-256 mismatch; expected ${display(AUTHORITY_CANONICAL_SHA256)}; received ${display(authorityHash)}`,
     );
   }
 
-  const authorityById = new Map(
+  const requirementsById = new Map(
     Array.isArray(authority.requirements)
       ? authority.requirements.map((requirement) => [
           requirement.id,
@@ -291,6 +376,23 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
         ])
       : [],
   );
+  frozenAuthorityCache = { authority, requirementsById };
+  return frozenAuthorityCache;
+};
+
+const addFrozenAuthorityErrors = (
+  errors,
+  requirementsById,
+  manifestCanonicalHash,
+) => {
+  let frozenAuthority;
+  try {
+    frozenAuthority = loadFrozenAuthority();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(message);
+    return;
+  }
   const frozenFields = [
     "priority",
     "dependencies",
@@ -300,7 +402,7 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
     "mutation_class",
   ];
   for (const id of REQUIRED_REQUIREMENT_IDS) {
-    const expected = authorityById.get(id);
+    const expected = frozenAuthority.requirementsById.get(id);
     const received = requirementsById.get(id);
     if (!expected || !received) continue;
     for (const field of frozenFields) {
@@ -314,10 +416,9 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
     }
   }
 
-  const manifestHash = computePhase2CanonicalSha256(manifest);
-  if (manifestHash !== AUTHORITY_CANONICAL_SHA256) {
+  if (manifestCanonicalHash !== AUTHORITY_CANONICAL_SHA256) {
     errors.push(
-      `manifest canonical SHA-256 does not match frozen authority; expected ${display(AUTHORITY_CANONICAL_SHA256)}; received ${display(manifestHash)}`,
+      `manifest canonical SHA-256 does not match frozen authority; expected ${display(AUTHORITY_CANONICAL_SHA256)}; received ${display(manifestCanonicalHash)}`,
     );
   }
 };
@@ -358,9 +459,8 @@ const findDependencyCycle = (requirementsById) => {
   return undefined;
 };
 
-export const validatePhase2Manifest = (manifest) => {
+const validatePhase2ManifestInternal = (manifest, manifestCanonicalHash) => {
   const errors = [];
-  if (!isRecord(manifest)) return ["manifest must be a JSON object"];
 
   addUnexpectedFieldErrors(errors, manifest, ROOT_KEYS, "manifest");
 
@@ -576,9 +676,33 @@ export const validatePhase2Manifest = (manifest) => {
     }
   }
 
-  addFrozenAuthorityErrors(errors, manifest, requirementsById);
+  addFrozenAuthorityErrors(errors, requirementsById, manifestCanonicalHash);
 
   return errors;
+};
+
+const stableErrorMessage = (error) => {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return "unknown validation error";
+  }
+};
+
+export const validatePhase2Manifest = (manifest) => {
+  try {
+    if (!isRecord(manifest)) return ["manifest must be a JSON object"];
+
+    let manifestCanonicalHash;
+    try {
+      manifestCanonicalHash = computePhase2CanonicalSha256(manifest);
+    } catch (error) {
+      return [`manifest canonicalization failed: ${stableErrorMessage(error)}`];
+    }
+    return validatePhase2ManifestInternal(manifest, manifestCanonicalHash);
+  } catch (error) {
+    return [`manifest validation failed: ${stableErrorMessage(error)}`];
+  }
 };
 
 export const validatePhase2ManifestFile = (

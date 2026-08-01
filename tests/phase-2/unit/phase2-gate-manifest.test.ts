@@ -1,9 +1,12 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
+  computePhase2CanonicalSha256,
   DEFAULT_MANIFEST_PATH,
   validatePhase2Manifest,
   validatePhase2ManifestFile,
@@ -32,6 +35,18 @@ type Manifest = {
 const fixturePath = (kind: "valid" | "invalid", name: string) =>
   resolve(process.cwd(), "fixtures", "phase-2", kind, name);
 
+const checkerPath = resolve(
+  process.cwd(),
+  "scripts/gates/check-phase2-manifest.mjs",
+);
+
+const runCheckerCli = (args: string[] = []) =>
+  spawnSync(process.execPath, [checkerPath, ...args], {
+    encoding: "utf8",
+    shell: false,
+    timeout: 10_000,
+  });
+
 const loadFixture = (kind: "valid" | "invalid", name: string): Manifest =>
   JSON.parse(readFileSync(fixturePath(kind, name), "utf8")) as Manifest;
 
@@ -59,6 +74,121 @@ describe("Phase 2 release-gate manifest", () => {
       validatePhase2Manifest(loadFixture("valid", "phase2-gate.json")),
     ).toEqual([]);
     expect(validatePhase2ManifestFile(DEFAULT_MANIFEST_PATH)).toEqual([]);
+  });
+
+  it("keeps the authority and fixtures intentionally synchronized", () => {
+    const validBytes = readFileSync(
+      fixturePath("valid", "phase2-gate.json"),
+      "utf8",
+    );
+    expect(readFileSync(DEFAULT_MANIFEST_PATH, "utf8")).toBe(validBytes);
+
+    const valid = JSON.parse(validBytes) as Manifest;
+    const invalid = loadFixture("invalid", "phase2-gate-cycle.json");
+    expect(requirement(invalid, "AH-HOOK-001").dependencies.pop()).toBe(
+      "AH-CONTEXT-COMPILER-001",
+    );
+    expect(invalid).toEqual(valid);
+  });
+
+  it("never throws when canonical JSON input contains a cycle", () => {
+    const circular = loadFixture("valid", "phase2-gate.json") as Manifest & {
+      self?: unknown;
+    };
+    circular.self = circular;
+    let errors: string[] = [];
+    expect(() => {
+      errors = validatePhase2Manifest(circular);
+    }).not.toThrow();
+    expect(errors).toContain(
+      "manifest canonicalization failed: circular reference at $.self",
+    );
+  });
+
+  it.each([
+    ["bigint", 2n, "unsupported bigint at $.phase"],
+    ["undefined", undefined, "unsupported undefined at $.phase"],
+    ["function", () => undefined, "unsupported function at $.phase"],
+    ["symbol", Symbol("phase"), "unsupported symbol at $.phase"],
+    ["NaN", Number.NaN, "non-finite number NaN at $.phase"],
+    [
+      "Infinity",
+      Number.POSITIVE_INFINITY,
+      "non-finite number Infinity at $.phase",
+    ],
+  ])(
+    "returns a stable error instead of throwing for %s",
+    (_label, value, message) => {
+      const manifest = loadFixture("valid", "phase2-gate.json");
+      (manifest as unknown as Record<string, unknown>).phase = value;
+      let errors: string[] = [];
+      expect(() => {
+        errors = validatePhase2Manifest(manifest);
+      }).not.toThrow();
+      expect(errors).toContain(`manifest canonicalization failed: ${message}`);
+    },
+  );
+
+  it("rejects non-plain objects without throwing", () => {
+    const manifest = loadFixture("valid", "phase2-gate.json");
+    (manifest as unknown as Record<string, unknown>).baseline = new Date(0);
+    let errors: string[] = [];
+    expect(() => {
+      errors = validatePhase2Manifest(manifest);
+    }).not.toThrow();
+    expect(errors).toContain(
+      "manifest canonicalization failed: non-plain object Date at $.baseline",
+    );
+  });
+
+  it("throws a typed error only from the low-level canonical hash API", () => {
+    let thrown: unknown;
+    try {
+      computePhase2CanonicalSha256({ value: 2n });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      name: "CanonicalJsonError",
+      code: "ERR_INVALID_CANONICAL_JSON",
+      message: "unsupported bigint at $.value",
+    });
+  });
+
+  it("exercises the real CLI without a shell", () => {
+    const valid = runCheckerCli();
+    expect(valid.error).toBeUndefined();
+    expect(valid.status).toBe(0);
+    expect(valid.stdout).toContain("phase2-manifest: valid");
+    expect(valid.stderr).toBe("");
+
+    const cycle = runCheckerCli([
+      fixturePath("invalid", "phase2-gate-cycle.json"),
+    ]);
+    expect(cycle.error).toBeUndefined();
+    expect(cycle.status).toBe(1);
+    expect(cycle.stderr).toContain("dependency cycle detected");
+
+    const missing = runCheckerCli([
+      fixturePath("invalid", "missing-phase2-gate.json"),
+    ]);
+    expect(missing.error).toBeUndefined();
+    expect(missing.status).toBe(1);
+    expect(missing.stderr).toContain("unable to read Phase 2 manifest");
+
+    const temporaryDirectory = mkdtempSync(
+      join(tmpdir(), "phase2-gate-manifest-"),
+    );
+    const malformedPath = join(temporaryDirectory, "malformed.json");
+    try {
+      writeFileSync(malformedPath, "{not-json", "utf8");
+      const malformed = runCheckerCli([malformedPath]);
+      expect(malformed.error).toBeUndefined();
+      expect(malformed.status).toBe(1);
+      expect(malformed.stderr).toContain("unable to read Phase 2 manifest");
+    } finally {
+      rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
   });
 
   it("requires exactly 64 unique requirement IDs", () => {
