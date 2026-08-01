@@ -53,6 +53,11 @@ Linux command execution additionally requires Bubblewrap and the util-linux
 `prlimit` utility. The harness fails closed when an OS sandbox authority is
 unavailable.
 
+The authoritative Phase 2 source gate additionally requires protected
+`/usr/bin/git` and `/usr/bin/python3`. Each executable, its resolved symlink
+target, and every ancestor must be root-owned and not group/world writable;
+the release gate fails explicitly when either protected tool is unavailable.
+
 ```bash
 npm ci
 npm run typecheck

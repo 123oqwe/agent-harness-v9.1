@@ -28,6 +28,11 @@ import {
 // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 import { securePublish } from "../../../scripts/gates/secure-publish.mjs";
 import {
+  TRUSTED_TOOL_PATHS,
+  validateProtectedExecutable,
+  // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/trusted-git.mjs";
+import {
   collectGateBindings,
   phase2CommandGraph,
   publishPhase2Evidence,
@@ -206,6 +211,42 @@ const syntheticPassedResults = (root: string) =>
   );
 
 describe("Phase 2 gate command orchestration", () => {
+  it("has no user-writable fallback in the authoritative toolchain", () => {
+    expect(TRUSTED_TOOL_PATHS).toEqual({
+      git: "/usr/bin/git",
+      python3: "/usr/bin/python3",
+    });
+    expect(JSON.stringify(TRUSTED_TOOL_PATHS)).not.toMatch(
+      /usr\/local|opt\/homebrew/u,
+    );
+  });
+
+  it("rejects an authoritative executable below a writable mocked ancestor", () => {
+    const directory = (mode: number) => ({
+      uid: 0,
+      mode,
+      isDirectory: () => true,
+      isFile: () => false,
+      isSymbolicLink: () => false,
+    });
+    const file = {
+      uid: 0,
+      mode: 0o100755,
+      isDirectory: () => false,
+      isFile: () => true,
+      isSymbolicLink: () => false,
+    };
+    expect(() =>
+      validateProtectedExecutable("/usr/bin/git", {
+        realpathSync: () => "/usr/bin/git",
+        lstatSync: (path: string) =>
+          path === "/usr" ? directory(0o40775) : path === "/usr/bin/git" ? file : directory(0o40755),
+        statSync: () => file,
+        accessSync: () => undefined,
+      }),
+    ).toThrow(/writable|protected|ownership|mode/u);
+  });
+
   it("binds both descriptor-relative helpers into the release runner identity", async () => {
     const gateModule = await import(
       // @ts-expect-error The production gate intentionally ships as plain Node ESM.

@@ -2,39 +2,20 @@
 
 import { spawnSync } from "node:child_process";
 import {
-  accessSync,
   closeSync,
   constants,
   fstatSync,
   lstatSync,
   openSync,
   realpathSync,
-  statSync,
 } from "node:fs";
 
-import { spawnTrustedGitSync } from "./trusted-git.mjs";
+import {
+  spawnTrustedGitSync,
+  TRUSTED_PYTHON_EXECUTABLE,
+} from "./trusted-git.mjs";
 
 const HELPER_PATH = "scripts/gates/secure-publish.py";
-const TOOL_CANDIDATES = Object.freeze({
-  python3: [
-    "/usr/bin/python3",
-    "/usr/local/bin/python3",
-    "/opt/homebrew/bin/python3",
-  ],
-});
-
-const trustedExecutable = (name) => {
-  for (const candidate of TOOL_CANDIDATES[name] ?? []) {
-    try {
-      const resolved = realpathSync(candidate);
-      accessSync(resolved, constants.X_OK);
-      if (statSync(resolved).isFile()) return resolved;
-    } catch {
-      // Continue through the fixed, non-PATH candidate list.
-    }
-  }
-  throw new Error(`trusted absolute ${name} executable is unavailable`);
-};
 
 const environment = () =>
   Object.fromEntries(
@@ -97,7 +78,6 @@ export const securePublish = (request) => {
   )
     throw new Error("descriptor publication requires a bound Git tree helper");
 
-  const python3 = trustedExecutable("python3");
   const repositoryRoot = realpathSync(authority.repositoryRoot);
   const rootDescriptor = openAuthorityRoot(repositoryRoot);
   try {
@@ -149,7 +129,7 @@ export const securePublish = (request) => {
     delete pythonRequest.authority;
     delete pythonRequest.testAfterAuthorityOpen;
     const execution = spawnSync(
-      python3,
+      TRUSTED_PYTHON_EXECUTABLE,
       ["-I", "-B", "-c", helper.stdout.toString("utf8")],
       {
         input: JSON.stringify(pythonRequest),
