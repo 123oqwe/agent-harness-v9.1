@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
@@ -22,6 +23,15 @@ import {
 } from "../../../scripts/gates/package-smoke.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const reportPath = () =>
+  join(repositoryRoot, "reports", "phase2", `e2e-${randomUUID()}.json`);
+const expectedArgv = (command: { command: string; args: string[] }) => [
+  command.command,
+  ...command.args.map(
+    (argument) =>
+      `<arg-sha256:${createHash("sha256").update(argument).digest("hex")}>`,
+  ),
+];
 
 const runScript = (script: string) =>
   spawnSync("npm", ["run", script, "--silent"], {
@@ -59,7 +69,7 @@ describe("Phase 2 real release gate", () => {
     const report = await verifyPhase2({
       mode: "local",
       repositoryRoot,
-      reportPath: join(temporaryRoot, "gate.json"),
+      reportPath: reportPath(),
       identityCollector: () => {
         identityCalls += 1;
         return {
@@ -70,11 +80,15 @@ describe("Phase 2 real release gate", () => {
           },
         };
       },
-      runner: async (command: { id: string }) => {
+      runner: async (command: {
+        id: string;
+        command: string;
+        args: string[];
+      }) => {
         visited.push(command.id);
         return {
           id: command.id,
-          argv: [],
+          argv: expectedArgv(command),
           status: "passed",
           exitCode: 0,
           signal: null,
@@ -117,11 +131,15 @@ describe("Phase 2 real release gate", () => {
     const report = await verifyPhase2({
       mode: "local",
       repositoryRoot,
-      reportPath: join(tmpdir(), `phase2-assets-blocker-${Date.now()}.json`),
+      reportPath: reportPath(),
       identityCollector: () => ({ errors: [], dirty: false, bindings: {} }),
-      runner: async (command: { id: string }) => ({
+      runner: async (command: {
+        id: string;
+        command: string;
+        args: string[];
+      }) => ({
         id: command.id,
-        argv: [],
+        argv: expectedArgv(command),
         status: command.id === "assets" ? "failed" : "passed",
         exitCode: command.id === "assets" ? 1 : 0,
         signal: null,

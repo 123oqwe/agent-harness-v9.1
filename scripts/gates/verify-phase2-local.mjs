@@ -4,7 +4,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -342,6 +344,105 @@ const staysInside = (root, candidate) => {
   );
 };
 
+const directorySnapshot = (path, created = false) => {
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY |
+      (constants.O_NOFOLLOW ?? 0) |
+      (constants.O_DIRECTORY ?? 0),
+  );
+  const opened = fstatSync(descriptor);
+  const named = lstatSync(path);
+  if (
+    !opened.isDirectory() ||
+    named.isSymbolicLink() ||
+    opened.dev !== named.dev ||
+    opened.ino !== named.ino
+  ) {
+    closeSync(descriptor);
+    throw new Error(`unsafe symlink or changed directory: ${path}`);
+  }
+  return { path, descriptor, dev: opened.dev, ino: opened.ino, created };
+};
+
+const assertDirectorySnapshot = (snapshot) => {
+  const opened = fstatSync(snapshot.descriptor);
+  const named = lstatSync(snapshot.path);
+  if (
+    named.isSymbolicLink() ||
+    opened.dev !== snapshot.dev ||
+    opened.ino !== snapshot.ino ||
+    named.dev !== snapshot.dev ||
+    named.ino !== snapshot.ino
+  ) {
+    throw new Error(`directory ownership changed: ${snapshot.path}`);
+  }
+};
+
+const ensureDirectoryNoFollow = (root, target) => {
+  const absoluteRoot = resolve(root);
+  const absoluteTarget = resolve(target);
+  if (!staysInside(absoluteRoot, absoluteTarget))
+    throw new Error(`unsafe directory outside repository: ${absoluteTarget}`);
+  const snapshots = [directorySnapshot(absoluteRoot, false)];
+  let current = absoluteRoot;
+  for (const segment of relative(absoluteRoot, absoluteTarget).split(sep).filter(Boolean)) {
+    current = join(current, segment);
+    let created = false;
+    if (!existsSync(current)) {
+      mkdirSync(current, { mode: 0o700 });
+      created = true;
+    }
+    if (lstatSync(current).isSymbolicLink())
+      throw new Error(`symlink is forbidden in directory path: ${current}`);
+    snapshots.push(directorySnapshot(current, created));
+  }
+  return snapshots;
+};
+
+const assertSnapshots = (snapshots) => {
+  for (const snapshot of snapshots) assertDirectorySnapshot(snapshot);
+};
+
+const closeSnapshots = (snapshots) => {
+  for (const snapshot of [...snapshots].reverse()) {
+    try {
+      closeSync(snapshot.descriptor);
+    } catch {
+      // Best effort only; no mutation occurs here.
+    }
+  }
+};
+
+const removeOwnedDirectory = (parent, ownership) => {
+  if (!ownership) return;
+  for (const entry of readdirSync(parent, { withFileTypes: true })) {
+    const candidate = join(parent, entry.name);
+    const stats = lstatSync(candidate);
+    if (
+      !stats.isSymbolicLink() &&
+      stats.isDirectory() &&
+      stats.dev === ownership.dev &&
+      stats.ino === ownership.ino
+    ) {
+      const quarantine = join(parent, `.cleanup-${randomUUID()}`);
+      renameSync(candidate, quarantine);
+      const quarantined = lstatSync(quarantine);
+      if (
+        quarantined.isSymbolicLink() ||
+        !quarantined.isDirectory() ||
+        quarantined.dev !== ownership.dev ||
+        quarantined.ino !== ownership.ino
+      ) {
+        throw new Error(`cleanup ownership changed: ${candidate}`);
+      }
+      rmSync(quarantine, { recursive: true, force: false });
+      fsyncFile(parent);
+      return;
+    }
+  }
+};
+
 const secureEvidenceDirectory = (root, directory, errors) => {
   const normalized = String(directory).replaceAll("\\", "/");
   if (
@@ -394,6 +495,38 @@ const fsyncFile = (path) => {
   const descriptor = openSync(path, "r");
   try {
     fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+};
+
+const readRegularFileNoFollow = (path) => {
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    const opened = fstatSync(descriptor);
+    const namedBefore = lstatSync(path);
+    if (
+      !opened.isFile() ||
+      namedBefore.isSymbolicLink() ||
+      opened.dev !== namedBefore.dev ||
+      opened.ino !== namedBefore.ino
+    ) {
+      throw new Error(`unsafe or changed regular file: ${path}`);
+    }
+    const bytes = readFileSync(descriptor);
+    const namedAfter = lstatSync(path);
+    const openedAfter = fstatSync(descriptor);
+    if (
+      namedAfter.isSymbolicLink() ||
+      namedAfter.dev !== openedAfter.dev ||
+      namedAfter.ino !== openedAfter.ino
+    ) {
+      throw new Error(`regular file changed while reading: ${path}`);
+    }
+    return bytes;
   } finally {
     closeSync(descriptor);
   }
@@ -469,7 +602,13 @@ export const verifyEvidenceBundle = ({
       errors.push(`missing or symlinked Evidence file ${logicalPath}`);
       continue;
     }
-    const bytes = readFileSync(absolute);
+    let bytes;
+    try {
+      bytes = readRegularFileNoFollow(absolute);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      continue;
+    }
     entries.push({ logicalPath, bytes });
     try {
       records.push(parseStrictJson(bytes, `Evidence ${logicalPath}`));
@@ -541,10 +680,19 @@ export const publishPhase2Evidence = ({
   const final = join(evidenceRoot, `${commitSha}-${runId}`);
   const finalRelative = relative(root, final).replaceAll("\\", "/");
   let renamed = false;
+  let reportsSnapshots = [];
+  let evidenceSnapshots = [];
+  let temporarySnapshots = [];
+  let temporaryOwnership = null;
+  let evidenceOwnership = null;
   try {
-    mkdirSync(reportsRoot, { recursive: true, mode: 0o700 });
-    mkdirSync(evidenceRoot, { recursive: true, mode: 0o700 });
+    reportsSnapshots = ensureDirectoryNoFollow(root, reportsRoot);
+    evidenceSnapshots = ensureDirectoryNoFollow(root, evidenceRoot);
+    evidenceOwnership = evidenceSnapshots.at(-1);
+    assertSnapshots([...reportsSnapshots, ...evidenceSnapshots]);
     mkdirSync(temporary, { mode: 0o700 });
+    temporarySnapshots = ensureDirectoryNoFollow(root, temporary);
+    temporaryOwnership = temporarySnapshots.at(-1);
     const authority = loadPhase2Authority({ repositoryRoot: root });
     if (authority.errors.length > 0 || !authority.manifest?.requirements)
       throw new Error(
@@ -559,19 +707,31 @@ export const publishPhase2Evidence = ({
     const writeAt = Math.floor(generated.records.length / 2);
     for (const [index, record] of generated.records.entries()) {
       if (index === writeAt) failureInjector("write");
+      assertSnapshots([
+        ...reportsSnapshots,
+        ...evidenceSnapshots,
+        ...temporarySnapshots,
+      ]);
       const logicalPath = pathsById.get(record.requirement_id);
       if (!safeRelativePath(logicalPath))
         throw new Error(`unsafe logical Evidence path ${String(logicalPath)}`);
       const path = join(temporary, logicalPath);
-      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      const parentSnapshots = ensureDirectoryNoFollow(root, dirname(path));
+      assertSnapshots([...temporarySnapshots, ...parentSnapshots]);
       writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, {
         encoding: "utf8",
         mode: 0o600,
         flag: "wx",
       });
       fsyncFile(path);
+      closeSnapshots(parentSnapshots);
     }
     failureInjector("validate");
+    assertSnapshots([
+      ...reportsSnapshots,
+      ...evidenceSnapshots,
+      ...temporarySnapshots,
+    ]);
     const temporaryRelative = relative(root, temporary).replaceAll("\\", "/");
     const checked = verifyEvidenceBundle({
       repositoryRoot: root,
@@ -587,6 +747,11 @@ export const publishPhase2Evidence = ({
     if (existsSync(final))
       throw new Error("Evidence version directory already exists");
     failureInjector("rename");
+    assertSnapshots([
+      ...reportsSnapshots,
+      ...evidenceSnapshots,
+      ...temporarySnapshots,
+    ]);
     renameSync(temporary, final);
     renamed = true;
     fsyncFile(evidenceRoot);
@@ -601,10 +766,52 @@ export const publishPhase2Evidence = ({
       throw new Error(
         `published Evidence validation failed: ${published.errors.join("; ")}`,
       );
+    closeSnapshots(temporarySnapshots);
+    closeSnapshots(evidenceSnapshots);
+    closeSnapshots(reportsSnapshots);
     return published;
   } catch (error) {
-    rmSync(temporary, { recursive: true, force: true });
-    if (renamed) rmSync(final, { recursive: true, force: true });
+    const cleanupErrors = [];
+    try {
+      failureInjector("cleanup");
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
+    }
+    try {
+      const trustedReports = reportsSnapshots.find(
+        (snapshot) => snapshot.path === reportsRoot,
+      );
+      if (trustedReports) {
+        const parent = trustedReports.path;
+        const opened = fstatSync(trustedReports.descriptor);
+        if (opened.dev === trustedReports.dev && opened.ino === trustedReports.ino) {
+          removeOwnedDirectory(parent, temporaryOwnership);
+          if (evidenceOwnership?.created)
+            removeOwnedDirectory(parent, evidenceOwnership);
+        }
+      }
+      if (renamed && evidenceOwnership) {
+        const evidenceParent = evidenceOwnership.path;
+        try {
+          assertDirectorySnapshot(evidenceOwnership);
+          removeOwnedDirectory(evidenceParent, temporaryOwnership);
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
+        }
+      }
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
+    }
+    closeSnapshots(temporarySnapshots);
+    closeSnapshots(evidenceSnapshots);
+    closeSnapshots(reportsSnapshots);
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        `${error instanceof Error ? error.message : String(error)}; cleanup failed: ${cleanupErrors.map((item) => (item instanceof Error ? item.message : String(item))).join("; ")}`,
+        { cause: error },
+      );
+    }
     throw error;
   }
 };
@@ -669,6 +876,7 @@ export const verifyPhase2 = async ({
     directory: null,
   };
   let claims = { requirementsVerified: 0, evidencePassed: 0 };
+  let publishedDirectory = null;
   if (
     mode === "local" &&
     execution.ok &&
@@ -695,11 +903,24 @@ export const verifyPhase2 = async ({
           `Evidence publisher returned an invalid release set (${String(published?.count)}/64)`,
         );
       }
-      evidence = {
-        count: published.count,
-        setSha256: published.setSha256,
-        files: published.files,
+      const independentlyChecked = verifyEvidenceBundle({
+        repositoryRoot: root,
         directory: published.directory,
+        expected: published,
+        currentBindings: postIdentity.bindings,
+        commandResults: execution.results,
+      });
+      if (!independentlyChecked.ok) {
+        throw new Error(
+          `publisher bundle failed independent verification: ${independentlyChecked.errors.join("; ")}`,
+        );
+      }
+      publishedDirectory = independentlyChecked.directory;
+      evidence = {
+        count: independentlyChecked.count,
+        setSha256: independentlyChecked.setSha256,
+        files: independentlyChecked.files,
+        directory: independentlyChecked.directory,
       };
       claims = { requirementsVerified: 64, evidencePassed: 64 };
     } catch (error) {
@@ -713,6 +934,39 @@ export const verifyPhase2 = async ({
         files: [],
         directory: null,
       };
+    }
+  }
+  if (mode === "local" && evidence.count === 64) {
+    const finalIdentity = identityCollector(root);
+    const stableAfterPublication =
+      !finalIdentity.dirty &&
+      finalIdentity.errors.length === 0 &&
+      stableJson(finalIdentity.bindings) === stableJson(postIdentity.bindings);
+    if (!stableAfterPublication) {
+      errors.push("repository identity changed after Evidence publication");
+      errors.push(...finalIdentity.errors);
+      blockers.push({ code: "repository_changed_after_evidence" });
+      if (publishedDirectory) {
+        const cleanupErrors = [];
+        const secured = secureEvidenceDirectory(root, publishedDirectory, cleanupErrors);
+        if (secured && cleanupErrors.length === 0) {
+          const ownership = directorySnapshot(secured.absolute);
+          try {
+            removeOwnedDirectory(dirname(secured.absolute), ownership);
+          } finally {
+            closeSnapshots([ownership]);
+          }
+        } else {
+          errors.push(...cleanupErrors.map((error) => `Evidence cleanup: ${error}`));
+        }
+      }
+      evidence = {
+        count: 0,
+        setSha256: EMPTY_SHA256,
+        files: [],
+        directory: null,
+      };
+      claims = { requirementsVerified: 0, evidencePassed: 0 };
     }
   }
   if (mode === "local" && evidence.count !== 64) {
@@ -747,7 +1001,7 @@ export const verifyPhase2 = async ({
   };
   const destination =
     reportPath ?? join(root, "reports", "phase2", `gate-report.${mode}.json`);
-  writeAtomicGateReport(destination, report);
+  writeAtomicGateReport(destination, report, { allowedRoot: root });
   return report;
 };
 

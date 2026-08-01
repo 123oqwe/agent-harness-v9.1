@@ -5,15 +5,19 @@ import { spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   fsyncSync,
+  lstatSync,
   mkdirSync,
   openSync,
   renameSync,
+  statSync,
   unlinkSync,
-  writeFileSync,
+  writeSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { clearTimeout, setTimeout } from "node:timers";
 
@@ -38,12 +42,76 @@ const INHERITED_ENV_ALLOWLIST = [
 const SENSITIVE_ENV_NAME =
   /(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH|COOKIE)/iu;
 
-const reportableArgv = (command, args) => [
+export const expectedCommandArgv = (command, args = []) => [
   command,
   ...args.map(
     (arg) => `<arg-sha256:${createHash("sha256").update(arg).digest("hex")}>`,
   ),
 ];
+
+const HASH = /^[a-f0-9]{64}$/u;
+const RESULT_STATUSES = new Set([
+  "passed",
+  "failed",
+  "timeout",
+  "aborted",
+  "spawn_error",
+  "signaled",
+]);
+const RESULT_KEYS = new Set([
+  "id",
+  "argv",
+  "status",
+  "exitCode",
+  "signal",
+  "durationMs",
+  "stdout",
+  "stderr",
+  "error",
+]);
+
+const sameJson = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+
+const validStreamResult = (stream) =>
+  stream !== null &&
+  typeof stream === "object" &&
+  !Array.isArray(stream) &&
+  Object.keys(stream).sort().join(",") ===
+    "bytes,capturedBytes,sha256,truncated" &&
+  Number.isSafeInteger(stream.bytes) &&
+  stream.bytes >= 0 &&
+  Number.isSafeInteger(stream.capturedBytes) &&
+  stream.capturedBytes >= 0 &&
+  stream.capturedBytes <= stream.bytes &&
+  typeof stream.truncated === "boolean" &&
+  stream.truncated === (stream.bytes > stream.capturedBytes) &&
+  HASH.test(stream.sha256);
+
+const validRunnerResult = (result, command) => {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return false;
+  if (
+    Object.keys(result).length !== RESULT_KEYS.size ||
+    Object.keys(result).some((key) => !RESULT_KEYS.has(key))
+  )
+    return false;
+  if (result.id !== command.id) return false;
+  const rawArgv = [command.command, ...(command.args ?? [])];
+  if (
+    !sameJson(result.argv, expectedCommandArgv(command.command, command.args ?? [])) &&
+    !sameJson(result.argv, rawArgv)
+  )
+    return false;
+  if (!RESULT_STATUSES.has(result.status)) return false;
+  if (!Number.isSafeInteger(result.durationMs) || result.durationMs < 0) return false;
+  if (!(result.exitCode === null || Number.isSafeInteger(result.exitCode))) return false;
+  if (!(result.signal === null || typeof result.signal === "string")) return false;
+  if (!validStreamResult(result.stdout) || !validStreamResult(result.stderr)) return false;
+  if (!(result.error === null || (typeof result.error === "object" && !Array.isArray(result.error))))
+    return false;
+  if (result.status === "passed" && (result.exitCode !== 0 || result.signal !== null))
+    return false;
+  return true;
+};
 
 const stableError = (error) => {
   if (error instanceof Error) {
@@ -144,7 +212,7 @@ export const runCommand = async ({
 }) => {
   validateCommand({ id, command, args, timeoutMs, maxOutputBytes });
   const environment = createSafeCommandEnvironment(additionalEnv);
-  const argv = reportableArgv(command, args);
+  const argv = expectedCommandArgv(command, args);
   if (signal?.aborted) {
     return Promise.resolve({
       id,
@@ -256,6 +324,18 @@ export const executeGateCommands = async (
 ) => {
   if (!Array.isArray(commands))
     throw new TypeError("commands must be an array");
+  const seen = new Set();
+  for (const item of commands) {
+    validateCommand({
+      id: item?.id,
+      command: item?.command,
+      args: item?.args ?? [],
+      timeoutMs: item?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      maxOutputBytes: item?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+    });
+    if (seen.has(item.id)) throw new TypeError(`duplicate command id: ${item.id}`);
+    seen.add(item.id);
+  }
   const results = [];
   for (const command of commands) {
     let result;
@@ -264,7 +344,7 @@ export const executeGateCommands = async (
     } catch (error) {
       result = {
         id: command.id,
-        argv: reportableArgv(command.command, command.args ?? []),
+        argv: expectedCommandArgv(command.command, command.args ?? []),
         status: "runner_error",
         exitCode: null,
         signal: null,
@@ -274,36 +354,101 @@ export const executeGateCommands = async (
         error: stableError(error),
       };
     }
+    if (!validRunnerResult(result, command)) {
+      result = {
+        id: command.id,
+        argv: expectedCommandArgv(command.command, command.args ?? []),
+        status: "runner_error",
+        exitCode: null,
+        signal: null,
+        durationMs: 0,
+        stdout: emptyStreamResult(),
+        stderr: emptyStreamResult(),
+        error: {
+          name: "RunnerContractError",
+          code: "INVALID_RUNNER_RESULT",
+          message: `runner returned an invalid result for ${command.id}`,
+        },
+      };
+    } else {
+      result = {
+        ...result,
+        id: command.id,
+        argv: expectedCommandArgv(command.command, command.args ?? []),
+      };
+    }
     results.push(result);
     if (result.status !== "passed") return { ok: false, results };
   }
   return { ok: true, results };
 };
 
-export const writeAtomicGateReport = (reportPath, report) => {
-  const directory = dirname(reportPath);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
+const within = (root, candidate) => {
+  const relation = relative(root, candidate);
+  return relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`));
+};
+
+const snapshotDirectory = (path) => {
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_DIRECTORY ?? 0),
+  );
+  const opened = fstatSync(descriptor);
+  const named = lstatSync(path);
+  if (!opened.isDirectory() || named.isSymbolicLink() || opened.dev !== named.dev || opened.ino !== named.ino) {
+    closeSync(descriptor);
+    throw new Error(`unsafe or changed directory: ${path}`);
+  }
+  return { path, descriptor, dev: opened.dev, ino: opened.ino };
+};
+
+const assertSnapshot = (snapshot) => {
+  const opened = fstatSync(snapshot.descriptor);
+  const named = lstatSync(snapshot.path);
+  if (named.isSymbolicLink() || opened.dev !== snapshot.dev || opened.ino !== snapshot.ino || named.dev !== snapshot.dev || named.ino !== snapshot.ino)
+    throw new Error(`directory ownership changed: ${snapshot.path}`);
+};
+
+const ensureDirectoryNoFollow = (allowedRoot, directory) => {
+  const root = resolve(allowedRoot);
+  const target = resolve(directory);
+  if (!within(root, target)) throw new Error(`unsafe report path outside allowed root: ${target}`);
+  if (!statSync(root).isDirectory() || lstatSync(root).isSymbolicLink())
+    throw new Error(`unsafe allowed root: ${root}`);
+  let current = root;
+  for (const segment of relative(root, target).split(sep).filter(Boolean)) {
+    current = resolve(current, segment);
+    if (!existsSync(current)) mkdirSync(current, { mode: 0o700 });
+    if (lstatSync(current).isSymbolicLink() || !statSync(current).isDirectory())
+      throw new Error(`symlink or non-directory in report path: ${current}`);
+  }
+  return snapshotDirectory(target);
+};
+
+export const writeAtomicGateReport = (reportPath, report, { allowedRoot } = {}) => {
+  if (!isAbsolute(reportPath)) throw new Error("gate report path must be absolute");
+  const directory = dirname(resolve(reportPath));
+  const directorySnapshot = ensureDirectoryNoFollow(allowedRoot ?? directory, directory);
   const temporaryPath = `${reportPath}.${process.pid}.${randomUUID()}.tmp`;
   let fileDescriptor;
   try {
-    writeFileSync(temporaryPath, `${JSON.stringify(report, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-      flag: "wx",
-    });
-    fileDescriptor = openSync(temporaryPath, "r");
+    assertSnapshot(directorySnapshot);
+    fileDescriptor = openSync(
+      temporaryPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
+      0o600,
+    );
+    writeSync(fileDescriptor, `${JSON.stringify(report, null, 2)}\n`, null, "utf8");
     fsyncSync(fileDescriptor);
     closeSync(fileDescriptor);
     fileDescriptor = undefined;
+    assertSnapshot(directorySnapshot);
     renameSync(temporaryPath, reportPath);
-    const directoryDescriptor = openSync(directory, "r");
-    try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
-    }
+    assertSnapshot(directorySnapshot);
+    fsyncSync(directorySnapshot.descriptor);
   } finally {
     if (fileDescriptor !== undefined) closeSync(fileDescriptor);
-    if (existsSync(temporaryPath)) unlinkSync(temporaryPath);
+    if (existsSync(temporaryPath) && !lstatSync(temporaryPath).isSymbolicLink()) unlinkSync(temporaryPath);
+    closeSync(directorySnapshot.descriptor);
   }
 };

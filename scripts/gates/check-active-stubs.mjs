@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
+  constants,
   existsSync,
+  fstatSync,
   lstatSync,
+  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -57,6 +62,7 @@ const EVIDENCE_KEYS = new Set([
   "status",
   "bindings",
   "source_files",
+  "source_bindings",
   "test_files",
   "command_receipts",
 ]);
@@ -80,6 +86,8 @@ const stableJson = (value) => {
   }
   return JSON.stringify(value);
 };
+
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 export const parseStrictJson = (bytes, label) => {
   if (bytes.length > MAX_JSON_BYTES)
@@ -246,11 +254,36 @@ const securePath = (root, path, expectedKind, errors, label) => {
   return actual;
 };
 
+const readFileNoFollow = (path) => {
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    const opened = fstatSync(descriptor);
+    const before = lstatSync(path);
+    if (
+      !opened.isFile() ||
+      before.isSymbolicLink() ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino
+    )
+      throw new Error(`unsafe or changed file ${path}`);
+    const bytes = readFileSync(descriptor);
+    const after = lstatSync(path);
+    if (after.isSymbolicLink() || after.dev !== opened.dev || after.ino !== opened.ino)
+      throw new Error(`file changed while reading ${path}`);
+    return bytes;
+  } finally {
+    closeSync(descriptor);
+  }
+};
+
 const readStrictRepositoryJson = (root, path, errors, label) => {
   const actual = securePath(root, path, "file", errors, label);
   if (!actual) return null;
   try {
-    return parseStrictJson(readFileSync(actual), label);
+    return parseStrictJson(readFileNoFollow(actual), label);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
     return null;
@@ -342,20 +375,90 @@ export const collectTrackedOwnerSourceFiles = ({
   return { files, errors };
 };
 
-const collectTrackedRepositoryPaths = (root, errors) => {
-  const tracked = spawnSync("git", ["ls-files", "-z", "--"], {
-    cwd: root,
-    env: createSafeCommandEnvironment(),
-    shell: false,
-    encoding: "utf8",
-    maxBuffer: 4 * 1024 * 1024,
-    timeout: 30_000,
-  });
-  if (tracked.status !== 0) {
-    errors.push(`git ls-files failed with exit ${String(tracked.status)}`);
-    return new Set();
+const treeSourceCache = new Map();
+
+const collectOwnerTreeSources = ({ root, treeSha, owner }) => {
+  const cacheKey = `${root}\0${treeSha}\0${owner}`;
+  if (treeSourceCache.has(cacheKey)) return treeSourceCache.get(cacheKey);
+  const errors = [];
+  if (!/^[a-f0-9]{40,64}$/u.test(treeSha ?? "")) {
+    return { entries: [], errors: ["release tree SHA is invalid"] };
   }
-  return new Set(tracked.stdout.split("\0").filter(Boolean));
+  const listed = spawnSync(
+    "git",
+    ["ls-tree", "-r", "-z", treeSha, "--", owner],
+    {
+      cwd: root,
+      env: createSafeCommandEnvironment(),
+      shell: false,
+      encoding: "buffer",
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: 30_000,
+    },
+  );
+  if (listed.status !== 0) {
+    return {
+      bindings: [],
+      entries: [],
+      errors: [`git ls-tree failed for ${owner}`],
+    };
+  }
+  const candidates = listed.stdout
+    .toString("utf8")
+    .split("\0")
+    .filter(Boolean)
+    .flatMap((line) => {
+      const match = line.match(/^[0-7]+ blob ([a-f0-9]{40,64})\t(.+)$/u);
+      return match ? [{ blobSha: match[1], path: match[2] }] : [];
+    })
+    .filter((entry) => sourceExtensions.has(extname(entry.path)));
+  const entries = [];
+  for (const entry of candidates) {
+    const blob = spawnSync("git", ["cat-file", "blob", entry.blobSha], {
+      cwd: root,
+      env: createSafeCommandEnvironment(),
+      shell: false,
+      encoding: "buffer",
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    if (blob.status !== 0) {
+      errors.push(`cannot read Git blob ${entry.blobSha}`);
+      continue;
+    }
+    entries.push({ ...entry, bytes: blob.stdout });
+  }
+  const result = { entries, errors };
+  treeSourceCache.set(cacheKey, result);
+  return result;
+};
+
+const collectRequirementTreeSources = ({ root, treeSha, requirement }) => {
+  const ownerSources = collectOwnerTreeSources({
+    root,
+    treeSha,
+    owner: requirement.owner,
+  });
+  const errors = [...ownerSources.errors];
+  const bindings = [];
+  for (const entry of ownerSources.entries) {
+    const requirementMarker = requirement.id.toLowerCase();
+    if (
+      !entry.path.toLowerCase().includes(requirementMarker) &&
+      !entry.bytes.toString("utf8").includes(requirement.id)
+    ) {
+      continue;
+    }
+    bindings.push({
+      path: entry.path,
+      blobSha: entry.blobSha,
+      contentSha256: sha256(entry.bytes),
+    });
+  }
+  bindings.sort((left, right) => left.path.localeCompare(right.path));
+  if (bindings.length === 0)
+    errors.push(`${requirement.id}: no source mapped in bound Git tree`);
+  return { bindings, errors };
 };
 
 const emptyResult = (errors, activeRequirementIds = []) => ({
@@ -397,7 +500,7 @@ export const scanActivePhase2Stubs = ({
   for (const [owner, requirementIds] of owners) {
     const ownerErrors = [];
     for (const file of semanticSourceFiles(root, owner, ownerErrors)) {
-      const contents = readFileSync(file, "utf8");
+      const contents = readFileNoFollow(file).toString("utf8");
       if (SEMANTIC_STUB_MARKERS.some((marker) => contents.includes(marker))) {
         semanticStubFiles.push(relative(root, file).replaceAll("\\", "/"));
         requirementIds.forEach((id) => active.add(id));
@@ -467,22 +570,13 @@ export const createPhase2EvidenceRecords = ({
   const resultsById = new Map(
     commandResults.map((result) => [result?.id, result]),
   );
-  const trackedPaths = collectTrackedRepositoryPaths(root, errors);
-  if (errors.length > 0) return { records: [], errors };
-  const sourcesByOwner = new Map();
   const records = [];
   for (const requirement of manifest.requirements) {
-    if (!sourcesByOwner.has(requirement.owner)) {
-      sourcesByOwner.set(
-        requirement.owner,
-        collectTrackedOwnerSourceFiles({
-          repositoryRoot: root,
-          owner: requirement.owner,
-          trackedPaths,
-        }),
-      );
-    }
-    const sourceResult = sourcesByOwner.get(requirement.owner);
+    const sourceResult = collectRequirementTreeSources({
+      root,
+      treeSha: currentBindings.treeSha,
+      requirement,
+    });
     if (sourceResult.errors.length > 0) {
       errors.push(
         ...sourceResult.errors.map((error) => `${requirement.id}: ${error}`),
@@ -508,7 +602,8 @@ export const createPhase2EvidenceRecords = ({
       requirement_id: requirement.id,
       status: "verified",
       bindings: JSON.parse(JSON.stringify(currentBindings)),
-      source_files: [...sourceResult.files],
+      source_files: sourceResult.bindings.map((binding) => binding.path),
+      source_bindings: sourceResult.bindings,
       test_files: [...requirement.test_suites],
       command_receipts: receipts,
     });
@@ -522,7 +617,7 @@ const validateEvidence = ({
   evidence,
   currentBindings,
   resultsById,
-  trackedSourceFiles,
+  expectedSourceBindings,
   errors,
 }) => {
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence))
@@ -556,13 +651,19 @@ const validateEvidence = ({
         errors.push(
           `${requirement.id}: source file is outside owner ${String(path)}`,
         );
-      } else {
-        securePath(root, path, "file", errors, requirement.id);
-        if (!trackedSourceFiles.has(path)) {
-          errors.push(`${requirement.id}: source file is not tracked ${path}`);
-        }
       }
     }
+  }
+  if (
+    stableJson(evidence.source_bindings) !== stableJson(expectedSourceBindings)
+  ) {
+    errors.push(`${requirement.id}: source_bindings do not match bound Git tree`);
+  }
+  if (
+    stableJson(evidence.source_files) !==
+    stableJson(expectedSourceBindings.map((binding) => binding.path))
+  ) {
+    errors.push(`${requirement.id}: source_files do not match source_bindings`);
   }
   if (
     stableJson([...(evidence.test_files ?? [])].sort()) !==
@@ -670,32 +771,22 @@ export const checkActivePhase2Stubs = ({
     recordsById.set(record.requirement_id, record);
   }
   const active = new Set(scan.activeRequirementIds);
-  const trackedErrors = [];
-  const trackedPaths = collectTrackedRepositoryPaths(root, trackedErrors);
-  errors.push(...trackedErrors);
-  const trackedByOwner = new Map();
   let evidencePassed = 0;
   for (const requirement of manifest.requirements) {
     const requirementErrors = [];
-    if (!trackedByOwner.has(requirement.owner)) {
-      trackedByOwner.set(
-        requirement.owner,
-        collectTrackedOwnerSourceFiles({
-          repositoryRoot: root,
-          owner: requirement.owner,
-          trackedPaths,
-        }),
-      );
-    }
-    const tracked = trackedByOwner.get(requirement.owner);
-    requirementErrors.push(...tracked.errors);
+    const expectedSources = collectRequirementTreeSources({
+      root,
+      treeSha: currentBindings.treeSha,
+      requirement,
+    });
+    requirementErrors.push(...expectedSources.errors);
     const passed = validateEvidence({
       root,
       requirement,
       evidence: recordsById.get(requirement.id),
       currentBindings,
       resultsById,
-      trackedSourceFiles: new Set(tracked.files),
+      expectedSourceBindings: expectedSources.bindings,
       errors: requirementErrors,
     });
     if (!passed || requirementErrors.length > 0) active.add(requirement.id);
