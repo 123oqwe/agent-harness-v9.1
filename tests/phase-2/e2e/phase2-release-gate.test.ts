@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -10,6 +16,10 @@ import {
   verifyPhase2,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/verify-phase2-local.mjs";
+import {
+  prepareExactSourceCheckout,
+  // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/package-smoke.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 
@@ -204,6 +214,34 @@ describe("Phase 2 real release gate", () => {
       expect.arrayContaining(["--mode", "source-checkout"]),
     );
   });
+
+  it(
+    "reproduces the exact detached source commit and tree in a real Git checkout",
+    { timeout: 120_000 },
+    async () => {
+      const temporaryRoot = mkdtempSync(
+        join(tmpdir(), "phase2-exact-source-test-"),
+      );
+      const checkout = join(temporaryRoot, "checkout");
+      const archive = join(temporaryRoot, "source.tar");
+      try {
+        const result = await prepareExactSourceCheckout({
+          repositoryRoot,
+          checkout,
+          archive,
+        });
+        expect(result).toMatchObject({ ok: true, errors: [] });
+        expect(result.checkoutCommitSha).toBe(result.commitSha);
+        expect(result.checkoutTreeSha).toBe(result.treeSha);
+        expect(existsSync(join(checkout, ".git"))).toBe(true);
+        expect(
+          result.commands.map((command: { id: string }) => command.id),
+        ).toEqual(["archive-head", "clone-head", "checkout-head"]);
+      } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("recognizes a symlinked script path as the CLI entry", () => {
     const temporaryRoot = mkdtempSync(join(tmpdir(), "phase2-gate-symlink-"));

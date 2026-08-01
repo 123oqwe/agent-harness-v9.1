@@ -4,7 +4,6 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -159,6 +158,102 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
   };
 };
 
+const resolveGitIdentity = (repositoryRoot) => {
+  const resolveRevision = (revision) => {
+    const result = spawnSync("git", ["rev-parse", "--verify", revision], {
+      cwd: repositoryRoot,
+      env: createSafeCommandEnvironment(),
+      shell: false,
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `cannot resolve source reproduction ${revision} (exit ${String(result.status)})`,
+      );
+    }
+    return result.stdout.trim();
+  };
+  return {
+    commitSha: resolveRevision("HEAD^{commit}"),
+    treeSha: resolveRevision("HEAD^{tree}"),
+  };
+};
+
+export const prepareExactSourceCheckout = async ({
+  repositoryRoot = root,
+  checkout,
+  archive,
+  runner = runCommand,
+}) => {
+  const errors = [];
+  let sourceIdentity = { commitSha: null, treeSha: null };
+  let checkoutIdentity = { commitSha: null, treeSha: null };
+  let execution = { ok: false, results: [] };
+  try {
+    sourceIdentity = resolveGitIdentity(repositoryRoot);
+    execution = await executeGateCommands(
+      [
+        {
+          id: "archive-head",
+          command: "git",
+          args: ["archive", "--format=tar", "--output", archive, "HEAD"],
+          cwd: repositoryRoot,
+          timeoutMs: 120_000,
+        },
+        {
+          id: "clone-head",
+          command: "git",
+          args: [
+            "clone",
+            "--shared",
+            "--no-checkout",
+            repositoryRoot,
+            checkout,
+          ],
+          cwd: dirname(checkout),
+          timeoutMs: 120_000,
+        },
+        {
+          id: "checkout-head",
+          command: "git",
+          args: ["checkout", "--detach", sourceIdentity.commitSha],
+          cwd: checkout,
+          timeoutMs: 120_000,
+        },
+      ],
+      { runner },
+    );
+    if (!execution.ok) {
+      const failure = execution.results.at(-1);
+      errors.push(
+        `source checkout command failed: ${failure?.id ?? "unknown"} (${failure?.status ?? "unknown"})`,
+      );
+    } else {
+      checkoutIdentity = resolveGitIdentity(checkout);
+      if (checkoutIdentity.commitSha !== sourceIdentity.commitSha) {
+        errors.push("source checkout commit does not match the requested HEAD");
+      }
+      if (checkoutIdentity.treeSha !== sourceIdentity.treeSha) {
+        errors.push(
+          "source checkout tree does not match the requested HEAD tree",
+        );
+      }
+    }
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+  return {
+    ok: execution.ok && errors.length === 0,
+    errors,
+    commitSha: sourceIdentity.commitSha,
+    treeSha: sourceIdentity.treeSha,
+    checkoutCommitSha: checkoutIdentity.commitSha,
+    checkoutTreeSha: checkoutIdentity.treeSha,
+    commands: execution.results,
+  };
+};
+
 export const runSourceCheckoutReproduction = async ({
   repositoryRoot = root,
 } = {}) => {
@@ -167,38 +262,38 @@ export const runSourceCheckoutReproduction = async ({
   );
   const checkout = join(temporaryRoot, "checkout");
   const archive = join(temporaryRoot, "source.tar");
-  mkdirSync(checkout);
   let commitSha = null;
+  let treeSha = null;
+  let checkoutCommitSha = null;
+  let checkoutTreeSha = null;
   let execution = { ok: false, results: [] };
   const errors = [];
   try {
-    const revision = spawnSync("git", ["rev-parse", "HEAD"], {
-      cwd: repositoryRoot,
-      env: createSafeCommandEnvironment(),
-      shell: false,
-      encoding: "utf8",
-      timeout: 30_000,
+    const sourceCheckout = await prepareExactSourceCheckout({
+      repositoryRoot,
+      checkout,
+      archive,
     });
-    if (revision.status !== 0)
-      throw new Error(
-        `cannot resolve source reproduction HEAD (exit ${String(revision.status)})`,
-      );
-    commitSha = revision.stdout.trim();
+    commitSha = sourceCheckout.commitSha;
+    treeSha = sourceCheckout.treeSha;
+    checkoutCommitSha = sourceCheckout.checkoutCommitSha;
+    checkoutTreeSha = sourceCheckout.checkoutTreeSha;
+    errors.push(...sourceCheckout.errors);
+    if (!sourceCheckout.ok) {
+      execution = { ok: false, results: sourceCheckout.commands };
+      return {
+        mode: "source-checkout",
+        commitSha,
+        treeSha,
+        checkoutCommitSha,
+        checkoutTreeSha,
+        success: false,
+        releaseReady: false,
+        errors,
+        commands: execution.results,
+      };
+    }
     const commands = [
-      {
-        id: "archive-head",
-        command: "git",
-        args: ["archive", "--format=tar", "--output", archive, "HEAD"],
-        cwd: repositoryRoot,
-        timeoutMs: 120_000,
-      },
-      {
-        id: "extract-head",
-        command: "tar",
-        args: ["-xf", archive, "-C", checkout],
-        cwd: repositoryRoot,
-        timeoutMs: 120_000,
-      },
       {
         id: "clean-install",
         command: "npm",
@@ -244,7 +339,13 @@ export const runSourceCheckoutReproduction = async ({
         timeoutMs: 300_000,
       },
     ];
-    execution = await executeGateCommands(commands, { runner: runCommand });
+    const reproduction = await executeGateCommands(commands, {
+      runner: runCommand,
+    });
+    execution = {
+      ok: sourceCheckout.ok && reproduction.ok,
+      results: [...sourceCheckout.commands, ...reproduction.results],
+    };
     if (!execution.ok) {
       const failure = execution.results.at(-1);
       errors.push(
@@ -259,6 +360,9 @@ export const runSourceCheckoutReproduction = async ({
   return {
     mode: "source-checkout",
     commitSha,
+    treeSha,
+    checkoutCommitSha,
+    checkoutTreeSha,
     success: execution.ok && errors.length === 0,
     releaseReady: execution.ok && errors.length === 0,
     errors,
