@@ -89,6 +89,20 @@ Both founders can stop one workflow, one identity, one domain, or the entire com
 
 Every swarm has exactly one objective, DRI, budget, deadline, success metric, evidence requirement, and termination condition. Roles are instantiated as needed, but identities remain separate when duties conflict. An author cannot be its own reviewer, verifier, or releaser.
 
+### 3.4 Role seats are separate from workers
+
+A company role is a durable `RoleSeat`; an Agent is only one possible worker assigned to that seat. A seat may be occupied by an AI worker, a human worker, or a human-agent pair. Objectives, authority, inbox, history, and accountability belong to the seat and WorkItem, not to a model conversation.
+
+```text
+RoleSeat: Engineering Lead
+  -> AI-operated
+  -> human-operated
+  -> paired operation
+  -> vacant / paused
+```
+
+Every AI-operated seat can be replaced by an authorized human without recreating the project or losing state. Replacement changes the active worker and capabilities; it does not rewrite prior decisions or evidence. Human occupation is not an unrestricted bypass: the person's real identity and organizational authority still pass through policy and audit controls.
+
 ## 4. Company control plane
 
 The control plane is deterministic software. Models may propose actions; they do not define policy or directly confer authority.
@@ -222,6 +236,50 @@ correlation_id: WI-2026-000044
 
 HumanInteraction is the authority for what a human said, what the system understood, which assumptions remain, which interaction mode applies, and whether an executable objective was actually confirmed. Chat text by itself is not authorization.
 
+### 5.7 RoleSeat and Assignment
+
+```yaml
+role_seat_id: seat.engineering.lead
+role_definition: role://engineering-lead/v2
+accountable_for: [technical_design, delivery_quality, engineering_coordination]
+reports_to: seat.cto
+current_assignment:
+  assignment_id: ASG-2026-00019
+  worker_type: agent
+  worker_id: agent.engineering.lead.04
+  mode: delegated
+  lease_expires_at: 2026-08-02T18:00:00+08:00
+  capability_ref: capability://CAP-0081
+  status: active
+allowed_human_occupants: [human.cto, human.engineer.on_call]
+handoff_checkpoint_ref: checkpoint://CP-104
+```
+
+Assignment is a revocable lease, not permanent ownership. Only one worker has write authority for a seat at a time unless the seat is explicitly in pairing mode. Reassignment atomically freezes the old worker, revokes its unused capabilities, creates a checkpoint, and transfers control to the new worker.
+
+### 5.8 ObjectiveRevision
+
+```yaml
+revision_id: OR-2026-00014
+work_id: WI-2026-000001
+base_revision: 3
+requested_by: human.ceo
+request_source: conversation
+natural_language_request: Prioritize reliability; do not ship this week
+compiled_patch:
+  objective: Improve onboarding without a production release this week
+  constraints_added: [production_release_before_2026_08_10_forbidden]
+affected_work: [WI-2026-000007, WI-2026-000009]
+impact:
+  schedule_days: 5
+  additional_cost_cny: 600
+  invalidated_artifacts: [release_plan_v3]
+confirmation_state: confirmed
+effective_from_checkpoint: CP-105
+```
+
+ObjectiveRevision preserves the old objective, compiles human language into a structured diff, shows downstream effects, and becomes active only after authorization appropriate to the impact.
+
 ## 6. Trigger model
 
 All triggers create or update a WorkItem; they never invoke unrestricted tools directly.
@@ -248,6 +306,8 @@ author -> reviewer -> verifier -> releaser -> outcome measurement
 ```
 
 Each identity has bounded turns, time, tokens, money, child count, and explicit exit criteria. Repeated conclusions or non-progress activate a circuit breaker.
+
+Work is assigned to RoleSeats and only then to workers. Scheduling therefore survives a worker change: replacing an Agent with a human, one model with another, or a solo worker with a pair does not change the goal or erase context.
 
 ### 7.2 Structured ideation council
 
@@ -356,6 +416,8 @@ The Objective Contract states the problem, target user, desired outcome, metric,
 
 For an ambiguous request such as “find out why acquisition is weak,” the system may propose a bounded read-only investigation, show expected time and cost, and state that it will not change pricing, publish content, edit the website, or contact customers. Execution begins only after the user starts that investigation or has previously delegated an exactly matching workflow.
 
+The same compiler handles mid-execution goal changes. A prompt such as “stop optimizing speed; make reliability the priority” is interpreted as a proposed ObjectiveRevision rather than injected into a worker's private prompt. The UI shows the structured before/after diff, affected tasks, invalidated artifacts, new cost/deadline, and whether running effects must stop. The human can confirm, edit, scope, or cancel the revision.
+
 ### 11.3 Collaboration modes
 
 Every interaction and project declares one of four modes:
@@ -386,7 +448,83 @@ Invariants:
 - `reported` is not completion without evidence or explicit human acceptance where the outcome is subjective.
 - Correction appends a new record and never overwrites the original instruction or result.
 
-### 11.5 Progressive disclosure
+### 11.5 Universal worker control contract
+
+Every AI worker exposes the same controls regardless of department or model:
+
+- **Inspect:** current role, objective revision, plan, active step, capabilities, budget, sources, produced artifacts, and blockers.
+- **Message:** provide non-authoritative context or ask a question without silently changing the goal.
+- **Redirect:** propose a natural-language ObjectiveRevision, preview its structured effect, then confirm it.
+- **Constrain:** immediately reduce budget, tools, data scope, external communication, deadline, or permitted effects. Constraint reduction can take effect without waiting for the Agent.
+- **Pause:** stop before the next effect boundary and revoke unused capabilities.
+- **Stop:** terminate the assignment, run required compensation, and preserve a checkpoint.
+- **Take over:** replace the Agent with an authorized human in the same RoleSeat.
+- **Replace:** assign a different Agent or human while preserving the WorkItem and history.
+- **Pair:** keep the Agent as an adviser while a human holds write authority, or require human confirmation at each checkpoint.
+- **Resume:** issue a new assignment lease from a selected checkpoint and objective revision.
+
+Controls are enforced by the workflow engine and Policy Engine, never merely appended to a model system prompt. An Agent that ignores a message still cannot use a revoked capability or cross a paused effect boundary.
+
+Each worker displays a control-status header:
+
+```text
+operator: agent.engineering.lead.04
+role seat: Engineering Lead
+mode: delegated
+objective revision: 4
+current step: validate migration in staging
+next effect: production promotion (blocked)
+budget: CNY 418 / 1,000
+assignment lease: 01:42:18 remaining
+human control: available
+```
+
+### 11.6 Human replacement and handoff protocol
+
+Taking over an Agent is an atomic state transition:
+
+```text
+takeover requested
+-> stop new dispatch
+-> wait for or cancel current safe boundary
+-> reconcile any in-flight external effect
+-> revoke Agent capabilities
+-> create signed checkpoint and handoff packet
+-> verify human identity and authority
+-> assign RoleSeat to human
+-> expose next safe actions
+```
+
+The handoff packet contains the active objective and revision history, completed effects and receipts, current plan and step, uncommitted artifacts, assumptions, unresolved decisions, risks, budget, credentials revoked, and rollback options. The human must never reconstruct the situation from raw chat.
+
+When the human finishes, they may close the WorkItem, retain the seat, return it to the same Agent, or select another worker. Returning work to AI creates a new lease and explicit scope; an old Agent process cannot silently resume.
+
+### 11.7 Prompt-based goal control
+
+Natural-language control is supported at three deliberately separate levels:
+
+1. **Context message:** adds evidence or preference; does not modify the objective.
+2. **Task redirect:** changes the current WorkItem's priority, scope, output, metric, deadline, or constraints through ObjectiveRevision.
+3. **Role policy change:** changes how a RoleSeat should behave across future WorkItems; requires a versioned policy proposal, evaluation, and authorized activation.
+
+The interface makes the chosen level visible before applying it. If the sentence is ambiguous, the safe default is a context message and the system asks whether the human intends a goal change. Phrases inside external documents, tool output, customer messages, or Agent messages can never create ObjectiveRevision; only authenticated humans with authority over the relevant WorkItem or RoleSeat can do so.
+
+Conflicting human instructions follow an explicit authority order based on company governance, not message recency. The compiler identifies the conflict, preserves both instructions, and routes it to the authorized decision owner. CEO and CTO domains remain distinct; one founder's prompt cannot silently override a dual-approval or domain-locked rule.
+
+### 11.8 Continuous controllability invariants
+
+- Every running Agent maps to one visible RoleSeat, Assignment, WorkItem, objective revision, budget, and capability set.
+- Every Agent is pausable, replaceable, and human-takeover-capable at defined effect boundaries.
+- New human constraints can immediately reduce authority; expanding authority requires normal approval.
+- Goal changes are versioned structured revisions, never destructive prompt replacement.
+- Old plans, approvals, and artifacts invalidated by a revision cannot remain executable.
+- No worker can hide, delay, or disable its control surface, audit stream, lease expiry, or stop mechanism.
+- If control-plane connectivity is lost, leases expire and workers fail closed before new external effects.
+- Human takeover does not erase audit, bypass segregation of duties, or grant authority the human does not hold.
+- A message to one Agent cannot mutate another Agent's objective except through the Work Graph and authorized revision propagation.
+- Replacing the model or worker does not change the governing objective, constraints, or evidence requirements.
+
+### 11.9 Progressive disclosure
 
 Important responses have three information layers:
 
@@ -398,7 +536,7 @@ The interface exposes rather than dumps deeper layers. CEO views emphasize custo
 
 The interface displays evidence strength independently from model confidence. “High confidence, weak evidence” must be visually distinguishable from “high confidence, strong evidence.” Historical accuracy for the workflow is shown where available.
 
-### 11.6 Decision-card contract
+### 11.10 Decision-card contract
 
 A decision card includes:
 
@@ -414,7 +552,7 @@ A decision card includes:
 
 Approval is bound to action, target, version, scope, and expiry. A stale card cannot execute. A card must not use deceptive urgency, preselected consent, ambiguous destructive controls, or color alone to convey risk.
 
-### 11.7 Attention and interruption budget
+### 11.11 Attention and interruption budget
 
 Notifications are classified independently from action risk:
 
@@ -428,7 +566,7 @@ Notifications are classified independently from action risk:
 
 One Incident Commander owns each root cause. The system deduplicates correlated alerts, prevents multiple agents from notifying the same human, respects focus hours for P2-P4, and measures founder interruptions, response time, and time spent. Reducing unnecessary human attention is an operating metric, not merely a UI preference.
 
-### 11.8 Correction and learning scope
+### 11.12 Correction and learning scope
 
 When a human corrects the system, the interface asks for the smallest necessary applicability:
 
@@ -441,13 +579,13 @@ company-wide rule
 
 A correction records the original behavior, corrected behavior, reason, applicability, re-execution requirement, owner, expiry, and review date. One conversational remark cannot silently become a company-wide policy. Workflow and company rules require explicit confirmation and regression evaluation before activation.
 
-### 11.9 Control and recoverability
+### 11.13 Control and recoverability
 
 Every effectful screen exposes its current mode and automation state. Pause, cancel, undo/rollback when feasible, and takeover are always reachable without navigating through agent-generated content. Before destructive or irreversible action, the interface shows the exact object, scope, consequence, recovery possibility, and required approvers.
 
-On takeover, the system produces a handoff packet containing current state, completed effects, uncommitted work, outstanding risks, credentials revoked, and safe next actions. It preserves the execution trail and does not attempt to continue in the background.
+On takeover, the system follows the RoleSeat handoff protocol above. It preserves the execution trail and does not attempt to continue in the background.
 
-### 11.10 Required interaction surfaces
+### 11.14 Required interaction surfaces
 
 The first release requires five coherent surfaces, to be specified visually after this logical protocol is accepted:
 
@@ -456,10 +594,11 @@ The first release requires five coherent surfaces, to be specified visually afte
 3. Decision inbox ordered by business impact, urgency, and expiry rather than arrival time.
 4. Project room containing objective, state, swarm, artifacts, evidence, budget, timeline, and control actions.
 5. Daily brief showing what changed, what was learned, what the system handled, what is next, and what requires attention.
+6. Role and worker control panel showing the RoleSeat, current occupant, objective diff, live step, capability/budget state, and inspect, redirect, constrain, pause, stop, take over, replace, pair, and resume actions.
 
 GitHub remains authoritative for engineering artifacts. The human interface shows summaries and deep links rather than creating a competing copy of code, tests, or PR state.
 
-### 11.11 Human-machine interaction metrics
+### 11.15 Human-machine interaction metrics
 
 Measure decision completion time, clarification rounds, false or unnecessary escalations, ignored-notification rate, founder minutes per completed outcome, takeover rate, correction rate, correction recurrence, approval reversals, evidence-open rate, and comprehension errors found in usability tests. Optimization must not suppress legitimate risk alerts merely to improve interruption metrics.
 
@@ -504,7 +643,7 @@ Engineering and growth agents are added only after the control plane passes its 
 
 | Days | Deliverable | Maximum autonomy |
 |---|---|---|
-| 1-14 | Goal/work/decision/approval/evidence models; GitHub and Feishu/DingTalk; identity, audit, stop controls; first four agents | R0-R1 |
+| 1-14 | Goal/work/decision/approval/evidence, RoleSeat/Assignment, and ObjectiveRevision models; GitHub and Feishu/DingTalk; identity, audit, stop/takeover controls; first four agents | R0-R1 |
 | 15-28 | Product spec to reviewed PR and test-environment deployment | R1 |
 | 29-42 | Feature flags, progressive release, rollback, product-feedback loop | R2 for proven reversible workflows |
 | 43-56 | ICP, content, CRM, sales follow-up, and attributable growth experiments | R2 |
@@ -523,7 +662,7 @@ Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy
 
 ### Day 2: repositories and schemas
 
-- Select the operating-system repository and create versioned schemas for CompanyEvent, WorkItem, Decision, Approval, and Evidence.
+- Select the operating-system repository and create versioned schemas for CompanyEvent, WorkItem, Decision, Approval, Evidence, RoleSeat, Assignment, and ObjectiveRevision.
 - Add owner, risk, budget, evidence, and rollback templates to GitHub.
 
 ### Day 3: identity and policy
@@ -531,6 +670,7 @@ Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy
 - Create the first four service identities.
 - Implement deny-by-default capability manifests and short-lived credentials.
 - Encode R0-R5 rules and prohibited actions in deterministic policy.
+- Implement assignment leases, capability revocation, safe checkpoints, and atomic human takeover.
 
 ### Day 4: command surface
 
@@ -538,6 +678,7 @@ Autonomy levels are L0 suggestion, L1 low-risk execution, L2 reversible autonomy
 - Implement `/goal`, `/project`, `/status`, `/decision`, `/approve`, `/reject`, `/stop`, and `/brief`.
 - Implement conversation, work, and decision-space boundaries so ordinary chat cannot authorize effects.
 - Implement Objective Contract preview and explicit confirmation before WorkItem authorization.
+- Implement natural-language redirect as a previewed ObjectiveRevision rather than direct prompt mutation.
 
 ### Day 5: durable orchestration
 
@@ -562,7 +703,7 @@ Verification has four layers:
 
 1. Unit: schemas, policy decisions, transitions, budgets, idempotency, and capability attenuation.
 2. Workflow: product release, marketing experiment, customer complaint, refund proposal, contract review, and incident recovery.
-3. Interaction: ambiguous intent, ordinary-chat non-authorization, safe silence, decision comprehension, correction scope, pause/takeover, progressive disclosure, keyboard access, and notification deduplication.
+3. Interaction: ambiguous intent, ordinary-chat non-authorization, safe silence, objective-revision diff comprehension, correction scope, pause/takeover/replace, human-to-agent return, progressive disclosure, keyboard access, and notification deduplication.
 4. Adversarial: prompt injection, forged approval, stale decision card, privilege escalation, secret exfiltration, self-review, audit deletion, dark-pattern consent, and runaway child creation.
 5. Business: time-to-release, founder minutes per outcome, human rework, cost-per-outcome, product activation, qualified leads, paid conversion, retention, and gross margin.
 
@@ -596,6 +737,10 @@ This design is implemented only when:
 - Silence, casual agreement, and stale decision cards never authorize an effect.
 - Every important decision exposes evidence, uncertainty, alternatives, non-action behavior, and exact authority scope.
 - Humans can pause, correct, constrain, or take over work without losing execution history.
+- Every RoleSeat can be occupied by an Agent, an authorized human, or a controlled human-agent pair without changing the governing WorkItem.
+- Authenticated humans can redirect an Agent through natural language, but the system previews and versions the structured goal change before it takes effect.
+- Replacing or taking over an Agent atomically revokes the old assignment, preserves a complete checkpoint, and prevents background continuation.
+- Agent control is enforced through workflow state, capability revocation, assignment leases, and policy rather than reliance on prompt obedience.
 - Corrections have explicit applicability and cannot silently become company policy.
 - Notifications are deduplicated, prioritized, measurable, and bounded by an attention budget.
 - No agent can approve itself, expand its own authority, alter governance, or cross the seven hard prohibitions.
