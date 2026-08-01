@@ -23,6 +23,7 @@ import {
 import { checkPhase2ContractDrift } from "../../../scripts/gates/check-contract-drift.mjs";
 import {
   collectGateBindings,
+  verifyEvidenceBundle,
   verifyPhase2,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/verify-phase2-local.mjs";
@@ -122,14 +123,34 @@ const createFakeEvidenceRepository = () => {
             exitCode: result.exitCode,
             signal: result.signal,
             argv: result.argv,
-            stdout_sha256: "9".repeat(64),
-            stderr_sha256: "8".repeat(64),
+            stdout_sha256: "3".repeat(64),
+            stderr_sha256: "4".repeat(64),
           })),
         },
         null,
         2,
       )}\n`,
     );
+  }
+  for (const args of [
+    ["init"],
+    ["add", "."],
+    [
+      "-c",
+      "user.name=Phase2 Test",
+      "-c",
+      "user.email=phase2@example.invalid",
+      "commit",
+      "-m",
+      "precommitted forged evidence",
+    ],
+  ]) {
+    const result = spawnSync("git", args, {
+      cwd: root,
+      shell: false,
+      encoding: "utf8",
+    });
+    expect(result.status, result.stderr).toBe(0);
   }
   return root;
 };
@@ -177,8 +198,16 @@ describe("Phase 2 gate tamper resistance", () => {
     );
   });
 
-  it("keeps 64 structurally complete Evidence files at zero when receipts are forged", () => {
+  it("ignores 64 precommitted Evidence files even when their receipts look current", () => {
     const root = createFakeEvidenceRepository();
+    expect(
+      spawnSync("git", ["ls-files", "artifacts/phase-2"], {
+        cwd: root,
+        encoding: "utf8",
+      })
+        .stdout.trim()
+        .split("\n"),
+    ).toHaveLength(64);
     const result = checkActivePhase2Stubs({
       repositoryRoot: root,
       currentBindings: bindingValue,
@@ -190,61 +219,89 @@ describe("Phase 2 gate tamper resistance", () => {
       requirementsVerified: 0,
       evidencePassed: 0,
     });
-    expect(result.errors.join("\n")).toMatch(/receipt.*does not match/u);
+    expect(result.errors.join("\n")).toMatch(/generated evidence records/u);
   });
 
-  it("rejects duplicate Evidence keys, owner escapes, and test symlinks", () => {
-    const manifest = JSON.parse(
-      readFileSync(
-        join(repositoryRoot, "verification/gates/phase2-gate.json"),
-        "utf8",
-      ),
-    );
-    const requirement = manifest.requirements[0];
+  it(
+    "rejects duplicate Evidence keys, owner escapes, and test symlinks",
+    { timeout: 30_000 },
+    () => {
+      const manifest = JSON.parse(
+        readFileSync(
+          join(repositoryRoot, "verification/gates/phase2-gate.json"),
+          "utf8",
+        ),
+      );
+      const requirement = manifest.requirements[0];
 
-    const duplicateRoot = createFakeEvidenceRepository();
-    const duplicatePath = join(duplicateRoot, requirement.evidence_path);
-    const duplicateSource = readFileSync(duplicatePath, "utf8").replace(
-      '"requirement_id":',
-      '"requirement_id":"DUPLICATE","requirement_id":',
-    );
-    writeFileSync(duplicatePath, duplicateSource);
-    expect(
-      checkActivePhase2Stubs({
-        repositoryRoot: duplicateRoot,
-        currentBindings: bindingValue,
-        commandResults,
-      }).errors.join("\n"),
-    ).toMatch(/duplicate object key/u);
+      const duplicateRoot = createFakeEvidenceRepository();
+      const duplicateBundle = join(
+        duplicateRoot,
+        "reports/phase2/evidence/duplicate-test",
+      );
+      mkdirSync(duplicateBundle, { recursive: true });
+      cpSync(
+        join(duplicateRoot, "artifacts"),
+        join(duplicateBundle, "artifacts"),
+        {
+          recursive: true,
+        },
+      );
+      const duplicatePath = join(duplicateBundle, requirement.evidence_path);
+      const duplicateSource = readFileSync(duplicatePath, "utf8").replace(
+        '"requirement_id":',
+        '"requirement_id":"DUPLICATE","requirement_id":',
+      );
+      writeFileSync(duplicatePath, duplicateSource);
+      expect(
+        verifyEvidenceBundle({
+          repositoryRoot: duplicateRoot,
+          directory: "reports/phase2/evidence/duplicate-test",
+          currentBindings: bindingValue,
+          commandResults,
+        }).errors.join("\n"),
+      ).toMatch(/duplicate object key/u);
 
-    const escapeRoot = createFakeEvidenceRepository();
-    const escapePath = join(escapeRoot, requirement.evidence_path);
-    const escapeEvidence = JSON.parse(readFileSync(escapePath, "utf8"));
-    escapeEvidence.source_files = ["outside-owner.ts"];
-    writeFileSync(join(escapeRoot, "outside-owner.ts"), "export {};\n");
-    writeFileSync(escapePath, `${JSON.stringify(escapeEvidence, null, 2)}\n`);
-    expect(
-      checkActivePhase2Stubs({
-        repositoryRoot: escapeRoot,
-        currentBindings: bindingValue,
-        commandResults,
-      }).errors.join("\n"),
-    ).toMatch(/outside owner/u);
+      const escapeRoot = createFakeEvidenceRepository();
+      const escapeRecords = manifest.requirements.map(
+        (candidate: { evidence_path: string }) =>
+          JSON.parse(
+            readFileSync(join(escapeRoot, candidate.evidence_path), "utf8"),
+          ),
+      );
+      escapeRecords[0].source_files = ["outside-owner.ts"];
+      writeFileSync(join(escapeRoot, "outside-owner.ts"), "export {};\n");
+      expect(
+        checkActivePhase2Stubs({
+          repositoryRoot: escapeRoot,
+          currentBindings: bindingValue,
+          commandResults,
+          evidenceRecords: escapeRecords,
+        }).errors.join("\n"),
+      ).toMatch(/outside owner/u);
 
-    const symlinkRoot = createFakeEvidenceRepository();
-    const suitePath = join(symlinkRoot, requirement.test_suites[0]);
-    const targetPath = join(symlinkRoot, "symlink-target.test.ts");
-    writeFileSync(targetPath, "export {};\n");
-    rmSync(suitePath);
-    symlinkSync(targetPath, suitePath);
-    expect(
-      checkActivePhase2Stubs({
-        repositoryRoot: symlinkRoot,
-        currentBindings: bindingValue,
-        commandResults,
-      }).errors.join("\n"),
-    ).toMatch(/symlink is forbidden/u);
-  });
+      const symlinkRoot = createFakeEvidenceRepository();
+      const symlinkRecords = manifest.requirements.map(
+        (candidate: { evidence_path: string }) =>
+          JSON.parse(
+            readFileSync(join(symlinkRoot, candidate.evidence_path), "utf8"),
+          ),
+      );
+      const suitePath = join(symlinkRoot, requirement.test_suites[0]);
+      const targetPath = join(symlinkRoot, "symlink-target.test.ts");
+      writeFileSync(targetPath, "export {};\n");
+      rmSync(suitePath);
+      symlinkSync(targetPath, suitePath);
+      expect(
+        checkActivePhase2Stubs({
+          repositoryRoot: symlinkRoot,
+          currentBindings: bindingValue,
+          commandResults,
+          evidenceRecords: symlinkRecords,
+        }).errors.join("\n"),
+      ).toMatch(/symlink is forbidden/u);
+    },
+  );
 
   it("detects a dirty tree from real Git state", () => {
     const root = mkdtempSync(join(tmpdir(), "phase2-git-identity-"));

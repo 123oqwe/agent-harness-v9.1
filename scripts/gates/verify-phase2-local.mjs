@@ -1,19 +1,32 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkPhase2ContractDrift } from "./check-contract-drift.mjs";
-import { checkActivePhase2Stubs } from "./check-active-stubs.mjs";
+import {
+  checkActivePhase2Stubs,
+  createPhase2EvidenceRecords,
+  loadPhase2Authority,
+  parseStrictJson,
+} from "./check-active-stubs.mjs";
 import {
   createSafeCommandEnvironment,
   executeGateCommands,
@@ -315,11 +328,294 @@ export const collectGateBindings = (repositoryRoot) => {
   };
 };
 
+const safeRelativePath = (path) =>
+  typeof path === "string" &&
+  path.length > 0 &&
+  !isAbsolute(path) &&
+  !path.split(/[\\/]/u).includes("..") &&
+  path.split(/[\\/]/u).every(Boolean);
+
+const staysInside = (root, candidate) => {
+  const relation = relative(root, candidate);
+  return (
+    relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))
+  );
+};
+
+const secureEvidenceDirectory = (root, directory, errors) => {
+  const normalized = String(directory).replaceAll("\\", "/");
+  if (
+    !safeRelativePath(normalized) ||
+    !normalized.startsWith("reports/phase2/")
+  ) {
+    errors.push(`unsafe Evidence directory ${String(directory)}`);
+    return null;
+  }
+  let current = root;
+  for (const segment of normalized.split("/")) {
+    current = join(current, segment);
+    if (!existsSync(current)) {
+      errors.push(`missing Evidence directory ${normalized}`);
+      return null;
+    }
+    if (lstatSync(current).isSymbolicLink()) {
+      errors.push(`symlink is forbidden in Evidence directory ${normalized}`);
+      return null;
+    }
+  }
+  const actualRoot = realpathSync(root);
+  const actual = realpathSync(current);
+  if (!staysInside(actualRoot, actual) || !statSync(actual).isDirectory()) {
+    errors.push(`Evidence directory escapes repository ${normalized}`);
+    return null;
+  }
+  return { absolute: actual, relative: normalized };
+};
+
+const evidenceSet = (entries) => {
+  const hash = createHash("sha256");
+  const files = [];
+  for (const entry of [...entries].sort((left, right) =>
+    left.logicalPath.localeCompare(right.logicalPath),
+  )) {
+    hash.update(entry.logicalPath);
+    hash.update("\0");
+    hash.update(entry.bytes);
+    hash.update("\0");
+    files.push({
+      logicalPath: entry.logicalPath,
+      sha256: sha256(entry.bytes),
+    });
+  }
+  return { count: files.length, setSha256: hash.digest("hex"), files };
+};
+
+const fsyncFile = (path) => {
+  const descriptor = openSync(path, "r");
+  try {
+    fsyncSync(descriptor);
+  } finally {
+    closeSync(descriptor);
+  }
+};
+
+const fsyncDirectoryTree = (directory) => {
+  const directories = [];
+  const visit = (path) => {
+    directories.push(path);
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      if (entry.isDirectory()) visit(join(path, entry.name));
+    }
+  };
+  visit(directory);
+  for (const path of directories.reverse()) fsyncFile(path);
+};
+
+export const verifyEvidenceBundle = ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  directory,
+  expected,
+  currentBindings,
+  commandResults,
+} = {}) => {
+  const root = resolve(repositoryRoot);
+  const errors = [];
+  const authority = loadPhase2Authority({ repositoryRoot: root });
+  errors.push(...authority.errors);
+  const bundle = secureEvidenceDirectory(root, directory, errors);
+  if (!authority.manifest?.requirements || !bundle) {
+    return {
+      ok: false,
+      errors,
+      count: 0,
+      setSha256: EMPTY_SHA256,
+      files: [],
+      directory: directory ?? null,
+    };
+  }
+  const expectedPaths = authority.manifest.requirements
+    .map((requirement) => requirement.evidence_path)
+    .sort();
+  const actualPaths = [];
+  const visit = (path) => {
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const child = join(path, entry.name);
+      if (entry.isSymbolicLink()) {
+        errors.push(
+          `symlink is forbidden in Evidence bundle ${relative(bundle.absolute, child)}`,
+        );
+      } else if (entry.isDirectory()) visit(child);
+      else if (entry.isFile())
+        actualPaths.push(
+          relative(bundle.absolute, child).replaceAll("\\", "/"),
+        );
+      else errors.push(`non-file entry in Evidence bundle ${entry.name}`);
+    }
+  };
+  visit(bundle.absolute);
+  actualPaths.sort();
+  if (stableJson(actualPaths) !== stableJson(expectedPaths)) {
+    errors.push("Evidence bundle file set does not match authority");
+  }
+  const records = [];
+  const entries = [];
+  for (const logicalPath of expectedPaths) {
+    if (!safeRelativePath(logicalPath)) {
+      errors.push(`unsafe logical Evidence path ${String(logicalPath)}`);
+      continue;
+    }
+    const absolute = join(bundle.absolute, logicalPath);
+    if (!existsSync(absolute) || lstatSync(absolute).isSymbolicLink()) {
+      errors.push(`missing or symlinked Evidence file ${logicalPath}`);
+      continue;
+    }
+    const bytes = readFileSync(absolute);
+    entries.push({ logicalPath, bytes });
+    try {
+      records.push(parseStrictJson(bytes, `Evidence ${logicalPath}`));
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  const summary = evidenceSet(entries);
+  const readiness = checkActivePhase2Stubs({
+    repositoryRoot: root,
+    currentBindings,
+    commandResults,
+    evidenceRecords: records,
+  });
+  errors.push(...readiness.errors);
+  if (expected) {
+    if (summary.count !== expected.count)
+      errors.push("Evidence count mismatch");
+    if (summary.setSha256 !== expected.setSha256)
+      errors.push("Evidence set hash mismatch");
+    if (stableJson(summary.files) !== stableJson(expected.files))
+      errors.push("Evidence file hash manifest mismatch");
+  }
+  return {
+    ok: errors.length === 0 && readiness.releaseReady,
+    errors,
+    ...summary,
+    directory: bundle.relative,
+  };
+};
+
+export const publishPhase2Evidence = ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  currentBindings,
+  commandResults,
+  failureInjector = () => {},
+  runId = randomUUID(),
+} = {}) => {
+  const root = resolve(repositoryRoot);
+  const generated = createPhase2EvidenceRecords({
+    repositoryRoot: root,
+    currentBindings,
+    commandResults,
+  });
+  if (generated.errors.length > 0 || generated.records.length !== 64) {
+    throw new Error(
+      `Evidence generation failed: ${generated.errors.join("; ") || `${generated.records.length}/64 records`}`,
+    );
+  }
+  const inMemory = checkActivePhase2Stubs({
+    repositoryRoot: root,
+    currentBindings,
+    commandResults,
+    evidenceRecords: generated.records,
+  });
+  if (!inMemory.releaseReady) {
+    throw new Error(
+      `in-memory Evidence validation failed: ${inMemory.errors.join("; ")}`,
+    );
+  }
+  const commitSha = currentBindings?.commitSha;
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(commitSha ?? ""))
+    throw new Error("Evidence publication requires a full commit SHA");
+  if (!/^[a-f0-9-]+$/u.test(runId))
+    throw new Error("Evidence publication runId is unsafe");
+  const reportsRoot = join(root, "reports", "phase2");
+  const evidenceRoot = join(reportsRoot, "evidence");
+  const temporary = join(reportsRoot, `.evidence-${runId}.tmp`);
+  const final = join(evidenceRoot, `${commitSha}-${runId}`);
+  const finalRelative = relative(root, final).replaceAll("\\", "/");
+  let renamed = false;
+  try {
+    mkdirSync(reportsRoot, { recursive: true, mode: 0o700 });
+    mkdirSync(evidenceRoot, { recursive: true, mode: 0o700 });
+    mkdirSync(temporary, { mode: 0o700 });
+    const authority = loadPhase2Authority({ repositoryRoot: root });
+    if (authority.errors.length > 0 || !authority.manifest?.requirements)
+      throw new Error(
+        `cannot load Evidence authority: ${authority.errors.join("; ")}`,
+      );
+    const pathsById = new Map(
+      authority.manifest.requirements.map((requirement) => [
+        requirement.id,
+        requirement.evidence_path,
+      ]),
+    );
+    const writeAt = Math.floor(generated.records.length / 2);
+    for (const [index, record] of generated.records.entries()) {
+      if (index === writeAt) failureInjector("write");
+      const logicalPath = pathsById.get(record.requirement_id);
+      if (!safeRelativePath(logicalPath))
+        throw new Error(`unsafe logical Evidence path ${String(logicalPath)}`);
+      const path = join(temporary, logicalPath);
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+        flag: "wx",
+      });
+      fsyncFile(path);
+    }
+    failureInjector("validate");
+    const temporaryRelative = relative(root, temporary).replaceAll("\\", "/");
+    const checked = verifyEvidenceBundle({
+      repositoryRoot: root,
+      directory: temporaryRelative,
+      currentBindings,
+      commandResults,
+    });
+    if (!checked.ok)
+      throw new Error(
+        `written Evidence validation failed: ${checked.errors.join("; ")}`,
+      );
+    fsyncDirectoryTree(temporary);
+    if (existsSync(final))
+      throw new Error("Evidence version directory already exists");
+    failureInjector("rename");
+    renameSync(temporary, final);
+    renamed = true;
+    fsyncFile(evidenceRoot);
+    const published = verifyEvidenceBundle({
+      repositoryRoot: root,
+      directory: finalRelative,
+      expected: checked,
+      currentBindings,
+      commandResults,
+    });
+    if (!published.ok)
+      throw new Error(
+        `published Evidence validation failed: ${published.errors.join("; ")}`,
+      );
+    return published;
+  } catch (error) {
+    rmSync(temporary, { recursive: true, force: true });
+    if (renamed) rmSync(final, { recursive: true, force: true });
+    throw error;
+  }
+};
+
 export const verifyPhase2 = async ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   mode = "dev",
   runner = runCommand,
   identityCollector = collectGateBindings,
+  evidencePublisher = publishPhase2Evidence,
+  evidenceFailureInjector,
   reportPath,
   signal,
 } = {}) => {
@@ -354,39 +650,83 @@ export const verifyPhase2 = async ({
     }
   }
   const postIdentity = mode === "local" ? identityCollector(root) : identity;
+  let identityStable = mode !== "local";
   if (mode === "local") {
-    if (
-      postIdentity.dirty ||
-      postIdentity.errors.length > 0 ||
-      stableJson(postIdentity.bindings) !== stableJson(identity.bindings)
-    ) {
+    identityStable =
+      !postIdentity.dirty &&
+      postIdentity.errors.length === 0 &&
+      stableJson(postIdentity.bindings) === stableJson(identity.bindings);
+    if (!identityStable) {
       errors.push("repository identity changed during the release gate");
       errors.push(...postIdentity.errors);
       blockers.push({ code: "repository_changed_during_gate" });
     }
   }
-  const readiness =
-    mode === "local"
-      ? checkActivePhase2Stubs({
-          repositoryRoot: root,
-          currentBindings: postIdentity.bindings,
-          commandResults: execution.results,
-        })
-      : null;
-  if (mode === "local" && readiness && !readiness.releaseReady) {
-    errors.push(
-      `Phase 2 Evidence incomplete: ${readiness.claims.evidencePassed}/64`,
-    );
+  let evidence = {
+    count: 0,
+    setSha256: EMPTY_SHA256,
+    files: [],
+    directory: null,
+  };
+  let claims = { requirementsVerified: 0, evidencePassed: 0 };
+  if (
+    mode === "local" &&
+    execution.ok &&
+    !identity.dirty &&
+    identityStable &&
+    errors.length === 0
+  ) {
+    try {
+      const published = evidencePublisher({
+        repositoryRoot: root,
+        currentBindings: postIdentity.bindings,
+        commandResults: execution.results,
+        failureInjector: evidenceFailureInjector,
+      });
+      if (
+        published?.ok !== true ||
+        published.count !== 64 ||
+        !/^[a-f0-9]{64}$/u.test(published.setSha256 ?? "") ||
+        !Array.isArray(published.files) ||
+        published.files.length !== 64 ||
+        typeof published.directory !== "string"
+      ) {
+        throw new Error(
+          `Evidence publisher returned an invalid release set (${String(published?.count)}/64)`,
+        );
+      }
+      evidence = {
+        count: published.count,
+        setSha256: published.setSha256,
+        files: published.files,
+        directory: published.directory,
+      };
+      claims = { requirementsVerified: 64, evidencePassed: 64 };
+    } catch (error) {
+      errors.push(
+        `Evidence publication failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      blockers.push({ code: "evidence_publication_failed" });
+      evidence = {
+        count: 0,
+        setSha256: EMPTY_SHA256,
+        files: [],
+        directory: null,
+      };
+    }
+  }
+  if (mode === "local" && evidence.count !== 64) {
+    errors.push(`Phase 2 Evidence incomplete: ${claims.evidencePassed}/64`);
     blockers.push({
       code: "evidence_incomplete",
-      verified: readiness.claims.evidencePassed,
+      verified: claims.evidencePassed,
       required: 64,
     });
   }
   const releaseReady =
     mode === "local" &&
     execution.ok &&
-    readiness?.releaseReady === true &&
+    evidence.count === 64 &&
     errors.length === 0;
   const success =
     mode === "dev" ? errors.length === 0 && execution.ok : releaseReady;
@@ -397,11 +737,12 @@ export const verifyPhase2 = async ({
     releaseReady,
     claims:
       mode === "local"
-        ? (readiness?.claims ?? { requirementsVerified: 0, evidencePassed: 0 })
+        ? claims
         : { requirementsVerified: 0, evidencePassed: 0 },
     errors,
     blockers,
     bindings: postIdentity.bindings,
+    evidence,
     commands: execution.results,
   };
   const destination =

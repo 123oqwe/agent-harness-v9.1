@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
@@ -20,6 +21,7 @@ import {
 import { fileURLToPath } from "node:url";
 
 import { validatePhase2Manifest } from "./check-phase2-manifest.mjs";
+import { createSafeCommandEnvironment } from "./run-command.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
@@ -79,7 +81,7 @@ const stableJson = (value) => {
   return JSON.stringify(value);
 };
 
-const parseStrictJson = (bytes, label) => {
+export const parseStrictJson = (bytes, label) => {
   if (bytes.length > MAX_JSON_BYTES)
     throw new SyntaxError(`${label} exceeds byte limit`);
   const source = bytes.toString("utf8");
@@ -266,6 +268,14 @@ const loadManifest = (root, errors) => {
   return manifest;
 };
 
+export const loadPhase2Authority = ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+} = {}) => {
+  const errors = [];
+  const manifest = loadManifest(resolve(repositoryRoot), errors);
+  return { manifest, errors };
+};
+
 const semanticSourceFiles = (root, owner, errors) => {
   const directory = securePath(
     root,
@@ -290,6 +300,62 @@ const semanticSourceFiles = (root, owner, errors) => {
   };
   visit(directory);
   return result;
+};
+
+export const collectTrackedOwnerSourceFiles = ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  owner,
+  trackedPaths,
+} = {}) => {
+  const root = resolve(repositoryRoot);
+  const actualRoot = realpathSync(root);
+  const errors = [];
+  const semantic = semanticSourceFiles(root, owner, errors).map((path) =>
+    relative(actualRoot, path).replaceAll("\\", "/"),
+  );
+  if (errors.length > 0) return { files: [], errors };
+  let repositoryTrackedPaths = trackedPaths;
+  if (!(repositoryTrackedPaths instanceof Set)) {
+    const tracked = spawnSync("git", ["ls-files", "-z", "--"], {
+      cwd: root,
+      env: createSafeCommandEnvironment(),
+      shell: false,
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    if (tracked.status !== 0) {
+      errors.push(
+        `owner ${String(owner)}: git ls-files failed with exit ${String(tracked.status)}`,
+      );
+      return { files: [], errors };
+    }
+    repositoryTrackedPaths = new Set(
+      tracked.stdout.split("\0").filter(Boolean),
+    );
+  }
+  const files = semantic
+    .filter((path) => repositoryTrackedPaths.has(path))
+    .sort();
+  if (files.length === 0)
+    errors.push(`owner ${String(owner)}: no tracked source files`);
+  return { files, errors };
+};
+
+const collectTrackedRepositoryPaths = (root, errors) => {
+  const tracked = spawnSync("git", ["ls-files", "-z", "--"], {
+    cwd: root,
+    env: createSafeCommandEnvironment(),
+    shell: false,
+    encoding: "utf8",
+    maxBuffer: 4 * 1024 * 1024,
+    timeout: 30_000,
+  });
+  if (tracked.status !== 0) {
+    errors.push(`git ls-files failed with exit ${String(tracked.status)}`);
+    return new Set();
+  }
+  return new Set(tracked.stdout.split("\0").filter(Boolean));
 };
 
 const emptyResult = (errors, activeRequirementIds = []) => ({
@@ -353,7 +419,7 @@ export const scanActivePhase2Stubs = ({
   };
 };
 
-const normalizedReceipt = (result) => ({
+export const normalizedReceipt = (result) => ({
   id: result?.id,
   status: result?.status,
   exitCode: result?.exitCode,
@@ -363,7 +429,7 @@ const normalizedReceipt = (result) => ({
   stderr_sha256: result?.stderr?.sha256,
 });
 
-const requiredReceiptIds = (requirement) => {
+export const requiredReceiptIds = (requirement) => {
   const ids = new Set(GLOBAL_RELEASE_RECEIPTS);
   for (const suite of requirement.test_suites ?? []) {
     const category = suite.split("/")[2];
@@ -373,19 +439,92 @@ const requiredReceiptIds = (requirement) => {
   return [...ids];
 };
 
+export const createPhase2EvidenceRecords = ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  currentBindings,
+  commandResults,
+} = {}) => {
+  const root = resolve(repositoryRoot);
+  const errors = [];
+  if (!currentBindings || !Array.isArray(commandResults)) {
+    return {
+      records: [],
+      errors: [
+        "Evidence generation requires current bindings and command results",
+      ],
+    };
+  }
+  const scan = scanActivePhase2Stubs({ repositoryRoot: root });
+  errors.push(...scan.errors);
+  if (scan.activeRequirementIds.length > 0) {
+    errors.push(
+      `Evidence generation blocked by ${scan.activeRequirementIds.length} active requirements`,
+    );
+  }
+  const manifest = loadManifest(root, errors);
+  if (!manifest?.requirements || errors.length > 0)
+    return { records: [], errors };
+  const resultsById = new Map(
+    commandResults.map((result) => [result?.id, result]),
+  );
+  const trackedPaths = collectTrackedRepositoryPaths(root, errors);
+  if (errors.length > 0) return { records: [], errors };
+  const sourcesByOwner = new Map();
+  const records = [];
+  for (const requirement of manifest.requirements) {
+    if (!sourcesByOwner.has(requirement.owner)) {
+      sourcesByOwner.set(
+        requirement.owner,
+        collectTrackedOwnerSourceFiles({
+          repositoryRoot: root,
+          owner: requirement.owner,
+          trackedPaths,
+        }),
+      );
+    }
+    const sourceResult = sourcesByOwner.get(requirement.owner);
+    if (sourceResult.errors.length > 0) {
+      errors.push(
+        ...sourceResult.errors.map((error) => `${requirement.id}: ${error}`),
+      );
+      continue;
+    }
+    const receipts = [];
+    let receiptsComplete = true;
+    for (const id of requiredReceiptIds(requirement)) {
+      const result = resultsById.get(id);
+      if (
+        !result ||
+        result.status !== "passed" ||
+        result.exitCode !== 0 ||
+        result.signal !== null
+      ) {
+        errors.push(`${requirement.id}: missing clean command receipt ${id}`);
+        receiptsComplete = false;
+      } else receipts.push(normalizedReceipt(result));
+    }
+    if (!receiptsComplete) continue;
+    records.push({
+      requirement_id: requirement.id,
+      status: "verified",
+      bindings: JSON.parse(JSON.stringify(currentBindings)),
+      source_files: [...sourceResult.files],
+      test_files: [...requirement.test_suites],
+      command_receipts: receipts,
+    });
+  }
+  return { records, errors };
+};
+
 const validateEvidence = ({
   root,
   requirement,
+  evidence,
   currentBindings,
   resultsById,
+  trackedSourceFiles,
   errors,
 }) => {
-  const evidence = readStrictRepositoryJson(
-    root,
-    requirement.evidence_path,
-    errors,
-    `${requirement.id} evidence`,
-  );
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence))
     return false;
   for (const key of Object.keys(evidence)) {
@@ -417,7 +556,12 @@ const validateEvidence = ({
         errors.push(
           `${requirement.id}: source file is outside owner ${String(path)}`,
         );
-      } else securePath(root, path, "file", errors, requirement.id);
+      } else {
+        securePath(root, path, "file", errors, requirement.id);
+        if (!trackedSourceFiles.has(path)) {
+          errors.push(`${requirement.id}: source file is not tracked ${path}`);
+        }
+      }
     }
   }
   if (
@@ -474,16 +618,25 @@ export const checkActivePhase2Stubs = ({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   currentBindings,
   commandResults,
+  evidenceRecords,
 } = {}) => {
   const root = resolve(repositoryRoot);
   const scan = scanActivePhase2Stubs({ repositoryRoot: root });
-  if (!currentBindings || !Array.isArray(commandResults)) {
+  if (
+    !currentBindings ||
+    !Array.isArray(commandResults) ||
+    !Array.isArray(evidenceRecords)
+  ) {
+    const authorityErrors = [];
+    const authority = loadManifest(root, authorityErrors);
     return emptyResult(
       [
         ...scan.errors,
-        "release Evidence validation requires current bindings and command results",
+        ...authorityErrors,
+        "release Evidence validation requires current bindings, command results, and generated evidence records",
       ],
-      scan.activeRequirementIds,
+      authority?.requirements?.map((requirement) => requirement.id) ??
+        scan.activeRequirementIds,
     );
   }
   const errors = [...scan.errors];
@@ -493,15 +646,56 @@ export const checkActivePhase2Stubs = ({
   const resultsById = new Map(
     commandResults.map((result) => [result?.id, result]),
   );
+  const recordsById = new Map();
+  const requirementIds = new Set(
+    manifest.requirements.map((requirement) => requirement.id),
+  );
+  for (const record of evidenceRecords) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      errors.push("generated evidence record must be an object");
+      continue;
+    }
+    if (!requirementIds.has(record.requirement_id)) {
+      errors.push(
+        `unknown generated evidence record ${String(record.requirement_id)}`,
+      );
+      continue;
+    }
+    if (recordsById.has(record.requirement_id)) {
+      errors.push(
+        `duplicate generated evidence record ${String(record.requirement_id)}`,
+      );
+      continue;
+    }
+    recordsById.set(record.requirement_id, record);
+  }
   const active = new Set(scan.activeRequirementIds);
+  const trackedErrors = [];
+  const trackedPaths = collectTrackedRepositoryPaths(root, trackedErrors);
+  errors.push(...trackedErrors);
+  const trackedByOwner = new Map();
   let evidencePassed = 0;
   for (const requirement of manifest.requirements) {
     const requirementErrors = [];
+    if (!trackedByOwner.has(requirement.owner)) {
+      trackedByOwner.set(
+        requirement.owner,
+        collectTrackedOwnerSourceFiles({
+          repositoryRoot: root,
+          owner: requirement.owner,
+          trackedPaths,
+        }),
+      );
+    }
+    const tracked = trackedByOwner.get(requirement.owner);
+    requirementErrors.push(...tracked.errors);
     const passed = validateEvidence({
       root,
       requirement,
+      evidence: recordsById.get(requirement.id),
       currentBindings,
       resultsById,
+      trackedSourceFiles: new Set(tracked.files),
       errors: requirementErrors,
     });
     if (!passed || requirementErrors.length > 0) active.add(requirement.id);

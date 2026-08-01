@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -18,9 +21,109 @@ import {
   writeAtomicGateReport,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/run-command.mjs";
+import {
+  collectGateBindings,
+  phase2CommandGraph,
+  verifyEvidenceBundle,
+  verifyPhase2,
+  // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/verify-phase2-local.mjs";
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const bindingValue = {
+  commitSha: "a".repeat(40),
+  treeSha: "b".repeat(40),
+  packageLockSha256: "c".repeat(64),
+  manifestSha256: "d".repeat(64),
+  mutationConfigSha256: "e".repeat(64),
+  assetsSha256: "f".repeat(64),
+  runnerSha256: "1".repeat(64),
+  runnerVersion: "phase2-gate-report/v1",
+};
+
+const git = (root: string, ...args: string[]) => {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    shell: false,
+    encoding: "utf8",
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim();
+};
+
+const createCompletePhase2Repository = () => {
+  const root = mkdtempSync(join(tmpdir(), "phase2-evidence-generation-"));
+  const manifestPath = "verification/gates/phase2-gate.json";
+  const manifest = JSON.parse(
+    readFileSync(join(repositoryRoot, manifestPath), "utf8"),
+  );
+  mkdirSync(join(root, dirname(manifestPath)), { recursive: true });
+  cpSync(join(repositoryRoot, manifestPath), join(root, manifestPath));
+  for (const owner of new Set<string>(
+    manifest.requirements.map(
+      (requirement: { owner: string }) => requirement.owner,
+    ),
+  )) {
+    const source = join(root, owner, "src", "implementation.ts");
+    mkdirSync(dirname(source), { recursive: true });
+    writeFileSync(source, "export const implemented = true;\n");
+  }
+  for (const requirement of manifest.requirements) {
+    for (const suite of requirement.test_suites) {
+      const path = join(root, suite);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, "export {};\n");
+    }
+  }
+  writeFileSync(join(root, ".gitignore"), "reports/\n");
+  git(root, "init");
+  git(root, "add", ".");
+  git(
+    root,
+    "-c",
+    "user.name=Phase2 Test",
+    "-c",
+    "user.email=phase2@example.invalid",
+    "commit",
+    "-m",
+    "complete Phase 2 fixture",
+  );
+  return { root, manifest };
+};
+
+const passedRunner = async (command: {
+  id: string;
+  command: string;
+  args: string[];
+}) => ({
+  id: command.id,
+  argv: [command.command, ...command.args],
+  status: "passed",
+  exitCode: 0,
+  signal: null,
+  durationMs: 1,
+  stdout: {
+    bytes: 0,
+    capturedBytes: 0,
+    truncated: false,
+    sha256: sha256(""),
+  },
+  stderr: {
+    bytes: 0,
+    capturedBytes: 0,
+    truncated: false,
+    sha256: sha256(""),
+  },
+  error: null,
+});
+
+const stableIdentity = () => ({
+  errors: [],
+  dirty: false,
+  bindings: structuredClone(bindingValue),
+});
 
 describe("Phase 2 gate command orchestration", () => {
   it("runs argv commands in order and fails fast without shell strings", async () => {
@@ -242,4 +345,137 @@ describe("Phase 2 gate command orchestration", () => {
       [],
     );
   });
+
+  it(
+    "generates and atomically publishes 64 Evidence packages only after an all-pass run",
+    { timeout: 30_000 },
+    async () => {
+      const { root, manifest } = createCompletePhase2Repository();
+      try {
+        expect(collectGateBindings(root).dirty).toBe(false);
+        const report = await verifyPhase2({
+          repositoryRoot: root,
+          mode: "local",
+          reportPath: join(root, "reports/phase2/gate.json"),
+          identityCollector: stableIdentity,
+          runner: passedRunner,
+        });
+        expect(report, JSON.stringify(report.errors, null, 2)).toMatchObject({
+          success: true,
+          releaseReady: true,
+          claims: { requirementsVerified: 64, evidencePassed: 64 },
+          evidence: {
+            count: 64,
+            setSha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+            directory: expect.stringMatching(
+              /^reports\/phase2\/evidence\/[a-f0-9]{40}-[a-f0-9-]+$/u,
+            ),
+          },
+        });
+        expect(report.evidence.files).toHaveLength(64);
+        expect(
+          report.evidence.files.map(
+            (file: { logicalPath: string }) => file.logicalPath,
+          ),
+        ).toEqual(
+          manifest.requirements
+            .map(
+              (requirement: { evidence_path: string }) =>
+                requirement.evidence_path,
+            )
+            .sort(),
+        );
+        const published = join(root, report.evidence.directory);
+        expect(existsSync(published)).toBe(true);
+        expect(
+          readdirSync(join(root, "reports/phase2")).filter((name) =>
+            name.startsWith(".evidence-"),
+          ),
+        ).toEqual([]);
+        expect(collectGateBindings(root).dirty).toBe(false);
+        expect(git(root, "status", "--porcelain=v1")).toBe("");
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each(["write", "validate", "rename"])(
+    "cleans temporary Evidence and publishes nothing when %s fails",
+    async (failureStage) => {
+      const { root } = createCompletePhase2Repository();
+      try {
+        const report = await verifyPhase2({
+          repositoryRoot: root,
+          mode: "local",
+          reportPath: join(root, "reports/phase2/gate.json"),
+          identityCollector: stableIdentity,
+          runner: passedRunner,
+          evidenceFailureInjector: (stage: string) => {
+            if (stage === failureStage)
+              throw new Error(`injected ${failureStage} failure`);
+          },
+        });
+        expect(report.releaseReady).toBe(false);
+        expect(report.claims).toEqual({
+          requirementsVerified: 0,
+          evidencePassed: 0,
+        });
+        expect(report.blockers).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: "evidence_publication_failed" }),
+          ]),
+        );
+        const phase2Reports = join(root, "reports/phase2");
+        expect(
+          existsSync(phase2Reports)
+            ? readdirSync(phase2Reports).filter((name) =>
+                name.startsWith(".evidence-"),
+              )
+            : [],
+        ).toEqual([]);
+        const evidenceRoot = join(phase2Reports, "evidence");
+        expect(
+          existsSync(evidenceRoot) ? readdirSync(evidenceRoot) : [],
+        ).toEqual([]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+
+  it(
+    "detects a published Evidence file whose bytes no longer match the bound set",
+    { timeout: 30_000 },
+    async () => {
+      const { root } = createCompletePhase2Repository();
+      try {
+        const report = await verifyPhase2({
+          repositoryRoot: root,
+          mode: "local",
+          reportPath: join(root, "reports/phase2/gate.json"),
+          identityCollector: stableIdentity,
+          runner: passedRunner,
+        });
+        expect(report.releaseReady).toBe(true);
+        const first = report.evidence.files[0];
+        writeFileSync(
+          join(root, report.evidence.directory, first.logicalPath),
+          '{"tampered":true}\n',
+        );
+        const checked = verifyEvidenceBundle({
+          repositoryRoot: root,
+          directory: report.evidence.directory,
+          expected: report.evidence,
+          currentBindings: bindingValue,
+          commandResults: report.commands,
+        });
+        expect(checked.ok).toBe(false);
+        expect(checked.errors.join("\n")).toMatch(/hash|tamper|mismatch/u);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 });
