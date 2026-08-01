@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase2-multimodal-contract",
+  "domain": "multimodal",
+  "requirement_ids": [
+    "AH-MM-ARTIFACT-001",
+    "AH-MM-DOC-VISION-001",
+    "AH-MM-IMAGE-EDIT-001",
+    "AH-MM-IMAGE-GEN-001",
+    "AH-MM-IMAGE-IN-001",
+    "AH-MM-VISION-VERIFY-001",
+    "AH-TOOL-IMAGE-GEN-001",
+    "AH-TOOL-SPEECH-GEN-001",
+    "AH-TOOL-TRANSCRIBE-001",
+    "AH-UI-MM-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-2/assets/evals/multimodal.json",
+    "sha256": "112b56e374b9208e9f430e3a5dbb73f18af2342754c3e664ba16a690b1a37e29"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      { "path": "$.schema_version", "equals": "1.0.0" },
+      { "path": "$.domain", "equals": "multimodal" },
+      { "path": "$.contract_fixture", "equals": true },
+      { "path": "$.purpose", "equals": "phase2-contract-bootstrap-only" }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect",
+    "media_generation"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}

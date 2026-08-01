@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "synthetic",
+  "dataset": {
+    "id": "phase2-synthetic-contract-v1",
+    "availability": "available",
+    "provenance": {
+      "publisher": "agent-harness maintainers",
+      "source_uri": "repository://fixtures/phase-2/assets/data/synthetic.json",
+      "created_at": "2026-08-02T00:00:00Z",
+      "purpose": "phase2-contract-bootstrap-only"
+    },
+    "license": "CC0-1.0",
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "27f59198e980f353fce82ada58077fb3c1ac9dc186da6dec9d932e14d48b50a7"
+    },
+    "path": "fixtures/phase-2/assets/data/synthetic.json",
+    "tenant": "phase2-fixture-synthetic",
+    "expected_runner": "scripts/gates/check-phase2-assets.mjs"
+  }
+}

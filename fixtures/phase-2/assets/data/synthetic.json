@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "phase2-synthetic-contract-v1",
+  "purpose": "phase2-contract-bootstrap-only",
+  "tenant": "phase2-fixture-synthetic",
+  "records": [
+    {
+      "case_id": "synthetic-contract-001",
+      "input": "contract bootstrap",
+      "expected": "no product capability claim"
+    }
+  ]
+}

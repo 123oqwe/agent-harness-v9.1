@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "phase2-contract-coding",
+  "domain": "coding",
+  "contract_fixture": true,
+  "purpose": "phase2-contract-bootstrap-only",
+  "input": "Validate that coding evaluation assets are wired without executing product capabilities."
+}

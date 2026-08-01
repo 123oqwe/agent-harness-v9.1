@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase2-planning-contract",
+  "domain": "planning",
+  "requirement_ids": ["AH-UI-PLANNING-001"],
+  "input": {
+    "path": "fixtures/phase-2/assets/evals/planning.json",
+    "sha256": "d0d4dfb104240f321a58b62366b29331ecf1fb19918b29c3f19eb25432aab950"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      { "path": "$.schema_version", "equals": "1.0.0" },
+      { "path": "$.domain", "equals": "planning" },
+      { "path": "$.contract_fixture", "equals": true },
+      { "path": "$.purpose", "equals": "phase2-contract-bootstrap-only" }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}

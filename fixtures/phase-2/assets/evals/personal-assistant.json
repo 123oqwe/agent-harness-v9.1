@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "phase2-contract-personal-assistant",
+  "domain": "personal-assistant",
+  "contract_fixture": true,
+  "purpose": "phase2-contract-bootstrap-only",
+  "input": "Validate that personal-assistant evaluation assets are wired without external side effects."
+}

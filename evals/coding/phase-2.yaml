@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase2-coding-contract",
+  "domain": "coding",
+  "requirement_ids": [
+    "AH-CONTEXT-COMPILER-001",
+    "AH-HOOK-001",
+    "AH-MCP-STDIO-001",
+    "AH-SANDBOX-OCI-001",
+    "AH-RUNTIME-BUDGET-002",
+    "AH-RUNTIME-COMPACTION-001",
+    "AH-RUNTIME-MODELFALLBACK-001",
+    "AH-RUNTIME-SESSIONTREE-001",
+    "AH-RUNTIME-STEERING-001",
+    "AH-TOOL-BEHAVIOR-VERIFY-001",
+    "AH-UI-TUI-001",
+    "AH-UX-API-001",
+    "AH-UX-CONTRACT-001",
+    "AH-UX-DESKTOP-001",
+    "AH-UX-STATES-001",
+    "AH-UX-WEB-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-2/assets/evals/coding.json",
+    "sha256": "2cd3ffbd3902f7125c4371684b2617407636cb7c3df3bf7a896fdad620a13e53"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      { "path": "$.schema_version", "equals": "1.0.0" },
+      { "path": "$.domain", "equals": "coding" },
+      { "path": "$.contract_fixture", "equals": true },
+      { "path": "$.purpose", "equals": "phase2-contract-bootstrap-only" }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}

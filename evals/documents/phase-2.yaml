@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase2-documents-contract",
+  "domain": "documents",
+  "requirement_ids": [
+    "AH-DOC-INGEST-DOCX-001",
+    "AH-DOC-INGEST-ENC-001",
+    "AH-DOC-INGEST-IMG-001",
+    "AH-DOC-INGEST-MD-001",
+    "AH-DOC-INGEST-PDF-001",
+    "AH-DOC-INGEST-PPTX-001",
+    "AH-DOC-INGEST-UNSUPPORTED-001",
+    "AH-DOC-INGEST-WEB-001",
+    "AH-DOC-INGEST-XLSX-001",
+    "AH-DOC-PARSE-HEAD-001",
+    "AH-DOC-PARSE-IMGREF-001",
+    "AH-DOC-PARSE-PROVENANCE-001",
+    "AH-DOC-PARSE-TABLE-001",
+    "AH-RAG-CHUNK-001",
+    "AH-RAG-CITE-001",
+    "AH-RAG-DELETE-001",
+    "AH-RAG-EMBED-001",
+    "AH-RAG-EMBED-MIG-001",
+    "AH-RAG-FTS-001",
+    "AH-RAG-GRAPH-001",
+    "AH-RAG-INJECTION-001",
+    "AH-RAG-META-001",
+    "AH-RAG-QUERY-001",
+    "AH-RAG-RERANK-001",
+    "AH-TOOL-SPREADSHEET-001",
+    "AH-TOOL-PRESENTATION-001",
+    "AH-TOOL-DOCUMENT-001",
+    "AH-TOOL-OCR-001",
+    "AH-UI-DOC-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-2/assets/evals/documents.json",
+    "sha256": "9a92fd8b224aeddc6bdc6cf4be0f6a6b7593eb7bc4de0a38becdd92f62586ba0"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      { "path": "$.schema_version", "equals": "1.0.0" },
+      { "path": "$.domain", "equals": "documents" },
+      { "path": "$.contract_fixture", "equals": true },
+      { "path": "$.purpose", "equals": "phase2-contract-bootstrap-only" }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}

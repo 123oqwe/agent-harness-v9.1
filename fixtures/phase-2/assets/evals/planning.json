@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "phase2-contract-planning",
+  "domain": "planning",
+  "contract_fixture": true,
+  "purpose": "phase2-contract-bootstrap-only",
+  "input": "Validate that planning evaluation assets are wired without creating a product plan."
+}

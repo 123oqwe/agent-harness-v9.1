@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "phase2-contract-multimodal",
+  "domain": "multimodal",
+  "contract_fixture": true,
+  "purpose": "phase2-contract-bootstrap-only",
+  "input": "Validate that multimodal evaluation assets are wired without generating media."
+}

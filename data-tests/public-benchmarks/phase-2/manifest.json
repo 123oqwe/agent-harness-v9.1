@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "public-benchmarks",
+  "dataset": {
+    "id": "phase2-public-contract-v1",
+    "availability": "bootstrap-only",
+    "release_ready": false,
+    "provenance": {
+      "publisher": "agent-harness maintainers",
+      "source_uri": "repository://fixtures/phase-2/assets/data/public-benchmark.json",
+      "created_at": "2026-08-02T00:00:00Z",
+      "purpose": "phase2-contract-bootstrap-only"
+    },
+    "license": "CC0-1.0",
+    "checksum": {
+      "algorithm": "sha256",
+      "value": "0cda7fe731df312993f6be2ea98f6ee0c6c89120e4f13f912215acab486a2247"
+    },
+    "path": "fixtures/phase-2/assets/data/public-benchmark.json",
+    "tenant": "phase2-fixture-public",
+    "expected_runner": "scripts/gates/check-phase2-assets.mjs"
+  }
+}

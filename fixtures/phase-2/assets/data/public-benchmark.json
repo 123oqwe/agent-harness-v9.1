@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "phase2-public-contract-v1",
+  "purpose": "phase2-contract-bootstrap-only",
+  "tenant": "phase2-fixture-public",
+  "license": "CC0-1.0",
+  "records": [
+    {
+      "case_id": "public-contract-001",
+      "input": "public contract bootstrap",
+      "expected": "no product capability claim"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase2-personal-assistant-contract",
+  "domain": "personal-assistant",
+  "requirement_ids": [
+    "AH-PAUSE-RESUME-001",
+    "AH-TOOL-ESCALATE-001",
+    "AH-UI-NOTIFY-001",
+    "AH-UI-PLANNING-001",
+    "AH-UI-RECONCILE-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-2/assets/evals/personal-assistant.json",
+    "sha256": "8fe8b9f8fcb6297099f79bdf9add8a47c9223aed47da201fd0071be5d4129c7d"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      { "path": "$.schema_version", "equals": "1.0.0" },
+      { "path": "$.domain", "equals": "personal-assistant" },
+      { "path": "$.contract_fixture", "equals": true },
+      { "path": "$.purpose", "equals": "phase2-contract-bootstrap-only" }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect",
+    "human_ticket"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}
