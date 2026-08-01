@@ -12,7 +12,7 @@ const EXPECTED_SHA = "bf5eac648527205603de7d26278276ad78819850";
 const EXPECTED_EVIDENCE_ROOT = "artifacts/phase-2";
 const EXPECTED_REQUIREMENT_COUNT = 64;
 export const AUTHORITY_CANONICAL_SHA256 =
-  "0ab204ff2bf0c2b99b284672e40bcf95742861733834a9417136ff00dd2c520e";
+  "bcdaeb0b3339c60f89bd7e43843ada27a765ae9a605280b541cbfbe71ae0ba2a";
 
 const ROOT_KEYS = new Set([
   "schema_version",
@@ -131,6 +131,7 @@ const ALLOWED_OWNERS = new Set([
   "packages/tool-fabric",
   "packages/api",
   "packages/ui",
+  "apps/api",
   "apps/web",
   "apps/desktop",
   "apps/tui",

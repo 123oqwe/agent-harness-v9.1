@@ -692,7 +692,7 @@
       "id": "AH-UX-API-001",
       "priority": "P0",
       "dependencies": ["AH-EVIDENCE-001"],
-      "owner": "packages/api",
+      "owner": "apps/api",
       "test_suites": ["tests/phase-2/e2e/ah-ux-api-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-API-001.json",
       "mutation_class": "critical",

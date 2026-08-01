@@ -69,6 +69,15 @@ const expectCanonicalHashMismatch = (errors: string[]) => {
 };
 
 describe("Phase 2 release-gate manifest", () => {
+  it("assigns server composition to apps/api while contracts remain in packages/api", () => {
+    const manifest = loadFixture("valid", "phase2-gate.json");
+
+    expect(requirement(manifest, "AH-UX-API-001").owner).toBe("apps/api");
+    expect(requirement(manifest, "AH-UX-CONTRACT-001").owner).toBe(
+      "packages/api",
+    );
+  });
+
   it("accepts the valid fixture and the source-release authority manifest", () => {
     expect(
       validatePhase2Manifest(loadFixture("valid", "phase2-gate.json")),
