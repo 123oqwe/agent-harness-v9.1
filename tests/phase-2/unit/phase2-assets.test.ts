@@ -267,6 +267,139 @@ describe("Phase 2 executable asset contracts", () => {
     );
   });
 
+  it("rejects a synchronized authority and eval tamper", () => {
+    const root = createRepositoryCopy();
+    const authorityPath = resolve(root, "verification/gates/phase2-gate.json");
+    const authority = readJson(authorityPath);
+    const requirements = authority.requirements as Array<
+      Record<string, unknown>
+    >;
+    const planning = requirements.find(
+      (requirement) => requirement.id === "AH-UI-PLANNING-001",
+    );
+    if (!planning) throw new Error("authority fixture is missing planning");
+    (planning.eval_suites as string[]).push("evals/writing/phase-2.yaml");
+    writeJson(authorityPath, authority);
+
+    const writingPath = resolve(root, "evals/writing/phase-2.yaml");
+    const writing = readJson(writingPath);
+    (writing.requirement_ids as string[]).push("AH-UI-PLANNING-001");
+    writeJson(writingPath, writing);
+
+    expect(
+      checkPhase2Assets({
+        mode: "bootstrap",
+        repositoryRoot: root,
+      }).errors.some((error: string) =>
+        error.startsWith(
+          "invalid frozen Phase 2 authority: manifest canonical SHA-256 does not match frozen authority",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    [
+      "manifest",
+      "evals/writing/phase-2.yaml",
+      "evals/planning/phase-2.yaml",
+      "evals/writing/phase-2.yaml contains forbidden symlink: evals/writing/phase-2.yaml",
+    ],
+    [
+      "input",
+      "fixtures/phase-2/assets/evals/writing.json",
+      "fixtures/phase-2/assets/evals/planning.json",
+      "evals/writing/phase-2.yaml input contains forbidden symlink: fixtures/phase-2/assets/evals/writing.json",
+    ],
+    [
+      "dataset",
+      "fixtures/phase-2/assets/data/public-benchmark.json",
+      "fixtures/phase-2/assets/data/synthetic.json",
+      "data-tests/public-benchmarks/phase-2/manifest.json dataset path contains forbidden symlink: fixtures/phase-2/assets/data/public-benchmark.json",
+    ],
+    [
+      "runner",
+      "scripts/gates/check-phase2-assets.mjs",
+      "scripts/gates/check-phase2-assets-runner-copy.mjs",
+      "data-tests/synthetic/phase-2/manifest.json expected_runner contains forbidden symlink: scripts/gates/check-phase2-assets.mjs",
+    ],
+  ])(
+    "rejects repository-internal %s symlinks",
+    (_kind, link, target, message) => {
+      const root = createRepositoryCopy();
+      const linkPath = resolve(root, link);
+      const targetPath = resolve(root, target);
+      if (_kind === "runner") cpSync(linkPath, targetPath);
+      rmSync(linkPath);
+      symlinkSync(targetPath, linkPath);
+
+      expect(
+        checkPhase2Assets({ mode: "bootstrap", repositoryRoot: root }).errors,
+      ).toContain(message);
+    },
+  );
+
+  it.each([
+    ["synthetic", "UNLICENSED", "CC0-1.0"],
+    ["public-benchmarks", "MIT", "CC0-1.0"],
+    ["consented-staging", "CC0-1.0", "CONSENT-REQUIRED"],
+  ])("enforces the %s license contract", (kind, license, expected) => {
+    const root = createRepositoryCopy();
+    const manifestPath = resolve(
+      root,
+      `data-tests/${kind}/phase-2/manifest.json`,
+    );
+    const manifest = readJson(manifestPath);
+    (manifest.dataset as Record<string, unknown>).license = license;
+    writeJson(manifestPath, manifest);
+
+    expect(
+      checkPhase2Assets({ mode: "bootstrap", repositoryRoot: root }).errors,
+    ).toContain(
+      `data-tests/${kind}/phase-2/manifest.json dataset license must be ${expected}`,
+    );
+  });
+
+  it("enforces frozen domain effects and exact evidence fields", () => {
+    const root = createRepositoryCopy();
+    const researchPath = resolve(root, "evals/research/phase-2.yaml");
+    const research = readJson(researchPath);
+    research.forbidden_effects = [
+      "requirement_verified",
+      "evidence_pass",
+      "external_side_effect",
+      "shell_access",
+    ];
+    research.evidence_fields = [
+      "case_id",
+      "requirement_ids",
+      "fixture_sha256",
+      "grader_results",
+      "forbidden_effects",
+      "evidence_path",
+      "evidence_path",
+      "unknown",
+    ];
+    writeJson(researchPath, research);
+
+    const errors = checkPhase2Assets({
+      mode: "bootstrap",
+      repositoryRoot: root,
+    }).errors;
+    expect(errors).toContain(
+      "evals/research/phase-2.yaml forbidden_effects has unknown value: shell_access",
+    );
+    expect(errors).toContain(
+      "evals/research/phase-2.yaml forbidden_effects is missing required value: network_request",
+    );
+    expect(errors).toContain(
+      "evals/research/phase-2.yaml evidence_fields has duplicate value: evidence_path",
+    );
+    expect(errors).toContain(
+      "evals/research/phase-2.yaml evidence_fields has unknown value: unknown",
+    );
+  });
+
   it.each([
     ["license", ""],
     ["checksum", { algorithm: "sha256", value: "" }],
@@ -333,7 +466,7 @@ describe("Phase 2 executable asset contracts", () => {
       expect(
         checkPhase2Assets({ mode: "bootstrap", repositoryRoot: root }).errors,
       ).toContain(
-        "evals/coding/phase-2.yaml input escapes repository through symlink: fixtures/phase-2/assets/evals/coding.json",
+        "evals/coding/phase-2.yaml input contains forbidden symlink: fixtures/phase-2/assets/evals/coding.json",
       );
     } finally {
       rmSync(outside, { force: true });

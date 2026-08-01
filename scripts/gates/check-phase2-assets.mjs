@@ -13,6 +13,8 @@ import {
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { validatePhase2Manifest } from "./check-phase2-manifest.mjs";
+
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
 
@@ -86,6 +88,38 @@ const REQUIRED_EVIDENCE_FIELDS = [
   "forbidden_effects",
   "evidence_path",
 ];
+const REQUIRED_FORBIDDEN_EFFECTS = {
+  coding: ["requirement_verified", "evidence_pass", "external_side_effect"],
+  documents: ["requirement_verified", "evidence_pass", "external_side_effect"],
+  research: [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect",
+    "network_request",
+  ],
+  writing: ["requirement_verified", "evidence_pass", "external_side_effect"],
+  planning: ["requirement_verified", "evidence_pass", "external_side_effect"],
+  "personal-assistant": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect",
+    "human_ticket",
+  ],
+  multimodal: [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect",
+    "media_generation",
+  ],
+};
+const FORBIDDEN_EFFECT_VOCABULARY = new Set(
+  Object.values(REQUIRED_FORBIDDEN_EFFECTS).flat(),
+);
+const LICENSE_BY_DATA_KIND = {
+  synthetic: "CC0-1.0",
+  "public-benchmarks": "CC0-1.0",
+  "consented-staging": "CONSENT-REQUIRED",
+};
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 const isRecord = (value) =>
@@ -151,9 +185,24 @@ const readRepositoryAsset = ({
     );
     return null;
   }
-  if (!existsSync(absolutePath)) {
-    errors.push(`missing required asset: ${relativePath}`);
-    return null;
+  let currentPath = repositoryRoot;
+  const traversed = [];
+  for (const segment of relativePath.split(/[\\/]/u)) {
+    traversed.push(segment);
+    currentPath = resolve(currentPath, segment);
+    let component;
+    try {
+      component = lstatSync(currentPath);
+    } catch {
+      errors.push(`missing required asset: ${relativePath}`);
+      return null;
+    }
+    if (component.isSymbolicLink()) {
+      errors.push(
+        `${label} contains forbidden symlink: ${traversed.join("/")}`,
+      );
+      return null;
+    }
   }
   let actualPath;
   try {
@@ -241,7 +290,10 @@ const validateEvaluation = ({
       `${definition.path} has duplicate requirement link: ${duplicate}`,
     );
   }
-  if (!sameStringSet(evaluation.requirement_ids, expectedRequirementIds)) {
+  if (
+    expectedRequirementIds !== null &&
+    !sameStringSet(evaluation.requirement_ids, expectedRequirementIds)
+  ) {
     errors.push(
       `${definition.path} requirement_ids does not exactly match authority links`,
     );
@@ -331,8 +383,26 @@ const validateEvaluation = ({
     errors.push(
       `${definition.path} forbidden_effects must contain non-empty strings`,
     );
-  } else if (duplicates(evaluation.forbidden_effects).length > 0) {
-    errors.push(`${definition.path} forbidden_effects contains duplicates`);
+  } else {
+    for (const duplicate of duplicates(evaluation.forbidden_effects)) {
+      errors.push(
+        `${definition.path} forbidden_effects has duplicate value: ${duplicate}`,
+      );
+    }
+    for (const effect of evaluation.forbidden_effects) {
+      if (!FORBIDDEN_EFFECT_VOCABULARY.has(effect)) {
+        errors.push(
+          `${definition.path} forbidden_effects has unknown value: ${effect}`,
+        );
+      }
+    }
+    for (const required of REQUIRED_FORBIDDEN_EFFECTS[definition.domain]) {
+      if (!evaluation.forbidden_effects.includes(required)) {
+        errors.push(
+          `${definition.path} forbidden_effects is missing required value: ${required}`,
+        );
+      }
+    }
   }
   if (
     !Array.isArray(evaluation.evidence_fields) ||
@@ -344,6 +414,20 @@ const validateEvaluation = ({
     errors.push(
       `${definition.path} evidence_fields must include ${requiredFields}`,
     );
+  }
+  if (Array.isArray(evaluation.evidence_fields)) {
+    for (const duplicate of duplicates(evaluation.evidence_fields)) {
+      errors.push(
+        `${definition.path} evidence_fields has duplicate value: ${duplicate}`,
+      );
+    }
+    for (const field of evaluation.evidence_fields) {
+      if (!REQUIRED_EVIDENCE_FIELDS.includes(field)) {
+        errors.push(
+          `${definition.path} evidence_fields has unknown value: ${String(field)}`,
+        );
+      }
+    }
   }
 };
 
@@ -388,8 +472,11 @@ const validateDataManifest = ({
   );
   if (!nonEmptyString(dataset.id))
     errors.push(`${definition.path} dataset id is invalid`);
-  if (!nonEmptyString(dataset.license))
-    errors.push(`${definition.path} dataset license is invalid`);
+  if (dataset.license !== LICENSE_BY_DATA_KIND[definition.kind]) {
+    errors.push(
+      `${definition.path} dataset license must be ${LICENSE_BY_DATA_KIND[definition.kind]}`,
+    );
+  }
   if (!nonEmptyString(dataset.tenant))
     errors.push(`${definition.path} dataset tenant is invalid`);
   if (!isRecord(dataset.provenance)) {
@@ -522,13 +609,22 @@ const loadAuthorityLinks = (repositoryRoot, errors) => {
     errors,
   });
   const authority = parseSafeJsonSubset(asset, path, errors);
+  if (!isRecord(authority) || !Array.isArray(authority.requirements)) {
+    errors.push(`${path} requirements are unavailable`);
+    return null;
+  }
+  const authorityErrors = validatePhase2Manifest(authority);
+  if (authorityErrors.length > 0) {
+    errors.push(
+      ...authorityErrors.map(
+        (error) => `invalid frozen Phase 2 authority: ${error}`,
+      ),
+    );
+    return null;
+  }
   const links = new Map(
     EVALUATIONS.map(({ path: evalPath }) => [evalPath, []]),
   );
-  if (!isRecord(authority) || !Array.isArray(authority.requirements)) {
-    errors.push(`${path} requirements are unavailable`);
-    return links;
-  }
   for (const requirement of authority.requirements) {
     if (
       !isRecord(requirement) ||
@@ -585,7 +681,7 @@ export const checkPhase2Assets = ({
     validateEvaluation({
       repositoryRoot: root,
       definition,
-      expectedRequirementIds: authorityLinks.get(definition.path) ?? [],
+      expectedRequirementIds: authorityLinks?.get(definition.path) ?? null,
       errors,
     });
   }
