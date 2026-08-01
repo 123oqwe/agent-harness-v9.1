@@ -75,6 +75,8 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
     nodeScript(root, "active-stubs", "scripts/gates/check-active-stubs.mjs", [
       "--root",
       root,
+      "--mode",
+      "scan",
     ]),
     command("typecheck", "npm", ["run", "typecheck", "--silent"], {
       timeoutMs: 300_000,
@@ -142,6 +144,13 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
     nodeScript(root, "package-smoke", "scripts/gates/package-smoke.mjs", [], {
       timeoutMs: 300_000,
     }),
+    nodeScript(
+      root,
+      "source-checkout-reproduction",
+      "scripts/gates/package-smoke.mjs",
+      ["--mode", "source-checkout"],
+      { timeoutMs: 3_600_000 },
+    ),
     command(
       "production-audit",
       "npm",
@@ -162,6 +171,26 @@ const git = (root, args) => {
   if (result.status !== 0)
     throw new Error(`git ${args[0]} failed with exit ${String(result.status)}`);
   return result.stdout.trim();
+};
+
+const gitExit = (root, args) =>
+  spawnSync("git", args, {
+    cwd: root,
+    env: createSafeCommandEnvironment(),
+    shell: false,
+    encoding: "utf8",
+    maxBuffer: 4 * 1024 * 1024,
+  });
+
+const stableJson = (value) => {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 };
 
 const hashPaths = (root, paths) => {
@@ -212,6 +241,32 @@ export const collectGateBindings = (repositoryRoot) => {
     dirty =
       git(root, ["status", "--porcelain=v1", "--untracked-files=all"]).length >
       0;
+    for (const args of [
+      ["diff-index", "--quiet", "HEAD", "--"],
+      ["diff-files", "--quiet"],
+    ]) {
+      const result = gitExit(root, args);
+      if (result.status === 1) dirty = true;
+      else if (result.status !== 0) {
+        errors.push(`git ${args[0]} failed with exit ${String(result.status)}`);
+        dirty = true;
+      }
+    }
+    const flags = git(root, ["ls-files", "-v"]).split("\n").filter(Boolean);
+    const skipWorktree = flags.filter((line) => line.startsWith("S "));
+    const assumeUnchanged = flags.filter((line) => /^[a-z] /u.test(line));
+    if (skipWorktree.length > 0) {
+      errors.push(
+        `git skip-worktree flags are forbidden (${skipWorktree.length})`,
+      );
+      dirty = true;
+    }
+    if (assumeUnchanged.length > 0) {
+      errors.push(
+        `git assume-unchanged flags are forbidden (${assumeUnchanged.length})`,
+      );
+      dirty = true;
+    }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }
@@ -273,9 +328,11 @@ export const verifyPhase2 = async ({
   const root = resolve(repositoryRoot);
   const identity = identityCollector(root);
   const errors = [...identity.errors];
+  const blockers = [];
   let execution = { ok: false, results: [] };
   if (mode === "local" && identity.dirty) {
     errors.push("release gate requires a clean committed worktree");
+    blockers.push({ code: "repository_not_clean" });
   } else if (errors.length === 0) {
     execution = await executeGateCommands(phase2CommandGraph(root, mode), {
       runner,
@@ -286,17 +343,45 @@ export const verifyPhase2 = async ({
       errors.push(
         `gate command ${failure?.id ?? "unknown"} ended with status ${failure?.status ?? "unknown"}`,
       );
+      blockers.push({
+        code:
+          failure?.id === "assets"
+            ? "assets_release_blocked"
+            : "deterministic_command_failed",
+        commandId: failure?.id ?? null,
+        status: failure?.status ?? "unknown",
+      });
+    }
+  }
+  const postIdentity = mode === "local" ? identityCollector(root) : identity;
+  if (mode === "local") {
+    if (
+      postIdentity.dirty ||
+      postIdentity.errors.length > 0 ||
+      stableJson(postIdentity.bindings) !== stableJson(identity.bindings)
+    ) {
+      errors.push("repository identity changed during the release gate");
+      errors.push(...postIdentity.errors);
+      blockers.push({ code: "repository_changed_during_gate" });
     }
   }
   const readiness =
-    mode === "local" ? checkActivePhase2Stubs({ repositoryRoot: root }) : null;
-  if (
-    mode === "local" &&
-    execution.ok &&
-    readiness &&
-    !readiness.releaseReady
-  ) {
-    errors.push(...readiness.errors);
+    mode === "local"
+      ? checkActivePhase2Stubs({
+          repositoryRoot: root,
+          currentBindings: postIdentity.bindings,
+          commandResults: execution.results,
+        })
+      : null;
+  if (mode === "local" && readiness && !readiness.releaseReady) {
+    errors.push(
+      `Phase 2 Evidence incomplete: ${readiness.claims.evidencePassed}/64`,
+    );
+    blockers.push({
+      code: "evidence_incomplete",
+      verified: readiness.claims.evidencePassed,
+      required: 64,
+    });
   }
   const releaseReady =
     mode === "local" &&
@@ -315,7 +400,8 @@ export const verifyPhase2 = async ({
         ? (readiness?.claims ?? { requirementsVerified: 0, evidencePassed: 0 })
         : { requirementsVerified: 0, evidencePassed: 0 },
     errors,
-    bindings: identity.bindings,
+    blockers,
+    bindings: postIdentity.bindings,
     commands: execution.results,
   };
   const destination =

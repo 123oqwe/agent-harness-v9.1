@@ -1,4 +1,13 @@
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -6,15 +15,61 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkActivePhase2Stubs,
+  scanActivePhase2Stubs,
   SEMANTIC_STUB_MARKERS,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/check-active-stubs.mjs";
 // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 import { checkPhase2ContractDrift } from "../../../scripts/gates/check-contract-drift.mjs";
-// @ts-expect-error The production gate intentionally ships as plain Node ESM.
-import { collectGateBindings } from "../../../scripts/gates/verify-phase2-local.mjs";
+import {
+  collectGateBindings,
+  verifyPhase2,
+  // @ts-expect-error The production gate intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/verify-phase2-local.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const releaseCommandIds = [
+  "manifest",
+  "assets",
+  "contract-drift",
+  "active-stubs",
+  "typecheck",
+  "cycles",
+  "build",
+  "lint",
+  "phase1-regression",
+  "coverage",
+  "phase2-unit",
+  "phase2-integration",
+  "phase2-security",
+  "phase2-e2e",
+  "mutation",
+  "evaluations",
+  "data",
+  "package-smoke",
+  "source-checkout-reproduction",
+  "production-audit",
+];
+const bindingValue = {
+  commitSha: "a".repeat(40),
+  treeSha: "b".repeat(40),
+  packageLockSha256: "c".repeat(64),
+  manifestSha256: "d".repeat(64),
+  mutationConfigSha256: "e".repeat(64),
+  assetsSha256: "f".repeat(64),
+  runnerSha256: "1".repeat(64),
+  runnerVersion: "phase2-gate-report/v1",
+};
+const commandResults = releaseCommandIds.map((id) => ({
+  id,
+  argv: ["node", `<arg-sha256:${"2".repeat(64)}>`],
+  status: "passed",
+  exitCode: 0,
+  signal: null,
+  stdout: { sha256: "3".repeat(64) },
+  stderr: { sha256: "4".repeat(64) },
+}));
+
 const copyAssetAuthority = () => {
   const root = mkdtempSync(join(tmpdir(), "phase2-contract-drift-"));
   for (const path of [
@@ -25,6 +80,56 @@ const copyAssetAuthority = () => {
     "fixtures/phase-2/assets",
   ]) {
     cpSync(join(repositoryRoot, path), join(root, path), { recursive: true });
+  }
+  return root;
+};
+
+const createFakeEvidenceRepository = () => {
+  const root = mkdtempSync(join(tmpdir(), "phase2-fake-evidence-"));
+  const manifest = JSON.parse(
+    readFileSync(
+      join(repositoryRoot, "verification/gates/phase2-gate.json"),
+      "utf8",
+    ),
+  );
+  const manifestPath = join(root, "verification/gates/phase2-gate.json");
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  for (const requirement of manifest.requirements) {
+    const sourcePath = `${requirement.owner}/src/${requirement.id.toLowerCase()}.ts`;
+    const absoluteSource = join(root, sourcePath);
+    mkdirSync(dirname(absoluteSource), { recursive: true });
+    writeFileSync(absoluteSource, "export const implemented = true;\n");
+    for (const suite of requirement.test_suites) {
+      const absoluteSuite = join(root, suite);
+      mkdirSync(dirname(absoluteSuite), { recursive: true });
+      writeFileSync(absoluteSuite, "export {};\n");
+    }
+    const evidencePath = join(root, requirement.evidence_path);
+    mkdirSync(dirname(evidencePath), { recursive: true });
+    writeFileSync(
+      evidencePath,
+      `${JSON.stringify(
+        {
+          requirement_id: requirement.id,
+          status: "verified",
+          bindings: bindingValue,
+          source_files: [sourcePath],
+          test_files: requirement.test_suites,
+          command_receipts: commandResults.map((result) => ({
+            id: result.id,
+            status: result.status,
+            exitCode: result.exitCode,
+            signal: result.signal,
+            argv: result.argv,
+            stdout_sha256: "9".repeat(64),
+            stderr_sha256: "8".repeat(64),
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+    );
   }
   return root;
 };
@@ -48,18 +153,97 @@ describe("Phase 2 gate tamper resistance", () => {
     expect(result.errors.join("\n")).toMatch(/frozen|authority|SHA-256/u);
   });
 
-  it("does not confuse ordinary TODO text with explicit active stubs", () => {
+  it("scans explicit stubs without making release claims", () => {
     expect(SEMANTIC_STUB_MARKERS).not.toContain("TODO");
-    const result = checkActivePhase2Stubs({ repositoryRoot });
+    const result = scanActivePhase2Stubs({ repositoryRoot });
     expect(result.releaseReady).toBe(false);
     expect(result.activeRequirementIds).toHaveLength(64);
     expect(result.claims).toEqual({
       requirementsVerified: 0,
       evidencePassed: 0,
     });
+    expect(result.errors.join("\n")).not.toMatch(/missing evidence/u);
+  });
+
+  it("refuses final Evidence validation without current release context", () => {
+    const result = checkActivePhase2Stubs({ repositoryRoot });
+    expect(result.releaseReady).toBe(false);
+    expect(result.claims).toEqual({
+      requirementsVerified: 0,
+      evidencePassed: 0,
+    });
+    expect(result.errors.join("\n")).toMatch(
+      /current bindings|command results/u,
+    );
+  });
+
+  it("keeps 64 structurally complete Evidence files at zero when receipts are forged", () => {
+    const root = createFakeEvidenceRepository();
+    const result = checkActivePhase2Stubs({
+      repositoryRoot: root,
+      currentBindings: bindingValue,
+      commandResults,
+    });
+    expect(result.releaseReady).toBe(false);
+    expect(result.activeRequirementIds).toHaveLength(64);
+    expect(result.claims).toEqual({
+      requirementsVerified: 0,
+      evidencePassed: 0,
+    });
+    expect(result.errors.join("\n")).toMatch(/receipt.*does not match/u);
+  });
+
+  it("rejects duplicate Evidence keys, owner escapes, and test symlinks", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repositoryRoot, "verification/gates/phase2-gate.json"),
+        "utf8",
+      ),
+    );
+    const requirement = manifest.requirements[0];
+
+    const duplicateRoot = createFakeEvidenceRepository();
+    const duplicatePath = join(duplicateRoot, requirement.evidence_path);
+    const duplicateSource = readFileSync(duplicatePath, "utf8").replace(
+      '"requirement_id":',
+      '"requirement_id":"DUPLICATE","requirement_id":',
+    );
+    writeFileSync(duplicatePath, duplicateSource);
     expect(
-      result.errors.some((error: string) => error.includes("missing evidence")),
-    ).toBe(true);
+      checkActivePhase2Stubs({
+        repositoryRoot: duplicateRoot,
+        currentBindings: bindingValue,
+        commandResults,
+      }).errors.join("\n"),
+    ).toMatch(/duplicate object key/u);
+
+    const escapeRoot = createFakeEvidenceRepository();
+    const escapePath = join(escapeRoot, requirement.evidence_path);
+    const escapeEvidence = JSON.parse(readFileSync(escapePath, "utf8"));
+    escapeEvidence.source_files = ["outside-owner.ts"];
+    writeFileSync(join(escapeRoot, "outside-owner.ts"), "export {};\n");
+    writeFileSync(escapePath, `${JSON.stringify(escapeEvidence, null, 2)}\n`);
+    expect(
+      checkActivePhase2Stubs({
+        repositoryRoot: escapeRoot,
+        currentBindings: bindingValue,
+        commandResults,
+      }).errors.join("\n"),
+    ).toMatch(/outside owner/u);
+
+    const symlinkRoot = createFakeEvidenceRepository();
+    const suitePath = join(symlinkRoot, requirement.test_suites[0]);
+    const targetPath = join(symlinkRoot, "symlink-target.test.ts");
+    writeFileSync(targetPath, "export {};\n");
+    rmSync(suitePath);
+    symlinkSync(targetPath, suitePath);
+    expect(
+      checkActivePhase2Stubs({
+        repositoryRoot: symlinkRoot,
+        currentBindings: bindingValue,
+        commandResults,
+      }).errors.join("\n"),
+    ).toMatch(/symlink is forbidden/u);
   });
 
   it("detects a dirty tree from real Git state", () => {
@@ -89,5 +273,108 @@ describe("Phase 2 gate tamper resistance", () => {
     writeFileSync(join(root, "dirty.txt"), "dirty\n");
     expect(collectGateBindings(root).dirty).toBe(true);
   });
+
+  it("rejects assume-unchanged and skip-worktree index flags", () => {
+    const root = mkdtempSync(join(tmpdir(), "phase2-git-flags-"));
+    writeFileSync(join(root, "tracked.txt"), "tracked\n");
+    const git = (...args: string[]) => {
+      const result = spawnSync("git", args, {
+        cwd: root,
+        shell: false,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+    };
+    git("init");
+    git("add", "tracked.txt");
+    git(
+      "-c",
+      "user.name=Phase2 Test",
+      "-c",
+      "user.email=phase2@example.invalid",
+      "commit",
+      "-m",
+      "fixture",
+    );
+
+    git("update-index", "--skip-worktree", "tracked.txt");
+    expect(collectGateBindings(root).errors.join("\n")).toMatch(
+      /skip-worktree/u,
+    );
+    git("update-index", "--no-skip-worktree", "tracked.txt");
+    git("update-index", "--assume-unchanged", "tracked.txt");
+    expect(collectGateBindings(root).errors.join("\n")).toMatch(
+      /assume-unchanged/u,
+    );
+  });
+
+  it("detects a command that mutates the real temporary Git tree and does not restore it", async () => {
+    const root = copyAssetAuthority();
+    cpSync(
+      join(repositoryRoot, "package-lock.json"),
+      join(root, "package-lock.json"),
+    );
+    const git = (...args: string[]) => {
+      const result = spawnSync("git", args, {
+        cwd: root,
+        shell: false,
+        encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+    };
+    git("init");
+    git("add", ".");
+    git(
+      "-c",
+      "user.name=Phase2 Test",
+      "-c",
+      "user.email=phase2@example.invalid",
+      "commit",
+      "-m",
+      "fixture",
+    );
+
+    let mutated = false;
+    const result = await verifyPhase2({
+      repositoryRoot: root,
+      mode: "local",
+      reportPath: join(root, "reports/phase2/gate.json"),
+      runner: async (command: { id: string }) => {
+        if (!mutated) {
+          writeFileSync(
+            join(root, "unrestored-command-write.txt"),
+            "tampered\n",
+          );
+          mutated = true;
+        }
+        return {
+          id: command.id,
+          argv: [],
+          status: "passed",
+          exitCode: 0,
+          signal: null,
+          durationMs: 0,
+          stdout: {
+            bytes: 0,
+            capturedBytes: 0,
+            truncated: false,
+            sha256: "0".repeat(64),
+          },
+          stderr: {
+            bytes: 0,
+            capturedBytes: 0,
+            truncated: false,
+            sha256: "0".repeat(64),
+          },
+          error: null,
+        };
+      },
+    });
+    expect(result.releaseReady).toBe(false);
+    expect(result.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "repository_changed_during_gate" }),
+      ]),
+    );
+  });
 });
-import { spawnSync } from "node:child_process";

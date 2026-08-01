@@ -45,11 +45,21 @@ describe("Phase 2 real release gate", () => {
       join(tmpdir(), "phase2-local-gate-test-"),
     );
     const visited: string[] = [];
+    let identityCalls = 0;
     const report = await verifyPhase2({
       mode: "local",
       repositoryRoot,
       reportPath: join(temporaryRoot, "gate.json"),
-      identityCollector: () => ({ errors: [], dirty: false, bindings: {} }),
+      identityCollector: () => {
+        identityCalls += 1;
+        return {
+          errors: [],
+          dirty: identityCalls === 2,
+          bindings: {
+            commitSha: identityCalls === 1 ? "a".repeat(40) : "b".repeat(40),
+          },
+        };
+      },
       runner: async (command: { id: string }) => {
         visited.push(command.id);
         return {
@@ -83,8 +93,75 @@ describe("Phase 2 real release gate", () => {
     });
     expect(report.errors.length).toBeGreaterThan(0);
     expect(visited.length).toBeGreaterThan(0);
+    expect(identityCalls).toBe(2);
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "repository_changed_during_gate" }),
+        expect.objectContaining({ code: "evidence_incomplete" }),
+      ]),
+    );
     rmSync(temporaryRoot, { recursive: true, force: true });
   });
+
+  it("uses a stable structured blocker for an assets release failure", async () => {
+    const report = await verifyPhase2({
+      mode: "local",
+      repositoryRoot,
+      reportPath: join(tmpdir(), `phase2-assets-blocker-${Date.now()}.json`),
+      identityCollector: () => ({ errors: [], dirty: false, bindings: {} }),
+      runner: async (command: { id: string }) => ({
+        id: command.id,
+        argv: [],
+        status: command.id === "assets" ? "failed" : "passed",
+        exitCode: command.id === "assets" ? 1 : 0,
+        signal: null,
+        durationMs: 0,
+        stdout: {
+          bytes: 0,
+          capturedBytes: 0,
+          truncated: false,
+          sha256: "0".repeat(64),
+        },
+        stderr: {
+          bytes: 0,
+          capturedBytes: 0,
+          truncated: false,
+          sha256: "0".repeat(64),
+        },
+        error: null,
+      }),
+    });
+    expect(report.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "assets_release_blocked" }),
+        expect.objectContaining({ code: "evidence_incomplete" }),
+      ]),
+    );
+    expect(JSON.stringify(report.blockers)).not.toMatch(
+      /API_KEY|TOKEN|SECRET/u,
+    );
+  });
+
+  it(
+    "installs the packed artifact into an isolated ESM consumer",
+    { timeout: 180_000 },
+    () => {
+      const build = runScript("build");
+      expect(build.status, build.stderr).toBe(0);
+      const smoke = runScript("test:phase2:package-smoke");
+      expect(smoke.status, smoke.stderr).toBe(0);
+      const result = JSON.parse(smoke.stdout);
+      expect(result).toMatchObject({
+        installed: true,
+        releaseReady: true,
+        errors: [],
+      });
+      expect(result.entry).toContain(
+        "node_modules/agent-harness/dist/index.js",
+      );
+      expect(result.entry.startsWith(repositoryRoot)).toBe(false);
+    },
+  );
 
   it("keeps the full E2E suite without spawning a nested local gate", () => {
     const e2e = phase2CommandGraph(repositoryRoot, "local").find(
@@ -111,6 +188,21 @@ describe("Phase 2 real release gate", () => {
         expect.arrayContaining(["--", "--maxWorkers=1"]),
       );
     }
+  });
+
+  it("records an exact source-checkout reproduction before release audit", () => {
+    const graph = phase2CommandGraph(repositoryRoot, "local");
+    const reproductionIndex = graph.findIndex(
+      (entry: { id: string }) => entry.id === "source-checkout-reproduction",
+    );
+    const auditIndex = graph.findIndex(
+      (entry: { id: string }) => entry.id === "production-audit",
+    );
+    expect(reproductionIndex).toBeGreaterThan(-1);
+    expect(reproductionIndex).toBeLessThan(auditIndex);
+    expect(graph[reproductionIndex]?.args).toEqual(
+      expect.arrayContaining(["--mode", "source-checkout"]),
+    );
   });
 
   it("recognizes a symlinked script path as the CLI entry", () => {
