@@ -43,6 +43,16 @@ const requirement = (manifest: Manifest, id: string) => {
   return result;
 };
 
+const expectCanonicalHashMismatch = (errors: string[]) => {
+  expect(
+    errors.some((error) =>
+      error.startsWith(
+        "manifest canonical SHA-256 does not match frozen authority; expected ",
+      ),
+    ),
+  ).toBe(true);
+};
+
 describe("Phase 2 release-gate manifest", () => {
   it("accepts the valid fixture and the source-release authority manifest", () => {
     expect(
@@ -94,11 +104,56 @@ describe("Phase 2 release-gate manifest", () => {
     expect(
       validatePhase2ManifestFile(
         fixturePath("invalid", "phase2-gate-cycle.json"),
-        { enforceAuthority: false },
       ),
-    ).toEqual([
+    ).toContain(
       "dependency cycle detected: AH-CONTEXT-COMPILER-001 -> AH-RUNTIME-COMPACTION-001 -> AH-HOOK-001 -> AH-CONTEXT-COMPILER-001",
-    ]);
+    );
+  });
+
+  it("rejects unexpected fields at every manifest object boundary", () => {
+    const rootExtra = loadFixture("valid", "phase2-gate.json");
+    (rootExtra as unknown as Record<string, unknown>).status = "PASS";
+    const rootErrors = validatePhase2Manifest(rootExtra);
+    expect(rootErrors).toContain("manifest contains unexpected field status");
+    expectCanonicalHashMismatch(rootErrors);
+
+    const baselineExtra = loadFixture("valid", "phase2-gate.json");
+    (baselineExtra.baseline as unknown as Record<string, unknown>).branch =
+      "main";
+    const baselineErrors = validatePhase2Manifest(baselineExtra);
+    expect(baselineErrors).toContain(
+      "manifest.baseline contains unexpected field branch",
+    );
+    expectCanonicalHashMismatch(baselineErrors);
+
+    const thresholdExtra = loadFixture("valid", "phase2-gate.json");
+    (
+      thresholdExtra.mutation_thresholds as unknown as Record<string, unknown>
+    ).egress = 0;
+    const thresholdErrors = validatePhase2Manifest(thresholdExtra);
+    expect(thresholdErrors).toContain(
+      "manifest.mutation_thresholds contains unexpected field egress",
+    );
+    expectCanonicalHashMismatch(thresholdErrors);
+
+    const requirementExtra = loadFixture("valid", "phase2-gate.json");
+    (
+      requirement(requirementExtra, "AH-RAG-QUERY-001") as unknown as Record<
+        string,
+        unknown
+      >
+    ).implementation_status = "verified";
+    const requirementErrors = validatePhase2Manifest(requirementExtra);
+    expect(requirementErrors).toContain(
+      "requirement AH-RAG-QUERY-001 contains unexpected field implementation_status",
+    );
+    expectCanonicalHashMismatch(requirementErrors);
+  });
+
+  it("treats array order as part of the frozen authority", () => {
+    const reordered = loadFixture("valid", "phase2-gate.json");
+    requirement(reordered, "AH-UI-TUI-001").dependencies.reverse();
+    expectCanonicalHashMismatch(validatePhase2Manifest(reordered));
   });
 
   it("freezes every requirement's complete dependency set", () => {
@@ -113,7 +168,7 @@ describe("Phase 2 release-gate manifest", () => {
       "AH-HOOK-001",
     );
     expect(validatePhase2Manifest(extraAcyclic)).toContain(
-      'requirement AH-DOC-INGEST-DOCX-001 dependencies must exactly match frozen authority; expected ["AH-TOOL-READ-001"], received ["AH-HOOK-001","AH-TOOL-READ-001"]',
+      'requirement AH-DOC-INGEST-DOCX-001 dependencies must exactly match frozen authority; expected ["AH-TOOL-READ-001"], received ["AH-TOOL-READ-001","AH-HOOK-001"]',
     );
   });
 
@@ -227,16 +282,30 @@ describe("Phase 2 release-gate manifest", () => {
     );
   });
 
-  it("rejects any semantic authority hash drift", () => {
+  it("rejects any canonical authority hash drift", () => {
     const tampered = loadFixture("valid", "phase2-gate.json");
     tampered.mutation_thresholds.critical = 91;
-    expect(
-      validatePhase2Manifest(tampered).some((error: string) =>
-        error.startsWith(
-          "manifest semantic SHA-256 does not match frozen authority; expected ",
-        ),
-      ),
-    ).toBe(true);
+    expectCanonicalHashMismatch(validatePhase2Manifest(tampered));
+  });
+
+  it("cannot bypass frozen authority by passing a second API argument", () => {
+    const drifted = loadFixture("valid", "phase2-gate.json");
+    requirement(drifted, "AH-RAG-QUERY-001").priority = "P1";
+    requirement(drifted, "AH-RAG-QUERY-001").owner = "apps/web";
+    requirement(drifted, "AH-RAG-QUERY-001").mutation_class = "core";
+    const errors = validatePhase2Manifest(drifted, {
+      enforceAuthority: false,
+    });
+    expect(errors).toContain(
+      'requirement AH-RAG-QUERY-001 priority must exactly match frozen authority; expected "P0", received "P1"',
+    );
+    expect(errors).toContain(
+      'requirement AH-RAG-QUERY-001 owner must exactly match frozen authority; expected "packages/rag", received "apps/web"',
+    );
+    expect(errors).toContain(
+      'requirement AH-RAG-QUERY-001 mutation_class must exactly match frozen authority; expected "critical", received "core"',
+    );
+    expectCanonicalHashMismatch(errors);
   });
 
   it("pins Phase 2 to the source-release baseline", () => {

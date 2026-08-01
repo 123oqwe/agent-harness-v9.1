@@ -11,8 +11,30 @@ const EXPECTED_REPOSITORY = "https://github.com/123oqwe/agentharness91.git";
 const EXPECTED_SHA = "bf5eac648527205603de7d26278276ad78819850";
 const EXPECTED_EVIDENCE_ROOT = "artifacts/phase-2";
 const EXPECTED_REQUIREMENT_COUNT = 64;
-export const AUTHORITY_SEMANTIC_SHA256 =
-  "85f4096b98014a30989ad60188887bedbbafcebf155359d6bdc94f526cdc557a";
+export const AUTHORITY_CANONICAL_SHA256 =
+  "0ab204ff2bf0c2b99b284672e40bcf95742861733834a9417136ff00dd2c520e";
+
+const ROOT_KEYS = new Set([
+  "schema_version",
+  "phase",
+  "baseline",
+  "evidence_root",
+  "mutation_thresholds",
+  "phase1_prerequisites",
+  "requirements",
+]);
+const BASELINE_KEYS = new Set(["repository", "sha"]);
+const MUTATION_THRESHOLD_KEYS = new Set(["critical", "core"]);
+const REQUIREMENT_KEYS = new Set([
+  "id",
+  "priority",
+  "dependencies",
+  "owner",
+  "test_suites",
+  "eval_suites",
+  "evidence_path",
+  "mutation_class",
+]);
 
 const REQUIRED_REQUIREMENT_IDS = [
   "AH-CONTEXT-COMPILER-001",
@@ -218,51 +240,31 @@ const display = (value) =>
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-const sortedStrings = (value) =>
-  Array.isArray(value) ? [...value].sort() : value;
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  }
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
+  }
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? "null" : serialized;
+};
 
-const semanticManifest = (manifest) => ({
-  schema_version: manifest?.schema_version,
-  phase: manifest?.phase,
-  baseline: isRecord(manifest?.baseline)
-    ? {
-        repository: manifest.baseline.repository,
-        sha: manifest.baseline.sha,
-      }
-    : manifest?.baseline,
-  evidence_root: manifest?.evidence_root,
-  mutation_thresholds: isRecord(manifest?.mutation_thresholds)
-    ? {
-        critical: manifest.mutation_thresholds.critical,
-        core: manifest.mutation_thresholds.core,
-      }
-    : manifest?.mutation_thresholds,
-  phase1_prerequisites: sortedStrings(manifest?.phase1_prerequisites),
-  requirements: Array.isArray(manifest?.requirements)
-    ? manifest.requirements
-        .map((requirement) => ({
-          id: requirement?.id,
-          priority: requirement?.priority,
-          dependencies: sortedStrings(requirement?.dependencies),
-          owner: requirement?.owner,
-          test_suites: sortedStrings(requirement?.test_suites),
-          eval_suites: sortedStrings(requirement?.eval_suites),
-          evidence_path: requirement?.evidence_path,
-          mutation_class: requirement?.mutation_class,
-        }))
-        .sort((left, right) => String(left.id).localeCompare(String(right.id)))
-    : manifest?.requirements,
-});
+export const computePhase2CanonicalSha256 = (manifest) =>
+  createHash("sha256").update(canonicalJson(manifest)).digest("hex");
 
-export const computePhase2SemanticSha256 = (manifest) =>
-  createHash("sha256")
-    .update(JSON.stringify(semanticManifest(manifest)))
-    .digest("hex");
-
-const exactAuthorityValue = (field, value) =>
-  ["dependencies", "test_suites", "eval_suites"].includes(field)
-    ? sortedStrings(value)
-    : value;
+const addUnexpectedFieldErrors = (errors, value, allowedKeys, label) => {
+  if (!isRecord(value)) return;
+  for (const key of Object.keys(value).sort()) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${label} contains unexpected field ${key}`);
+    }
+  }
+};
 
 const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
   let authority;
@@ -274,10 +276,10 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
     return;
   }
 
-  const authorityHash = computePhase2SemanticSha256(authority);
-  if (authorityHash !== AUTHORITY_SEMANTIC_SHA256) {
+  const authorityHash = computePhase2CanonicalSha256(authority);
+  if (authorityHash !== AUTHORITY_CANONICAL_SHA256) {
     errors.push(
-      `frozen authority snapshot semantic SHA-256 mismatch; expected ${display(AUTHORITY_SEMANTIC_SHA256)}; received ${display(authorityHash)}`,
+      `frozen authority snapshot canonical SHA-256 mismatch; expected ${display(AUTHORITY_CANONICAL_SHA256)}; received ${display(authorityHash)}`,
     );
   }
 
@@ -302,8 +304,8 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
     const received = requirementsById.get(id);
     if (!expected || !received) continue;
     for (const field of frozenFields) {
-      const expectedValue = exactAuthorityValue(field, expected[field]);
-      const receivedValue = exactAuthorityValue(field, received[field]);
+      const expectedValue = expected[field];
+      const receivedValue = received[field];
       if (JSON.stringify(receivedValue) !== JSON.stringify(expectedValue)) {
         errors.push(
           `requirement ${id} ${field} must exactly match frozen authority; expected ${display(expectedValue)}, received ${display(receivedValue)}`,
@@ -312,10 +314,10 @@ const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
     }
   }
 
-  const manifestHash = computePhase2SemanticSha256(manifest);
-  if (manifestHash !== AUTHORITY_SEMANTIC_SHA256) {
+  const manifestHash = computePhase2CanonicalSha256(manifest);
+  if (manifestHash !== AUTHORITY_CANONICAL_SHA256) {
     errors.push(
-      `manifest semantic SHA-256 does not match frozen authority; expected ${display(AUTHORITY_SEMANTIC_SHA256)}; received ${display(manifestHash)}`,
+      `manifest canonical SHA-256 does not match frozen authority; expected ${display(AUTHORITY_CANONICAL_SHA256)}; received ${display(manifestHash)}`,
     );
   }
 };
@@ -356,9 +358,11 @@ const findDependencyCycle = (requirementsById) => {
   return undefined;
 };
 
-export const validatePhase2Manifest = (manifest, options = {}) => {
+export const validatePhase2Manifest = (manifest) => {
   const errors = [];
   if (!isRecord(manifest)) return ["manifest must be a JSON object"];
+
+  addUnexpectedFieldErrors(errors, manifest, ROOT_KEYS, "manifest");
 
   if (manifest.schema_version !== EXPECTED_SCHEMA_VERSION) {
     errors.push(
@@ -373,6 +377,12 @@ export const validatePhase2Manifest = (manifest, options = {}) => {
   if (!isRecord(manifest.baseline)) {
     errors.push("manifest.baseline must be a JSON object");
   } else {
+    addUnexpectedFieldErrors(
+      errors,
+      manifest.baseline,
+      BASELINE_KEYS,
+      "manifest.baseline",
+    );
     if (manifest.baseline.repository !== EXPECTED_REPOSITORY) {
       errors.push(
         `manifest.baseline.repository must be ${display(EXPECTED_REPOSITORY)}; received ${display(manifest.baseline.repository)}`,
@@ -393,6 +403,12 @@ export const validatePhase2Manifest = (manifest, options = {}) => {
   const thresholds = isRecord(manifest.mutation_thresholds)
     ? manifest.mutation_thresholds
     : {};
+  addUnexpectedFieldErrors(
+    errors,
+    manifest.mutation_thresholds,
+    MUTATION_THRESHOLD_KEYS,
+    "manifest.mutation_thresholds",
+  );
   if (typeof thresholds.critical !== "number" || thresholds.critical < 90) {
     errors.push(
       `mutation_thresholds.critical must be at least 90; received ${display(thresholds.critical)}`,
@@ -448,6 +464,12 @@ export const validatePhase2Manifest = (manifest, options = {}) => {
       continue;
     }
     const id = typeof entry.id === "string" ? entry.id : display(entry.id);
+    addUnexpectedFieldErrors(
+      errors,
+      entry,
+      REQUIREMENT_KEYS,
+      `requirement ${id}`,
+    );
     if (requirementsById.has(id))
       errors.push(`duplicate requirement id: ${id}`);
     else requirementsById.set(id, entry);
@@ -554,16 +576,13 @@ export const validatePhase2Manifest = (manifest, options = {}) => {
     }
   }
 
-  if (options.enforceAuthority !== false) {
-    addFrozenAuthorityErrors(errors, manifest, requirementsById);
-  }
+  addFrozenAuthorityErrors(errors, manifest, requirementsById);
 
   return errors;
 };
 
 export const validatePhase2ManifestFile = (
   filePath = DEFAULT_MANIFEST_PATH,
-  options = {},
 ) => {
   let manifest;
   try {
@@ -572,7 +591,7 @@ export const validatePhase2ManifestFile = (
     const message = error instanceof Error ? error.message : String(error);
     return [`unable to read Phase 2 manifest ${filePath}: ${message}`];
   }
-  return validatePhase2Manifest(manifest, options);
+  return validatePhase2Manifest(manifest);
 };
 
 const isDirectExecution =
