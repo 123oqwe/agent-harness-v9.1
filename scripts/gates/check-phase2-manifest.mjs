@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -10,6 +11,8 @@ const EXPECTED_REPOSITORY = "https://github.com/123oqwe/agentharness91.git";
 const EXPECTED_SHA = "bf5eac648527205603de7d26278276ad78819850";
 const EXPECTED_EVIDENCE_ROOT = "artifacts/phase-2";
 const EXPECTED_REQUIREMENT_COUNT = 64;
+export const AUTHORITY_SEMANTIC_SHA256 =
+  "85f4096b98014a30989ad60188887bedbbafcebf155359d6bdc94f526cdc557a";
 
 const REQUIRED_REQUIREMENT_IDS = [
   "AH-CONTEXT-COMPILER-001",
@@ -111,10 +114,35 @@ const ALLOWED_OWNERS = new Set([
   "apps/tui",
 ]);
 
+const TEST_SUITE_PATTERN =
+  /^tests\/phase-2\/(?:unit|integration|e2e|security)\/[a-z0-9]+(?:-[a-z0-9]+)*\.test\.ts$/;
+
+const ALLOWED_EVAL_SUITES = new Set(
+  [
+    "coding",
+    "documents",
+    "research",
+    "writing",
+    "planning",
+    "personal-assistant",
+    "multimodal",
+  ].map((domain) => `evals/${domain}/phase-2.yaml`),
+);
+
+const PERSONAL_ASSISTANT_EVAL = "evals/personal-assistant/phase-2.yaml";
+const PA_CLOSED_LOOP_REQUIREMENTS = [
+  "AH-PAUSE-RESUME-001",
+  "AH-TOOL-ESCALATE-001",
+  "AH-UI-NOTIFY-001",
+  "AH-UI-PLANNING-001",
+  "AH-UI-RECONCILE-001",
+];
+
 const REQUIRED_EDGES = {
   "AH-DOC-INGEST-WEB-001": ["AH-TOOL-WEB-FETCH-001"],
-  "AH-RAG-QUERY-001": ["AH-RAG-EMBED-001", "AH-RAG-META-001"],
+  "AH-RAG-QUERY-001": ["AH-RAG-FTS-001", "AH-RAG-EMBED-001", "AH-RAG-META-001"],
   "AH-RAG-DELETE-001": [
+    "AH-RAG-FTS-001",
     "AH-RAG-EMBED-001",
     "AH-RAG-META-001",
     "AH-RAG-GRAPH-001",
@@ -166,6 +194,7 @@ const REQUIRED_EDGES = {
     "AH-RUNTIME-STEERING-001",
   ],
   "AH-UX-STATES-001": [
+    "AH-UX-WEB-001",
     "AH-UI-DOC-001",
     "AH-UI-MM-001",
     "AH-UI-NOTIFY-001",
@@ -188,6 +217,108 @@ const display = (value) =>
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
+
+const sortedStrings = (value) =>
+  Array.isArray(value) ? [...value].sort() : value;
+
+const semanticManifest = (manifest) => ({
+  schema_version: manifest?.schema_version,
+  phase: manifest?.phase,
+  baseline: isRecord(manifest?.baseline)
+    ? {
+        repository: manifest.baseline.repository,
+        sha: manifest.baseline.sha,
+      }
+    : manifest?.baseline,
+  evidence_root: manifest?.evidence_root,
+  mutation_thresholds: isRecord(manifest?.mutation_thresholds)
+    ? {
+        critical: manifest.mutation_thresholds.critical,
+        core: manifest.mutation_thresholds.core,
+      }
+    : manifest?.mutation_thresholds,
+  phase1_prerequisites: sortedStrings(manifest?.phase1_prerequisites),
+  requirements: Array.isArray(manifest?.requirements)
+    ? manifest.requirements
+        .map((requirement) => ({
+          id: requirement?.id,
+          priority: requirement?.priority,
+          dependencies: sortedStrings(requirement?.dependencies),
+          owner: requirement?.owner,
+          test_suites: sortedStrings(requirement?.test_suites),
+          eval_suites: sortedStrings(requirement?.eval_suites),
+          evidence_path: requirement?.evidence_path,
+          mutation_class: requirement?.mutation_class,
+        }))
+        .sort((left, right) => String(left.id).localeCompare(String(right.id)))
+    : manifest?.requirements,
+});
+
+export const computePhase2SemanticSha256 = (manifest) =>
+  createHash("sha256")
+    .update(JSON.stringify(semanticManifest(manifest)))
+    .digest("hex");
+
+const exactAuthorityValue = (field, value) =>
+  ["dependencies", "test_suites", "eval_suites"].includes(field)
+    ? sortedStrings(value)
+    : value;
+
+const addFrozenAuthorityErrors = (errors, manifest, requirementsById) => {
+  let authority;
+  try {
+    authority = JSON.parse(readFileSync(DEFAULT_MANIFEST_PATH, "utf8"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`unable to load frozen Phase 2 authority: ${message}`);
+    return;
+  }
+
+  const authorityHash = computePhase2SemanticSha256(authority);
+  if (authorityHash !== AUTHORITY_SEMANTIC_SHA256) {
+    errors.push(
+      `frozen authority snapshot semantic SHA-256 mismatch; expected ${display(AUTHORITY_SEMANTIC_SHA256)}; received ${display(authorityHash)}`,
+    );
+  }
+
+  const authorityById = new Map(
+    Array.isArray(authority.requirements)
+      ? authority.requirements.map((requirement) => [
+          requirement.id,
+          requirement,
+        ])
+      : [],
+  );
+  const frozenFields = [
+    "priority",
+    "dependencies",
+    "owner",
+    "test_suites",
+    "eval_suites",
+    "mutation_class",
+  ];
+  for (const id of REQUIRED_REQUIREMENT_IDS) {
+    const expected = authorityById.get(id);
+    const received = requirementsById.get(id);
+    if (!expected || !received) continue;
+    for (const field of frozenFields) {
+      const expectedValue = exactAuthorityValue(field, expected[field]);
+      const receivedValue = exactAuthorityValue(field, received[field]);
+      if (JSON.stringify(receivedValue) !== JSON.stringify(expectedValue)) {
+        errors.push(
+          `requirement ${id} ${field} must exactly match frozen authority; expected ${display(expectedValue)}, received ${display(receivedValue)}`,
+        );
+      }
+    }
+  }
+
+  const manifestHash = computePhase2SemanticSha256(manifest);
+  if (manifestHash !== AUTHORITY_SEMANTIC_SHA256) {
+    errors.push(
+      `manifest semantic SHA-256 does not match frozen authority; expected ${display(AUTHORITY_SEMANTIC_SHA256)}; received ${display(manifestHash)}`,
+    );
+  }
+};
 
 const findDependencyCycle = (requirementsById) => {
   const visited = new Set();
@@ -225,7 +356,7 @@ const findDependencyCycle = (requirementsById) => {
   return undefined;
 };
 
-export const validatePhase2Manifest = (manifest) => {
+export const validatePhase2Manifest = (manifest, options = {}) => {
   const errors = [];
   if (!isRecord(manifest)) return ["manifest must be a JSON object"];
 
@@ -341,6 +472,25 @@ export const validatePhase2Manifest = (manifest) => {
     }
     if (!Array.isArray(entry.test_suites) || entry.test_suites.length === 0) {
       errors.push(`requirement ${id} test_suites must be a non-empty array`);
+    } else {
+      for (const suite of entry.test_suites) {
+        if (typeof suite !== "string" || !TEST_SUITE_PATTERN.test(suite)) {
+          errors.push(
+            `requirement ${id} test_suites entry must be a concrete Phase 2 test path without traversal; received ${display(suite)}`,
+          );
+        }
+      }
+    }
+    if (!Array.isArray(entry.eval_suites) || entry.eval_suites.length === 0) {
+      errors.push(`requirement ${id} eval_suites must be a non-empty array`);
+    } else {
+      for (const suite of entry.eval_suites) {
+        if (typeof suite !== "string" || !ALLOWED_EVAL_SUITES.has(suite)) {
+          errors.push(
+            `requirement ${id} eval_suites entry must be one of the seven Phase 2 eval paths; received ${display(suite)}`,
+          );
+        }
+      }
     }
     const expectedEvidencePath = `${EXPECTED_EVIDENCE_ROOT}/${id}.json`;
     if (entry.evidence_path !== expectedEvidencePath) {
@@ -392,11 +542,28 @@ export const validatePhase2Manifest = (manifest) => {
     }
   }
 
+  for (const id of PA_CLOSED_LOOP_REQUIREMENTS) {
+    const evalSuites = requirementsById.get(id)?.eval_suites;
+    if (
+      !Array.isArray(evalSuites) ||
+      !evalSuites.includes(PERSONAL_ASSISTANT_EVAL)
+    ) {
+      errors.push(
+        `requirement ${id} is missing required eval suite ${PERSONAL_ASSISTANT_EVAL}`,
+      );
+    }
+  }
+
+  if (options.enforceAuthority !== false) {
+    addFrozenAuthorityErrors(errors, manifest, requirementsById);
+  }
+
   return errors;
 };
 
 export const validatePhase2ManifestFile = (
   filePath = DEFAULT_MANIFEST_PATH,
+  options = {},
 ) => {
   let manifest;
   try {
@@ -405,7 +572,7 @@ export const validatePhase2ManifestFile = (
     const message = error instanceof Error ? error.message : String(error);
     return [`unable to read Phase 2 manifest ${filePath}: ${message}`];
   }
-  return validatePhase2Manifest(manifest);
+  return validatePhase2Manifest(manifest, options);
 };
 
 const isDirectExecution =

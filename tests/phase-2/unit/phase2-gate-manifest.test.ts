@@ -23,6 +23,7 @@ type Manifest = {
     dependencies: string[];
     owner: string;
     test_suites: string[];
+    eval_suites: string[];
     evidence_path: string;
     mutation_class: string;
   }>;
@@ -93,9 +94,26 @@ describe("Phase 2 release-gate manifest", () => {
     expect(
       validatePhase2ManifestFile(
         fixturePath("invalid", "phase2-gate-cycle.json"),
+        { enforceAuthority: false },
       ),
-    ).toContain(
+    ).toEqual([
       "dependency cycle detected: AH-CONTEXT-COMPILER-001 -> AH-RUNTIME-COMPACTION-001 -> AH-HOOK-001 -> AH-CONTEXT-COMPILER-001",
+    ]);
+  });
+
+  it("freezes every requirement's complete dependency set", () => {
+    const missingOriginal = loadFixture("valid", "phase2-gate.json");
+    requirement(missingOriginal, "AH-DOC-INGEST-DOCX-001").dependencies = [];
+    expect(validatePhase2Manifest(missingOriginal)).toContain(
+      'requirement AH-DOC-INGEST-DOCX-001 dependencies must exactly match frozen authority; expected ["AH-TOOL-READ-001"], received []',
+    );
+
+    const extraAcyclic = loadFixture("valid", "phase2-gate.json");
+    requirement(extraAcyclic, "AH-DOC-INGEST-DOCX-001").dependencies.push(
+      "AH-HOOK-001",
+    );
+    expect(validatePhase2Manifest(extraAcyclic)).toContain(
+      'requirement AH-DOC-INGEST-DOCX-001 dependencies must exactly match frozen authority; expected ["AH-TOOL-READ-001"], received ["AH-HOOK-001","AH-TOOL-READ-001"]',
     );
   });
 
@@ -127,6 +145,26 @@ describe("Phase 2 release-gate manifest", () => {
       "requirement AH-RAG-QUERY-001 test_suites must be a non-empty array",
     );
 
+    const badSuite = loadFixture("valid", "phase2-gate.json");
+    requirement(badSuite, "AH-RAG-QUERY-001").test_suites = ["banana"];
+    expect(validatePhase2Manifest(badSuite)).toContain(
+      'requirement AH-RAG-QUERY-001 test_suites entry must be a concrete Phase 2 test path without traversal; received "banana"',
+    );
+
+    const missingEval = loadFixture("valid", "phase2-gate.json");
+    requirement(missingEval, "AH-RAG-QUERY-001").eval_suites = [];
+    expect(validatePhase2Manifest(missingEval)).toContain(
+      "requirement AH-RAG-QUERY-001 eval_suites must be a non-empty array",
+    );
+
+    const badEval = loadFixture("valid", "phase2-gate.json");
+    requirement(badEval, "AH-RAG-QUERY-001").eval_suites = [
+      "evals/../phase-2.yaml",
+    ];
+    expect(validatePhase2Manifest(badEval)).toContain(
+      'requirement AH-RAG-QUERY-001 eval_suites entry must be one of the seven Phase 2 eval paths; received "evals/../phase-2.yaml"',
+    );
+
     const badClass = loadFixture("valid", "phase2-gate.json");
     requirement(badClass, "AH-RAG-QUERY-001").mutation_class = "optional";
     expect(validatePhase2Manifest(badClass)).toContain(
@@ -144,6 +182,61 @@ describe("Phase 2 release-gate manifest", () => {
     expect(validatePhase2Manifest(lowCore)).toContain(
       "mutation_thresholds.core must be at least 85; received 84",
     );
+  });
+
+  it("locks valid-looking priorities, owners, and suites to each requirement", () => {
+    const wrongPriority = loadFixture("valid", "phase2-gate.json");
+    requirement(wrongPriority, "AH-RAG-QUERY-001").priority = "P1";
+    expect(validatePhase2Manifest(wrongPriority)).toContain(
+      'requirement AH-RAG-QUERY-001 priority must exactly match frozen authority; expected "P0", received "P1"',
+    );
+
+    const swappedOwner = loadFixture("valid", "phase2-gate.json");
+    requirement(swappedOwner, "AH-RAG-QUERY-001").owner = "apps/web";
+    expect(validatePhase2Manifest(swappedOwner)).toContain(
+      'requirement AH-RAG-QUERY-001 owner must exactly match frozen authority; expected "packages/rag", received "apps/web"',
+    );
+
+    const borrowedSuite = loadFixture("valid", "phase2-gate.json");
+    requirement(borrowedSuite, "AH-RAG-QUERY-001").test_suites = [
+      "tests/phase-2/unit/ah-rag-meta-001.test.ts",
+    ];
+    expect(validatePhase2Manifest(borrowedSuite)).toContain(
+      'requirement AH-RAG-QUERY-001 test_suites must exactly match frozen authority; expected ["tests/phase-2/unit/ah-rag-query-001.test.ts"], received ["tests/phase-2/unit/ah-rag-meta-001.test.ts"]',
+    );
+
+    const borrowedEval = loadFixture("valid", "phase2-gate.json");
+    requirement(borrowedEval, "AH-RAG-QUERY-001").eval_suites = [
+      "evals/research/phase-2.yaml",
+    ];
+    expect(validatePhase2Manifest(borrowedEval)).toContain(
+      'requirement AH-RAG-QUERY-001 eval_suites must exactly match frozen authority; expected ["evals/documents/phase-2.yaml"], received ["evals/research/phase-2.yaml"]',
+    );
+  });
+
+  it.each([
+    "AH-TOOL-BEHAVIOR-VERIFY-001",
+    "AH-TOOL-WEB-FETCH-001",
+    "AH-TOOL-WEB-SEARCH-001",
+    "AH-UI-TUI-001",
+  ])("keeps risk-critical requirement %s at the 90 mutation gate", (id) => {
+    const downgraded = loadFixture("valid", "phase2-gate.json");
+    requirement(downgraded, id).mutation_class = "core";
+    expect(validatePhase2Manifest(downgraded)).toContain(
+      `requirement ${id} mutation_class must exactly match frozen authority; expected "critical", received "core"`,
+    );
+  });
+
+  it("rejects any semantic authority hash drift", () => {
+    const tampered = loadFixture("valid", "phase2-gate.json");
+    tampered.mutation_thresholds.critical = 91;
+    expect(
+      validatePhase2Manifest(tampered).some((error: string) =>
+        error.startsWith(
+          "manifest semantic SHA-256 does not match frozen authority; expected ",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("pins Phase 2 to the source-release baseline", () => {
@@ -172,9 +265,11 @@ describe("Phase 2 release-gate manifest", () => {
       ["AH-DOC-INGEST-WEB-001", "AH-TOOL-WEB-FETCH-001"],
       ["AH-RAG-QUERY-001", "AH-RAG-EMBED-001"],
       ["AH-RAG-QUERY-001", "AH-RAG-META-001"],
+      ["AH-RAG-QUERY-001", "AH-RAG-FTS-001"],
       ["AH-RAG-DELETE-001", "AH-RAG-EMBED-001"],
       ["AH-RAG-DELETE-001", "AH-RAG-META-001"],
       ["AH-RAG-DELETE-001", "AH-RAG-GRAPH-001"],
+      ["AH-RAG-DELETE-001", "AH-RAG-FTS-001"],
       ["AH-RUNTIME-COMPACTION-001", "AH-HOOK-001"],
       ["AH-TOOL-ESCALATE-001", "AH-CONTRACT-TOOLSPEC-001"],
       ["AH-TOOL-ESCALATE-001", "AH-POLICY-ENGINE-001"],
@@ -205,7 +300,10 @@ describe("Phase 2 release-gate manifest", () => {
         ["AH-UX-STATES-001", id],
       );
     }
-    requiredEdges.push(["AH-UX-STATES-001", "AH-UI-TUI-001"]);
+    requiredEdges.push(
+      ["AH-UX-STATES-001", "AH-UI-TUI-001"],
+      ["AH-UX-STATES-001", "AH-UX-WEB-001"],
+    );
 
     for (const [id, dependency] of requiredEdges) {
       const missingEdge = clone(valid);
