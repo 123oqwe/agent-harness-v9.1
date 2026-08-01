@@ -1,0 +1,680 @@
+{
+  "schema_version": "1.0.0",
+  "phase": 2,
+  "baseline": {
+    "repository": "https://github.com/123oqwe/agentharness91.git",
+    "sha": "bf5eac648527205603de7d26278276ad78819850"
+  },
+  "evidence_root": "artifacts/phase-2",
+  "mutation_thresholds": {
+    "critical": 90,
+    "core": 85
+  },
+  "phase1_prerequisites": [
+    "AH-CAPMAP-020",
+    "AH-CONTRACT-EFFECTRISK-001",
+    "AH-CONTRACT-TOOLSPEC-001",
+    "AH-DOC-VERTICAL-001",
+    "AH-EVIDENCE-001",
+    "AH-PA-VERTICAL-001",
+    "AH-PLANNING-VERTICAL-001",
+    "AH-POLICY-ENGINE-001",
+    "AH-RESEARCH-VERTICAL-001",
+    "AH-RUNTIME-LOOP-001",
+    "AH-RUNTIME-SESSION-001",
+    "AH-SANDBOX-001",
+    "AH-STATE-EXTERNAL-001",
+    "AH-TOOL-READ-001",
+    "AH-UI-CHAT-001",
+    "AH-VFS-001",
+    "AH-WRITING-VERTICAL-001"
+  ],
+  "requirements": [
+    {
+      "id": "AH-CONTEXT-COMPILER-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-COMPACTION-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-CONTEXT-COMPILER-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-DOCX-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-DOCX-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-ENC-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-ENC-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-IMG-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-IMG-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-MD-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-MD-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-PDF-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PDF-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-PPTX-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PPTX-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-UNSUPPORTED-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-UNSUPPORTED-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-WEB-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001", "AH-TOOL-WEB-FETCH-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-WEB-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-INGEST-XLSX-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-XLSX-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-PARSE-HEAD-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-HEAD-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-PARSE-IMGREF-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-PDF-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-IMGREF-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-PARSE-PROVENANCE-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-PROVENANCE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-DOC-PARSE-TABLE-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-XLSX-001"],
+      "owner": "packages/documents",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-TABLE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-HOOK-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-LOOP-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-HOOK-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MCP-STDIO-001",
+      "priority": "P0",
+      "dependencies": ["AH-HOOK-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MCP-STDIO-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-ARTIFACT-001",
+      "priority": "P0",
+      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-ARTIFACT-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-DOC-VISION-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-PDF-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-DOC-VISION-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-IMAGE-EDIT-001",
+      "priority": "P0",
+      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-EDIT-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-IMAGE-GEN-001",
+      "priority": "P0",
+      "dependencies": ["AH-POLICY-ENGINE-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-GEN-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-IMAGE-IN-001",
+      "priority": "P0",
+      "dependencies": ["AH-TOOL-READ-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-IN-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-MM-VISION-VERIFY-001",
+      "priority": "P0",
+      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-MM-VISION-VERIFY-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-PAUSE-RESUME-001",
+      "priority": "P0",
+      "dependencies": ["AH-STATE-EXTERNAL-001", "AH-RUNTIME-SESSION-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-PAUSE-RESUME-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-SANDBOX-OCI-001",
+      "priority": "P0",
+      "dependencies": ["AH-SANDBOX-001", "AH-VFS-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration", "security"],
+      "evidence_path": "artifacts/phase-2/AH-SANDBOX-OCI-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-CHUNK-001",
+      "priority": "P0",
+      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-CHUNK-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-CITE-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-RERANK-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-CITE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-DELETE-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-RAG-FTS-001",
+        "AH-RAG-EMBED-001",
+        "AH-RAG-META-001",
+        "AH-RAG-GRAPH-001"
+      ],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-DELETE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-EMBED-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-CHUNK-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-EMBED-MIG-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-EMBED-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-MIG-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-FTS-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-CHUNK-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-FTS-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-GRAPH-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-CHUNK-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-GRAPH-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-INJECTION-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-QUERY-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration", "security"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-INJECTION-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-META-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-CHUNK-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-META-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-QUERY-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-FTS-001", "AH-RAG-EMBED-001", "AH-RAG-META-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-QUERY-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RAG-RERANK-001",
+      "priority": "P0",
+      "dependencies": ["AH-RAG-QUERY-001"],
+      "owner": "packages/rag",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RAG-RERANK-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RUNTIME-BUDGET-002",
+      "priority": "P0",
+      "dependencies": ["AH-POLICY-ENGINE-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RUNTIME-BUDGET-002.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RUNTIME-COMPACTION-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-SESSION-001", "AH-HOOK-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RUNTIME-COMPACTION-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RUNTIME-MODELFALLBACK-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-LOOP-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RUNTIME-MODELFALLBACK-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RUNTIME-SESSIONTREE-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-SESSION-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RUNTIME-SESSIONTREE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-RUNTIME-STEERING-001",
+      "priority": "P0",
+      "dependencies": ["AH-RUNTIME-LOOP-001"],
+      "owner": "packages/context",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-RUNTIME-STEERING-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-BEHAVIOR-VERIFY-001",
+      "priority": "P2",
+      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-BEHAVIOR-VERIFY-001.json",
+      "mutation_class": "core"
+    },
+    {
+      "id": "AH-TOOL-IMAGE-GEN-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001",
+        "AH-MM-IMAGE-GEN-001"
+      ],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-IMAGE-GEN-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-SPEECH-GEN-001",
+      "priority": "P0",
+      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-POLICY-ENGINE-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-SPEECH-GEN-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-TRANSCRIBE-001",
+      "priority": "P0",
+      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-POLICY-ENGINE-001"],
+      "owner": "packages/multimodal",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-TRANSCRIBE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-SPREADSHEET-001",
+      "priority": "P0",
+      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-SPREADSHEET-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-PRESENTATION-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001",
+        "AH-TOOL-IMAGE-GEN-001"
+      ],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-PRESENTATION-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-DOCUMENT-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001",
+        "AH-TOOL-IMAGE-GEN-001"
+      ],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-DOCUMENT-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-OCR-001",
+      "priority": "P0",
+      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-OCR-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-ESCALATE-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001",
+        "AH-CAPMAP-020",
+        "AH-PAUSE-RESUME-001"
+      ],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit", "integration"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-ESCALATE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-TOOL-WEB-FETCH-001",
+      "priority": "P1",
+      "dependencies": ["AH-TOOL-WEB-SEARCH-001"],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-WEB-FETCH-001.json",
+      "mutation_class": "core"
+    },
+    {
+      "id": "AH-TOOL-WEB-SEARCH-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-CONTRACT-EFFECTRISK-001",
+        "AH-POLICY-ENGINE-001"
+      ],
+      "owner": "packages/tool-fabric",
+      "test_suites": ["unit"],
+      "evidence_path": "artifacts/phase-2/AH-TOOL-WEB-SEARCH-001.json",
+      "mutation_class": "core"
+    },
+    {
+      "id": "AH-UI-DOC-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-DOC-VERTICAL-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-DOC-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-MM-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-MM-ARTIFACT-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-MM-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-NOTIFY-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-CAPMAP-020",
+        "AH-TOOL-ESCALATE-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-NOTIFY-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-PLANNING-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-PLANNING-VERTICAL-001",
+        "AH-PA-VERTICAL-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-PLANNING-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-RECONCILE-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-PAUSE-RESUME-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-RECONCILE-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-RESEARCH-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-RESEARCH-VERTICAL-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-RESEARCH-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UI-TUI-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-UI-CHAT-001",
+        "AH-UX-API-001",
+        "AH-UX-CONTRACT-001",
+        "AH-RUNTIME-STEERING-001"
+      ],
+      "owner": "apps/tui",
+      "test_suites": ["unit", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-TUI-001.json",
+      "mutation_class": "core"
+    },
+    {
+      "id": "AH-UI-WRITING-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UX-WEB-001",
+        "AH-UX-CONTRACT-001",
+        "AH-WRITING-VERTICAL-001"
+      ],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UI-WRITING-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UX-API-001",
+      "priority": "P0",
+      "dependencies": ["AH-EVIDENCE-001"],
+      "owner": "packages/api",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UX-API-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UX-CONTRACT-001",
+      "priority": "P0",
+      "dependencies": ["AH-UX-API-001"],
+      "owner": "packages/api",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UX-CONTRACT-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UX-DESKTOP-001",
+      "priority": "P0",
+      "dependencies": ["AH-UX-API-001"],
+      "owner": "apps/desktop",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UX-DESKTOP-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UX-STATES-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-UI-DOC-001",
+        "AH-UI-MM-001",
+        "AH-UI-NOTIFY-001",
+        "AH-UI-PLANNING-001",
+        "AH-UI-RECONCILE-001",
+        "AH-UI-RESEARCH-001",
+        "AH-UI-WRITING-001",
+        "AH-UI-TUI-001"
+      ],
+      "owner": "packages/ui",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UX-STATES-001.json",
+      "mutation_class": "critical"
+    },
+    {
+      "id": "AH-UX-WEB-001",
+      "priority": "P0",
+      "dependencies": ["AH-UX-API-001"],
+      "owner": "apps/web",
+      "test_suites": ["unit", "integration", "e2e"],
+      "evidence_path": "artifacts/phase-2/AH-UX-WEB-001.json",
+      "mutation_class": "critical"
+    }
+  ]
+}
