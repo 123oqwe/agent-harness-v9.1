@@ -215,6 +215,7 @@ describe("Phase 2 gate command orchestration", () => {
       expect.arrayContaining([
         "scripts/gates/secure-publish.mjs",
         "scripts/gates/secure-publish.py",
+        "scripts/gates/trusted-git.mjs",
       ]),
     );
     const identity = collectGateBindings(repositoryRoot);
@@ -766,6 +767,99 @@ describe("Phase 2 gate command orchestration", () => {
     } finally {
       if (previous === undefined) delete process.env.PATH;
       else process.env.PATH = previous;
+    }
+  });
+
+  it("keeps the complete gate and helper authority independent of PATH git and stale trees", () => {
+    const bin = mkdtempSync(join(tmpdir(), "phase2-full-gate-path-spoof-"));
+    const marker = join(bin, "malicious-git-ran");
+    const fakeGit = join(bin, "git");
+    writeFileSync(
+      fakeGit,
+      `#!/bin/sh\nprintf ran > ${JSON.stringify(marker)}\nexit 99\n`,
+    );
+    chmodSync(fakeGit, 0o755);
+    const result = spawnSync(
+      process.execPath,
+      [join(repositoryRoot, "scripts/gates/verify-phase2-local.mjs"), "--mode", "dev"],
+      {
+        cwd: repositoryRoot,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+        encoding: "utf8",
+        shell: false,
+        timeout: 90_000,
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(marker)).toBe(false);
+
+    const root = createSecurePublicationRepository();
+    const staleTreeSha = git(root, "rev-parse", "HEAD^{tree}");
+    writeFileSync(join(root, "new-head.txt"), "new head\n");
+    git(root, "add", ".");
+    git(
+      root,
+      "-c",
+      "user.name=Phase2 Test",
+      "-c",
+      "user.email=phase2@example.invalid",
+      "commit",
+      "-m",
+      "advance authority head",
+    );
+    expect(() =>
+      securePublish({
+        operation: "write_file_atomic",
+        path: "reports/phase2/stale-tree.json",
+        contentBase64: "e30=",
+        authority: { repositoryRoot: root, treeSha: staleTreeSha },
+      }),
+    ).toThrow(/HEAD|authority|tree/u);
+    expect(existsSync(join(root, "reports"))).toBe(false);
+  });
+
+  it("rejects NUL and unencodable components before any filesystem mutation", () => {
+    for (const unsafePath of ["bad\0.json", "bad\ud800.json"]) {
+      const root = createSecurePublicationRepository();
+      expect(() =>
+        securePublish(
+          secureRequest(root, {
+            operation: "publish_tree",
+            temporary: "reports/phase2/.invalid-component.tmp",
+            final: "reports/phase2/evidence/invalid-component",
+            files: [{ path: unsafePath, contentBase64: "e30=" }],
+          }),
+        ),
+      ).toThrow(/NUL|component|encoding|surrogate|unsafe/u);
+      expect(existsSync(join(root, "reports"))).toBe(false);
+    }
+  });
+
+  it("preserves atomic report publication and cleanup errors together", () => {
+    const root = createSecurePublicationRepository();
+    mkdirSync(join(root, "reports/phase2/gate.json"), { recursive: true });
+    const previous = process.env.PHASE2_SECURE_PUBLISH_TESTING;
+    process.env.PHASE2_SECURE_PUBLISH_TESTING = "1";
+    try {
+      expect(() =>
+        securePublish(
+          secureRequest(root, {
+            operation: "write_file_atomic",
+            path: "reports/phase2/gate.json",
+            contentBase64: "e30=",
+            testFailCleanup: true,
+          }),
+        ),
+      ).toThrow(/directory|exist|rename[\s\S]*cleanup/u);
+      expect(
+        readdirSync(join(root, "reports/phase2")).filter((name) =>
+          name.endsWith(".tmp"),
+        ),
+      ).toEqual([]);
+    } finally {
+      if (previous === undefined)
+        delete process.env.PHASE2_SECURE_PUBLISH_TESTING;
+      else process.env.PHASE2_SECURE_PUBLISH_TESTING = previous;
     }
   });
 

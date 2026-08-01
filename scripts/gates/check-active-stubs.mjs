@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants,
@@ -26,7 +25,7 @@ import {
 import { fileURLToPath } from "node:url";
 
 import { validatePhase2Manifest } from "./check-phase2-manifest.mjs";
-import { createSafeCommandEnvironment } from "./run-command.mjs";
+import { spawnTrustedGitSync } from "./trusted-git.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
@@ -349,10 +348,8 @@ export const collectTrackedOwnerSourceFiles = ({
   if (errors.length > 0) return { files: [], errors };
   let repositoryTrackedPaths = trackedPaths;
   if (!(repositoryTrackedPaths instanceof Set)) {
-    const tracked = spawnSync("git", ["ls-files", "-z", "--"], {
+    const tracked = spawnTrustedGitSync(["ls-files", "-z", "--"], {
       cwd: root,
-      env: createSafeCommandEnvironment(),
-      shell: false,
       encoding: "utf8",
       maxBuffer: 4 * 1024 * 1024,
       timeout: 30_000,
@@ -384,13 +381,10 @@ const collectOwnerTreeSources = ({ root, treeSha, owner }) => {
   if (!/^[a-f0-9]{40,64}$/u.test(treeSha ?? "")) {
     return { entries: [], errors: ["release tree SHA is invalid"] };
   }
-  const listed = spawnSync(
-    "git",
+  const listed = spawnTrustedGitSync(
     ["ls-tree", "-r", "-z", treeSha, "--", owner],
     {
       cwd: root,
-      env: createSafeCommandEnvironment(),
-      shell: false,
       encoding: "buffer",
       maxBuffer: 8 * 1024 * 1024,
       timeout: 30_000,
@@ -414,10 +408,8 @@ const collectOwnerTreeSources = ({ root, treeSha, owner }) => {
     .filter((entry) => sourceExtensions.has(extname(entry.path)));
   const entries = [];
   for (const entry of candidates) {
-    const blob = spawnSync("git", ["cat-file", "blob", entry.blobSha], {
+    const blob = spawnTrustedGitSync(["cat-file", "blob", entry.blobSha], {
       cwd: root,
-      env: createSafeCommandEnvironment(),
-      shell: false,
       encoding: "buffer",
       maxBuffer: 16 * 1024 * 1024,
       timeout: 30_000,

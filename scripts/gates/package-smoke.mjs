@@ -19,6 +19,10 @@ import {
   executeGateCommands,
   runCommand,
 } from "./run-command.mjs";
+import {
+  spawnTrustedGitSync,
+  TRUSTED_GIT_EXECUTABLE,
+} from "./trusted-git.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const REQUIRED_EXPORTS = [
@@ -160,10 +164,8 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
 
 const resolveGitIdentity = (repositoryRoot) => {
   const resolveRevision = (revision) => {
-    const result = spawnSync("git", ["rev-parse", "--verify", revision], {
+    const result = spawnTrustedGitSync(["rev-parse", "--verify", revision], {
       cwd: repositoryRoot,
-      env: createSafeCommandEnvironment(),
-      shell: false,
       encoding: "utf8",
       timeout: 30_000,
     });
@@ -196,14 +198,14 @@ export const prepareExactSourceCheckout = async ({
       [
         {
           id: "archive-head",
-          command: "git",
+          command: TRUSTED_GIT_EXECUTABLE,
           args: ["archive", "--format=tar", "--output", archive, "HEAD"],
           cwd: repositoryRoot,
           timeoutMs: 120_000,
         },
         {
           id: "clone-head",
-          command: "git",
+          command: TRUSTED_GIT_EXECUTABLE,
           args: [
             "clone",
             "--shared",
@@ -216,7 +218,7 @@ export const prepareExactSourceCheckout = async ({
         },
         {
           id: "checkout-head",
-          command: "git",
+          command: TRUSTED_GIT_EXECUTABLE,
           args: ["checkout", "--detach", sourceIdentity.commitSha],
           cwd: checkout,
           timeoutMs: 120_000,

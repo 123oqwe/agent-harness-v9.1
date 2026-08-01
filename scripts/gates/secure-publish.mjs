@@ -12,9 +12,10 @@ import {
   statSync,
 } from "node:fs";
 
+import { spawnTrustedGitSync } from "./trusted-git.mjs";
+
 const HELPER_PATH = "scripts/gates/secure-publish.py";
 const TOOL_CANDIDATES = Object.freeze({
-  git: ["/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"],
   python3: [
     "/usr/bin/python3",
     "/usr/local/bin/python3",
@@ -96,19 +97,28 @@ export const securePublish = (request) => {
   )
     throw new Error("descriptor publication requires a bound Git tree helper");
 
-  const git = trustedExecutable("git");
   const python3 = trustedExecutable("python3");
   const repositoryRoot = realpathSync(authority.repositoryRoot);
   const rootDescriptor = openAuthorityRoot(repositoryRoot);
   try {
-    const helper = spawnSync(
-      git,
+    const head = spawnTrustedGitSync(["rev-parse", "HEAD^{tree}"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024,
+      timeout: 30_000,
+    });
+    if (
+      head.status !== 0 ||
+      head.error !== undefined ||
+      head.stdout.trim() !== authority.treeSha
+    )
+      throw new Error("supplied authority tree does not match trusted Git HEAD tree");
+
+    const helper = spawnTrustedGitSync(
       ["cat-file", "blob", `${authority.treeSha}:${HELPER_PATH}`],
       {
         cwd: repositoryRoot,
         encoding: "buffer",
-        env: environment(),
-        shell: false,
         maxBuffer: 2 * 1024 * 1024,
         timeout: 30_000,
       },

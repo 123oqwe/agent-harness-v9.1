@@ -2,7 +2,6 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   readdirSync,
@@ -21,12 +20,12 @@ import {
   parseStrictJson,
 } from "./check-active-stubs.mjs";
 import {
-  createSafeCommandEnvironment,
   executeGateCommands,
   runCommand,
   writeAtomicGateReport,
 } from "./run-command.mjs";
 import { securePublish } from "./secure-publish.mjs";
+import { spawnTrustedGitSync } from "./trusted-git.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "../..");
@@ -38,6 +37,7 @@ export const RUNNER_BINDING_PATHS = Object.freeze([
   "scripts/gates/run-command.mjs",
   "scripts/gates/secure-publish.mjs",
   "scripts/gates/secure-publish.py",
+  "scripts/gates/trusted-git.mjs",
   "scripts/gates/check-active-stubs.mjs",
   "scripts/gates/check-contract-drift.mjs",
   "scripts/gates/run-phase2-evals.mjs",
@@ -181,10 +181,8 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
 };
 
 const git = (root, args) => {
-  const result = spawnSync("git", args, {
+  const result = spawnTrustedGitSync(args, {
     cwd: root,
-    env: createSafeCommandEnvironment(),
-    shell: false,
     encoding: "utf8",
     maxBuffer: 4 * 1024 * 1024,
   });
@@ -194,10 +192,8 @@ const git = (root, args) => {
 };
 
 const gitExit = (root, args) =>
-  spawnSync("git", args, {
+  spawnTrustedGitSync(args, {
     cwd: root,
-    env: createSafeCommandEnvironment(),
-    shell: false,
     encoding: "utf8",
     maxBuffer: 4 * 1024 * 1024,
   });

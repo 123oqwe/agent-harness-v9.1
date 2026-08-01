@@ -45,6 +45,15 @@ def components(path: object, *, publication_path: bool = True) -> list[str]:
     result = path.replace("\\", "/").split("/")
     if any(not part or part in (".", "..") for part in result):
         fail(f"unsafe relative path: {path!r}")
+    for part in result:
+        if "\0" in part:
+            fail("NUL is forbidden in path components")
+        try:
+            encoded = os.fsencode(part)
+        except UnicodeEncodeError as error:
+            fail(f"path component is not filesystem-encodable: {error}")
+        if b"\0" in encoded or os.fsdecode(encoded) != part:
+            fail("path component has an unsafe filesystem encoding")
     if publication_path and (len(result) < 3 or result[:2] != ["reports", "phase2"]):
         fail("publication paths must be below reports/phase2")
     return result
@@ -215,7 +224,11 @@ def validate_request(raw: object) -> dict:
     root_key = "rootFd" if "rootFd" in raw else "root"
     test_pause = {"testPauseAfterRootOpenMs"}
     if operation == "write_file_atomic":
-        request = exact_object(raw, {"operation", root_key, "path", "contentBase64"}, test_pause)
+        request = exact_object(
+            raw,
+            {"operation", root_key, "path", "contentBase64"},
+            test_pause | {"testFailCleanup"},
+        )
         request["pathParts"] = components(request["path"])
         request["payload"] = decode_base64(request["contentBase64"])
     elif operation == "publish_tree":
@@ -270,12 +283,22 @@ def write_file_atomic(root_fd: int, request: dict) -> dict:
         os.rename(temporary, path_parts[-1], src_dir_fd=parent, dst_dir_fd=parent)
         os.fsync(parent)
         return {"ok": True, "bytes": len(payload)}
-    except BaseException:
+    except BaseException as original:
+        cleanup_errors = []
         try:
             os.unlink(temporary, dir_fd=parent)
             os.fsync(parent)
         except FileNotFoundError:
             pass
+        except BaseException as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+        if request.get("testFailCleanup"):
+            cleanup_errors.append(RuntimeError("injected cleanup failure"))
+        if cleanup_errors:
+            detail = "; ".join(
+                f"{type(error).__name__}: {error}" for error in cleanup_errors
+            )
+            fail(f"{type(original).__name__}: {original}; cleanup failed: {detail}")
         raise
     finally:
         os.close(parent)
