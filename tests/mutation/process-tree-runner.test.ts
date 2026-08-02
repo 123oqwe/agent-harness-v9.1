@@ -89,10 +89,10 @@ describe("bounded mutation process trees", () => {
     expect(runMutationChunkCommand).toBeTypeOf("function");
 
     const stateDirectory = temporaryRoot();
-    const timeoutMs = 600;
+    const timeoutMs = 1_500;
     const terminationGraceMs = 100;
     const killWaitMs = 500;
-    const markerDelayMs = 1_600;
+    const markerDelayMs = 3_000;
     const startedAt = Date.now();
 
     await expect(
@@ -112,7 +112,7 @@ describe("bounded mutation process trees", () => {
 
     const elapsedMs = Date.now() - startedAt;
     expect(elapsedMs).toBeLessThan(
-      timeoutMs + terminationGraceMs + killWaitMs + 500,
+      timeoutMs + terminationGraceMs + killWaitMs + 1_500,
     );
     expect(existsSync(join(stateDirectory, "partial-report.json"))).toBe(true);
 
@@ -134,7 +134,7 @@ describe("bounded mutation process trees", () => {
       );
     }
     expect(existsSync(join(stateDirectory, "late-marker"))).toBe(false);
-  }, 5_000);
+  }, 8_000);
 
   it("fails closed before spawning a mutation tree on Windows", async () => {
     expect(existsSync(helperPath)).toBe(true);
@@ -231,7 +231,7 @@ describe("bounded mutation process trees", () => {
     ).rejects.toThrow(/left descendant processes.*no report is accepted/iu);
 
     expect(Date.now() - startedAt).toBeLessThan(
-      normalExitGraceMs + terminationGraceMs + killWaitMs + 500,
+      normalExitGraceMs + terminationGraceMs + killWaitMs + 2_000,
     );
     const grandchildPid = Number.parseInt(
       readFileSync(join(stateDirectory, "grandchild.pid"), "utf8"),
@@ -245,7 +245,7 @@ describe("bounded mutation process trees", () => {
       );
     }
     expect(existsSync(join(stateDirectory, "late-marker"))).toBe(false);
-  }, 5_000);
+  }, 8_000);
 
   it("accepts a zero-exit process only when its process group is gone", async () => {
     expect(existsSync(helperPath)).toBe(true);

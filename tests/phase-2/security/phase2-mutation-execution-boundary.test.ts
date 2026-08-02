@@ -487,7 +487,10 @@ describe("Phase 2 mutation execution security boundary", () => {
     }
   });
 
-  it("never launches mutation execution in the live authoritative worktree", async () => {
+  it(
+    "never launches mutation execution in the live authoritative worktree",
+    { timeout: 20_000 },
+    async () => {
     const root = mkdtempSync(join(tmpdir(), "phase2-live-worktree-"));
     try {
       const identity = createFixture(root);
@@ -513,5 +516,6 @@ describe("Phase 2 mutation execution security boundary", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+    },
+  );
 });

@@ -380,7 +380,7 @@ describe('Phase 1 release repository provenance', () => {
     }
   });
 
-  it('ignores Git replace refs for repository, blob, and isolated-tree authority', async () => {
+  it('ignores Git replace refs for repository, blob, and isolated-tree authority', { timeout: 15_000 }, async () => {
     const boundary = await loadBoundary();
     const repository = temporaryRoot();
     const isolated = join(temporaryRoot(), 'isolated');

@@ -623,8 +623,7 @@ describe('Phase 1 mutation report integrity', () => {
       'checker',
     );
     writeFileSync(join(root, 'scripts', 'repository-paths.mjs'), 'paths');
-    mkdirSync(join(root, 'scripts', 'gates'), { recursive: true });
-    writeFileSync(join(root, 'scripts', 'gates', 'trusted-git.mjs'), 'trusted-git');
+    writeFileSync(join(root, 'scripts', 'trusted-git.mjs'), 'trusted-git');
     writeFileSync(join(root, 'scripts', 'secure-release-io.mjs'), 'secure-js');
     writeFileSync(join(root, 'scripts', 'secure-release-io.py'), 'secure-py');
     writeFileSync(join(root, 'vitest.mutation.config.ts'), 'vitest');
@@ -647,7 +646,7 @@ describe('Phase 1 mutation report integrity', () => {
       expect.arrayContaining([
         'scripts/check-mutation-thresholds.mjs',
         'scripts/run-process-tree.mjs',
-        'scripts/gates/trusted-git.mjs',
+        'scripts/trusted-git.mjs',
         'scripts/secure-release-io.mjs',
         'scripts/secure-release-io.py',
         'benchmarks/phase1/final-evidence.schema.json',

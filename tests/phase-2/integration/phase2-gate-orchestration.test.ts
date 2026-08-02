@@ -331,7 +331,13 @@ describe("Phase 2 gate command orchestration", () => {
         join(home, ".gitconfig"),
         `[core]\n\tfsmonitor = /usr/bin/touch ${marker}\n`,
       );
-      expect(expectNoExecution(["status", "--porcelain"]).status).toBe(0);
+      expect(
+        expectNoExecution([
+          "status",
+          "--porcelain=v1",
+          "--untracked-files=all",
+        ]).status,
+      ).toBe(0);
 
       const included = join(root, "included.gitconfig");
       writeFileSync(
@@ -342,14 +348,22 @@ describe("Phase 2 gate command orchestration", () => {
         join(home, ".gitconfig"),
         `[includeIf "gitdir:${repository}/"]\n\tpath = ${included}\n`,
       );
-      expect(expectNoExecution(["status", "--porcelain"]).status).toBe(0);
+      expect(
+        expectNoExecution([
+          "status",
+          "--porcelain=v1",
+          "--untracked-files=all",
+        ]).status,
+      ).toBe(0);
 
       writeFileSync(
         join(home, ".gitconfig"),
         `[filter "attack"]\n\tsmudge = /usr/bin/touch ${marker}\n\trequired = true\n`,
       );
       rmSync(marker, { force: true });
-      expect(() => run(["checkout", "--", "payload"])).toThrow(/not allowed/u);
+      expect(() => run(["checkout", "--", "payload"])).toThrow(
+        /outside the exact read grammar/u,
+      );
       expect(existsSync(marker)).toBe(false);
 
       writeFileSync(
@@ -357,7 +371,7 @@ describe("Phase 2 gate command orchestration", () => {
         `[alias]\n\tpwn = !/usr/bin/touch ${marker}\n`,
       );
       rmSync(marker, { force: true });
-      expect(() => run(["pwn"])).toThrow(/not allowed/u);
+      expect(() => run(["pwn"])).toThrow(/outside the exact read grammar/u);
       expect(existsSync(marker)).toBe(false);
       expect(expectNoExecution(["cat-file", "blob", "HEAD:payload"]).stdout).toBe(
         "trusted payload\n",
