@@ -471,6 +471,60 @@ describe("Phase 2 incremental monorepo architecture", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it.each([
+    [
+      "multi-level constant process key",
+      'const key0 = "process"; const key1 = key0; void globalThis[key1].pid;',
+      /global process access is forbidden/u,
+    ],
+    [
+      "computed process destructuring",
+      'const key0 = "process"; const key1 = key0; const { [key1]: runtime } = globalThis; void runtime.pid;',
+      /global process access is forbidden/u,
+    ],
+    [
+      "cyclic constant aliases",
+      "const key0 = key1; const key1 = key0; void globalThis[key0];",
+      /unresolved global property access is forbidden/u,
+    ],
+    [
+      "non-constant property key",
+      'let key = "process"; void globalThis[key];',
+      /unresolved global property access is forbidden/u,
+    ],
+    [
+      "unknown property key",
+      "const key = getGlobalKey(); void globalThis[key];",
+      /unresolved global property access is forbidden/u,
+    ],
+  ])("fails closed for %s", (_label, source, expectedError) => {
+    const root = copyArchitectureFixture();
+    writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+
+    const result = runChecker(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(expectedError);
+  });
+
+  it("resolves a multi-level constant transport key only for its authority workspace", () => {
+    const allowedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(allowedRoot, "packages/api/src/index.ts"),
+      'const key0 = "fetch"; const key1 = key0; void globalThis[key1];\n',
+    );
+    expect(runChecker(allowedRoot).status).toBe(0);
+
+    const deniedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(deniedRoot, "packages/context/src/index.ts"),
+      'const key0 = "fetch"; const key1 = key0; void globalThis[key1];\n',
+    );
+    const denied = runChecker(deniedRoot);
+    expect(denied.status).toBe(1);
+    expect(denied.stderr).toMatch(/global fetch access is forbidden/u);
+  });
+
   it("does not make a development dependency importable by production source", () => {
     const root = copyArchitectureFixture();
     updateJson(root, "packages/rag/package.json", (manifest) => {

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-// Source-admission defense, not a runtime isolation boundary. Gateway,
-// SecretsBroker, Policy/PEP, VFS, Sandbox, and Receipts remain authoritative.
+// Source-admission defense against accidental authority bypasses, not a proof
+// that arbitrary JavaScript is safe and not a runtime isolation boundary.
+// Gateway, SecretsBroker, Policy/PEP, VFS, Sandbox, and Receipts remain
+// authoritative. Unresolved global indirection therefore fails closed here.
 
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
@@ -376,6 +378,28 @@ const collectGlobalProcessBindings = (sourceFile) => {
   };
   collect(sourceFile);
 
+  let stringChanged = true;
+  while (stringChanged) {
+    stringChanged = false;
+    for (const declaration of declarations) {
+      if (!ts.isIdentifier(declaration.name)) continue;
+      const initializer = unwrapExpression(declaration.initializer);
+      if (
+        !initializer ||
+        !ts.isIdentifier(initializer) ||
+        !stringConstants.has(initializer.text) ||
+        stringConstants.has(declaration.name.text)
+      ) {
+        continue;
+      }
+      stringConstants.set(
+        declaration.name.text,
+        stringConstants.get(initializer.text),
+      );
+      stringChanged = true;
+    }
+  }
+
   const staticPropertyName = (node) => {
     if (ts.isPropertyAccessExpression(node)) return node.name.text;
     if (!ts.isElementAccessExpression(node) || !node.argumentExpression)
@@ -506,6 +530,25 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
       violations.add("global process access is forbidden");
     }
     if (
+      ts.isElementAccessExpression(node) &&
+      processBindings.isGlobalObject(node.expression) &&
+      processBindings.staticPropertyName(node) === null
+    ) {
+      violations.add("unresolved global property access is forbidden");
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      processBindings.isGlobalObject(node.initializer) &&
+      node.name.elements.some(
+        (element) =>
+          element.dotDotDotToken !== undefined ||
+          processBindings.bindingPropertyName(element) === null,
+      )
+    ) {
+      violations.add("unresolved global property access is forbidden");
+    }
+    if (
       ts.isIdentifier(node) &&
       node.text === "fetch" &&
       !isDeclarationName(node) &&
@@ -524,18 +567,15 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
       );
     }
     if (
-      (ts.isPropertyAccessExpression(node) &&
-        GLOBAL_OBJECTS.has(node.expression.getText()) &&
-        (node.name.text === "fetch" ||
-          GLOBAL_NETWORK_IDENTIFIERS.has(node.name.text))) ||
-      (ts.isElementAccessExpression(node) &&
-        GLOBAL_OBJECTS.has(node.expression.getText()) &&
-        (elementAccessName(node) === "fetch" ||
-          GLOBAL_NETWORK_IDENTIFIERS.has(elementAccessName(node))))
+      (ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node)) &&
+      processBindings.isGlobalObject(node.expression) &&
+      (processBindings.staticPropertyName(node) === "fetch" ||
+        GLOBAL_NETWORK_IDENTIFIERS.has(
+          processBindings.staticPropertyName(node),
+        ))
     ) {
-      const name = ts.isPropertyAccessExpression(node)
-        ? node.name.text
-        : elementAccessName(node);
+      const name = processBindings.staticPropertyName(node);
       if (!transportGlobals.has(name))
         violations.add(
           name === "fetch"
