@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-// Source-admission defense against accidental authority bypasses, not a proof
-// that arbitrary JavaScript is safe and not a runtime isolation boundary.
-// Gateway, SecretsBroker, Policy/PEP, VFS, Sandbox, and Receipts remain
-// authoritative. Unresolved global indirection therefore fails closed here.
+// Source-admission defense against accidental authority bypasses for the
+// explicitly supported static syntax. It does not prove arbitrary dynamic
+// JavaScript, function-returned authorities, or runtime obfuscation safe.
+// Gateway, SecretsBroker, Policy/PEP, VFS, Sandbox, and Receipts remain the
+// runtime authorities. Recognized global indirection fails closed here.
 
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
@@ -358,14 +359,14 @@ const collectGlobalProcessBindings = (sourceFile) => {
   const globalAliases = new Set(GLOBAL_OBJECTS);
   const processAliases = new Set(["process"]);
   const declarations = [];
+  const isConstantDeclaration = (declaration) =>
+    (declaration.parent.flags & ts.NodeFlags.Const) !== 0;
   const collect = (node) => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      (node.parent.flags & ts.NodeFlags.Const) !== 0
-    ) {
+    if (ts.isVariableDeclaration(node)) {
       declarations.push(node);
       const initializer = unwrapExpression(node.initializer);
       if (
+        isConstantDeclaration(node) &&
         ts.isIdentifier(node.name) &&
         initializer &&
         (ts.isStringLiteral(initializer) ||
@@ -382,7 +383,12 @@ const collectGlobalProcessBindings = (sourceFile) => {
   while (stringChanged) {
     stringChanged = false;
     for (const declaration of declarations) {
-      if (!ts.isIdentifier(declaration.name)) continue;
+      if (
+        !isConstantDeclaration(declaration) ||
+        !ts.isIdentifier(declaration.name)
+      ) {
+        continue;
+      }
       const initializer = unwrapExpression(declaration.initializer);
       if (
         !initializer ||
@@ -456,6 +462,7 @@ const collectGlobalProcessBindings = (sourceFile) => {
   while (changed) {
     changed = false;
     for (const declaration of declarations) {
+      if (!isConstantDeclaration(declaration)) continue;
       const initializer = unwrapExpression(declaration.initializer);
       if (!initializer) continue;
       if (ts.isIdentifier(declaration.name)) {
@@ -491,6 +498,12 @@ const collectGlobalProcessBindings = (sourceFile) => {
     }
   }
 
+  const mutableAuthorityAlias = declarations.some((declaration) => {
+    if (isConstantDeclaration(declaration)) return false;
+    const initializer = unwrapExpression(declaration.initializer);
+    return isGlobalObject(initializer) || isGlobalProcess(initializer);
+  });
+
   return {
     globalAliases,
     processAliases,
@@ -498,12 +511,16 @@ const collectGlobalProcessBindings = (sourceFile) => {
     isGlobalObject,
     isGlobalProcess,
     bindingPropertyName,
+    mutableAuthorityAlias,
   };
 };
 
 const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
   const violations = new Set();
   const processBindings = collectGlobalProcessBindings(sourceFile);
+  if (processBindings.mutableAuthorityAlias) {
+    violations.add("mutable global authority alias is forbidden");
+  }
   const visit = (node) => {
     if (
       ts.isIdentifier(node) &&

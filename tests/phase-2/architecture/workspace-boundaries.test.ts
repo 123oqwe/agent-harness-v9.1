@@ -473,6 +473,30 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
   it.each([
     [
+      "a direct let initializer",
+      "let authority = globalThis; void authority.process.pid;",
+    ],
+    [
+      "an unwrapped var initializer through a resolved alias",
+      "const root = window; var authority = ((root)); void authority.fetch;",
+    ],
+  ])(
+    "rejects mutable global authority aliases through %s",
+    (_label, source) => {
+      const root = copyArchitectureFixture();
+      writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+
+      const result = runChecker(root);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(
+        /mutable global authority alias is forbidden/u,
+      );
+    },
+  );
+
+  it.each([
+    [
       "multi-level constant process key",
       'const key0 = "process"; const key1 = key0; void globalThis[key1].pid;',
       /global process access is forbidden/u,
@@ -488,8 +512,13 @@ describe("Phase 2 incremental monorepo architecture", () => {
       /unresolved global property access is forbidden/u,
     ],
     [
-      "non-constant property key",
+      "let string property key",
       'let key = "process"; void globalThis[key];',
+      /unresolved global property access is forbidden/u,
+    ],
+    [
+      "var string property key",
+      'var key = "process"; void globalThis[key];',
       /unresolved global property access is forbidden/u,
     ],
     [
