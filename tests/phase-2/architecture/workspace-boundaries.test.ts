@@ -413,6 +413,64 @@ describe("Phase 2 incremental monorepo architecture", () => {
     expect(result.stderr).toMatch(/navigator\.sendBeacon/u);
   });
 
+  it.each([
+    ["bare process", "void process.pid;"],
+    ["direct element access", 'void process["getBuiltinModule"]("node:fs");'],
+    [
+      "direct destructuring",
+      'const { getBuiltinModule } = process; void getBuiltinModule("node:fs");',
+    ],
+    [
+      "global object property",
+      'void globalThis.process.getBuiltinModule("node:fs");',
+    ],
+    [
+      "global object element access",
+      'void global["process"]["getBuiltinModule"]("node:fs");',
+    ],
+    [
+      "global process destructuring",
+      'const { process: runtime } = self; void runtime.getBuiltinModule("node:fs");',
+    ],
+    [
+      "bare process alias",
+      'const runtime = process; void runtime.getBuiltinModule("node:fs");',
+    ],
+    [
+      "global object alias",
+      'const host = window; void host.process.getBuiltinModule("node:fs");',
+    ],
+    [
+      "constant computed aliases",
+      'const host = globalThis; const processKey = "process"; const builtinKey = "getBuiltinModule"; void host[processKey][builtinKey]("node:fs");',
+    ],
+  ])("rejects global process access through %s", (_label, source) => {
+    const root = copyArchitectureFixture();
+    writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+
+    const result = runChecker(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/global process access is forbidden/u);
+  });
+
+  it("keeps process-independent cancellation globals available", () => {
+    const root = copyArchitectureFixture();
+    writeFileSync(
+      join(root, "packages/context/src/index.ts"),
+      [
+        "const controller = new AbortController();",
+        "const signal: AbortSignal = controller.signal;",
+        'const processResult = "safe local value";',
+        "void signal; void processResult;",
+      ].join("\n"),
+    );
+
+    const result = runChecker(root);
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("does not make a development dependency importable by production source", () => {
     const root = copyArchitectureFixture();
     updateJson(root, "packages/rag/package.json", (manifest) => {

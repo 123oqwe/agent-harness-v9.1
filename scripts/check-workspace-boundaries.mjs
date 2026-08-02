@@ -337,9 +337,174 @@ const elementAccessName = (node) =>
     ? node.argumentExpression.text
     : null;
 
+const unwrapExpression = (node) => {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isNonNullExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return current;
+};
+
+const collectGlobalProcessBindings = (sourceFile) => {
+  const stringConstants = new Map();
+  const globalAliases = new Set(GLOBAL_OBJECTS);
+  const processAliases = new Set(["process"]);
+  const declarations = [];
+  const collect = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      declarations.push(node);
+      const initializer = unwrapExpression(node.initializer);
+      if (
+        ts.isIdentifier(node.name) &&
+        initializer &&
+        (ts.isStringLiteral(initializer) ||
+          ts.isNoSubstitutionTemplateLiteral(initializer))
+      ) {
+        stringConstants.set(node.name.text, initializer.text);
+      }
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(sourceFile);
+
+  const staticPropertyName = (node) => {
+    if (ts.isPropertyAccessExpression(node)) return node.name.text;
+    if (!ts.isElementAccessExpression(node) || !node.argumentExpression)
+      return null;
+    const argument = unwrapExpression(node.argumentExpression);
+    if (
+      ts.isStringLiteral(argument) ||
+      ts.isNoSubstitutionTemplateLiteral(argument)
+    ) {
+      return argument.text;
+    }
+    return ts.isIdentifier(argument)
+      ? (stringConstants.get(argument.text) ?? null)
+      : null;
+  };
+  const isGlobalObject = (node) => {
+    const expression = unwrapExpression(node);
+    return Boolean(
+      expression &&
+      ts.isIdentifier(expression) &&
+      globalAliases.has(expression.text),
+    );
+  };
+  const isGlobalProcess = (node) => {
+    const expression = unwrapExpression(node);
+    if (!expression) return false;
+    if (ts.isIdentifier(expression)) return processAliases.has(expression.text);
+    return (
+      (ts.isPropertyAccessExpression(expression) ||
+        ts.isElementAccessExpression(expression)) &&
+      isGlobalObject(expression.expression) &&
+      staticPropertyName(expression) === "process"
+    );
+  };
+  const bindingPropertyName = (element) => {
+    const property = element.propertyName ?? element.name;
+    if (ts.isIdentifier(property) || ts.isStringLiteral(property))
+      return property.text;
+    if (ts.isComputedPropertyName(property)) {
+      const expression = unwrapExpression(property.expression);
+      if (
+        ts.isStringLiteral(expression) ||
+        ts.isNoSubstitutionTemplateLiteral(expression)
+      ) {
+        return expression.text;
+      }
+      if (ts.isIdentifier(expression))
+        return stringConstants.get(expression.text) ?? null;
+    }
+    return null;
+  };
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const declaration of declarations) {
+      const initializer = unwrapExpression(declaration.initializer);
+      if (!initializer) continue;
+      if (ts.isIdentifier(declaration.name)) {
+        if (
+          isGlobalObject(initializer) &&
+          !globalAliases.has(declaration.name.text)
+        ) {
+          globalAliases.add(declaration.name.text);
+          changed = true;
+        }
+        if (
+          isGlobalProcess(initializer) &&
+          !processAliases.has(declaration.name.text)
+        ) {
+          processAliases.add(declaration.name.text);
+          changed = true;
+        }
+      } else if (
+        ts.isObjectBindingPattern(declaration.name) &&
+        isGlobalObject(initializer)
+      ) {
+        for (const element of declaration.name.elements) {
+          if (
+            bindingPropertyName(element) === "process" &&
+            ts.isIdentifier(element.name) &&
+            !processAliases.has(element.name.text)
+          ) {
+            processAliases.add(element.name.text);
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    globalAliases,
+    processAliases,
+    staticPropertyName,
+    isGlobalObject,
+    isGlobalProcess,
+    bindingPropertyName,
+  };
+};
+
 const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
   const violations = new Set();
+  const processBindings = collectGlobalProcessBindings(sourceFile);
   const visit = (node) => {
+    if (
+      ts.isIdentifier(node) &&
+      processBindings.processAliases.has(node.text) &&
+      !isDeclarationName(node)
+    ) {
+      violations.add("global process access is forbidden");
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node)) &&
+      processBindings.isGlobalProcess(node)
+    ) {
+      violations.add("global process access is forbidden");
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      processBindings.isGlobalObject(node.initializer) &&
+      node.name.elements.some(
+        (element) => processBindings.bindingPropertyName(element) === "process",
+      )
+    ) {
+      violations.add("global process access is forbidden");
+    }
     if (
       ts.isIdentifier(node) &&
       node.text === "fetch" &&
