@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HookSystem } from '../../../packages/runtime-core/src/index.js';
 import {
+  assertTrustedHookExecutionResult,
   assertTrustedHookPlatform,
   assertTrustedHookSandboxResult,
   SandboxedHookExecutionPort,
@@ -144,6 +145,47 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     expect(() => assertTrustedHookSandboxResult('none', 'none')).toThrow(
       'changed from none to none',
     );
+  });
+
+  it.each([
+    ['timedOut', { timedOut: true }],
+    ['canceled', { canceled: true }],
+    ['truncated', { truncated: true }],
+    ['memory limit', { limitExceeded: 'memory' as const }],
+    ['process limit', { limitExceeded: 'process' as const }],
+    ['output limit', { limitExceeded: 'output' as const }],
+    ['null exit', { exitCode: null }],
+    ['nonzero exit', { exitCode: 7 }],
+  ])('fails closed on a sandbox result with %s', (_label, override) => {
+    const result = {
+      exitCode: 0,
+      timedOut: false,
+      canceled: false,
+      stdout: Buffer.from('{}'),
+      stderr: Buffer.alloc(0),
+      truncated: false,
+      mechanism: 'seatbelt' as const,
+      durationMs: 1,
+      ...override,
+    };
+    expect(() => assertTrustedHookExecutionResult('seatbelt', result)).toThrow(
+      'external Hook sandbox execution failed closed',
+    );
+  });
+
+  it('accepts only a successful result from the unchanged trusted mechanism', () => {
+    expect(() =>
+      assertTrustedHookExecutionResult('bubblewrap', {
+        exitCode: 0,
+        timedOut: false,
+        canceled: false,
+        stdout: Buffer.from('{}'),
+        stderr: Buffer.alloc(0),
+        truncated: false,
+        mechanism: 'bubblewrap',
+        durationMs: 1,
+      }),
+    ).not.toThrow();
   });
 
   it.each(['user', 'hash_reviewed'] as const)(

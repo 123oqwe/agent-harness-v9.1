@@ -31,6 +31,7 @@ import {
   execSandboxed,
   SandboxError,
   type SandboxMechanism,
+  type SandboxResult,
 } from '../sandbox/process-sandbox.js';
 
 const MAX_JSON_BYTES = 256 * 1024;
@@ -97,6 +98,32 @@ export function assertTrustedHookSandboxResult(
   ) {
     throw new SandboxError(
       `external Hook sandbox mechanism changed from ${expected} to ${actual}`,
+    );
+  }
+}
+
+/**
+ * Validate the complete result returned by the canonical process sandbox.
+ * Keeping this check as a pure boundary makes every fail-closed condition
+ * independently testable while the active execution path always invokes it.
+ */
+export function assertTrustedHookExecutionResult(
+  expectedMechanism: SandboxMechanism,
+  result: SandboxResult,
+): void {
+  assertTrustedHookSandboxResult(expectedMechanism, result.mechanism);
+  if (
+    result.timedOut ||
+    result.canceled ||
+    result.truncated ||
+    result.limitExceeded !== undefined ||
+    result.exitCode !== 0
+  ) {
+    throw new SandboxError(
+      `external Hook sandbox execution failed closed ` +
+        `(mechanism=${result.mechanism}, exit=${String(result.exitCode)}, ` +
+        `timeout=${String(result.timedOut)}, canceled=${String(result.canceled)}, ` +
+        `truncated=${String(result.truncated)}, limit=${result.limitExceeded ?? 'none'})`,
     );
   }
 }
@@ -170,21 +197,7 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
         },
         signal,
       });
-      assertTrustedHookSandboxResult(expectedMechanism, result.mechanism);
-      if (
-        result.timedOut ||
-        result.canceled ||
-        result.truncated ||
-        result.limitExceeded !== undefined ||
-        result.exitCode !== 0
-      ) {
-        throw new SandboxError(
-          `external Hook sandbox execution failed closed ` +
-            `(mechanism=${result.mechanism}, exit=${String(result.exitCode)}, ` +
-            `timeout=${String(result.timedOut)}, canceled=${String(result.canceled)}, ` +
-            `truncated=${String(result.truncated)}, limit=${result.limitExceeded ?? 'none'})`,
-        );
-      }
+      assertTrustedHookExecutionResult(expectedMechanism, result);
       return parseSingleJson(result.stdout);
     } finally {
       rmSync(workspaceRoot, { recursive: true, force: true });

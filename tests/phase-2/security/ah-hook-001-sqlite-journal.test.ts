@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createDurableHookSystem,
@@ -118,6 +118,112 @@ describe('AH-HOOK-001 encrypted SQLite HookJournal', () => {
       replayed: true,
     });
     restarted.close();
+  });
+
+  it('wires every optional durable Hook port into the existing authorities', async () => {
+    const auditEntries: unknown[] = [];
+    const audit = {
+      record: vi.fn(async (entry) => {
+        auditEntries.push(entry);
+      }),
+    };
+    const attenuationPolicy = {
+      validate: vi.fn(() => ({ allowed: true as const })),
+    };
+    const executionPort = {
+      execute: vi.fn(async () => ({
+        action: 'observe' as const,
+        follow_up: { source: 'wired-execution-port' },
+      })),
+    };
+    const monotonicValues = [10, 12, 20, 25];
+    const runtime = createDurableHookSystem({
+      databasePath: fixture(),
+      masterKey,
+      ownerId: 'all-options-composition',
+      leaseMs: 1_000,
+      nowMs: () => 0,
+      now: () => '2026-08-03T00:00:00.000Z',
+      monotonicNow: () => monotonicValues.shift() ?? 25,
+      audit,
+      attenuationPolicy,
+      executionPort,
+      registrations: [
+        {
+          id: 'managed-attenuation',
+          event: 'pre_tool_use',
+          trust: 'managed',
+          priority: 1,
+          timeout_ms: 100,
+          handler: {
+            handle: async () => ({
+              action: 'attenuate' as const,
+              payload: { permitted: true },
+            }),
+          },
+        },
+        {
+          id: 'reviewed-observer',
+          event: 'post_tool_use',
+          trust: 'hash_reviewed',
+          priority: 2,
+          timeout_ms: 100,
+          content_hash: 'a'.repeat(64),
+          execution: {
+            executable_path: '/usr/bin/node',
+            argv: ['/tmp/reviewed-hook.mjs'],
+            source_path: '/tmp/reviewed-hook.mjs',
+          },
+        },
+      ],
+    });
+
+    await expect(
+      runtime.hooks.dispatch({
+        event: 'pre_tool_use',
+        invocation_id: 'all-options-attenuation',
+        idempotency_key: 'all-options-attenuation-key',
+        scope: scope(),
+        payload: { permitted: true, excessive: true },
+      }),
+    ).resolves.toMatchObject({
+      action: 'continue',
+      payload: { permitted: true },
+    });
+    await expect(
+      runtime.hooks.dispatch({
+        event: 'post_tool_use',
+        invocation_id: 'all-options-observer',
+        idempotency_key: 'all-options-observer-key',
+        scope: scope(),
+        payload: { result: 'ok' },
+      }),
+    ).resolves.toMatchObject({
+      action: 'continue',
+      follow_ups: [{ source: 'wired-execution-port' }],
+    });
+
+    expect(attenuationPolicy.validate).toHaveBeenCalledOnce();
+    expect(executionPort.execute).toHaveBeenCalledOnce();
+    expect(audit.record).toHaveBeenCalledTimes(2);
+    expect(auditEntries).toMatchObject([
+      {
+        hook_id: 'managed-attenuation',
+        outcome: 'attenuated',
+        timestamp: '2026-08-03T00:00:00.000Z',
+        duration_ms: 2,
+      },
+      {
+        hook_id: 'reviewed-observer',
+        outcome: 'observed',
+        timestamp: '2026-08-03T00:00:00.000Z',
+        duration_ms: 5,
+      },
+    ]);
+    runtime.close();
+    await expect(runtime.journal.claim(claimInput('after-close'))).rejects.toThrow(
+      'Hook journal is closed',
+    );
   });
 
   it('atomically commits and replays within tenant/run/session scope', async () => {
