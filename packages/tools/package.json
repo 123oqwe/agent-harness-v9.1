@@ -1,5 +1,5 @@
 {
-  "name": "@agent-harness/api",
+  "name": "@agent-harness/tools",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -20,11 +20,6 @@
   },
   "dependencies": {
     "@agent-harness/runtime-core": "0.0.0",
-    "@agent-harness/router": "0.0.0",
-    "@agent-harness/security": "0.0.0",
-    "@agent-harness/tools": "0.0.0",
-    "@agent-harness/documents": "0.0.0",
-    "@agent-harness/rag": "0.0.0",
-    "@agent-harness/multimodal": "0.0.0"
+    "@agent-harness/security": "0.0.0"
   }
 }

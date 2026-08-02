@@ -193,6 +193,13 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
     }),
     nodeScript(
       root,
+      "workspace-smoke",
+      "scripts/gates/package-smoke.mjs",
+      ["--mode", "workspace"],
+      { timeoutMs: 300_000 },
+    ),
+    nodeScript(
+      root,
       "source-checkout-reproduction",
       "scripts/gates/package-smoke.mjs",
       ["--mode", "source-checkout"],
@@ -620,19 +627,33 @@ export const publishPhase2Evidence = ({
 
 const RELEASE_AUTHORITY = Symbol("phase2-release-authority");
 
-const verifyPhase2Implementation = async (
-  {
-    repositoryRoot = DEFAULT_REPOSITORY_ROOT,
-    mode = "dev",
-    runner = runCommand,
-    identityCollector = collectGateBindings,
-    evidencePublisher = publishPhase2Evidence,
-    evidenceFailureInjector,
-    reportPath,
-    signal,
-  } = {},
-  authorityToken,
-) => {
+export const classifyLocalGateReadiness = ({
+  executionOk,
+  identityStable,
+  candidateEvidenceCount,
+  errors,
+  mutationReady = true,
+}) => ({
+  candidateReady:
+    executionOk === true &&
+    identityStable === true &&
+    mutationReady === true &&
+    candidateEvidenceCount === 64 &&
+    Array.isArray(errors) &&
+    errors.length === 0,
+  releaseReady: false,
+});
+
+const verifyPhase2Implementation = async ({
+  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  mode = "dev",
+  runner = runCommand,
+  identityCollector = collectGateBindings,
+  evidencePublisher = publishPhase2Evidence,
+  evidenceFailureInjector,
+  reportPath,
+  signal,
+} = {}, authorityToken) => {
   if (!new Set(["dev", "local"]).has(mode))
     throw new Error(`unsupported Phase 2 gate mode: ${String(mode)}`);
   const root = resolve(repositoryRoot);
@@ -837,24 +858,36 @@ const verifyPhase2Implementation = async (
       required: 64,
     });
   }
-  const releaseReady =
-    mode === "local" &&
-    hasReleaseAuthority &&
-    mutationReadiness.ok &&
-    execution.ok &&
-    evidence.count === 64 &&
-    errors.length === 0;
+  const readiness = classifyLocalGateReadiness({
+    executionOk: mode === "local" && hasReleaseAuthority && execution.ok,
+    identityStable,
+    mutationReady: mutationReadiness.ok,
+    candidateEvidenceCount: evidence.count,
+    errors,
+  });
+  const releaseReady = false;
+  if (mode === "local") {
+    blockers.push({
+      code: "external_attestation_required",
+      baselineSha: postIdentity.bindings?.commitSha ?? null,
+    });
+  }
   const success =
-    mode === "dev" ? errors.length === 0 && execution.ok : releaseReady;
+    mode === "dev" ? errors.length === 0 && execution.ok : readiness.candidateReady;
   const report = {
     schemaVersion: RUNNER_VERSION,
     mode,
     success,
     releaseReady,
-    claims:
-      mode === "local"
-        ? claims
-        : { requirementsVerified: 0, evidencePassed: 0 },
+    candidateReady: mode === "local" && readiness.candidateReady,
+    formalAuthority: {
+      source: "github-actions-exact-sha-attestation",
+      status: "external_attestation_required",
+      exactSha: postIdentity.bindings?.commitSha ?? null,
+    },
+    claims: { requirementsVerified: 0, evidencePassed: 0 },
+    candidateClaims:
+      mode === "local" ? claims : { requirementsVerified: 0, evidencePassed: 0 },
     errors,
     blockers,
     mutation: {
@@ -866,7 +899,13 @@ const verifyPhase2Implementation = async (
       phase1MutationSha256: mutationReadiness.phase1MutationSha256,
     },
     bindings: postIdentity.bindings,
-    evidence,
+    evidence: {
+      count: 0,
+      setSha256: EMPTY_SHA256,
+      files: [],
+      directory: null,
+    },
+    candidateEvidence: evidence,
     commands: execution.results,
   };
   const destination =

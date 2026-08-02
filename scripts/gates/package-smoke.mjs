@@ -43,7 +43,7 @@ const REQUIRED_EXPORTS = [
   "SecretsBrokerApi",
 ];
 
-export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
+export const runPackedPackageSmoke = async ({ repositoryRoot = root } = {}) => {
   const packageJson = JSON.parse(
     readFileSync(join(repositoryRoot, "package.json"), "utf8"),
   );
@@ -52,37 +52,18 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
   let entry = "";
   let tarballSha256 = null;
   let exported = [];
-  const workspaces = [];
   let installed = false;
-  let compositionBound = false;
+  let packedFiles = [];
+  const workspaceNames = new Set(EXPECTED_WORKSPACES.map(({ name }) => name));
+  const workspaceDependencies = [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ].flatMap((section) =>
+    Object.keys(packageJson[section] ?? {}).filter((name) => workspaceNames.has(name)),
+  );
   try {
-    const boundaries = checkWorkspaceBoundaries({ repositoryRoot });
-    if (!boundaries.ok) {
-      throw new Error(
-        `workspace boundary validation failed: ${boundaries.errors.join("; ")}`,
-      );
-    }
-    for (const workspace of EXPECTED_WORKSPACES) {
-      const entrypoint = join(repositoryRoot, workspace.path, "dist/index.js");
-      if (!existsSync(entrypoint)) {
-        throw new Error(
-          `workspace entry is missing: ${workspace.path}/dist/index.js`,
-        );
-      }
-      const module = await import(pathToFileURL(entrypoint).href);
-      const identity = module.workspaceIdentity;
-      if (
-        identity?.name !== workspace.name ||
-        identity?.path !== workspace.path
-      ) {
-        throw new Error(`workspace identity mismatch: ${workspace.path}`);
-      }
-      workspaces.push({
-        name: identity.name,
-        path: identity.path,
-        entrypoint,
-      });
-    }
     const packed = spawnSync(
       "npm",
       [
@@ -104,6 +85,20 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
     if (packed.status !== 0)
       throw new Error(`npm pack failed with exit ${String(packed.status)}`);
     const packResult = JSON.parse(packed.stdout);
+    packedFiles = packResult[0].files.map(({ path }) => path);
+    const leakedWorkspaceFiles = packedFiles.filter((path) =>
+      /^(?:packages|apps)\//u.test(path),
+    );
+    if (leakedWorkspaceFiles.length > 0) {
+      throw new Error(
+        `packed root contains private workspace files: ${leakedWorkspaceFiles.join(", ")}`,
+      );
+    }
+    if (workspaceDependencies.length > 0) {
+      throw new Error(
+        `packed root declares private workspace dependencies: ${workspaceDependencies.join(", ")}`,
+      );
+    }
     const tarball = join(temporaryRoot, basename(packResult[0].filename));
     tarballSha256 = createHash("sha256")
       .update(readFileSync(tarball))
@@ -147,16 +142,12 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
       throw new Error(`packed package entry is missing: ${entry}`);
     const smokeSource = [
       `import * as api from ${JSON.stringify(packageJson.name)};`,
-      `const apiApp=await import(${JSON.stringify(pathToFileURL(join(repositoryRoot, "apps/api/dist/index.js")).href)});`,
       `const required=${JSON.stringify(REQUIRED_EXPORTS)};`,
       "const missing=required.filter((name)=>!(name in api));",
       "if(missing.length>0)throw new Error(`missing exports: ${missing.join(',')}`);",
       "const tools=new api.ToolRegistry();",
       "const skills=new api.SkillRegistry();skills.loadBaseSkills();",
-      "const composition=apiApp.composeApiApp(api);",
-      "const compositionBound=composition.kernel.Harness===api.Harness&&composition.kernel.createDefaultExecutionContext===api.createDefaultExecutionContext;",
-      "if(!compositionBound)throw new Error('API composition did not bind packed root authorities');",
-      "process.stdout.write(JSON.stringify({exported:Object.keys(api),tools:tools.size(),skills:skills.size(),compositionBound}));",
+      "process.stdout.write(JSON.stringify({exported:Object.keys(api),tools:tools.size(),skills:skills.size()}));",
     ].join("");
     const smoke = spawnSync(
       process.execPath,
@@ -176,7 +167,6 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
       );
     const smokeResult = JSON.parse(smoke.stdout);
     exported = smokeResult.exported;
-    compositionBound = smokeResult.compositionBound === true;
     if (smokeResult.tools !== 0 || smokeResult.skills !== 8) {
       throw new Error(
         "isolated registry instantiation returned unexpected state",
@@ -194,11 +184,74 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
     exported,
     tarballSha256,
     installed,
-    workspaces,
-    compositionBound,
+    packedFiles,
+    workspaceDependencies,
     releaseReady: installed && errors.length === 0,
   };
 };
+
+export const runWorkspaceCompositionSmoke = async ({
+  repositoryRoot = root,
+} = {}) => {
+  const errors = [];
+  const workspaces = [];
+  let compositionBound = false;
+  try {
+    const boundaries = checkWorkspaceBoundaries({ repositoryRoot });
+    if (!boundaries.ok) {
+      throw new Error(
+        `workspace boundary validation failed: ${boundaries.errors.join("; ")}`,
+      );
+    }
+    for (const workspace of EXPECTED_WORKSPACES) {
+      const entrypoint = join(repositoryRoot, workspace.path, "dist/index.js");
+      if (!existsSync(entrypoint)) {
+        throw new Error(
+          `workspace entry is missing: ${workspace.path}/dist/index.js`,
+        );
+      }
+      const module = await import(pathToFileURL(entrypoint).href);
+      const identity = module.workspaceIdentity;
+      if (
+        identity?.name !== workspace.name ||
+        identity?.path !== workspace.path
+      ) {
+        throw new Error(`workspace identity mismatch: ${workspace.path}`);
+      }
+      workspaces.push({
+        name: identity.name,
+        path: identity.path,
+        entrypoint,
+      });
+    }
+
+    const rootEntrypoint = join(repositoryRoot, "dist/index.js");
+    const apiEntrypoint = join(repositoryRoot, "apps/api/dist/index.js");
+    if (!existsSync(rootEntrypoint))
+      throw new Error("root dist/index.js is missing");
+    const api = await import(pathToFileURL(rootEntrypoint).href);
+    const apiApp = await import(pathToFileURL(apiEntrypoint).href);
+    const composition = apiApp.composeApiApp(api);
+    compositionBound =
+      composition.kernel.Harness === api.Harness &&
+      composition.kernel.createDefaultExecutionContext ===
+        api.createDefaultExecutionContext;
+    if (!compositionBound) {
+      throw new Error("API composition did not bind built root authorities");
+    }
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+  return {
+    mode: "workspace",
+    errors,
+    workspaces,
+    compositionBound,
+    workspaceReady: errors.length === 0,
+  };
+};
+
+export const runPackageSmoke = runPackedPackageSmoke;
 
 const resolveGitIdentity = (repositoryRoot) => {
   const resolveRevision = (revision) => {
@@ -365,6 +418,17 @@ export const runSourceCheckoutReproduction = async ({
         cwd: checkout,
         timeoutMs: 300_000,
       },
+      {
+        id: "source-workspace-smoke",
+        command: process.execPath,
+        args: [
+          join(checkout, "scripts/gates/package-smoke.mjs"),
+          "--mode",
+          "workspace",
+        ],
+        cwd: checkout,
+        timeoutMs: 300_000,
+      },
     ];
     const reproduction = await executeGateCommands(commands, {
       runner: runCommand,
@@ -402,10 +466,12 @@ const parseArguments = (argv) => {
   if (
     argv.length === 2 &&
     argv[0] === "--mode" &&
-    ["packed", "source-checkout"].includes(argv[1])
+    ["packed", "workspace", "source-checkout"].includes(argv[1])
   )
     return argv[1];
-  throw new Error("usage: package-smoke.mjs --mode <packed|source-checkout>");
+  throw new Error(
+    "usage: package-smoke.mjs --mode <packed|workspace|source-checkout>",
+  );
 };
 
 const isMain = (() => {
@@ -425,8 +491,10 @@ if (isMain) {
     const mode = parseArguments(process.argv.slice(2));
     result =
       mode === "packed"
-        ? await runPackageSmoke()
-        : await runSourceCheckoutReproduction();
+        ? await runPackedPackageSmoke()
+        : mode === "workspace"
+          ? await runWorkspaceCompositionSmoke()
+          : await runSourceCheckoutReproduction();
   } catch (error) {
     result = {
       mode: "unknown",
@@ -435,5 +503,12 @@ if (isMain) {
     };
   }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  process.exitCode = result.releaseReady ? 0 : 1;
+  process.exitCode =
+    result.mode === "workspace"
+      ? result.workspaceReady
+        ? 0
+        : 1
+      : result.releaseReady
+        ? 0
+        : 1;
 }

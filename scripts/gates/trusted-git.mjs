@@ -115,6 +115,12 @@ const matchesGrammar = (args) => {
   if (command === "merge-base")
     return rest.length === 3 && rest[0] === "--is-ancestor" &&
       HASH_OR_REF.test(rest[1]) && HASH_OR_REF.test(rest[2]);
+  if (command === "rev-list")
+    return (
+      rest.length === 2 &&
+      ((rest[0] === "--parents" && HASH_OR_REF.test(rest[1])) ||
+        (rest[0] === "--reverse" && rest[1] === "HEAD"))
+    );
   if (command === "cat-file")
     return rest.length === 2 && rest[0] === "blob" &&
       (/^[0-9a-f]{40}$/u.test(rest[1]) || OBJECT_PATH.test(rest[1]));

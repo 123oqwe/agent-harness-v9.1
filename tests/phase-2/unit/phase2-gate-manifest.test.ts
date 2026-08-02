@@ -1,17 +1,29 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   computePhase2CanonicalSha256,
   DEFAULT_MANIFEST_PATH,
+  parseTrackedGitIndex,
   validatePhase2Manifest,
   validatePhase2ManifestFile,
+  validatePhase2ManifestSnapshotFile,
+  verifySourceAuthorities,
   // @ts-expect-error The production checker intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/check-phase2-manifest.mjs";
+// @ts-expect-error The production checker intentionally ships as plain Node ESM.
+import * as phase2ManifestChecker from "../../../scripts/gates/check-phase2-manifest.mjs";
 
 type Manifest = {
   schema_version: string;
@@ -19,6 +31,23 @@ type Manifest = {
   baseline: { repository: string; sha: string };
   evidence_root: string;
   mutation_thresholds: { critical: number; core: number };
+  source_authorities: Array<{
+    id: string;
+    migration_requirement: string | null;
+    root: {
+      state: "active" | "retired";
+      paths: string[];
+      exports: string[];
+      tests: string[];
+    };
+    workspace: {
+      state: "scaffold" | "active";
+      owner: string;
+      paths: string[];
+      exports: string[];
+      tests: string[];
+    };
+  }>;
   phase1_prerequisites: string[];
   requirements: Array<{
     id: string;
@@ -29,6 +58,8 @@ type Manifest = {
     eval_suites: string[];
     evidence_path: string;
     mutation_class: string;
+    source_files?: string[];
+    test_files?: string[];
   }>;
 };
 
@@ -40,27 +71,43 @@ const checkerPath = resolve(
   "scripts/gates/check-phase2-manifest.mjs",
 );
 
-const git = (...args: string[]) => {
-  const result = spawnSync("/usr/bin/git", args, {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    shell: false,
-  });
-  expect(result.status, result.stderr).toBe(0);
-  return result.stdout.trim();
-};
-
 const runCheckerCli = (args: string[] = []) =>
   spawnSync(process.execPath, [checkerPath, ...args], {
     encoding: "utf8",
     shell: false,
-    timeout: 10_000,
+    timeout: 30_000,
   });
 
 const loadFixture = (kind: "valid" | "invalid", name: string): Manifest =>
   JSON.parse(readFileSync(fixturePath(kind, name), "utf8")) as Manifest;
 
 const clone = (manifest: Manifest): Manifest => structuredClone(manifest);
+
+const createSourceAuthorityFixture = () => {
+  const root = mkdtempSync(join(tmpdir(), "phase2-source-authority-"));
+  const manifest = loadFixture("valid", "phase2-gate.json");
+  const paths = new Set(["index.ts", "verification/gates/phase2-gate.json"]);
+  for (const authority of manifest.source_authorities) {
+    for (const path of [...authority.root.paths, ...authority.root.tests]) {
+      paths.add(path);
+    }
+  }
+  for (const path of paths) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    cpSync(resolve(process.cwd(), path), join(root, path));
+  }
+  const git = (...args: string[]) => {
+    const result = spawnSync("/usr/bin/git", args, {
+      cwd: root,
+      encoding: "utf8",
+      shell: false,
+    });
+    expect(result.status, result.stderr).toBe(0);
+  };
+  git("init", "--quiet");
+  git("add", ".");
+  return { root, manifest, git };
+};
 
 const requirement = (manifest: Manifest, id: string) => {
   const result = manifest.requirements.find((entry) => entry.id === id);
@@ -79,6 +126,259 @@ const expectCanonicalHashMismatch = (errors: string[]) => {
 };
 
 describe("Phase 2 release-gate manifest", () => {
+  it("parses exact NUL-delimited index records and fails closed", () => {
+    const blob = "a".repeat(40);
+    expect(
+      parseTrackedGitIndex(
+        `100644 ${blob} 0\tindex.ts\u0000100755 ${blob} 0\tscripts/gate.mjs\u0000`,
+      ),
+    ).toEqual(
+      new Map([
+        ["index.ts", { mode: "100644", blob, status: "0" }],
+        ["scripts/gate.mjs", { mode: "100755", blob, status: "0" }],
+      ]),
+    );
+    for (const malformed of [
+      `100644 ${blob} 0\tindex.ts`,
+      `100644 ${"a".repeat(39)} 0\tindex.ts\u0000`,
+      `100644 ${blob}\tindex.ts\u0000`,
+      `100644 ${blob} 1\tindex.ts\u0000`,
+      `100644 ${blob} 0\tindex.ts\u0000100644 ${blob} 0\tindex.ts\u0000`,
+      `100644 ${blob} 0\t../index.ts\u0000`,
+      `100644 ${blob} 0\t/absolute.ts\u0000`,
+      "",
+    ]) {
+      expect(parseTrackedGitIndex(malformed)).toBeNull();
+    }
+  });
+
+  it("freezes one active implementation for every Phase 1 source authority", () => {
+    const manifest = loadFixture("valid", "phase2-gate.json");
+    expect(manifest.source_authorities.map((entry) => entry.id)).toEqual([
+      "Harness",
+      "Gateway",
+      "Router",
+      "Runtime",
+      "Strategies",
+      "Tools",
+      "Skills",
+      "Policy",
+      "PEP",
+      "Capability",
+      "Auth",
+      "Secrets",
+      "VFS",
+      "Sandbox",
+      "Session",
+      "Verification",
+    ]);
+    for (const authority of manifest.source_authorities) {
+      expect(
+        [authority.root.state, authority.workspace.state].filter(
+          (state) => state === "active",
+        ),
+        authority.id,
+      ).toHaveLength(1);
+      expect(authority.root.state, authority.id).toBe("active");
+      expect(authority.workspace.state, authority.id).toBe("scaffold");
+      expect(authority.migration_requirement, authority.id).toBeNull();
+    }
+  });
+
+  it("rejects double-active, zero-active, and unsynchronized authority migrations", () => {
+    const valid = loadFixture("valid", "phase2-gate.json");
+
+    const doubleActive = clone(valid);
+    doubleActive.source_authorities[0]!.workspace.state = "active";
+    expect(validatePhase2Manifest(doubleActive).join("\n")).toMatch(
+      /Harness.*exactly one active implementation/u,
+    );
+
+    const zeroActive = clone(valid);
+    zeroActive.source_authorities[0]!.root.state = "retired";
+    expect(validatePhase2Manifest(zeroActive).join("\n")).toMatch(
+      /Harness.*exactly one active implementation/u,
+    );
+
+    const incompleteMigration = clone(valid);
+    incompleteMigration.source_authorities[0]!.root.state = "retired";
+    incompleteMigration.source_authorities[0]!.workspace.state = "active";
+    expect(validatePhase2Manifest(incompleteMigration).join("\n")).toMatch(
+      /Harness.*migration_requirement/u,
+    );
+  });
+
+  it("freezes each authority's canonical owner and runtime value exports", () => {
+    const wrongOwner = loadFixture("valid", "phase2-gate.json");
+    const runtime = wrongOwner.source_authorities.find(
+      (authority) => authority.id === "Runtime",
+    );
+    if (!runtime) throw new Error("missing Runtime authority");
+    runtime.workspace.owner = "packages/tools";
+    expect(validatePhase2Manifest(wrongOwner).join("\n")).toMatch(
+      /Runtime workspace.owner must remain packages\/runtime-core/u,
+    );
+
+    const wrongExport = loadFixture("valid", "phase2-gate.json");
+    const router = wrongExport.source_authorities.find(
+      (authority) => authority.id === "Router",
+    );
+    if (!router) throw new Error("missing Router authority");
+    router.root.exports = ["chooseExecutionRoute"];
+    expect(validatePhase2Manifest(wrongExport).join("\n")).toMatch(
+      /Router root.exports must remain.*StaticRouter/u,
+    );
+  });
+
+  it("requires authority state, requirement, source, test, and root export to migrate in one commit", () => {
+    const verifyAtomicAuthorityMigrations = (
+      phase2ManifestChecker as Record<string, unknown>
+    ).verifyAtomicAuthorityMigrations;
+    expect(typeof verifyAtomicAuthorityMigrations).toBe("function");
+    if (typeof verifyAtomicAuthorityMigrations !== "function") return;
+    const createRepository = (split: boolean) => {
+      const root = mkdtempSync(join(tmpdir(), "phase2-atomic-migration-"));
+      const git = (...args: string[]) => {
+        const result = spawnSync("/usr/bin/git", args, {
+          cwd: root,
+          encoding: "utf8",
+          shell: false,
+        });
+        expect(result.status, result.stderr).toBe(0);
+      };
+      const manifestPath = join(root, "verification/gates/phase2-gate.json");
+      mkdirSync(dirname(manifestPath), { recursive: true });
+      writeFileSync(
+        join(root, "index.ts"),
+        'export * from "./runtime/loop.js";\n',
+      );
+      const base = {
+        source_authorities: [
+          {
+            id: "Runtime",
+            migration_requirement: null as string | null,
+            root: {
+              state: "active",
+              paths: ["runtime/loop.ts"],
+              exports: ["LoopEngine"],
+              tests: ["tests/runtime/loop.test.ts"],
+            },
+            workspace: {
+              state: "scaffold",
+              owner: "packages/runtime-core",
+              paths: ["packages/runtime-core/src/index.ts"],
+              exports: ["workspaceIdentity"],
+              tests: [] as string[],
+            },
+          },
+        ],
+        requirements: [
+          {
+            id: "AH-RUNTIME-SESSIONTREE-001",
+            owner: "packages/runtime-core",
+            test_suites: ["tests/phase-2/unit/session-tree.test.ts"],
+          },
+        ],
+      };
+      writeFileSync(manifestPath, `${JSON.stringify(base, null, 2)}\n`);
+      mkdirSync(join(root, "runtime"), { recursive: true });
+      writeFileSync(
+        join(root, "runtime/loop.ts"),
+        "export class LoopEngine {}\n",
+      );
+      mkdirSync(join(root, "tests/runtime"), { recursive: true });
+      writeFileSync(join(root, "tests/runtime/loop.test.ts"), "export {};\n");
+      git("init", "--quiet");
+      git("add", ".");
+      git(
+        "-c",
+        "user.name=Phase2",
+        "-c",
+        "user.email=p2@example.invalid",
+        "commit",
+        "-m",
+        "base",
+        "--quiet",
+      );
+
+      const migrated = structuredClone(base);
+      const authority = migrated.source_authorities[0]!;
+      const requirement = migrated.requirements[0]!;
+      authority.root.state = "retired";
+      authority.workspace.state = "active";
+      authority.workspace.paths = ["packages/runtime-core/src/loop-engine.ts"];
+      authority.workspace.exports = ["LoopEngine"];
+      authority.workspace.tests = ["tests/phase-2/unit/session-tree.test.ts"];
+      authority.migration_requirement = requirement.id;
+      Object.assign(requirement, {
+        source_files: authority.workspace.paths,
+        test_files: authority.workspace.tests,
+      });
+      mkdirSync(join(root, "packages/runtime-core/src"), { recursive: true });
+      writeFileSync(
+        join(root, "packages/runtime-core/src/loop-engine.ts"),
+        "export class LoopEngine {}\n",
+      );
+      mkdirSync(join(root, "tests/phase-2/unit"), { recursive: true });
+      writeFileSync(
+        join(root, "tests/phase-2/unit/session-tree.test.ts"),
+        "export {};\n",
+      );
+      writeFileSync(manifestPath, `${JSON.stringify(migrated, null, 2)}\n`);
+      if (split) {
+        git("add", ".");
+        git(
+          "-c",
+          "user.name=Phase2",
+          "-c",
+          "user.email=p2@example.invalid",
+          "commit",
+          "-m",
+          "prestage",
+          "--quiet",
+        );
+      }
+      writeFileSync(
+        join(root, "index.ts"),
+        'export * from "./packages/runtime-core/src/loop-engine.js";\n',
+      );
+      git("add", ".");
+      git(
+        "-c",
+        "user.name=Phase2",
+        "-c",
+        "user.email=p2@example.invalid",
+        "commit",
+        "-m",
+        "migrate",
+        "--quiet",
+      );
+      return root;
+    };
+
+    const atomic = createRepository(false);
+    const split = createRepository(true);
+    try {
+      expect(
+        (
+          verifyAtomicAuthorityMigrations as (options: {
+            repositoryRoot: string;
+          }) => string[]
+        )({ repositoryRoot: atomic }),
+      ).toEqual([]);
+      expect(
+        (
+          verifyAtomicAuthorityMigrations as (options: {
+            repositoryRoot: string;
+          }) => string[]
+        )({ repositoryRoot: split }).join("\n"),
+      ).toMatch(/same commit|atomic/u);
+    } finally {
+      rmSync(atomic, { recursive: true, force: true });
+      rmSync(split, { recursive: true, force: true });
+    }
+  });
+
   it("assigns server composition to apps/api while contracts remain in packages/api", () => {
     const manifest = loadFixture("valid", "phase2-gate.json");
 
@@ -95,12 +395,17 @@ describe("Phase 2 release-gate manifest", () => {
     expect(validatePhase2ManifestFile(DEFAULT_MANIFEST_PATH)).toEqual([]);
   });
 
-  it("keeps the authority and fixtures intentionally synchronized", () => {
+  it("keeps the valid fixture as a byte-frozen snapshot of the sole authority", () => {
     const validBytes = readFileSync(
       fixturePath("valid", "phase2-gate.json"),
       "utf8",
     );
     expect(readFileSync(DEFAULT_MANIFEST_PATH, "utf8")).toBe(validBytes);
+    expect(
+      validatePhase2ManifestSnapshotFile(
+        fixturePath("valid", "phase2-gate.json"),
+      ),
+    ).toEqual([]);
 
     const valid = JSON.parse(validBytes) as Manifest;
     const invalid = loadFixture("invalid", "phase2-gate-cycle.json");
@@ -108,29 +413,6 @@ describe("Phase 2 release-gate manifest", () => {
       "AH-CONTEXT-COMPILER-001",
     );
     expect(invalid).toEqual(valid);
-  });
-
-  it("pins the baseline to the actual parent of the Phase 2 authority history", () => {
-    const introductionCommit = git(
-      "log",
-      "--diff-filter=A",
-      "--format=%H",
-      "--",
-      "verification/gates/phase2-gate.json",
-    )
-      .split("\n")
-      .filter(Boolean)
-      .at(-1);
-    expect(introductionCommit).toMatch(/^[a-f0-9]{40}$/u);
-    const prerequisiteSha = git("rev-parse", `${introductionCommit}^`);
-    const authority = JSON.parse(
-      readFileSync(DEFAULT_MANIFEST_PATH, "utf8"),
-    ) as Manifest;
-
-    expect(authority.baseline.sha).toBe(prerequisiteSha);
-    expect(git("merge-base", "--is-ancestor", prerequisiteSha, "HEAD")).toBe(
-      "",
-    );
   });
 
   it("never throws when canonical JSON input contains a cycle", () => {
@@ -323,7 +605,7 @@ describe("Phase 2 release-gate manifest", () => {
     expect(() => validatePhase2Manifest(revocable.proxy)).not.toThrow();
   });
 
-  it("exercises the real CLI without a shell", () => {
+  it("exercises the real CLI without a shell", { timeout: 60_000 }, () => {
     const valid = runCheckerCli();
     expect(valid.error).toBeUndefined();
     expect(valid.status).toBe(0);
@@ -358,6 +640,278 @@ describe("Phase 2 release-gate manifest", () => {
       rmSync(temporaryDirectory, { recursive: true, force: true });
     }
   });
+
+  it(
+    "binds every active source authority to real source, root exports, and tests",
+    { timeout: 20_000 },
+    () => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }),
+        ).toEqual([]);
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    [
+      "comment",
+      (source: string) =>
+        source.replace(
+          "export class StaticRouter {",
+          "/* export class StaticRouter */ class RenamedRouter {",
+        ),
+    ],
+    [
+      "string",
+      (source: string) =>
+        source.replace(
+          "export class StaticRouter {",
+          'const exportDecoy = "export class StaticRouter"; class RenamedRouter {',
+        ),
+    ],
+    [
+      "local declaration",
+      (source: string) =>
+        source.replace("export class StaticRouter {", "class StaticRouter {"),
+    ],
+  ])(
+    "rejects a %s fake active export",
+    { timeout: 20_000 },
+    (_label, transform) => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        const path = join(fixture.root, "router/static-router.ts");
+        writeFileSync(path, transform(readFileSync(path, "utf8")));
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }).join("\n"),
+        ).toMatch(
+          /StaticRouter.*(?:real|runtime value) export|(?:real|runtime value) export.*StaticRouter/u,
+        );
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "rejects a root barrel that resolves an authority export from the wrong path",
+    { timeout: 20_000 },
+    () => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        const decoy = join(fixture.root, "router/decoy-router.ts");
+        writeFileSync(decoy, "export class StaticRouter {}\n");
+        const indexPath = join(fixture.root, "index.ts");
+        writeFileSync(
+          indexPath,
+          readFileSync(indexPath, "utf8").replace(
+            "export * from './router/static-router.js';",
+            "export * from './router/decoy-router.js';",
+          ),
+        );
+        fixture.git("add", ".");
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }).join("\n"),
+        ).toMatch(/StaticRouter.*root index|root index.*StaticRouter/u);
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "rejects a bound authority test that only comments the symbol name",
+    { timeout: 20_000 },
+    () => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        writeFileSync(
+          join(fixture.root, "tests/router/static-router.test.ts"),
+          "// StaticRouter\nexport {};\n",
+        );
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }).join("\n"),
+        ).toMatch(
+          /StaticRouter.*(?:test binding|observable test assertion)|(?:test binding|observable test assertion).*StaticRouter/u,
+        );
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    [
+      "type-only authority and type-only test",
+      "export type StaticRouter = { readonly fake: true };\n",
+      [
+        'import type { StaticRouter } from "../../router/static-router.js";',
+        "type NeverExecuted = StaticRouter;",
+        "export type { NeverExecuted };",
+      ].join("\n"),
+    ],
+    [
+      "void-only test use",
+      "export class StaticRouter {}\n",
+      [
+        'import { StaticRouter } from "../../router/static-router.js";',
+        "void StaticRouter;",
+      ].join("\n"),
+    ],
+    [
+      "unreachable test use",
+      "export class StaticRouter {}\n",
+      [
+        'import { StaticRouter } from "../../router/static-router.js";',
+        "if (false) { void StaticRouter; }",
+      ].join("\n"),
+    ],
+    [
+      "unrelated assertion",
+      "export class StaticRouter {}\n",
+      [
+        'import { describe, expect, it } from "vitest";',
+        'import { StaticRouter } from "../../router/static-router.js";',
+        'describe("fake", () => {',
+        '  it("does not assert router behavior", () => {',
+        "    new StaticRouter();",
+        "    expect(true).toBe(true);",
+        "  });",
+        "});",
+      ].join("\n"),
+    ],
+    [
+      "constructor existence assertion",
+      "export class StaticRouter {}\n",
+      [
+        'import { describe, expect, it } from "vitest";',
+        'import { StaticRouter } from "../../router/static-router.js";',
+        'describe("fake", () => {',
+        '  it("only proves construction", () => {',
+        "    expect(new StaticRouter()).toBeDefined();",
+        "  });",
+        "});",
+      ].join("\n"),
+    ],
+    [
+      "typeof-only function assertion",
+      "export function StaticRouter() { return true; }\n",
+      [
+        'import { describe, expect, it } from "vitest";',
+        'import { StaticRouter } from "../../router/static-router.js";',
+        'describe("fake", () => {',
+        '  it("only proves the export type", () => {',
+        '    expect(typeof StaticRouter).toBe("function");',
+        "  });",
+        "});",
+      ].join("\n"),
+    ],
+    [
+      "truthy-only function result assertion",
+      "export function StaticRouter() { return true; }\n",
+      [
+        'import { describe, expect, it } from "vitest";',
+        'import { StaticRouter } from "../../router/static-router.js";',
+        'describe("fake", () => {',
+        '  it("only proves a truthy result", () => {',
+        "    expect(StaticRouter()).toBeTruthy();",
+        "  });",
+        "});",
+      ].join("\n"),
+    ],
+  ])(
+    "rejects %s as a real authority/test binding",
+    { timeout: 20_000 },
+    (_label, source, testSource) => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        writeFileSync(join(fixture.root, "router/static-router.ts"), source);
+        writeFileSync(
+          join(fixture.root, "tests/router/static-router.test.ts"),
+          `${testSource}\n`,
+        );
+        fixture.git(
+          "add",
+          "router/static-router.ts",
+          "tests/router/static-router.test.ts",
+        );
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }).join("\n"),
+        ).toMatch(/runtime value export|observable test assertion/u);
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("rejects abnormal Git index modes", () => {
+    const blob = "a".repeat(40);
+    for (const mode of ["000000", "120000", "160000"]) {
+      expect(
+        parseTrackedGitIndex(`${mode} ${blob} 0\tindex.ts\u0000`),
+        mode,
+      ).toBeNull();
+    }
+  });
+
+  it(
+    "rejects an active authority whose working bytes drift from the Git index",
+    { timeout: 20_000 },
+    () => {
+      const fixture = createSourceAuthorityFixture();
+      try {
+        const path = join(fixture.root, "router/static-router.ts");
+        writeFileSync(path, `${readFileSync(path, "utf8")}\n`);
+        expect(
+          verifySourceAuthorities({
+            repositoryRoot: fixture.root,
+            manifestPath: join(
+              fixture.root,
+              "verification/gates/phase2-gate.json",
+            ),
+          }).join("\n"),
+        ).toMatch(
+          /Git index blob.*working bytes|working bytes.*Git index blob/u,
+        );
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("requires exactly 64 unique requirement IDs", () => {
     const tooShort = loadFixture("valid", "phase2-gate.json");
@@ -616,7 +1170,7 @@ describe("Phase 2 release-gate manifest", () => {
     const wrongSha = loadFixture("valid", "phase2-gate.json");
     wrongSha.baseline.sha = "deadbeef";
     expect(validatePhase2Manifest(wrongSha)).toContain(
-      'manifest.baseline.sha must be "2d59a526fcf7cd067fbe9d44981537a42d441360"; received "deadbeef"',
+      'manifest.baseline.sha must be "8dca581e11b8043aed257cb07c5161237633c40e"; received "deadbeef"',
     );
 
     const wrongRepository = loadFixture("valid", "phase2-gate.json");

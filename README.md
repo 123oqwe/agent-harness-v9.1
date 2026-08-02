@@ -1,8 +1,9 @@
 # Agent Harness
 
 Agent Harness is a security-first TypeScript runtime for routed, tool-using AI
-agents. This repository branch contains the Phase 1 harness source only; the
-Factory is not part of the runtime or release package.
+agents. This repository branch contains the complete Phase 1 runtime and the
+Phase 2 batch-zero source scaffold; it does not claim that Phase 2 capabilities
+are implemented. The Factory is not part of the runtime or release package.
 
 ## Phase 1 execution path
 
@@ -125,6 +126,13 @@ authorities. The package does not create permissive security defaults.
 
 ## Source layout
 
+The root `agent-harness` package is the only formal Phase 1 release artifact and publication authority.
+Private `packages/*` and `apps/*` workspaces are Phase 2 composition
+and migration boundaries, not duplicate implementations. Each later requirement
+must make an atomic authority migration from its root module to one workspace,
+with the requirement, tests, exports, and authority state changing in the same commit;
+the same runtime authority must never be implemented in both places.
+
 ```text
 gateway/       model providers and the only model-call gateway
 router/        task normalization and deterministic routing
@@ -141,7 +149,16 @@ ingestion/     document ingestion capability
 contracts/     generated TypeScript contracts
 spec/          authoritative schemas, APIs, state machines, and threat model
 tests/         unit, integration, security, packaging, and acceptance tests
+packages/      private Phase 2 module boundaries; not separately released
+apps/          private API, Web, Desktop, and TUI composition boundaries
+evals/         seven Phase 2 domain evaluation definitions
+data-tests/    Phase 2 real-data manifest definitions
+fixtures/phase-2/        deterministic Phase 2 test inputs and frozen snapshots
+verification/gates/      sole Phase 2 gate authority manifest
 ```
+
+`fixtures/phase-2/valid/phase2-gate.json` is a byte-frozen test snapshot of
+`verification/gates/phase2-gate.json`; it is not a second authority.
 
 The package is private and `UNLICENSED`; no open-source license grant is
 implied. See [SECURITY.md](SECURITY.md) for vulnerability reporting.

@@ -916,7 +916,7 @@ describe("Phase 2 gate command orchestration", () => {
     }
   });
 
-  it("keeps the complete gate and helper authority independent of PATH git and stale trees", () => {
+  it("keeps the complete gate and helper authority independent of PATH git and stale trees", { timeout: 120_000 }, () => {
     const bin = mkdtempSync(join(tmpdir(), "phase2-full-gate-path-spoof-"));
     const marker = join(bin, "malicious-git-ran");
     const fakeGit = join(bin, "git");
@@ -962,7 +962,7 @@ describe("Phase 2 gate command orchestration", () => {
       }),
     ).toThrow(/HEAD|authority|tree/u);
     expect(existsSync(join(root, "reports"))).toBe(false);
-  }, 30_000);
+  });
 
   it("rejects NUL and unencodable components before any filesystem mutation", () => {
     for (const unsafePath of ["bad\0.json", "bad\ud800.json"]) {

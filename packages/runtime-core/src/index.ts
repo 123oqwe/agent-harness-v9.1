@@ -1,8 +1,8 @@
 export const workspaceIdentity = Object.freeze({
-  name: "@agent-harness/context",
-  path: "packages/context",
+  name: "@agent-harness/runtime-core",
+  path: "packages/runtime-core",
 } as const);
 
-export interface ContextPackagePort {
+export interface RuntimeCorePackagePort {
   readonly workspace: typeof workspaceIdentity.name;
 }

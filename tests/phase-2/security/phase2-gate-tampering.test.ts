@@ -51,6 +51,7 @@ const releaseCommandIds = [
   "evaluations",
   "data",
   "package-smoke",
+  "workspace-smoke",
   "source-checkout-reproduction",
   "production-audit",
 ];

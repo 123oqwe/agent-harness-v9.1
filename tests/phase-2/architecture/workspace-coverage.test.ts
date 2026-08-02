@@ -56,7 +56,7 @@ describe("workspace coverage gate", () => {
 
   it("fails closed for missing, zero-line, and weak API composition coverage", () => {
     const { root, summary, write } = fixture();
-    delete summary[join(root, "packages/context/src/index.ts")];
+    delete summary[join(root, "packages/runtime-core/src/index.ts")];
     summary[join(root, "packages/rag/src/index.ts")] = {
       lines: { total: 1, covered: 0, skipped: 0, pct: 0 },
       branches: { total: 0, covered: 0, skipped: 0, pct: 100 },
@@ -75,7 +75,7 @@ describe("workspace coverage gate", () => {
     const result = checkWorkspaceCoverage({ repositoryRoot: root });
 
     expect(result.ok).toBe(false);
-    expect(result.errors.join("\n")).toMatch(/context.*missing/u);
+    expect(result.errors.join("\n")).toMatch(/runtime-core.*missing/u);
     expect(result.errors.join("\n")).toMatch(/rag.*non-zero/u);
     expect(result.errors.join("\n")).toMatch(/apps\/api.*85%/u);
   });
@@ -92,9 +92,11 @@ describe("workspace coverage gate", () => {
 
   it("requires non-zero coverage for every nested TypeScript source file", () => {
     const { root, summary, write } = fixture();
-    const nested = join(root, "packages/context/src/nested/covered.ts");
-    const missing = join(root, "packages/context/src/nested/missing.tsx");
-    mkdirSync(join(root, "packages/context/src/nested"), { recursive: true });
+    const nested = join(root, "packages/runtime-core/src/nested/covered.ts");
+    const missing = join(root, "packages/runtime-core/src/nested/missing.tsx");
+    mkdirSync(join(root, "packages/runtime-core/src/nested"), {
+      recursive: true,
+    });
     writeFileSync(nested, "export const nested = true;\n");
     writeFileSync(missing, "export const missing = true;\n");
     summary[nested] = {
@@ -107,10 +109,10 @@ describe("workspace coverage gate", () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors.join("\n")).toMatch(
-      /packages\/context\/src\/nested\/missing\.tsx.*missing/u,
+      /packages\/runtime-core\/src\/nested\/missing\.tsx.*missing/u,
     );
     expect(
       result.entries.map((entry: { path: string }) => entry.path),
-    ).toContain("packages/context/src/nested/covered.ts");
+    ).toContain("packages/runtime-core/src/nested/covered.ts");
   });
 });

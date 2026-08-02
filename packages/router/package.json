@@ -1,5 +1,5 @@
 {
-  "name": "@agent-harness/context",
+  "name": "@agent-harness/router",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agent-harness/contracts": "0.0.0"
+    "@agent-harness/contracts": "0.0.0",
+    "@agent-harness/runtime-core": "0.0.0"
   }
 }

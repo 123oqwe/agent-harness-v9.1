@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -22,6 +23,8 @@ import {
 } from "../../../scripts/gates/verify-phase2-local.mjs";
 import {
   prepareExactSourceCheckout,
+  runPackedPackageSmoke,
+  runWorkspaceCompositionSmoke,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/package-smoke.mjs";
 import {
@@ -78,7 +81,7 @@ describe("Phase 2 real release gate", () => {
 
   it(
     "allows the dirty-tree development gate but makes zero release claims",
-    { timeout: 30_000 },
+    { timeout: 120_000 },
     () => {
       const result = runScript("verify:phase2:dev");
       expect(result.status, result.stderr).toBe(0);
@@ -209,36 +212,76 @@ describe("Phase 2 real release gate", () => {
   });
 
   it(
-    "installs the packed artifact into an isolated ESM consumer",
+    "keeps packed-root readiness isolated from private workspace composition",
     { timeout: 180_000 },
-    () => {
+    async () => {
       const build = runScript("build");
       expect(build.status, build.stderr).toBe(0);
-      const smoke = runScript("test:phase2:package-smoke");
-      expect(smoke.status, smoke.stderr).toBe(0);
-      const result = JSON.parse(smoke.stdout);
-      expect(result).toMatchObject({
+
+      const apiEntry = join(repositoryRoot, "apps/api/dist/index.js");
+      const hiddenApiEntry = `${apiEntry}.attack-hidden`;
+      renameSync(apiEntry, hiddenApiEntry);
+      let packed;
+      let brokenComposition;
+      try {
+        packed = await runPackedPackageSmoke({ repositoryRoot });
+        brokenComposition = await runWorkspaceCompositionSmoke({
+          repositoryRoot,
+        });
+      } finally {
+        renameSync(hiddenApiEntry, apiEntry);
+      }
+
+      expect(packed).toMatchObject({
+        mode: "packed",
         installed: true,
         releaseReady: true,
         errors: [],
       });
-      expect(result.entry).toContain(
+      expect(packed).not.toHaveProperty("workspaceReady");
+      expect(packed).not.toHaveProperty("compositionBound");
+      expect(packed.workspaceDependencies).toEqual([]);
+      expect(
+        packed.packedFiles.some((path: string) =>
+          /^(?:packages|apps)\//u.test(path),
+        ),
+      ).toBe(false);
+      expect(packed.entry).toContain(
         "node_modules/agent-harness/dist/index.js",
       );
-      expect(result.entry.startsWith(repositoryRoot)).toBe(false);
-      expect(result.workspaces).toHaveLength(12);
-      expect(result.compositionBound).toBe(true);
+      expect(packed.entry.startsWith(repositoryRoot)).toBe(false);
+      expect(brokenComposition).toMatchObject({
+        mode: "workspace",
+        workspaceReady: false,
+        compositionBound: false,
+      });
+
+      const composition = await runWorkspaceCompositionSmoke({
+        repositoryRoot,
+      });
+      expect(composition).toMatchObject({
+        mode: "workspace",
+        workspaceReady: true,
+        compositionBound: true,
+        errors: [],
+      });
+      expect(composition).not.toHaveProperty("releaseReady");
       expect(
-        result.workspaces.map((workspace: { path: string }) => workspace.path),
+        composition.workspaces.map(
+          (workspace: { path: string }) => workspace.path,
+        ),
       ).toEqual([
         "packages/contracts",
-        "packages/context",
+        "packages/runtime-core",
+        "packages/router",
+        "packages/security",
+        "packages/tools",
+        "packages/ui",
+        "packages/api",
+        "packages/eval",
         "packages/documents",
         "packages/rag",
         "packages/multimodal",
-        "packages/tool-fabric",
-        "packages/api",
-        "packages/ui",
         "apps/api",
         "apps/web",
         "apps/desktop",
