@@ -9,17 +9,18 @@
  * durable backend that writes each event as it happens.
  */
 import Database from 'better-sqlite3';
-import {
-  createCipheriv,
-  createDecipheriv,
-  hkdfSync,
-  randomBytes,
-  randomUUID,
-} from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { SessionEvent, SessionEventType, SessionSnapshot } from './durable-session.js';
+import {
+  decryptSessionString,
+  deriveSessionRecordKey,
+  encryptSessionString,
+  hasSessionEncryptionEnvelope,
+  insertCanonicalSessionEvent,
+} from './sqlite-authority-internals.js';
 
 export interface OperationRecord {
   operation_id: string;
@@ -57,9 +58,6 @@ export interface SqliteSessionStoreOptions {
   /** Caller-custodied device/master key. It is derived and never persisted. */
   masterKey: Uint8Array;
 }
-
-const ENCRYPTION_PREFIX = 'ahenc:v1';
-const KEY_DERIVATION_CONTEXT = 'agent-harness/session-store/v1';
 
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -171,31 +169,16 @@ export class SqliteSessionStore {
       this.db.close();
       throw new Error('session encryption salt unavailable');
     }
-    const salt = Buffer.from(saltRow.value, 'base64');
-    if (salt.byteLength !== 32) {
-      this.db.close();
-      throw new Error('session encryption salt invalid');
-    }
-    const suppliedKey = Buffer.from(options.masterKey);
     try {
-      this.recordKey = Buffer.from(
-        hkdfSync(
-          'sha256',
-          suppliedKey,
-          salt,
-          KEY_DERIVATION_CONTEXT,
-          32,
-        ),
-      );
-    } finally {
-      suppliedKey.fill(0);
-      salt.fill(0);
+      this.recordKey = deriveSessionRecordKey(this.db, options.masterKey);
+    } catch (error) {
+      this.db.close();
+      throw error;
     }
     this._insertRun = this.db.prepare('INSERT OR IGNORE INTO runs (run_id, goal, strategy, status, created_at) VALUES (?, ?, ?, ?, ?)');
     this._getRun = this.db.prepare('SELECT * FROM runs WHERE run_id = ?');
     this._updateRunStatus = this.db.prepare('UPDATE runs SET status = ? WHERE run_id = ?');
     this._getEvent = this.db.prepare('SELECT seq, type, timestamp, data_json, hash, prev_hash FROM events WHERE run_id = ? AND seq = ?');
-    this._insertEvent = this.db.prepare('INSERT OR IGNORE INTO events (seq, run_id, type, timestamp, data_json, hash, prev_hash) VALUES (?, ?, ?, ?, ?, ?, ?)');
     this._insertSnapshot = this.db.prepare('INSERT OR REPLACE INTO snapshots (run_id, version, last_seq, last_hash, created_at, summary_json) VALUES (?, ?, ?, ?, ?, ?)');
     this._getLatestSnapshot = this.db.prepare(
       'SELECT run_id AS session_id, version, last_seq, last_hash, created_at, summary_json FROM snapshots WHERE run_id = ? ORDER BY version DESC LIMIT 1',
@@ -218,7 +201,6 @@ export class SqliteSessionStore {
   private readonly _getRun: Database.Statement;
   private readonly _updateRunStatus: Database.Statement;
   private readonly _getEvent: Database.Statement;
-  private readonly _insertEvent: Database.Statement;
   private readonly _insertSnapshot: Database.Statement;
   private readonly _getLatestSnapshot: Database.Statement;
   private readonly _upsertOperation: Database.Statement;
@@ -232,48 +214,15 @@ export class SqliteSessionStore {
   private closed = false;
 
   private encryptString(value: string, associatedData: string): string {
-    const nonce = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.recordKey, nonce);
-    cipher.setAAD(Buffer.from(associatedData, 'utf8'));
-    const ciphertext = Buffer.concat([
-      cipher.update(value, 'utf8'),
-      cipher.final(),
-    ]);
-    const tag = cipher.getAuthTag();
-    return [
-      ENCRYPTION_PREFIX,
-      nonce.toString('base64'),
-      tag.toString('base64'),
-      ciphertext.toString('base64'),
-    ].join(':');
+    return encryptSessionString(this.recordKey, value, associatedData);
   }
 
   private decryptString(value: string, associatedData: string): string {
-    const parts = value.split(':');
-    if (
-      parts.length !== 5 ||
-      `${parts[0]}:${parts[1]}` !== ENCRYPTION_PREFIX
-    ) {
+    if (!hasSessionEncryptionEnvelope(value)) {
       throw new Error('unencrypted session field rejected');
     }
     try {
-      const nonce = Buffer.from(parts[2]!, 'base64');
-      const tag = Buffer.from(parts[3]!, 'base64');
-      const ciphertext = Buffer.from(parts[4]!, 'base64');
-      if (nonce.byteLength !== 12 || tag.byteLength !== 16) {
-        throw new Error('invalid encrypted envelope');
-      }
-      const decipher = createDecipheriv(
-        'aes-256-gcm',
-        this.recordKey,
-        nonce,
-      );
-      decipher.setAAD(Buffer.from(associatedData, 'utf8'));
-      decipher.setAuthTag(tag);
-      return Buffer.concat([
-        decipher.update(ciphertext),
-        decipher.final(),
-      ]).toString('utf8');
+      return decryptSessionString(this.recordKey, value, associatedData);
     } catch {
       throw new Error('session field authentication failed');
     }
@@ -353,18 +302,7 @@ export class SqliteSessionStore {
       }
       return;
     }
-    this._insertEvent.run(
-      ev.seq,
-      runId,
-      ev.type,
-      ev.timestamp,
-      this.encryptString(
-        JSON.stringify(ev.data),
-        `events:${runId}:${ev.seq}:data_json`,
-      ),
-      ev.hash,
-      ev.prev_hash,
-    );
+    insertCanonicalSessionEvent(this.db, this.recordKey, runId, ev);
   }
 
   /** Persist a snapshot. */

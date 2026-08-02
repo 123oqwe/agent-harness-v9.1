@@ -185,8 +185,19 @@ describe("Phase 2 gate tamper resistance", () => {
   it("scans explicit stubs without making release claims", () => {
     expect(SEMANTIC_STUB_MARKERS).not.toContain("TODO");
     const result = scanActivePhase2Stubs({ repositoryRoot });
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repositoryRoot, "verification/gates/phase2-gate.json"),
+        "utf8",
+      ),
+    ) as { requirements: Array<{ id: string }> };
+    const expectedActive = manifest.requirements
+      .map((requirement) => requirement.id)
+      .filter((id) => id !== "AH-RUNTIME-SESSIONTREE-001")
+      .sort();
     expect(result.releaseReady).toBe(false);
-    expect(result.activeRequirementIds).toHaveLength(64);
+    expect(result.activeRequirementIds).toHaveLength(63);
+    expect([...result.activeRequirementIds].sort()).toEqual(expectedActive);
     expect(result.claims).toEqual({
       requirementsVerified: 0,
       evidencePassed: 0,

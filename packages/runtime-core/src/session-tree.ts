@@ -149,6 +149,11 @@ export interface SessionTreeCommandResult {
   readonly replayed: boolean;
 }
 
+export interface SessionTreeOptions {
+  readonly max_tree_events?: number;
+  readonly max_depth?: number;
+}
+
 export interface SessionTreeBranchCommand {
   readonly command_id: string;
   readonly source_session_id: string;
@@ -170,6 +175,8 @@ export type SessionTreeErrorCode =
   | "STALE_SOURCE"
   | "SESSION_CONFLICT"
   | "COMMAND_CONFLICT"
+  | "TREE_HEAD_CONFLICT"
+  | "RESOURCE_LIMIT"
   | "CORRUPT_LOG"
   | "AUTHORITY_VIOLATION"
   | "AUTHORITY_FAILURE";
@@ -185,41 +192,70 @@ export class SessionTreeError extends Error {
   }
 }
 
-const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const SHA256 = /^[0-9a-f]{64}$/;
-const EVENT_TYPES = new Set<SessionTreeAuthorityEventType>([
-  "user",
-  "assistant",
-  "tool_call",
-  "tool_result",
-  "compaction",
-  "branch",
-  "fork",
-  "steer",
-  "system",
-  "error",
-  "summary",
-]);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+function isAuthorityFaultCode(value: unknown): value is SessionTreeErrorCode {
+  return typeof value === "string" && [
+    "SOURCE_NOT_FOUND",
+    "INVALID_TARGET",
+    "STALE_SOURCE",
+    "SESSION_CONFLICT",
+    "COMMAND_CONFLICT",
+    "TREE_HEAD_CONFLICT",
+    "RESOURCE_LIMIT",
+    "CORRUPT_LOG",
+    "AUTHORITY_VIOLATION",
+  ].includes(value as SessionTreeErrorCode);
+}
+
+function isAuthorityEventType(value: unknown): value is SessionTreeAuthorityEventType {
+  return typeof value === "string" && [
+    "user",
+    "assistant",
+    "tool_call",
+    "tool_result",
+    "compaction",
+    "branch",
+    "fork",
+    "steer",
+    "system",
+    "error",
+    "summary",
+  ].includes(value as SessionTreeAuthorityEventType);
+}
+
+const authorityFault = (error: unknown): SessionTreeError | null => {
+  if (
+    !isRecord(error) ||
+    error.name !== "SessionTreeAuthorityFault" ||
+    !isAuthorityFaultCode(error.code)
+  ) {
+    return null;
+  }
+  return new SessionTreeError(
+    error.code as SessionTreeErrorCode,
+    typeof error.message === "string" ? error.message : "session tree authority rejected the operation",
+  );
+};
 
 function fail(code: SessionTreeErrorCode, message: string): never {
   throw new SessionTreeError(code, message);
 }
 
 const identifier = (value: unknown, name: string): string => {
-  if (typeof value !== "string" || !IDENTIFIER.test(value)) {
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)
+  ) {
     fail("INVALID_INPUT", `${name} is invalid`);
   }
   return value;
 };
 
-const sha256 = (value: unknown, name: string, allowGenesis = false): string => {
-  if (
-    typeof value !== "string" ||
-    (!SHA256.test(value) && !(allowGenesis && value === ""))
-  ) {
+const sha256 = (value: unknown, name: string): string => {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
     fail("CORRUPT_LOG", `${name} must be a SHA-256 hash`);
   }
   return value;
@@ -246,26 +282,23 @@ const jsonClone = <T>(value: T, label: string): T => {
 };
 
 const deepFreeze = <T>(value: T): T => {
-  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-    for (const child of Object.values(value as Record<string, unknown>)) {
-      deepFreeze(child);
-    }
-    Object.freeze(value);
+  if (value === null || typeof value !== "object") return value;
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    deepFreeze(child);
   }
-  return value;
+  return Object.freeze(value);
 };
 
-const immutable = <T>(value: T, label: string): T =>
-  deepFreeze(jsonClone(value, label));
+function immutable<T>(value: T): T {
+  return deepFreeze(jsonClone(value, "session tree value"));
+}
 
-const validateScope = (value: SessionTreeScope): SessionTreeScope =>
-  immutable(
-    {
-      tenant_id: identifier(value?.tenant_id, "tenant_id"),
-      root_session_id: identifier(value?.root_session_id, "root_session_id"),
-    },
-    "session tree scope",
-  );
+function validateScope(value: SessionTreeScope): SessionTreeScope {
+  return immutable({
+    tenant_id: identifier(value?.tenant_id, "tenant_id"),
+    root_session_id: identifier(value?.root_session_id, "root_session_id"),
+  });
+}
 
 const validateSecurity = (
   value: unknown,
@@ -281,17 +314,14 @@ const validateSecurity = (
   ) {
     fail("AUTHORITY_VIOLATION", `${label} authorization_epoch is invalid`);
   }
-  return immutable(
-    {
-      state_hash: sha256(value.state_hash, `${label}.state_hash`),
-      capability_ceiling_hash: sha256(
-        value.capability_ceiling_hash,
-        `${label}.capability_ceiling_hash`,
-      ),
-      authorization_epoch: authorizationEpoch as number,
-    },
-    `${label} security`,
-  );
+  return immutable({
+    state_hash: sha256(value.state_hash, `${label}.state_hash`),
+    capability_ceiling_hash: sha256(
+      value.capability_ceiling_hash,
+      `${label}.capability_ceiling_hash`,
+    ),
+    authorization_epoch: authorizationEpoch as number,
+  });
 };
 
 const validatePoint = (
@@ -315,26 +345,26 @@ const validatePoint = (
   const eventHash = value.hash;
   const validEmpty = allowEmpty && seq === 0 && eventHash === "";
   if (!validEmpty) positiveSequence(seq, `${label}.seq`);
-  return immutable(
-    {
-      tenant_id: scope.tenant_id,
-      root_session_id: scope.root_session_id,
-      session_id: expectedSessionId,
-      seq: seq as number,
-      hash: sha256(eventHash, `${label}.hash`, validEmpty),
-      security: validateSecurity(value.security, label),
-    },
-    label,
-  );
+  return immutable({
+    tenant_id: scope.tenant_id,
+    root_session_id: scope.root_session_id,
+    session_id: expectedSessionId,
+    seq: seq as number,
+    hash: validEmpty ? "" : sha256(eventHash, `${label}.hash`),
+    security: validateSecurity(value.security, label),
+  });
 };
 
-const samePoint = (
+function samePoint(
   left: Pick<SessionTreeSessionPoint, "session_id" | "seq" | "hash">,
   right: Pick<SessionTreeSessionPoint, "session_id" | "seq" | "hash">,
-): boolean =>
-  left.session_id === right.session_id &&
-  left.seq === right.seq &&
-  left.hash === right.hash;
+): boolean {
+  return (
+    left.session_id === right.session_id &&
+    left.seq === right.seq &&
+    left.hash === right.hash
+  );
+}
 
 const lineageData = (
   value: unknown,
@@ -400,18 +430,15 @@ const lineageData = (
   if (value.replay_policy !== "lineage_only_no_effect_replay") {
     fail("CORRUPT_LOG", "lineage replay policy is unsafe");
   }
-  return immutable(
-    {
-      version: 1,
-      command_id: identifier(value.command_id, "lineage command_id"),
-      operation,
-      child_session_id: childSessionId,
-      source,
-      source_head: sourceHead,
-      replay_policy: "lineage_only_no_effect_replay",
-    },
-    "lineage event",
-  );
+  return immutable({
+    version: 1,
+    command_id: identifier(value.command_id, "lineage command_id"),
+    operation,
+    child_session_id: childSessionId,
+    source,
+    source_head: sourceHead,
+    replay_policy: "lineage_only_no_effect_replay",
+  });
 };
 
 interface Projection {
@@ -423,8 +450,13 @@ interface Projection {
 export class SessionTree {
   readonly #scope: SessionTreeScope;
   readonly #authority: SessionTreeAuthorityPort;
+  readonly #limits: Readonly<Required<SessionTreeOptions>>;
 
-  constructor(scope: SessionTreeScope, authority: SessionTreeAuthorityPort) {
+  constructor(
+    scope: SessionTreeScope,
+    authority: SessionTreeAuthorityPort,
+    options: SessionTreeOptions = {},
+  ) {
     this.#scope = validateScope(scope);
     if (!authority || typeof authority !== "object") {
       fail("INVALID_INPUT", "session tree authority is required");
@@ -440,6 +472,15 @@ export class SessionTree {
       }
     }
     this.#authority = authority;
+    this.#limits = {
+      max_tree_events: options.max_tree_events ?? 100_000,
+      max_depth: options.max_depth ?? 1_024,
+    };
+    for (const [name, value] of Object.entries(this.#limits)) {
+      if (!Number.isSafeInteger(value) || value < 1) {
+        fail("INVALID_INPUT", `${name} must be a positive safe integer`);
+      }
+    }
   }
 
   async snapshot(): Promise<SessionTreeSnapshot> {
@@ -468,6 +509,7 @@ export class SessionTree {
     operation: SessionTreeOperation,
     command: SessionTreeBranchCommand,
     requestedPoint: Readonly<{ seq: number; hash: string }> | null,
+    conflictRetries = 0,
   ): Promise<SessionTreeCommandResult> {
     try {
       const commandId = identifier(command?.command_id, "command_id");
@@ -509,16 +551,21 @@ export class SessionTree {
             "command_id already has a different durable meaning",
           );
         }
-        return immutable(
-          { node: priorCommand, snapshot: projection.snapshot, replayed: true },
-          "session tree command result",
-        );
+        return immutable({
+          node: priorCommand,
+          snapshot: projection.snapshot,
+          replayed: true,
+        });
       }
       if (projection.bySession.has(childSessionId)) {
         fail("SESSION_CONFLICT", "child session already exists");
       }
       if (!projection.bySession.has(sourceSessionId)) {
         fail("SOURCE_NOT_FOUND", "source session is outside this tree");
+      }
+      const parent = projection.bySession.get(sourceSessionId)!;
+      if (parent.ancestor_session_ids.length + 1 > this.#limits.max_depth) {
+        fail("RESOURCE_LIMIT", "session tree depth limit reached");
       }
 
       const rawHead = await this.#authority.readSessionHead(
@@ -562,18 +609,15 @@ export class SessionTree {
         fail("INVALID_TARGET", "rewind must target an earlier source point");
       }
 
-      const data: SessionTreeLineageData = immutable(
-        {
-          version: 1,
-          command_id: commandId,
-          operation,
-          child_session_id: childSessionId,
-          source,
-          source_head: sourceHead,
-          replay_policy: "lineage_only_no_effect_replay",
-        },
-        "lineage command",
-      );
+      const data: SessionTreeLineageData = immutable({
+        version: 1,
+        command_id: commandId,
+        operation,
+        child_session_id: childSessionId,
+        source,
+        source_head: sourceHead,
+        replay_policy: "lineage_only_no_effect_replay",
+      });
       const expectedEventType = operation === "fork" ? "fork" : "branch";
       const commit = await this.#authority.appendLineageEvent({
         scope: this.#scope,
@@ -619,16 +663,29 @@ export class SessionTree {
       ) {
         fail("AUTHORITY_VIOLATION", "commit result disagrees with durable log");
       }
-      return immutable(
-        { node, snapshot: updated.snapshot, replayed: commit.duplicate },
-        "session tree command result",
-      );
+      return immutable({
+        node,
+        snapshot: updated.snapshot,
+        replayed: commit.duplicate,
+      });
     } catch (error) {
       if (error instanceof SessionTreeError) throw error;
-      throw new SessionTreeError(
-        "AUTHORITY_FAILURE",
-        `session tree authority failed: ${error instanceof Error ? error.message : "unknown error"}`,
-      );
+      const typed = authorityFault(error);
+      if (!typed) {
+        throw new SessionTreeError(
+          "AUTHORITY_FAILURE",
+          `session tree authority failed: ${error instanceof Error ? error.message : "unknown error"}`,
+        );
+      }
+      if (typed.code === "TREE_HEAD_CONFLICT" && conflictRetries < 3) {
+        return this.#execute(
+          operation,
+          command,
+          requestedPoint,
+          conflictRetries + 1,
+        );
+      }
+      throw typed;
     }
   }
 
@@ -638,6 +695,8 @@ export class SessionTree {
       rawLog = await this.#authority.loadTree(this.#scope);
     } catch (error) {
       if (error instanceof SessionTreeError) throw error;
+      const typed = authorityFault(error);
+      if (typed) throw typed;
       throw new SessionTreeError(
         "AUTHORITY_FAILURE",
         `session tree authority failed: ${error instanceof Error ? error.message : "unknown error"}`,
@@ -651,22 +710,22 @@ export class SessionTree {
     ) {
       fail("AUTHORITY_VIOLATION", "authority returned a cross-scope tree log");
     }
+    if (rawLog.events.length > this.#limits.max_tree_events) {
+      fail("RESOURCE_LIMIT", "session tree event limit exceeded");
+    }
 
-    const root: SessionTreeNode = immutable(
-      {
-        session_id: this.#scope.root_session_id,
-        parent_session_id: null,
-        ancestor_session_ids: [],
-        operation: "root",
-        command_id: null,
-        source: null,
-        inherited_security: null,
-        replay_policy: null,
-        created_at: null,
-        tree_event: null,
-      },
-      "root session node",
-    );
+    const root: SessionTreeNode = immutable({
+      session_id: this.#scope.root_session_id,
+      parent_session_id: null,
+      ancestor_session_ids: [],
+      operation: "root",
+      command_id: null,
+      source: null,
+      inherited_security: null,
+      replay_policy: null,
+      created_at: null,
+      tree_event: null,
+    });
     const nodes: SessionTreeNode[] = [root];
     const bySession = new Map<string, SessionTreeNode>([
       [root.session_id, root],
@@ -687,8 +746,7 @@ export class SessionTree {
         );
       }
       if (
-        typeof rawEvent.type !== "string" ||
-        !EVENT_TYPES.has(rawEvent.type as SessionTreeAuthorityEventType)
+        !isAuthorityEventType(rawEvent.type)
       ) {
         fail("CORRUPT_LOG", `authority event type is invalid at ${seq}`);
       }
@@ -718,46 +776,40 @@ export class SessionTree {
         fail("CORRUPT_LOG", "lineage source ancestor is missing");
       }
       const ancestors = [...parent.ancestor_session_ids, parent.session_id];
-      if (ancestors.includes(data.child_session_id)) {
-        fail("CORRUPT_LOG", "lineage creates a cycle");
+      if (ancestors.length > this.#limits.max_depth) {
+        fail("RESOURCE_LIMIT", "session tree depth limit exceeded");
       }
-      const node: SessionTreeNode = immutable(
-        {
-          session_id: data.child_session_id,
-          parent_session_id: data.source.session_id,
-          ancestor_session_ids: ancestors,
-          operation: data.operation,
-          command_id: data.command_id,
-          source: {
-            session_id: data.source.session_id,
-            seq: data.source.seq,
-            hash: data.source.hash,
-          },
-          inherited_security: data.source.security,
-          replay_policy: data.replay_policy,
-          created_at: rawEvent.timestamp,
-          tree_event: { seq, hash: eventHash },
+      const node: SessionTreeNode = immutable({
+        session_id: data.child_session_id,
+        parent_session_id: data.source.session_id,
+        ancestor_session_ids: ancestors,
+        operation: data.operation,
+        command_id: data.command_id,
+        source: {
+          session_id: data.source.session_id,
+          seq: data.source.seq,
+          hash: data.source.hash,
         },
-        `session tree node ${data.child_session_id}`,
-      );
+        inherited_security: data.source.security,
+        replay_policy: data.replay_policy,
+        created_at: rawEvent.timestamp,
+        tree_event: { seq, hash: eventHash },
+      });
       nodes.push(node);
       bySession.set(node.session_id, node);
       byCommand.set(data.command_id, node);
     }
 
-    const snapshot: SessionTreeSnapshot = immutable(
-      {
-        version: 1,
-        tenant_id: this.#scope.tenant_id,
-        root_session_id: this.#scope.root_session_id,
-        authority_head: {
-          seq: rawLog.events.length,
-          hash: previousHash,
-        },
-        nodes,
+    const snapshot: SessionTreeSnapshot = immutable({
+      version: 1,
+      tenant_id: this.#scope.tenant_id,
+      root_session_id: this.#scope.root_session_id,
+      authority_head: {
+        seq: rawLog.events.length,
+        hash: previousHash,
       },
-      "session tree snapshot",
-    );
+      nodes,
+    });
     return { snapshot, bySession, byCommand };
   }
 }

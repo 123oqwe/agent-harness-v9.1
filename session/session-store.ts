@@ -9,6 +9,13 @@ export {
   SqliteSessionStore,
   SqliteSessionStore as SessionStore,
 } from './sqlite-session-store.js';
+export {
+  SqliteSessionTreeAuthority,
+  type SecurityStateResolver,
+  type SessionTreeScopeValue,
+  type SessionTreeSecurityValue,
+  type SqliteSessionTreeAuthorityOptions,
+} from './sqlite-session-tree-authority.js';
 export type {
   OperationRecord,
   ReceiptRecord,

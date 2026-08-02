@@ -10,10 +10,10 @@
 import {
   createCipheriv,
   createDecipheriv,
-  createHash,
   randomBytes,
   randomUUID,
 } from 'node:crypto';
+import { hashSessionEvent, SESSION_EVENT_TYPES } from './session-event-codec.js';
 
 export type SessionEventType = 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'compaction' | 'branch' | 'fork' | 'steer' | 'system' | 'error' | 'summary';
 
@@ -54,23 +54,7 @@ export class SessionError extends Error {
   constructor(message: string) { super(message); this.name = 'SessionError'; Object.setPrototypeOf(this, SessionError.prototype); }
 }
 
-const ALL_TYPES = Object.freeze<SessionEventType[]>([
-  'user',
-  'assistant',
-  'tool_call',
-  'tool_result',
-  'compaction',
-  'branch',
-  'fork',
-  'steer',
-  'system',
-  'error',
-  'summary',
-]);
-
-function hashEvent(seq: number, type: SessionEventType, timestamp: string, data: unknown, prev_hash: string): string {
-  return createHash('sha256').update(`${seq}|${type}|${timestamp}|${JSON.stringify(data)}|${prev_hash}`).digest('hex');
-}
+const ALL_TYPES = SESSION_EVENT_TYPES;
 
 function cloneJsonValue<T>(value: T, label: string): T {
   let serialized: string | undefined;
@@ -171,7 +155,7 @@ export class DurableSession {
     const timestamp = this.clock();
     const prev_hash = this.last_hash;
     const eventData = cloneJsonValue(data, 'event data');
-    const hash = hashEvent(seq, type, timestamp, eventData, prev_hash);
+    const hash = hashSessionEvent(seq, type, timestamp, eventData, prev_hash);
     const ev = immutableEvent({ seq, type, timestamp, data: eventData, hash, prev_hash });
     // Durable append must succeed before the in-memory authority advances.
     if (this.logPath) {
@@ -242,7 +226,7 @@ export class DurableSession {
         throw new SessionError(`invalid hash envelope at seq ${ev.seq}`);
       }
       const eventData = cloneJsonValue(ev.data, `event data at seq ${ev.seq}`);
-      const expected = hashEvent(ev.seq, ev.type, ev.timestamp, eventData, ev.prev_hash);
+      const expected = hashSessionEvent(ev.seq, ev.type, ev.timestamp, eventData, ev.prev_hash);
       if (expected !== ev.hash) throw new SessionError(`hash chain broken at seq ${ev.seq}`);
       if (ev.prev_hash !== prev) throw new SessionError(`prev_hash mismatch at seq ${ev.seq}`);
       s.events.push(immutableEvent({ ...ev, data: eventData }));

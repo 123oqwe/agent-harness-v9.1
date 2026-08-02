@@ -334,6 +334,41 @@ describe('SQLite Session Store', () => {
     expect(op!.effect_state).toBe('PRE_DISPATCH');
   });
 
+  it('lists only one run\'s operations as decrypted immutable records', () => {
+    store.createRun('run-list', 'test');
+    store.createRun('run-list-other', 'test');
+    for (const [operation_id, run_id, receipt_json] of [
+      ['op-list-b', 'run-list', '{"position":2}'],
+      ['op-list-a', 'run-list', '{"position":1}'],
+      ['op-list-other', 'run-list-other', '{"position":0}'],
+    ] as const) {
+      store.recordOperation({
+        operation_id,
+        run_id,
+        step_id: `step-${operation_id}`,
+        attempt_id: 'attempt',
+        tool_name: 'read_file',
+        idempotency_key: `idem-${operation_id}`,
+        effect_state: 'PRE_DISPATCH',
+        receipt_json,
+      });
+    }
+    const listed = store.listOperations('run-list');
+    expect(listed).toHaveLength(2);
+    expect(listed.map((operation) => operation.operation_id).sort()).toEqual([
+      'op-list-a',
+      'op-list-b',
+    ]);
+    expect(listed.find((operation) => operation.operation_id === 'op-list-a')).toMatchObject({
+      receipt_json: '{"position":1}',
+    });
+    expect(listed.find((operation) => operation.operation_id === 'op-list-b')).toMatchObject({
+      receipt_json: '{"position":2}',
+    });
+    expect(Object.isFrozen(listed)).toBe(true);
+    expect(listed.every((operation) => Object.isFrozen(operation))).toBe(true);
+  });
+
   it('requires every new effect journal entry to begin PRE_DISPATCH', () => {
     store.createRun('run-initial-state', 'test');
     expect(() =>

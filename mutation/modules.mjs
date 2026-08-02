@@ -90,7 +90,10 @@ export const mutationModules = {
   session: {
     mutate: [
       'session/durable-session.ts',
+      'session/session-event-codec.ts',
+      'session/sqlite-authority-internals.ts',
       'session/sqlite-session-store.ts',
+      'session/sqlite-session-tree-authority.ts',
       'session/progress-store.ts',
       'session/run-session.ts',
     ],
