@@ -339,7 +339,7 @@ export class SqliteHookJournal implements HookJournalPort {
     this.#assertOpen();
     requiredId("claimToken", claimToken);
     this.#validateRecord(record);
-    const transaction = this.#database.transaction(() => {
+    const transaction = this.#database.transaction((): "committed" | "expired" => {
       const row = this.#database
         .prepare("SELECT * FROM hook_journal WHERE claim_token_hash = ?")
         .get(tokenHash(claimToken)) as JournalRow | undefined;
@@ -368,9 +368,7 @@ export class SqliteHookJournal implements HookJournalPort {
             row.session_id,
             row.idempotency_key,
           );
-        throw new Error(
-          "Hook journal claim expired and requires reconciliation",
-        );
+        return "expired";
       }
       const encrypted = this.#encryptOutcome(row, record.outcome);
       const result = this.#database
@@ -390,8 +388,11 @@ export class SqliteHookJournal implements HookJournalPort {
           row.idempotency_key,
         );
       if (result.changes !== 1) throw new Error("Hook journal commit conflict");
+      return "committed";
     });
-    transaction.immediate();
+    if (transaction.immediate() === "expired") {
+      throw new Error("Hook journal claim expired and requires reconciliation");
+    }
   }
 
   async release(claimToken: string): Promise<void> {

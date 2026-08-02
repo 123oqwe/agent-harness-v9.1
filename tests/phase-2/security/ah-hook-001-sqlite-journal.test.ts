@@ -617,10 +617,6 @@ db.close();`,
     await expect(journal.commit(token, record(input, 'must-not-write'))).rejects.toThrow(
       'Hook journal claim expired and requires reconciliation',
     );
-    await expect(journal.claim(input)).resolves.toEqual({
-      status: 'reconciliation',
-      reason_code: 'hook_claim_abandoned',
-    });
     const raw = new Database(path, { readonly: true });
     expect(
       raw
@@ -628,6 +624,10 @@ db.close();`,
         .get(input.idempotency_key),
     ).toEqual({ state: 'RECONCILIATION', outcome_ciphertext: null });
     raw.close();
+    await expect(journal.claim(input)).resolves.toEqual({
+      status: 'reconciliation',
+      reason_code: 'hook_claim_abandoned',
+    });
     journal.close();
   });
 
