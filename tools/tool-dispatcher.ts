@@ -54,6 +54,14 @@ export interface ToolDispatcherClock {
   isoNow(): string;
 }
 
+export interface ToolPostconditionObserver {
+  observe(input: {
+    readonly tool_name: string;
+    readonly input: unknown;
+    readonly result: unknown;
+  }): Promise<void>;
+}
+
 const SYSTEM_CLOCK: ToolDispatcherClock = Object.freeze({
   monotonicNow: () => performance.now(),
   isoNow: () => new Date().toISOString(),
@@ -75,6 +83,7 @@ export class ToolDispatcher {
     private readonly executor: ToolExecutor,
     implementations: ReadonlyMap<string, ToolImplementation>,
     private readonly clock: ToolDispatcherClock = SYSTEM_CLOCK,
+    private readonly postconditionObserver?: ToolPostconditionObserver,
   ) {
     const frozen = new Map(implementations);
     for (const name of snapshot.tool_names) {
@@ -132,7 +141,7 @@ export class ToolDispatcher {
         req.input,
         async (dependencies) =>
           implementation(dependencies, req.input) as Promise<T>,
-        (candidate) => {
+        async (candidate) => {
           if (candidate === undefined) {
             throw new ToolDispatcherError('tool returned undefined result');
           }
@@ -148,6 +157,11 @@ export class ToolDispatcher {
               `output schema validation failed for ${req.tool_name}: ${errors}`,
             );
           }
+          await this.postconditionObserver?.observe({
+            tool_name: req.tool_name,
+            input: req.input,
+            result: candidate,
+          });
         },
       );
 

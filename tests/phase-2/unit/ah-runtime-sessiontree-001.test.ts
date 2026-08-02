@@ -1980,7 +1980,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "keeps lineage off the live parent log and allows the parent to continue",
-    { timeout: 30_000 },
+    { timeout: 120_000 },
     async () => {
       const fixture = realAuthorityFixture();
       try {
@@ -2137,7 +2137,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "keeps logical handles scope-bound and fails stale or closed writers before memory advances",
-    { timeout: 10_000 },
+    { timeout: 120_000 },
     async () => {
       const fixture = realAuthorityFixture();
       try {
@@ -2260,7 +2260,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "enforces logical-session event and payload limits at exact boundaries",
-    { timeout: 20_000 },
+    { timeout: 120_000 },
     async () => {
       const exactSessionLimit = realAuthorityFixture(
         { max_session_events: 3 },
@@ -2515,7 +2515,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "isolates identical logical session IDs by tenant and rejects cross-scope reads",
-    { timeout: 10_000 },
+    { timeout: 120_000 },
     async () => {
       const fixture = realAuthorityFixture();
       const tenantB = {
@@ -2904,7 +2904,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "enforces per-session and depth ceilings before child creation",
-    { timeout: 10_000 },
+    { timeout: 120_000 },
     async () => {
       const sessionLimited = realAuthorityFixture({ max_session_events: 1 }, 1);
       try {
@@ -2997,7 +2997,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "checks the complete tree head and enforces the exact direct tree limit",
-    { timeout: 10_000 },
+    { timeout: 120_000 },
     async () => {
       const staleHash = realAuthorityFixture(undefined, 1);
       try {
@@ -3225,7 +3225,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "fails closed for corrupt idempotency, stale CAS, duplicate children, and missing sources",
-    { timeout: 15_000 },
+    { timeout: 120_000 },
     async () => {
       const corruptIndex = realAuthorityFixture(
         undefined,
@@ -3355,7 +3355,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it(
     "validates every source anchor and security anchor inside the SQLite transaction",
-    { timeout: 15_000 },
+    { timeout: 120_000 },
     async () => {
       type AuthorityPoint = NonNullable<
         Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>

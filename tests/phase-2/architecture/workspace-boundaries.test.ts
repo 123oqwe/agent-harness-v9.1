@@ -488,8 +488,19 @@ describe("Phase 2 incremental monorepo architecture", () => {
         (entry) => entry.id === binding.id,
       );
       if (!requirement) throw new Error(`missing ${binding.id}`);
-      requirement.source_files = [binding.source];
-      requirement.test_files = [binding.test];
+      requirement.source_files = [
+        ...new Set([
+          ...((requirement.source_files as string[] | undefined) ?? []),
+          binding.source,
+        ]),
+      ];
+      requirement.test_suites = [
+        ...new Set([
+          ...((requirement.test_suites as string[] | undefined) ?? []),
+          binding.test,
+        ]),
+      ];
+      requirement.test_files = requirement.test_suites;
       mkdirSync(join(root, binding.source, ".."), { recursive: true });
       writeFileSync(join(root, binding.source), `${binding.code}\n`);
       mkdirSync(join(root, binding.test, ".."), { recursive: true });

@@ -56,9 +56,15 @@ describe("Phase 2 batch-zero release structure", () => {
     );
     expect(accepted.status, accepted.stderr).toBe(0);
     const current = readFileSync(join(repositoryRoot, "index.ts"), "utf8");
-    const addition = "export * from './session/session-state-root.js';\n";
-    expect(current.replace(addition, "")).toBe(accepted.stdout);
-    expect(current.split(addition)).toHaveLength(2);
+    const additions = [
+      "export * from './session/session-state-root.js';\n",
+      "export * from './runtime/hook-port.js';\n",
+      "export * from './runtime/sandboxed-hook-execution-port.js';\n",
+    ];
+    expect(
+      additions.reduce((source, addition) => source.replace(addition, ""), current),
+    ).toBe(accepted.stdout);
+    for (const addition of additions) expect(current.split(addition)).toHaveLength(2);
   });
 
   it("proves the accepted baseline is in HEAD history and includes all 30 hardening files", () => {

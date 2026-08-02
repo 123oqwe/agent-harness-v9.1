@@ -9,6 +9,7 @@ import type {
   RuntimeStepState,
 } from './loop.js';
 import { LoopError } from './errors.js';
+import { HookRestrictionError } from './hook-port.js';
 import type { StrategyContext } from './reasoning-strategy.js';
 
 type WorkflowNode = WorkflowGraph['nodes'][number];
@@ -772,12 +773,22 @@ export async function runPlanExecute(
         context.recordObservation(
           recorded,
           call,
-          'error',
+          error instanceof HookRestrictionError ? 'rejected' : 'error',
           message,
           stepId,
         );
       }
       context.setStepState(stepId, 'failed', { reason: message });
+      if (error instanceof HookRestrictionError) {
+        context.terminate(
+          error.action === 'force_prompt'
+            ? 'approval_required'
+            : error.action === 'skip'
+              ? 'skipped'
+              : 'denied',
+        );
+        return;
+      }
       context.terminate(
         error instanceof LoopError ? 'malformed_response' : 'tool_failure',
       );

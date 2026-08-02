@@ -15,6 +15,7 @@ import { LoopError } from './errors.js';
 import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
+import { HookRestrictionError } from './hook-port.js';
 
 export { LoopError } from './errors.js';
 
@@ -30,6 +31,8 @@ export type TerminationReason =
   | 'context_reset'
   | 'completed'
   | 'denied'
+  | 'skipped'
+  | 'approval_required'
   | 'provider_failure'
   | 'tool_failure'
   | 'verification_failed'
@@ -142,6 +145,17 @@ export interface LoopDeps {
   /** Legacy stop hint only. It never grants verification success. */
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
   signal?: AbortSignal | undefined;
+  turnHooks?: {
+    beforeTurn(input: {
+      readonly iteration: number;
+      readonly messages: unknown[];
+    }): Promise<void>;
+    afterTurn(input: {
+      readonly iteration: number;
+      readonly turn?: ModelTurn;
+      readonly observations: readonly ToolObservation[];
+    }): Promise<void>;
+  };
 }
 
 export interface ToolCallExecutionContext {
@@ -197,6 +211,7 @@ export class LoopEngine {
   private inputTokens = 0;
   private outputTokens = 0;
   private readonly stepStatesValue = new Map<string, RuntimeStepState>();
+  private pendingHookTurn: LoopTurn | undefined;
   private lifecycle: 'idle' | 'running' | 'finished' = 'idle';
   private requestedStop: TerminationReason | null = null;
 
@@ -238,6 +253,15 @@ export class LoopEngine {
       });
       this.terminate(reason);
     } finally {
+      try {
+        await this.flushPendingTurnHook();
+      } catch (error) {
+        this.deps.session.append('error', {
+          event: 'post_turn_hook_failed',
+          message: error instanceof Error ? error.message : 'unknown hook error',
+        });
+        if (!this.terminatedValue) this.terminate(this.classifyUnhandled(error));
+      }
       this.writeProgressSafely();
       this.deps.session.releaseWriter();
       this.lifecycle = 'finished';
@@ -272,7 +296,17 @@ export class LoopEngine {
     const self = this;
     return {
       config: this.config,
-      deps: this.deps,
+      deps: {
+        ...this.deps,
+        modelCall: async (messages, attempt, budget, directive) => {
+          await self.flushPendingTurnHook();
+          await self.deps.turnHooks?.beforeTurn({
+            iteration: self.iterationsValue,
+            messages,
+          });
+          return self.deps.modelCall(messages, attempt, budget, directive);
+        },
+      },
       turns: this.turns,
       get iterations() {
         return self.iterationsValue;
@@ -355,6 +389,7 @@ export class LoopEngine {
       timestamp: this.now(),
     };
     this.turns.push(recorded);
+    this.pendingHookTurn = recorded;
     this.decisionSummariesValue.push(turn.decision_summary);
     this.deps.session.append('assistant', {
       decision_summary: turn.decision_summary,
@@ -363,6 +398,17 @@ export class LoopEngine {
     });
     this.writeProgressSafely();
     return recorded;
+  }
+
+  private async flushPendingTurnHook(): Promise<void> {
+    const pending = this.pendingHookTurn;
+    if (pending === undefined) return;
+    this.pendingHookTurn = undefined;
+    await this.deps.turnHooks?.afterTurn({
+      iteration: pending.iteration,
+      turn: pending.model,
+      observations: pending.tool_observations,
+    });
   }
 
   private recordToolCall(
@@ -461,6 +507,13 @@ export class LoopEngine {
 
   private classifyUnhandled(error: unknown): TerminationReason {
     if (this.deps.signal?.aborted) return 'user_cancel';
+    if (error instanceof HookRestrictionError) {
+      return error.action === 'force_prompt'
+        ? 'approval_required'
+        : error.action === 'skip'
+          ? 'skipped'
+          : 'denied';
+    }
     if (error instanceof LoopError) return 'malformed_response';
     return 'provider_failure';
   }

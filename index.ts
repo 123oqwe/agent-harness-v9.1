@@ -55,6 +55,8 @@ export * from './session/durable-session.js';
 export * from './session/session-store.js';
 export * from './session/sqlite-session-store.js';
 export * from './session/session-state-root.js';
+export * from './runtime/hook-port.js';
+export * from './runtime/sandboxed-hook-execution-port.js';
 export {
   LoopEngine,
   LoopError,

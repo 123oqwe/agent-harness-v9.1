@@ -69,6 +69,13 @@ import {
 } from './runtime/harness-support.js';
 import { TransactionalWorkspace } from './vfs/transactional-workspace.js';
 import {
+  dispatchHookBoundary,
+  HookRestrictionError,
+  type HookRuntimePort,
+  type RuntimeHookEvent,
+  type RuntimeHookOutcome,
+} from './runtime/hook-port.js';
+import {
   isTerminalRun,
   openRunSession,
 } from './session/run-session.js';
@@ -87,6 +94,11 @@ export interface HarnessOutcome {
   session: DurableSession;
   evidence: RunEvidence;
   success: boolean;
+  hook_disposition?: {
+    readonly action: 'deny' | 'skip' | 'force_prompt';
+    readonly state: 'blocked' | 'skipped' | 'approval_required';
+    readonly reason_code: string;
+  };
 }
 
 /** Injected security components — must be provided by the caller. */
@@ -124,6 +136,10 @@ export interface HarnessConfig {
   maxSkillRiskTier?: 1 | 2 | 3 | 4;
   /** Per-provider-call output ceiling; overall run budget remains separate. */
   maxOutputTokensPerCall?: number;
+  /** Phase 2 Hook authority. It can restrict a request but never authorize one. */
+  hooks?: HookRuntimePort;
+  /** Aggregate boundary ceiling; individual Hook registrations may be lower. */
+  hookTimeoutMs?: number;
 }
 
 export class Harness {
@@ -184,7 +200,24 @@ export class Harness {
     }
     this.activeRun = true;
     try {
-      return await this.runOnce(task, runId);
+      const requestedRunId = runId ?? deterministicRunId(task);
+      const prompt = await this.dispatchHook(
+        'user_prompt_submit',
+        task,
+        `prompt:${requestedRunId}`,
+        'decision',
+        {
+          run_id: requestedRunId,
+          session_id: requestedRunId,
+        },
+      );
+      if (prompt.action !== 'continue') {
+        return await this.runOnce(task, runId, prompt);
+      }
+      if (!this.isTaskContract(prompt.payload)) {
+        throw new Error('UserPromptSubmit hook returned an invalid TaskContract');
+      }
+      return await this.runOnce(prompt.payload, runId);
     } finally {
       this.activeRun = false;
     }
@@ -193,6 +226,7 @@ export class Harness {
   private async runOnce(
     task: TaskContract,
     runId?: string,
+    promptRestriction?: RuntimeHookOutcome,
   ): Promise<HarnessOutcome> {
     this._modelCallCount = 0;
     const router = new StaticRouter({
@@ -229,6 +263,11 @@ export class Harness {
     } = openedSession;
 
     try {
+      await this.observationalHook(
+        'session_start',
+        { restored: existingEvents.length > 0 },
+        `session-start:${actualRunId}`,
+      );
       if (isTerminalRun(openedSession)) {
         session.releaseWriter();
         const termination =
@@ -261,6 +300,61 @@ export class Harness {
           success: termination === 'goal_satisfied',
         };
       }
+      if (promptRestriction && promptRestriction.action !== 'continue') {
+        const action = promptRestriction.action;
+        const reasonCode = promptRestriction.reason_code ?? 'hook_restricted';
+        const state =
+          action === 'force_prompt'
+            ? 'approval_required'
+            : action === 'skip'
+              ? 'skipped'
+              : 'blocked';
+        const failure = recordTerminalFailure(
+          session,
+          routing.run_plan?.reasoning_strategy ?? 'direct',
+          {
+            reason: 'user_prompt_hook_restricted',
+            hook_action: action,
+            hook_state: state,
+            reason_code: reasonCode,
+            approval_required: action === 'force_prompt',
+          },
+        );
+        session.releaseWriter();
+        sqliteStore?.updateRunStatus(actualRunId, 'denied');
+        await this.observationalHook(
+          'stop',
+          { termination_reason: 'denied', hook_action: action, hook_state: state },
+          `stop:${actualRunId}:prompt-${action}`,
+        );
+        if (this.config.sessionLogPath) {
+          persistSession(session, this.config.sessionLogPath, {
+            encryptionKey: this.config.sessionMasterKey!,
+          });
+        }
+        return {
+          run_plan: routing.run_plan ?? null,
+          routing,
+          loop_result: failure,
+          verification_report: null,
+          session,
+          evidence: buildEvidence({
+            session,
+            runPlan: routing.run_plan,
+            loopResult: failure,
+            verificationReport: null,
+            workspaceChanges: [],
+            auditEntries: this.config.security.auditSink.all,
+            buildCommitSha: this.config.buildCommitSha,
+          }),
+          success: false,
+          hook_disposition: {
+            action,
+            state,
+            reason_code: reasonCode,
+          },
+        };
+      }
     if (routing.outcome !== 'route') {
       const failure = recordTerminalFailure(session, 'direct', {
         reason:
@@ -273,6 +367,11 @@ export class Harness {
       });
       session.releaseWriter();
       sqliteStore?.updateRunStatus(actualRunId, 'denied');
+      await this.observationalHook(
+        'stop',
+        { termination_reason: 'denied', routing_outcome: routing.outcome },
+        `stop:${actualRunId}:denied`,
+      );
       if (this.config.sessionLogPath) {
         persistSession(session, this.config.sessionLogPath, {
           encryptionKey: this.config.sessionMasterKey!,
@@ -356,6 +455,11 @@ export class Harness {
           });
         }
         sqliteStore?.updateRunStatus(actualRunId, 'denied');
+        await this.observationalHook(
+          'stop',
+          { termination_reason: 'denied', reason: 'skill_activation_failed' },
+          `stop:${actualRunId}:skill-activation`,
+        );
         return {
           run_plan: runPlan,
           routing,
@@ -425,14 +529,32 @@ export class Harness {
             selectedTools,
             ...(directive === undefined ? {} : { directive }),
           });
-          const resolved = this.config.gateway.resolve(req);
+          const beforeProvider = await this.decisionHook(
+            'before_provider_request',
+            req,
+            `provider-before:${runPlan.run_id}:${modelCallCount}`,
+          );
+          if (
+            beforeProvider.payload === null ||
+            typeof beforeProvider.payload !== 'object' ||
+            Array.isArray(beforeProvider.payload)
+          ) {
+            throw new Error('before_provider_request returned an invalid request');
+          }
+          const effectiveRequest = beforeProvider.payload as typeof req;
+          const resolved = this.config.gateway.resolve(effectiveRequest);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
           const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
-        const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, req, {
+        const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, effectiveRequest, {
           operation_id: opId,
           attempt_id: attId,
           signal: this.config.signal,
         });
+          await this.observationalHook(
+            'after_response',
+            result,
+            `provider-after:${runPlan.run_id}:${modelCallCount}`,
+          );
           return gatewayResultToModelTurn(result);
         },
         toolExecute: async (
@@ -443,6 +565,27 @@ export class Harness {
           return this.executeTool(name, args, context, session, sqliteStore);
         },
         signal: this.config.signal,
+        turnHooks: {
+          beforeTurn: async ({ iteration, messages }) => {
+            const before = await this.decisionHook(
+              'pre_turn',
+              { messages },
+              `turn-before:${runPlan.run_id}:${iteration}`,
+            );
+            const candidate = before.payload as { messages?: unknown };
+            if (!candidate || !Array.isArray(candidate.messages)) {
+              throw new Error('pre_turn returned invalid messages');
+            }
+            messages.splice(0, messages.length, ...candidate.messages);
+          },
+          afterTurn: async ({ iteration, turn, observations }) => {
+            await this.observationalHook(
+              'post_turn',
+              { iteration, turn, observations },
+              `turn-after:${runPlan.run_id}:${iteration}`,
+            );
+          },
+        },
       },
     );
 
@@ -533,6 +676,11 @@ export class Harness {
       actualRunId,
       loopResult.termination_reason,
     );
+    await this.observationalHook(
+      'stop',
+      { termination_reason: loopResult.termination_reason },
+      `stop:${actualRunId}:${loopResult.termination_reason}`,
+    );
     return {
       run_plan: runPlan,
       routing,
@@ -542,8 +690,20 @@ export class Harness {
       evidence,
       success,
     };
+    } catch (error) {
+      await this.observationalHook(
+        'stop',
+        { termination_reason: 'internal_error' },
+        `stop:${actualRunId}:internal-error`,
+      );
+      throw error;
     } finally {
       try {
+        await this.observationalHook(
+          'session_end',
+          { run_id: actualRunId },
+          `session-end:${actualRunId}`,
+        );
         this.finalizeOverlay(false);
       } finally {
         sqliteStore?.close();
@@ -564,7 +724,50 @@ private async executeTool(
   session: DurableSession,
   effectJournal: SqliteSessionStore | null,
 ): Promise<unknown> {
-  const normalizedArgs = normalizeWorkspaceToolInput(name, args);
+  const initialArgs = normalizeWorkspaceToolInput(name, args);
+  let preTool: RuntimeHookOutcome;
+  try {
+    preTool = await this.decisionHook(
+      'pre_tool_use',
+      initialArgs,
+      `tool-before:${this.execCtx!.run_id}:${call.step_id}:${call.tool_call_id}:${call.attempt_index}`,
+      {
+        operation_id: `${this.execCtx!.operation_id}:${call.tool_call_id}`,
+        attempt_id: `${this.execCtx!.attempt_id}:${call.attempt_index}`,
+      },
+    );
+  } catch (error) {
+    if (error instanceof HookRestrictionError) {
+      session.append('tool_result', {
+        step: call.step_id,
+        tool_call_id: call.tool_call_id,
+        tool: name,
+        status: 'rejected',
+        receipt: Object.freeze({
+          tool_name: name,
+          timestamp: this.now(),
+          success: false,
+          error: `hook_${error.action}:${error.reason_code}`,
+          duration_ms: 0,
+          input_hash: canonicalHash(initialArgs, 16),
+        }),
+      });
+    }
+    throw error;
+  }
+  if (
+    preTool.payload === null ||
+    typeof preTool.payload !== 'object' ||
+    Array.isArray(preTool.payload)
+  ) {
+    throw new Error('PreToolUse hook returned invalid tool arguments');
+  }
+  const normalizedArgs = normalizeWorkspaceToolInput(
+    name,
+    preTool.payload as Record<string, unknown>,
+  );
+  for (const key of Object.keys(args)) delete args[key];
+  Object.assign(args, normalizedArgs);
   const identity = canonicalHash(
     {
       run_id: this.execCtx!.run_id,
@@ -617,6 +820,20 @@ private async executeTool(
      this.toolSnapshot,
      executor,
      implementations,
+     undefined,
+     {
+       observe: async ({ input, result }) => {
+         await this.observationalHook(
+           'post_tool_use',
+           { tool_name: name, input, result },
+           `tool-after:${this.execCtx!.run_id}:${call.step_id}:${call.tool_call_id}:${call.attempt_index}`,
+           {
+             operation_id: execCtxForTool.operation_id,
+             attempt_id: execCtxForTool.attempt_id,
+           },
+         );
+       },
+     },
    );
    const dispatchResult = await dispatcher.dispatch({
      tool_name: name,
@@ -626,6 +843,107 @@ private async executeTool(
      throw new Error(dispatchResult.error ?? 'tool dispatch failed');
    }
    return dispatchResult.result;
+ }
+
+ private async decisionHook(
+   event: RuntimeHookEvent,
+   payload: unknown,
+   identity: string,
+   scopeOverrides: Partial<{
+     run_id: string;
+     session_id: string;
+     operation_id: string;
+     attempt_id: string;
+   }> = {},
+ ): Promise<RuntimeHookOutcome> {
+   const result = await this.dispatchHook(
+     event,
+     payload,
+     identity,
+     'decision',
+     scopeOverrides,
+   );
+   if (result.action !== 'continue') {
+     throw new HookRestrictionError(
+       event,
+       result.action,
+       result.reason_code ?? 'restricted',
+     );
+   }
+   return result;
+ }
+
+ private async observationalHook(
+   event: RuntimeHookEvent,
+   payload: unknown,
+   identity: string,
+   scopeOverrides: Partial<{
+     run_id: string;
+     session_id: string;
+     operation_id: string;
+     attempt_id: string;
+   }> = {},
+ ): Promise<RuntimeHookOutcome> {
+   return this.dispatchHook(
+     event,
+     payload,
+     identity,
+     'observational',
+     scopeOverrides,
+   );
+ }
+
+ private async dispatchHook(
+   event: RuntimeHookEvent,
+   payload: unknown,
+   identity: string,
+   mode: 'decision' | 'observational',
+   scopeOverrides: Partial<{
+     run_id: string;
+     session_id: string;
+     operation_id: string;
+     attempt_id: string;
+   }>,
+ ): Promise<RuntimeHookOutcome> {
+   const context = this.execCtx ?? this.config.executionContext;
+   const scope = {
+     tenant_id: context.tenant_id,
+     run_id: scopeOverrides.run_id ?? context.run_id,
+     session_id: scopeOverrides.session_id ?? context.session_id,
+     operation_id: scopeOverrides.operation_id ?? context.operation_id,
+     attempt_id: scopeOverrides.attempt_id ?? context.attempt_id,
+   };
+   const key = canonicalHash({ event, identity, scope }, 32);
+   return dispatchHookBoundary(
+     this.config.hooks,
+     {
+       event,
+       invocation_id: `hook-${key}`,
+       idempotency_key: `hook-idempotency-${key}`,
+       scope,
+       payload,
+       ...(this.config.signal === undefined ? {} : { signal: this.config.signal }),
+     },
+     {
+       mode,
+       ...(this.config.hookTimeoutMs === undefined
+         ? {}
+         : { timeout_ms: this.config.hookTimeoutMs }),
+     },
+   );
+ }
+
+ private isTaskContract(value: unknown): value is TaskContract {
+   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+     return false;
+   }
+   const candidate = value as Partial<TaskContract>;
+   return (
+     typeof candidate.goal === 'string' &&
+     candidate.goal.trim().length > 0 &&
+     Array.isArray(candidate.success_criteria) &&
+     Array.isArray(candidate.constraints)
+   );
  }
 
   /** Finalize the overlay: commit on success, discard on failure. */

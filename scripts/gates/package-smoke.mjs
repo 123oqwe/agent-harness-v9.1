@@ -41,6 +41,8 @@ const REQUIRED_EXPORTS = [
   "LoopEngine",
   "SecretsBroker",
   "SecretsBrokerApi",
+  "HookRestrictionError",
+  "SandboxedHookExecutionPort",
 ];
 
 export const parseNpmJson = (stdout) => {
@@ -105,7 +107,7 @@ export const runPackedPackageSmoke = async ({ repositoryRoot = root } = {}) => {
     const packResult = parseNpmJson(packed.stdout);
     packedFiles = packResult[0].files.map(({ path }) => path);
     const leakedWorkspaceFiles = packedFiles.filter((path) =>
-      /^(?:packages|apps)\//u.test(path),
+      /^(?:packages|apps|dist\/(?:packages|apps))\//u.test(path),
     );
     if (leakedWorkspaceFiles.length > 0) {
       throw new Error(

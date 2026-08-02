@@ -31,7 +31,22 @@ export const phase2MutationRequirements = Object.freeze([
   requirement("AH-DOC-PARSE-IMGREF-001"),
   requirement("AH-DOC-PARSE-PROVENANCE-001"),
   requirement("AH-DOC-PARSE-TABLE-001"),
-  requirement("AH-HOOK-001"),
+  requirement("AH-HOOK-001", {
+    status: "ready",
+    sources: [
+      "packages/runtime-core/src/hook-system.ts",
+      "packages/runtime-core/src/sqlite-hook-journal.ts",
+      "runtime/sandboxed-hook-execution-port.ts",
+    ],
+    integrationSources: [
+      "harness.ts",
+      "runtime/hook-port.ts",
+      "runtime/loop.ts",
+      "runtime/plan-execute.ts",
+      "runtime/react.ts",
+      "tools/tool-dispatcher.ts",
+    ],
+  }),
   requirement("AH-MCP-STDIO-001"),
   requirement("AH-MM-ARTIFACT-001"),
   requirement("AH-MM-DOC-VISION-001"),

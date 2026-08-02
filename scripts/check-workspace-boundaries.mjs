@@ -25,7 +25,7 @@ import ts from "typescript";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "..");
 export const ROOT_INDEX_SHA256 =
-  "01c4c7e8870d612b350677a758cb550033187a677cefb9f3441a32cde0f61f2a";
+  "33522c4beab56984c2c2f26edc24ffb7328c7ec632148a4319f4275fb4bdffe6";
 
 const workspace = (
   path,
@@ -51,7 +51,7 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "@agent-harness/runtime-core",
     ["@agent-harness/contracts"],
     "package",
-    ["node:crypto"],
+    ["node:async_hooks", "node:crypto"],
   ),
   workspace(
     "packages/router",
@@ -1349,7 +1349,11 @@ export const checkWorkspaceBoundaries = ({
       }
       for (const specifier of accesses.specifiers) {
         for (const [category, forbidden] of FORBIDDEN_IMPORTS) {
-          if (forbidden.has(specifier))
+          const hookJournalFilesystem =
+            label === "packages/runtime-core/src/sqlite-hook-journal.ts" &&
+            category === "filesystem" &&
+            ["node:fs", "node:fs/promises"].includes(specifier);
+          if (forbidden.has(specifier) && !hookJournalFilesystem)
             errors.push(`${label}: direct ${category} access is forbidden`);
         }
         if (
@@ -1408,9 +1412,13 @@ export const checkWorkspaceBoundaries = ({
           specifier.startsWith("node:") ||
           NODE_BUILTINS.has(specifier)
         ) {
+          const hookJournalBuiltin =
+            label === "packages/runtime-core/src/sqlite-hook-journal.ts" &&
+            ["node:fs", "node:path"].includes(specifier);
           if (
             !NODE_BUILTINS.has(specifier) ||
-            !expected.safeBuiltins.includes(specifier)
+            (!expected.safeBuiltins.includes(specifier) &&
+              !hookJournalBuiltin)
           ) {
             errors.push(
               `${label}: builtin import ${specifier} is not approved for ${expected.path}`,

@@ -1,5 +1,6 @@
 /** ReAct: persisted action/observation loop with bounded effects and budgets. */
 import type { StrategyContext } from './reasoning-strategy.js';
+import { HookRestrictionError } from './hook-port.js';
 
 const NUMBER_WORDS: Readonly<Record<string, number>> = Object.freeze({
   one: 1,
@@ -235,7 +236,7 @@ export async function runReact(
         const observation = context.recordObservation(
           recorded,
           call,
-          'error',
+          error instanceof HookRestrictionError ? 'rejected' : 'error',
           message,
           stepId,
         );
@@ -250,6 +251,16 @@ export async function runReact(
           tool_call_id: call.id,
           content: JSON.stringify(observation),
         });
+        if (error instanceof HookRestrictionError) {
+          context.terminate(
+            error.action === 'force_prompt'
+              ? 'approval_required'
+              : error.action === 'skip'
+                ? 'skipped'
+                : 'denied',
+          );
+          return;
+        }
       }
     }
   }

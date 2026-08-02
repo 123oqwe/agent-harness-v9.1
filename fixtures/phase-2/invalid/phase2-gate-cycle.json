@@ -195,10 +195,59 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-LOOP-001", "AH-CONTEXT-COMPILER-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-hook-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-hook-001.test.ts",
+        "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
+        "tests/phase-2/security/ah-hook-001-injection.test.ts",
+        "tests/phase-2/security/ah-hook-001-attenuation.test.ts",
+        "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
+        "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-HOOK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": [
+        "packages/runtime-core/src/hook-system.ts",
+        "packages/runtime-core/src/sqlite-hook-journal.ts"
+      ],
+      "test_files": [
+        "tests/phase-2/unit/ah-hook-001.test.ts",
+        "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
+        "tests/phase-2/security/ah-hook-001-injection.test.ts",
+        "tests/phase-2/security/ah-hook-001-attenuation.test.ts",
+        "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
+        "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts"
+      ],
+      "owned_sources": [
+        "packages/runtime-core/src/hook-system.ts",
+        "packages/runtime-core/src/sqlite-hook-journal.ts",
+        "runtime/sandboxed-hook-execution-port.ts"
+      ],
+      "integration_sources": [
+        "harness.ts",
+        "runtime/hook-port.ts",
+        "runtime/loop.ts",
+        "runtime/plan-execute.ts",
+        "runtime/react.ts",
+        "tools/tool-dispatcher.ts"
+      ],
+      "runtime_assets": [
+        "index.ts",
+        "package-lock.json",
+        "packages/runtime-core/package.json",
+        "packages/runtime-core/src/index.ts"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-hook-001.test.ts",
+        "tests/phase-2/integration/ah-hook-001-pipeline.test.ts"
+      ],
+      "security_tests": [
+        "tests/phase-2/security/ah-hook-001-injection.test.ts",
+        "tests/phase-2/security/ah-hook-001-attenuation.test.ts",
+        "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
+        "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts"
+      ],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-MCP-STDIO-001",
@@ -442,15 +491,26 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-SESSION-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-round6-security.test.ts",
+        "tests/phase-2/security/trusted-python-host.security.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-SESSIONTREE-001.json",
       "mutation_class": "critical",
       "eval_suites": ["evals/coding/phase-2.yaml"],
       "source_files": [
-        "packages/runtime-core/src/index.ts",
         "packages/runtime-core/src/session-tree.ts"
       ],
-      "test_files": ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
+      "test_files": [
+        "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-round6-security.test.ts",
+        "tests/phase-2/security/trusted-python-host.security.test.ts"
+      ],
       "owned_sources": [
         "packages/runtime-core/src/session-tree.ts",
         "session/session-event-codec.ts",

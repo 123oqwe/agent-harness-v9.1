@@ -30,3 +30,36 @@ export {
   type SessionTreeSnapshot,
   type SessionTreeSourceRef,
 } from "./session-tree.js";
+
+export {
+  HOOK_EVENTS,
+  HookSystem,
+  type HookAuditEntry,
+  type HookAuditPort,
+  type HookAttenuationDecision,
+  type HookAttenuationPolicy,
+  type HookDispatchOutcome,
+  type HookEvent,
+  type HookHandler,
+  type HookHandlerInput,
+  type HookHandlerResult,
+  type HookExecutionPort,
+  type HookInvocationRequest,
+  type HookJournalClaim,
+  type HookJournalPort,
+  type HookJournalRecord,
+  type HookRegistration,
+  type ManagedHookRegistration,
+  type ExternalHookExecution,
+  type ExternalHookRegistration,
+  type HookScope,
+  type HookSystemOptions,
+  type HookTrust,
+} from "./hook-system.js";
+
+export {
+  createDurableHookSystem,
+  SqliteHookJournal,
+  type DurableHookSystemOptions,
+  type SqliteHookJournalOptions,
+} from "./sqlite-hook-journal.js";

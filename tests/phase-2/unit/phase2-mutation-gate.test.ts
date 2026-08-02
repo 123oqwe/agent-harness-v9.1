@@ -185,7 +185,7 @@ describe("Phase 2 mutation authority", () => {
     ).toHaveLength(0);
   });
 
-  it("does not pre-bind Hook or SessionTree suites before those batches integrate", () => {
+  it("derives the integrated Hook and SessionTree suites from the gate", () => {
     const authority = loadPhase2MutationAuthority({ manifest });
     const testsFor = (id: string) =>
       authority.requirements.find((entry: { id: string }) => entry.id === id)
@@ -193,28 +193,37 @@ describe("Phase 2 mutation authority", () => {
 
     expect(testsFor("AH-HOOK-001")).toEqual([
       "tests/phase-2/unit/ah-hook-001.test.ts",
+      "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
+      "tests/phase-2/security/ah-hook-001-injection.test.ts",
+      "tests/phase-2/security/ah-hook-001-attenuation.test.ts",
+      "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
+      "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts",
     ]);
     expect(testsFor("AH-RUNTIME-SESSIONTREE-001")).toEqual([
       "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+      "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
+      "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+      "tests/phase-2/security/ah-runtime-sessiontree-001-round6-security.test.ts",
+      "tests/phase-2/security/trusted-python-host.security.test.ts",
     ]);
   });
 
   it("separates owned mutation sources from shared integration sources covered by Phase 1", () => {
     const registry = cloneRegistry();
-    const hook = registry.find(
-      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    const compiler = registry.find(
+      (entry: { id: string }) => entry.id === "AH-CONTEXT-COMPILER-001",
     );
-    hook.integrationSources = ["harness.ts"];
+    compiler.integrationSources = ["harness.ts"];
     const projectedManifest = structuredClone(manifest);
     projectedManifest.requirements.find(
-      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+      (entry: { id: string }) => entry.id === "AH-CONTEXT-COMPILER-001",
     ).integration_sources = ["harness.ts"];
     const authority = loadPhase2MutationAuthority({
       manifest: projectedManifest,
       registry,
     });
     const requirement = authority.requirements.find(
-      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+      (entry: { id: string }) => entry.id === "AH-CONTEXT-COMPILER-001",
     );
 
     expect(authority.errors).toEqual([]);
@@ -227,13 +236,13 @@ describe("Phase 2 mutation authority", () => {
 
   it("rejects a shared integration source that escapes every Phase 1 mutation module", () => {
     const registry = cloneRegistry();
-    const hook = registry.find(
-      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    const compiler = registry.find(
+      (entry: { id: string }) => entry.id === "AH-CONTEXT-COMPILER-001",
     );
-    hook.integrationSources = ["runtime/uncovered-shared-consumer.ts"];
+    compiler.integrationSources = ["runtime/uncovered-shared-consumer.ts"];
     const projectedManifest = structuredClone(manifest);
     projectedManifest.requirements.find(
-      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+      (entry: { id: string }) => entry.id === "AH-CONTEXT-COMPILER-001",
     ).integration_sources = ["runtime/uncovered-shared-consumer.ts"];
 
     expect(
@@ -296,7 +305,7 @@ describe("Phase 2 mutation authority", () => {
 
     expect(readiness).toMatchObject({
       ok: false,
-      completed: 1,
+      completed: 2,
       required: 64,
     });
     expect(readiness.blockers).toEqual(

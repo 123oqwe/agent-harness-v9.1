@@ -101,6 +101,7 @@ export const mutationModules = {
       'harness.ts',
       'runtime/errors.ts',
       'runtime/harness-support.ts',
+      'runtime/hook-port.ts',
       'runtime/loop.ts',
       'runtime/retry.ts',
       'runtime/notifications.ts',
