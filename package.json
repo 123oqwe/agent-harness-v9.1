@@ -82,6 +82,7 @@
     "test:phase2:evals": "node scripts/gates/run-phase2-evals.mjs --mode bootstrap",
     "test:phase2:data": "node scripts/gates/run-phase2-data.mjs --mode bootstrap",
     "test:phase2:package-smoke": "node scripts/gates/package-smoke.mjs",
+    "test:phase2:workspace-smoke": "node scripts/gates/package-smoke.mjs --mode workspace",
     "generate:contracts": "node scripts/generate-contracts.mjs",
     "prepare": "patch-package"
   },

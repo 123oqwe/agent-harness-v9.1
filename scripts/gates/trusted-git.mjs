@@ -105,6 +105,7 @@ const READ_ONLY_GIT_COMMANDS = new Set([
   "ls-files",
   "ls-tree",
   "rev-parse",
+  "rev-list",
   "status",
 ]);
 

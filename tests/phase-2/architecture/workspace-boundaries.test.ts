@@ -44,6 +44,7 @@ const copyArchitectureFixture = () => {
     "packages",
     "apps",
     "scripts",
+    "verification",
   ]) {
     cpSync(join(repositoryRoot, path), join(root, path), { recursive: true });
   }
@@ -118,126 +119,135 @@ describe("Phase 2 incremental monorepo architecture", () => {
     }
   });
 
-  it("builds and imports every private workspace entrypoint", async () => {
-    const paths = [
-      "packages/contracts",
-      "packages/context",
-      "packages/documents",
-      "packages/rag",
-      "packages/multimodal",
-      "packages/tool-fabric",
-      "packages/api",
-      "packages/ui",
-      "apps/api",
-      "apps/web",
-      "apps/desktop",
-      "apps/tui",
-    ];
-    for (const path of paths) {
-      rmSync(join(repositoryRoot, path, "dist"), {
-        recursive: true,
-        force: true,
-      });
-    }
-    const build = spawnSync(
-      join(repositoryRoot, "node_modules/.bin/turbo"),
-      ["run", "build", "--filter=@agent-harness/*"],
-      {
-        cwd: repositoryRoot,
-        encoding: "utf8",
-        shell: false,
-        timeout: 120_000,
-      },
-    );
-    expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
+  it(
+    "builds and imports every private workspace entrypoint",
+    { timeout: 120_000 },
+    async () => {
+      const paths = [
+        "packages/contracts",
+        "packages/runtime-core",
+        "packages/router",
+        "packages/security",
+        "packages/tools",
+        "packages/ui",
+        "packages/api",
+        "packages/eval",
+        "packages/documents",
+        "packages/rag",
+        "packages/multimodal",
+        "apps/api",
+        "apps/web",
+        "apps/desktop",
+        "apps/tui",
+      ];
+      for (const path of paths) {
+        rmSync(join(repositoryRoot, path, "dist"), {
+          recursive: true,
+          force: true,
+        });
+      }
+      const build = spawnSync(
+        join(repositoryRoot, "node_modules/.bin/turbo"),
+        ["run", "build", "--filter=@agent-harness/*"],
+        {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          shell: false,
+          timeout: 120_000,
+        },
+      );
+      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
 
-    for (const path of paths) {
-      const manifest = JSON.parse(
-        readFileSync(join(repositoryRoot, path, "package.json"), "utf8"),
-      ) as {
-        name: string;
-        private: boolean;
-        type: string;
-        version: string;
+      for (const path of paths) {
+        const manifest = JSON.parse(
+          readFileSync(join(repositoryRoot, path, "package.json"), "utf8"),
+        ) as {
+          name: string;
+          private: boolean;
+          type: string;
+          version: string;
+        };
+        expect(manifest.private, path).toBe(true);
+        expect(manifest.version, path).toBe("0.0.0");
+        expect(manifest.type, path).toBe("module");
+        const module = (await import(
+          pathToFileURL(join(repositoryRoot, path, "dist/index.js")).href
+        )) as { workspaceIdentity?: { name: string; path: string } };
+        expect(module.workspaceIdentity).toEqual({
+          name: manifest.name,
+          path,
+        });
+        const sourceModule = (await import(
+          pathToFileURL(join(repositoryRoot, path, "src/index.ts")).href
+        )) as { workspaceIdentity?: { name: string; path: string } };
+        expect(sourceModule.workspaceIdentity).toEqual(
+          module.workspaceIdentity,
+        );
+      }
+
+      const apiApp = (await import(
+        pathToFileURL(join(repositoryRoot, "apps/api/dist/index.js")).href
+      )) as {
+        composeApiApp?: (kernel: unknown) => unknown;
       };
-      expect(manifest.private, path).toBe(true);
-      expect(manifest.version, path).toBe("0.0.0");
-      expect(manifest.type, path).toBe("module");
-      const module = (await import(
-        pathToFileURL(join(repositoryRoot, path, "dist/index.js")).href
-      )) as { workspaceIdentity?: { name: string; path: string } };
-      expect(module.workspaceIdentity).toEqual({
-        name: manifest.name,
-        path,
-      });
-      const sourceModule = (await import(
-        pathToFileURL(join(repositoryRoot, path, "src/index.ts")).href
-      )) as { workspaceIdentity?: { name: string; path: string } };
-      expect(sourceModule.workspaceIdentity).toEqual(module.workspaceIdentity);
-    }
-
-    const apiApp = (await import(
-      pathToFileURL(join(repositoryRoot, "apps/api/dist/index.js")).href
-    )) as {
-      composeApiApp?: (kernel: unknown) => unknown;
-    };
-    expect(apiApp.composeApiApp).toBeTypeOf("function");
-    expect(() => apiApp.composeApiApp?.(null)).toThrow(/kernel public port/u);
-    const minimalKernel = {
-      Harness: class Harness {
-        run() {
-          return Promise.resolve();
-        }
-      },
-      createDefaultExecutionContext: () => ({}),
-    };
-    const binding = apiApp.composeApiApp?.(minimalKernel) as {
-      kernel?: typeof minimalKernel;
-    };
-    expect(binding.kernel?.Harness).toBe(minimalKernel.Harness);
-    expect(binding.kernel?.createDefaultExecutionContext).toBe(
-      minimalKernel.createDefaultExecutionContext,
-    );
-    expect(() =>
-      apiApp.composeApiApp?.({ Harness: minimalKernel.Harness }),
-    ).toThrow(/kernel public port/u);
-
-    const sourceApiApp = (await import(
-      pathToFileURL(join(repositoryRoot, "apps/api/src/index.ts")).href
-    )) as { composeApiApp: (kernel: unknown) => typeof binding };
-    const sourceBinding = sourceApiApp.composeApiApp(minimalKernel);
-    expect(sourceBinding.kernel?.Harness).toBe(minimalKernel.Harness);
-    expect(sourceBinding.kernel?.createDefaultExecutionContext).toBe(
-      minimalKernel.createDefaultExecutionContext,
-    );
-    expect(() => sourceApiApp.composeApiApp(null)).toThrow(
-      /kernel public port/u,
-    );
-    expect(() => sourceApiApp.composeApiApp(() => undefined)).toThrow(
-      /kernel public port/u,
-    );
-    expect(() =>
-      sourceApiApp.composeApiApp({ Harness: minimalKernel.Harness }),
-    ).toThrow(/kernel public port/u);
-    expect(() =>
-      sourceApiApp.composeApiApp({
-        Harness: class WrongName {
+      expect(apiApp.composeApiApp).toBeTypeOf("function");
+      expect(() => apiApp.composeApiApp?.(null)).toThrow(/kernel public port/u);
+      const minimalKernel = {
+        Harness: class Harness {
           run() {
             return Promise.resolve();
           }
         },
-        createDefaultExecutionContext:
-          minimalKernel.createDefaultExecutionContext,
-      }),
-    ).toThrow(/kernel public port/u);
-    expect(() =>
-      sourceApiApp.composeApiApp({
-        Harness: class Harness {},
-        createDefaultExecutionContext:
-          minimalKernel.createDefaultExecutionContext,
-      }),
-    ).toThrow(/kernel public port/u);
-  });
+        createDefaultExecutionContext: () => ({}),
+      };
+      const binding = apiApp.composeApiApp?.(minimalKernel) as {
+        kernel?: typeof minimalKernel;
+      };
+      expect(binding.kernel?.Harness).toBe(minimalKernel.Harness);
+      expect(binding.kernel?.createDefaultExecutionContext).toBe(
+        minimalKernel.createDefaultExecutionContext,
+      );
+      expect(() =>
+        apiApp.composeApiApp?.({ Harness: minimalKernel.Harness }),
+      ).toThrow(/kernel public port/u);
+
+      const sourceApiApp = (await import(
+        pathToFileURL(join(repositoryRoot, "apps/api/src/index.ts")).href
+      )) as { composeApiApp: (kernel: unknown) => typeof binding };
+      const sourceBinding = sourceApiApp.composeApiApp(minimalKernel);
+      expect(sourceBinding.kernel?.Harness).toBe(minimalKernel.Harness);
+      expect(sourceBinding.kernel?.createDefaultExecutionContext).toBe(
+        minimalKernel.createDefaultExecutionContext,
+      );
+      expect(() => sourceApiApp.composeApiApp(null)).toThrow(
+        /kernel public port/u,
+      );
+      expect(() => sourceApiApp.composeApiApp(() => undefined)).toThrow(
+        /kernel public port/u,
+      );
+      expect(() =>
+        sourceApiApp.composeApiApp({ Harness: minimalKernel.Harness }),
+      ).toThrow(/kernel public port/u);
+      expect(() =>
+        sourceApiApp.composeApiApp({
+          Harness: class WrongName {
+            run() {
+              return Promise.resolve();
+            }
+          },
+          createDefaultExecutionContext:
+            minimalKernel.createDefaultExecutionContext,
+        }),
+      ).toThrow(/kernel public port/u);
+      expect(() =>
+        sourceApiApp.composeApiApp({
+          Harness: class Harness {},
+          createDefaultExecutionContext:
+            minimalKernel.createDefaultExecutionContext,
+        }),
+      ).toThrow(/kernel public port/u);
+    },
+  );
 
   it("rejects package-to-app and app-to-app dependency edges", () => {
     const root = copyArchitectureFixture();
@@ -256,7 +266,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects dependency cycles and edges outside the frozen source DAG", () => {
     const root = copyArchitectureFixture();
     updateJson(root, "packages/contracts/package.json", (manifest) => {
-      manifest.dependencies = { "@agent-harness/context": "0.0.0" };
+      manifest.dependencies = { "@agent-harness/runtime-core": "0.0.0" };
     });
 
     const result = runChecker(root);
@@ -267,7 +277,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects deep root imports and duplicate authority declarations", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/context/src/index.ts"),
+      join(root, "packages/runtime-core/src/index.ts"),
       [
         'import "agent-harness/runtime/runtime-loop.js";',
         'import "@harness/runtime/loop.js";',
@@ -279,15 +289,214 @@ describe("Phase 2 incremental monorepo architecture", () => {
     const result = runChecker(root);
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/deep root import/u);
-    expect(result.stderr).toMatch(/root package import.*packages\/context/u);
+    expect(result.stderr).toMatch(
+      /root package import.*packages\/runtime-core/u,
+    );
     expect(result.stderr).toMatch(/duplicate authority.*ModelGateway/u);
+  });
+
+  it("keeps Phase 1 authority workspaces as identity-only scaffolds", () => {
+    for (const [label, source] of [
+      [
+        "known duplicate",
+        [
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export class StaticRouter {}",
+        ].join("\n"),
+      ],
+      [
+        "renamed business implementation",
+        [
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export function chooseExecutionRoute() { return 'direct'; }",
+        ].join("\n"),
+      ],
+      [
+        "unbound extra export",
+        [
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export { hiddenRouter } from './hidden-router.js';",
+        ].join("\n"),
+      ],
+    ] as const) {
+      const root = copyArchitectureFixture();
+      writeFileSync(join(root, "packages/router/src/index.ts"), `${source}\n`);
+      if (label === "unbound extra export") {
+        writeFileSync(
+          join(root, "packages/router/src/hidden-router.ts"),
+          "export const hiddenRouter = () => 'direct';\n",
+        );
+      }
+
+      const result = runChecker(root);
+      expect(result.status, label).toBe(1);
+      expect(result.stderr, label).toMatch(/identity-only scaffold/u);
+    }
+  });
+
+  it("rejects hidden renamed implementations outside the scaffold index", () => {
+    const root = copyArchitectureFixture();
+    writeFileSync(
+      join(root, "packages/router/src/renamed-router.ts"),
+      "export function chooseExecutionRoute() { return 'direct'; }\n",
+    );
+
+    const result = runChecker(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/identity-only scaffold/u);
+  });
+
+  it.each([".mts", ".cts", ".jsx", ".cjs"])(
+    "rejects hidden authority source using the %s extension",
+    (extension) => {
+      const root = copyArchitectureFixture();
+      writeFileSync(
+        join(root, `packages/router/src/renamed-router${extension}`),
+        "export function chooseExecutionRoute() { return 'direct'; }\n",
+      );
+
+      const result = runChecker(root);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/identity-only scaffold/u);
+    },
+  );
+
+  it("derives duplicate authority names from the source-authority manifest", () => {
+    const root = copyArchitectureFixture();
+    const manifestPath = join(root, "verification/gates/phase2-gate.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      requirements: Array<Record<string, unknown>>;
+    };
+    const requirement = manifest.requirements.find(
+      (entry) => entry.id === "AH-HOOK-001",
+    );
+    if (!requirement) throw new Error("missing AH-HOOK-001");
+    const source = "packages/runtime-core/src/fake-verification.ts";
+    const test = "tests/phase-2/unit/ah-hook-001.test.ts";
+    requirement.source_files = [source];
+    requirement.test_files = [test];
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    writeFileSync(join(root, source), "export class VerificationEngine {}\n");
+    mkdirSync(join(root, test, ".."), { recursive: true });
+    writeFileSync(
+      join(root, test),
+      'import { VerificationEngine } from "../../../packages/runtime-core/src/fake-verification.js";\nvoid VerificationEngine;\n',
+    );
+    const indexPath = join(root, "packages/runtime-core/src/index.ts");
+    writeFileSync(
+      indexPath,
+      `${readFileSync(indexPath, "utf8")}\nexport { VerificationEngine } from "./fake-verification.js";\n`,
+    );
+
+    const result = runChecker(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/duplicate authority declaration VerificationEngine/u);
+  });
+
+  it("does not authorize a router implementation with another owner's requirement comment", () => {
+    const root = copyArchitectureFixture();
+    writeFileSync(
+      join(root, "packages/router/src/renamed-router.ts"),
+      [
+        "// AH-RUNTIME-SESSIONTREE-001 belongs to packages/runtime-core.",
+        "export function chooseExecutionRoute() { return 'direct'; }",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(root, "packages/router/src/index.ts"),
+      [
+        "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+        "export { chooseExecutionRoute } from './renamed-router.js';",
+      ].join("\n"),
+    );
+
+    const result = runChecker(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/identity-only scaffold|structured requirement binding/u);
+  });
+
+  it("fails closed for nonliteral hidden business declarations", () => {
+    const root = copyArchitectureFixture();
+    writeFileSync(
+      join(root, "packages/router/src/computed-router.ts"),
+      [
+        "const routeName = getRouteName();",
+        "export default { [routeName]: () => 'direct' };",
+      ].join("\n"),
+    );
+
+    const result = runChecker(root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/identity-only scaffold|nonliteral/u);
+  });
+
+  it("allows explicitly bound SessionTree and Hook additions in runtime-core", () => {
+    const root = copyArchitectureFixture();
+    const manifestPath = join(root, "verification/gates/phase2-gate.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      requirements: Array<Record<string, unknown>>;
+    };
+    const bindings = [
+      {
+        id: "AH-RUNTIME-SESSIONTREE-001",
+        source: "packages/runtime-core/src/session-tree.ts",
+        test: "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+        code: [
+          "export const sessionTreeRequirementId = 'AH-RUNTIME-SESSIONTREE-001' as const;",
+          "export class SessionTree {}",
+        ].join("\n"),
+        testCode: [
+          "import { SessionTree } from '../../../packages/runtime-core/src/session-tree.js';",
+          "void SessionTree;",
+        ].join("\n"),
+        reexport: "export { SessionTree } from './session-tree.js';",
+      },
+      {
+        id: "AH-HOOK-001",
+        source: "packages/runtime-core/src/hook.ts",
+        test: "tests/phase-2/unit/ah-hook-001.test.ts",
+        code: [
+          "export const hookRequirementId = 'AH-HOOK-001' as const;",
+          "export function runHook() { return 'ok'; }",
+        ].join("\n"),
+        testCode: [
+          "import { runHook } from '../../../packages/runtime-core/src/hook.js';",
+          "void runHook;",
+        ].join("\n"),
+        reexport: "export { runHook } from './hook.js';",
+      },
+    ];
+    for (const binding of bindings) {
+      const requirement = manifest.requirements.find(
+        (entry) => entry.id === binding.id,
+      );
+      if (!requirement) throw new Error(`missing ${binding.id}`);
+      requirement.source_files = [binding.source];
+      requirement.test_files = [binding.test];
+      mkdirSync(join(root, binding.source, ".."), { recursive: true });
+      writeFileSync(join(root, binding.source), `${binding.code}\n`);
+      mkdirSync(join(root, binding.test, ".."), { recursive: true });
+      writeFileSync(join(root, binding.test), `${binding.testCode}\n`);
+    }
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    writeFileSync(
+      join(root, "packages/runtime-core/src/index.ts"),
+      [
+        "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/runtime-core', path: 'packages/runtime-core' } as const);",
+        "export interface RuntimeCorePackagePort { readonly workspace: typeof workspaceIdentity.name; }",
+        ...bindings.map((binding) => binding.reexport),
+      ].join("\n"),
+    );
+
+    const result = runChecker(root);
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("rejects noncanonical exports even with a declared production dependency", () => {
     const root = copyArchitectureFixture();
-    updateJson(root, "packages/tool-fabric/package.json", (manifest) => {
+    updateJson(root, "packages/tools/package.json", (manifest) => {
       manifest.dependencies = {
-        "@agent-harness/context": "0.0.0",
+        "@agent-harness/runtime-core": "0.0.0",
         execa: "9.0.0",
       };
       manifest.exports = { ".": "./src/index.ts" };
@@ -302,7 +511,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects dynamic imports, require, createRequire, and workspace deep imports", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/context/src/index.ts"),
+      join(root, "packages/runtime-core/src/index.ts"),
       [
         'void import("node:fs");',
         'void import("@agent-harness/contracts/private.js");',
@@ -326,11 +535,11 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("allows a literal dynamic import that resolves inside the same workspace", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/context/src/local-feature.ts"),
+      join(root, "packages/rag/src/local-feature.ts"),
       "export const localFeature = true;\n",
     );
     writeFileSync(
-      join(root, "packages/context/src/index.ts"),
+      join(root, "packages/rag/src/index.ts"),
       'export const localFeature = () => import("./local-feature.js");\n',
     );
 
@@ -341,20 +550,20 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("enforces the frozen safe builtin set per workspace", () => {
     const allowedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(allowedRoot, "packages/context/src/index.ts"),
+      join(allowedRoot, "packages/rag/src/index.ts"),
       'import { createHash } from "node:crypto"; void createHash;\n',
     );
     expect(runChecker(allowedRoot).status).toBe(0);
 
     const deniedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(deniedRoot, "packages/context/src/index.ts"),
+      join(deniedRoot, "packages/rag/src/index.ts"),
       'import { join } from "node:path"; void join;\n',
     );
     const denied = runChecker(deniedRoot);
     expect(denied.status).toBe(1);
     expect(denied.stderr).toMatch(
-      /builtin import node:path is not approved for packages\/context/u,
+      /builtin import node:path is not approved for packages\/rag/u,
     );
   });
 
@@ -446,7 +655,10 @@ describe("Phase 2 incremental monorepo architecture", () => {
     ],
   ])("rejects global process access through %s", (_label, source) => {
     const root = copyArchitectureFixture();
-    writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+    writeFileSync(
+      join(root, "packages/rag/src/index.ts"),
+      `${source}\n`,
+    );
 
     const result = runChecker(root);
 
@@ -457,7 +669,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("keeps process-independent cancellation globals available", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/context/src/index.ts"),
+      join(root, "packages/rag/src/index.ts"),
       [
         "const controller = new AbortController();",
         "const signal: AbortSignal = controller.signal;",
@@ -484,7 +696,10 @@ describe("Phase 2 incremental monorepo architecture", () => {
     "rejects mutable global authority aliases through %s",
     (_label, source) => {
       const root = copyArchitectureFixture();
-      writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+      writeFileSync(
+        join(root, "packages/runtime-core/src/index.ts"),
+        `${source}\n`,
+      );
 
       const result = runChecker(root);
 
@@ -526,15 +741,22 @@ describe("Phase 2 incremental monorepo architecture", () => {
       "const key = getGlobalKey(); void globalThis[key];",
       /unresolved global property access is forbidden/u,
     ],
-  ])("fails closed for %s", (_label, source, expectedError) => {
-    const root = copyArchitectureFixture();
-    writeFileSync(join(root, "packages/context/src/index.ts"), `${source}\n`);
+  ])(
+    "fails closed for %s",
+    (_label, source, expectedError) => {
+      const root = copyArchitectureFixture();
+      writeFileSync(
+        join(root, "packages/runtime-core/src/index.ts"),
+        `${source}\n`,
+      );
 
-    const result = runChecker(root);
+      const result = runChecker(root);
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(expectedError);
-  });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(expectedError);
+    },
+    20_000,
+  );
 
   it("resolves a multi-level constant transport key only for its authority workspace", () => {
     const allowedRoot = copyArchitectureFixture();
@@ -546,13 +768,13 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
     const deniedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(deniedRoot, "packages/context/src/index.ts"),
+      join(deniedRoot, "packages/runtime-core/src/index.ts"),
       'const key0 = "fetch"; const key1 = key0; void globalThis[key1];\n',
     );
     const denied = runChecker(deniedRoot);
     expect(denied.status).toBe(1);
     expect(denied.stderr).toMatch(/global fetch access is forbidden/u);
-  });
+  }, 20_000);
 
   it("does not make a development dependency importable by production source", () => {
     const root = copyArchitectureFixture();
@@ -618,11 +840,11 @@ describe("Phase 2 incremental monorepo architecture", () => {
     );
     symlinkSync(
       join(external, "outside.ts"),
-      join(root, "packages/context/src/outside.ts"),
+      join(root, "packages/runtime-core/src/outside.ts"),
     );
     symlinkSync(
       join(external, "nested"),
-      join(root, "packages/context/src/nested"),
+      join(root, "packages/runtime-core/src/nested"),
     );
 
     const result = runChecker(root);
@@ -663,7 +885,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects direct filesystem, CLI, HTTP, socket, DNS, fetch, and credential access", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/tool-fabric/src/index.ts"),
+      join(root, "packages/tools/src/index.ts"),
       [
         'import { readFileSync } from "node:fs";',
         'import { spawn } from "node:child_process";',
@@ -689,7 +911,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects fetch/environment aliases, element access, eval, and Function", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/context/src/index.ts"),
+      join(root, "packages/runtime-core/src/index.ts"),
       [
         "const f = fetch; void f;",
         'void globalThis["fetch"];',

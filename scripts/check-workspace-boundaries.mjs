@@ -47,11 +47,58 @@ const workspace = (
 export const EXPECTED_WORKSPACES = Object.freeze([
   workspace("packages/contracts", "@agent-harness/contracts", [], "package"),
   workspace(
-    "packages/context",
-    "@agent-harness/context",
+    "packages/runtime-core",
+    "@agent-harness/runtime-core",
     ["@agent-harness/contracts"],
     "package",
     ["node:crypto"],
+  ),
+  workspace(
+    "packages/router",
+    "@agent-harness/router",
+    ["@agent-harness/contracts", "@agent-harness/runtime-core"],
+    "package",
+  ),
+  workspace(
+    "packages/security",
+    "@agent-harness/security",
+    ["@agent-harness/contracts"],
+    "package",
+  ),
+  workspace(
+    "packages/tools",
+    "@agent-harness/tools",
+    ["@agent-harness/runtime-core", "@agent-harness/security"],
+    "package",
+    ["node:crypto"],
+  ),
+  workspace(
+    "packages/ui",
+    "@agent-harness/ui",
+    ["@agent-harness/api"],
+    "package",
+  ),
+  workspace(
+    "packages/api",
+    "@agent-harness/api",
+    [
+      "@agent-harness/runtime-core",
+      "@agent-harness/router",
+      "@agent-harness/security",
+      "@agent-harness/tools",
+      "@agent-harness/documents",
+      "@agent-harness/rag",
+      "@agent-harness/multimodal",
+    ],
+    "package",
+    ["node:crypto"],
+    ["fetch"],
+  ),
+  workspace(
+    "packages/eval",
+    "@agent-harness/eval",
+    ["@agent-harness/api"],
+    "package",
   ),
   workspace(
     "packages/documents",
@@ -73,33 +120,6 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     ["@agent-harness/documents"],
     "package",
     ["node:buffer", "node:crypto"],
-  ),
-  workspace(
-    "packages/tool-fabric",
-    "@agent-harness/tool-fabric",
-    ["@agent-harness/context"],
-    "package",
-    ["node:crypto"],
-  ),
-  workspace(
-    "packages/api",
-    "@agent-harness/api",
-    [
-      "@agent-harness/context",
-      "@agent-harness/documents",
-      "@agent-harness/rag",
-      "@agent-harness/multimodal",
-      "@agent-harness/tool-fabric",
-    ],
-    "package",
-    ["node:crypto"],
-    ["fetch"],
-  ),
-  workspace(
-    "packages/ui",
-    "@agent-harness/ui",
-    ["@agent-harness/api"],
-    "package",
   ),
   workspace(
     "apps/api",
@@ -141,22 +161,23 @@ const EXPECTED_TURBO = "2.10.5";
 const EXPECTED_WORKSPACE_EXPORTS = {
   ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
 };
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs"]);
-const AUTHORITY_NAMES = new Set([
-  "AuthorizationService",
-  "DurableSession",
-  "LoopEngine",
-  "ModelGateway",
-  "PolicyEngine",
-  "PolicyEnforcementPoint",
-  "Receipt",
-  "Sandbox",
-  "SecretsBroker",
-  "SkillRegistry",
-  "ToolDispatcher",
-  "ToolRegistry",
-  "VirtualFilesystem",
+const SOURCE_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
 ]);
+const PHASE1_AUTHORITY_WORKSPACES = new Set([
+  "packages/runtime-core",
+  "packages/router",
+  "packages/security",
+  "packages/tools",
+]);
+const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
 const FORBIDDEN_IMPORTS = new Map([
   ["filesystem", new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])],
   ["CLI", new Set(["child_process", "node:child_process"])],
@@ -233,6 +254,313 @@ const sourceFiles = (root, errors, label) => {
   });
 };
 
+const safeRepositoryPath = (path) =>
+  typeof path === "string" &&
+  path.length > 0 &&
+  !isAbsolute(path) &&
+  !path.split(/[\\/]/u).includes("..") &&
+  path.split(/[\\/]/u).every(Boolean);
+
+const staticModuleTarget = (file, specifier) => {
+  if (typeof specifier !== "string" || !specifier.startsWith(".")) return null;
+  const base = resolve(dirname(file), specifier);
+  const candidates = specifier.endsWith(".js")
+    ? [base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx", base]
+    : [base, `${base}.ts`, `${base}.tsx`, join(base, "index.ts")];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+};
+
+const exportedDeclarationNames = (sourceFile) => {
+  const names = new Set();
+  for (const statement of sourceFile.statements) {
+    const exported = statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
+    if (!exported) continue;
+    for (const name of declarationNames(statement)) names.add(name);
+  }
+  return names;
+};
+
+const readAuthorityBindings = (root, errors) => {
+  const manifest = readJson(
+    join(root, PHASE2_AUTHORITY_PATH),
+    errors,
+    PHASE2_AUTHORITY_PATH,
+  );
+  const byWorkspace = new Map(
+    [...PHASE1_AUTHORITY_WORKSPACES].map((path) => [path, new Map()]),
+  );
+  const activeExportsByPath = new Map();
+  const canonicalAuthorityNames = new Set();
+  const requirements = new Map(
+    Array.isArray(manifest?.requirements)
+      ? manifest.requirements.map((requirement) => [requirement.id, requirement])
+      : [],
+  );
+  for (const requirement of requirements.values()) {
+    const hasSources = Object.hasOwn(requirement, "source_files");
+    const hasTests = Object.hasOwn(requirement, "test_files");
+    if (!hasSources && !hasTests) continue;
+    const label = `requirement ${String(requirement.id)}`;
+    if (!hasSources || !hasTests) {
+      errors.push(`${label} must bind source_files and test_files together`);
+      continue;
+    }
+    if (
+      !Array.isArray(requirement.source_files) ||
+      requirement.source_files.length === 0 ||
+      !Array.isArray(requirement.test_files) ||
+      requirement.test_files.length === 0
+    ) {
+      errors.push(`${label} source_files and test_files must be non-empty arrays`);
+      continue;
+    }
+    if (
+      stable(requirement.test_files) !== stable(requirement.test_suites)
+    ) {
+      errors.push(`${label} test_files must exactly match test_suites`);
+    }
+    if (!PHASE1_AUTHORITY_WORKSPACES.has(requirement.owner)) continue;
+    const workspaceBindings = byWorkspace.get(requirement.owner);
+    for (const path of requirement.source_files) {
+      if (
+        !safeRepositoryPath(path) ||
+        !path.startsWith(`${requirement.owner}/src/`) ||
+        !SOURCE_EXTENSIONS.has(extname(path))
+      ) {
+        errors.push(`${label} source file is outside owner: ${String(path)}`);
+        continue;
+      }
+      const existing = workspaceBindings.get(path);
+      if (existing) {
+        errors.push(
+          `${path} is bound to multiple requirements: ${existing.id}, ${requirement.id}`,
+        );
+      } else workspaceBindings.set(path, requirement);
+      try {
+        const stats = lstatSync(join(root, path));
+        if (!stats.isFile() || stats.isSymbolicLink()) {
+          errors.push(`${label} source file must be a regular non-symlink: ${path}`);
+        }
+      } catch {
+        errors.push(`${label} source file is missing: ${path}`);
+      }
+    }
+    for (const path of requirement.test_files) {
+      if (!safeRepositoryPath(path) || !path.startsWith("tests/phase-2/")) {
+        errors.push(`${label} test file is outside Phase 2 tests: ${String(path)}`);
+      }
+      try {
+        const stats = lstatSync(join(root, path));
+        if (!stats.isFile() || stats.isSymbolicLink()) {
+          errors.push(`${label} test file must be a regular non-symlink: ${path}`);
+        }
+      } catch {
+        errors.push(`${label} test file is missing: ${path}`);
+      }
+    }
+  }
+  for (const authority of Array.isArray(manifest?.source_authorities)
+    ? manifest.source_authorities
+    : []) {
+    for (const name of authority?.root?.exports ?? []) {
+      if (typeof name === "string" && name.length > 0)
+        canonicalAuthorityNames.add(name);
+    }
+    if (authority?.workspace?.state !== "active") continue;
+    const requirement = requirements.get(authority.migration_requirement);
+    const label = `source authority ${String(authority.id)}`;
+    if (!requirement) {
+      errors.push(`${label} active migration has no structured requirement binding`);
+      continue;
+    }
+    if (requirement.owner !== authority.workspace.owner) {
+      errors.push(`${label} migration owner does not match requirement owner`);
+    }
+    if (stable(authority.workspace.paths) !== stable(requirement.source_files)) {
+      errors.push(`${label} migration paths must exactly match source_files`);
+    }
+    if (stable(authority.workspace.tests) !== stable(requirement.test_files)) {
+      errors.push(`${label} migration tests must exactly match test_files`);
+    }
+    for (const path of authority.workspace.paths ?? []) {
+      const names = activeExportsByPath.get(path) ?? new Set();
+      for (const name of authority.workspace.exports ?? []) names.add(name);
+      activeExportsByPath.set(path, names);
+    }
+  }
+  return { byWorkspace, activeExportsByPath, canonicalAuthorityNames };
+};
+
+const identityStatement = (statement, expected) => {
+  if (
+    !ts.isVariableStatement(statement) ||
+    !statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    ) ||
+    (statement.declarationList.flags & ts.NodeFlags.Const) === 0 ||
+    statement.declarationList.declarations.length !== 1
+  ) {
+    return false;
+  }
+  const declaration = statement.declarationList.declarations[0];
+  if (
+    !ts.isIdentifier(declaration.name) ||
+    declaration.name.text !== "workspaceIdentity" ||
+    !declaration.initializer
+  ) {
+    return false;
+  }
+  const initializer = unwrapExpression(declaration.initializer);
+  if (
+    !ts.isCallExpression(initializer) ||
+    !ts.isPropertyAccessExpression(initializer.expression) ||
+    !ts.isIdentifier(initializer.expression.expression) ||
+    initializer.expression.expression.text !== "Object" ||
+    initializer.expression.name.text !== "freeze" ||
+    initializer.arguments.length !== 1
+  ) {
+    return false;
+  }
+  const object = unwrapExpression(initializer.arguments[0]);
+  if (!object || !ts.isObjectLiteralExpression(object)) return false;
+  const values = new Map();
+  for (const property of object.properties) {
+    if (
+      !ts.isPropertyAssignment(property) ||
+      (!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name))
+    ) {
+      return false;
+    }
+    const value = unwrapExpression(property.initializer);
+    if (!value || !ts.isStringLiteral(value)) return false;
+    values.set(property.name.text, value.text);
+  }
+  return (
+    values.size === 2 &&
+    values.get("name") === expected.name &&
+    values.get("path") === expected.path
+  );
+};
+
+const portStatement = (statement, expected) => {
+  const expectedName = `${expected.name
+    .replace("@agent-harness/", "")
+    .split("-")
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join("")}PackagePort`;
+  if (
+    !ts.isInterfaceDeclaration(statement) ||
+    statement.name.text !== expectedName ||
+    !statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    ) ||
+    statement.typeParameters ||
+    statement.heritageClauses ||
+    statement.members.length !== 1
+  ) {
+    return false;
+  }
+  const member = statement.members[0];
+  return (
+    ts.isPropertySignature(member) &&
+    member.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword,
+    ) === true &&
+    ts.isIdentifier(member.name) &&
+    member.name.text === "workspace" &&
+    member.questionToken === undefined &&
+    member.type !== undefined &&
+    ts.isTypeQueryNode(member.type) &&
+    ts.isQualifiedName(member.type.exprName) &&
+    ts.isIdentifier(member.type.exprName.left) &&
+    member.type.exprName.left.text === "workspaceIdentity" &&
+    member.type.exprName.right.text === "name"
+  );
+};
+
+const validateAuthorityWorkspaceSource = ({
+  root,
+  file,
+  sourceFile,
+  expected,
+  bindings,
+}) => {
+  if (!PHASE1_AUTHORITY_WORKSPACES.has(expected.path)) return [];
+  const errors = [];
+  const relativePath = relative(root, file).replaceAll("\\", "/");
+  const indexPath = `${expected.path}/src/index.ts`;
+  if (relativePath !== indexPath) {
+    if (!bindings.has(relativePath)) {
+      errors.push(
+        "Phase 1 authority workspace must remain an identity-only scaffold; extra source lacks structured requirement binding",
+      );
+    }
+    return errors;
+  }
+
+  let identityCount = 0;
+  let portCount = 0;
+  for (const statement of sourceFile.statements) {
+    if (identityStatement(statement, expected)) {
+      identityCount += 1;
+      continue;
+    }
+    if (
+      portStatement(statement, expected)
+    ) {
+      portCount += 1;
+      continue;
+    }
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      const target = staticModuleTarget(file, statement.moduleSpecifier.text);
+      const targetPath = target
+        ? relative(root, target).replaceAll("\\", "/")
+        : null;
+      const requirement = targetPath ? bindings.get(targetPath) : null;
+      if (!target || !requirement) {
+        errors.push(
+          "Phase 1 authority workspace re-export lacks structured requirement binding",
+        );
+        continue;
+      }
+      const targetFile = ts.createSourceFile(
+        target,
+        readFileSync(target, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        extname(target) === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      );
+      const targetExports = exportedDeclarationNames(targetFile);
+      for (const element of statement.exportClause.elements) {
+        const importedName = element.propertyName?.text ?? element.name.text;
+        if (!targetExports.has(importedName)) {
+          errors.push(
+            `${relativePath}: re-export ${element.name.text} is not a real export of ${targetPath}`,
+          );
+        }
+      }
+      continue;
+    }
+    errors.push(
+      "Phase 1 authority workspace must remain an identity-only scaffold unless an export has a structured requirement binding",
+    );
+  }
+  if (identityCount !== 1 || portCount !== 1) {
+    errors.push(
+      "Phase 1 authority workspace index must contain exactly one frozen identity and PackagePort declaration",
+    );
+  }
+  return errors;
+};
+
 const declarationNames = (node) => {
   if (
     (ts.isClassDeclaration(node) ||
@@ -250,6 +578,26 @@ const declarationNames = (node) => {
     );
   }
   return [];
+};
+
+const authorityImplementationNames = (node) => {
+  if (
+    (ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node)) &&
+    node.name
+  ) {
+    return [node.name.text];
+  }
+  if (!ts.isVariableStatement(node)) return [];
+  return node.declarationList.declarations.flatMap((declaration) => {
+    if (!ts.isIdentifier(declaration.name) || !declaration.initializer) return [];
+    const initializer = unwrapExpression(declaration.initializer);
+    return initializer &&
+      (ts.isClassExpression(initializer) ||
+        ts.isFunctionExpression(initializer) ||
+        ts.isArrowFunction(initializer))
+      ? [declaration.name.text]
+      : [];
+  });
 };
 
 const moduleAccesses = (sourceFile) => {
@@ -824,6 +1172,7 @@ export const checkWorkspaceBoundaries = ({
 } = {}) => {
   const root = resolve(repositoryRoot);
   const errors = [];
+  const authorityBindings = readAuthorityBindings(root, errors);
   const rootPackage = readJson(
     join(root, "package.json"),
     errors,
@@ -976,9 +1325,24 @@ export const checkWorkspaceBoundaries = ({
         readFileSync(file, "utf8"),
         ts.ScriptTarget.Latest,
         true,
-        extname(file) === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+        new Set([".tsx", ".jsx"]).has(extname(file))
+          ? ts.ScriptKind.TSX
+          : ts.ScriptKind.TS,
       );
       const label = relative(root, file).replaceAll("\\", "/");
+      if (sourceFile.parseDiagnostics.length > 0) {
+        errors.push(`${label}: unsupported or malformed source syntax`);
+        continue;
+      }
+      for (const violation of validateAuthorityWorkspaceSource({
+        root,
+        sourceFile,
+        file,
+        expected,
+        bindings: authorityBindings.byWorkspace.get(expected.path) ?? new Map(),
+      })) {
+        errors.push(`${label}: identity-only scaffold violation: ${violation}`);
+      }
       const accesses = moduleAccesses(sourceFile);
       for (const loader of new Set(accesses.loaders)) {
         errors.push(`${label}: direct module loader ${loader} is forbidden`);
@@ -1073,8 +1437,12 @@ export const checkWorkspaceBoundaries = ({
         }
       }
       const visit = (node) => {
-        for (const name of declarationNames(node)) {
-          if (AUTHORITY_NAMES.has(name))
+        for (const name of authorityImplementationNames(node)) {
+          const migratedNames = authorityBindings.activeExportsByPath.get(label);
+          if (
+            authorityBindings.canonicalAuthorityNames.has(name) &&
+            !migratedNames?.has(name)
+          )
             errors.push(
               `${label}: duplicate authority declaration ${name} is forbidden`,
             );

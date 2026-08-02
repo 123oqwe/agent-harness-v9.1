@@ -1,5 +1,5 @@
 {
-  "name": "@agent-harness/tool-fabric",
+  "name": "@agent-harness/security",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,6 +19,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agent-harness/context": "0.0.0"
+    "@agent-harness/contracts": "0.0.0"
   }
 }

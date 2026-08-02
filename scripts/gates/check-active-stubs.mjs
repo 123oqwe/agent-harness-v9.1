@@ -56,6 +56,7 @@ const GLOBAL_RELEASE_RECEIPTS = [
   "evaluations",
   "data",
   "package-smoke",
+  "workspace-smoke",
   "source-checkout-reproduction",
   "production-audit",
 ];

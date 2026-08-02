@@ -1,8 +1,8 @@
 export const workspaceIdentity = Object.freeze({
-  name: "@agent-harness/tool-fabric",
-  path: "packages/tool-fabric",
+  name: "@agent-harness/router",
+  path: "packages/router",
 } as const);
 
-export interface ToolFabricPackagePort {
+export interface RouterPackagePort {
   readonly workspace: typeof workspaceIdentity.name;
 }
