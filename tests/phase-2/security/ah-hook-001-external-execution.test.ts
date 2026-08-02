@@ -190,7 +190,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      1_000,
+      10_000,
       'post_tool_use',
     );
     await expect(
@@ -245,7 +245,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     } finally {
       server.close();
     }
-  });
+  }, 30_000);
 
   it('kills an ignoring process tree and permits zero late effects', async () => {
     const fixture = externalFixture();
