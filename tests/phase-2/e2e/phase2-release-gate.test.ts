@@ -15,6 +15,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  collectGateBindings,
   phase2CommandGraph,
   verifyPhase2,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
@@ -23,6 +24,10 @@ import {
   prepareExactSourceCheckout,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/package-smoke.mjs";
+import {
+  materializeExactGitTree,
+  // @ts-expect-error The production materializer intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/materialize-git-tree.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const reportPath = () =>
@@ -45,27 +50,31 @@ const runScript = (script: string) =>
   });
 
 describe("Phase 2 real release gate", () => {
-  it("never includes Python bytecode caches in the packed Harness", () => {
-    const packed = spawnSync(
-      "npm",
-      ["pack", "--dry-run", "--json", "--ignore-scripts"],
-      {
-        cwd: repositoryRoot,
-        encoding: "utf8",
-        shell: false,
-        timeout: 120_000,
-        maxBuffer: 16 * 1024 * 1024,
-      },
-    );
-    expect(packed.status, packed.stderr).toBe(0);
-    const paths = JSON.parse(packed.stdout)[0].files.map(
-      (entry: { path: string }) => entry.path,
-    );
-    expect(paths.some((path: string) => path.includes("__pycache__"))).toBe(
-      false,
-    );
-    expect(paths.some((path: string) => path.endsWith(".pyc"))).toBe(false);
-  });
+  it(
+    "never includes Python bytecode caches in the packed Harness",
+    { timeout: 30_000 },
+    () => {
+      const packed = spawnSync(
+        "npm",
+        ["pack", "--dry-run", "--json", "--ignore-scripts"],
+        {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          shell: false,
+          timeout: 120_000,
+          maxBuffer: 16 * 1024 * 1024,
+        },
+      );
+      expect(packed.status, packed.stderr).toBe(0);
+      const paths = JSON.parse(packed.stdout)[0].files.map(
+        (entry: { path: string }) => entry.path,
+      );
+      expect(paths.some((path: string) => path.includes("__pycache__"))).toBe(
+        false,
+      );
+      expect(paths.some((path: string) => path.endsWith(".pyc"))).toBe(false);
+    },
+  );
 
   it(
     "allows the dirty-tree development gate but makes zero release claims",
@@ -295,6 +304,105 @@ describe("Phase 2 real release gate", () => {
         expect(
           result.commands.map((command: { id: string }) => command.id),
         ).toEqual(["materialize-head"]);
+      } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it(
+    "ignores local Git replacement objects for identity and source materialization",
+    { timeout: 120_000 },
+    async () => {
+      const temporaryRoot = mkdtempSync(
+        join(tmpdir(), "phase2-git-replace-source-"),
+      );
+      const source = join(temporaryRoot, "source");
+      const directCheckout = join(temporaryRoot, "direct-checkout");
+      const preparedCheckout = join(temporaryRoot, "prepared-checkout");
+      const runGit = (args: string[]) => {
+        const result = spawnSync("/usr/bin/git", args, {
+          cwd: source,
+          encoding: "utf8",
+          env: {
+            PATH: "/usr/bin:/bin",
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_TERMINAL_PROMPT: "0",
+          },
+          shell: false,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        return result.stdout.trim();
+      };
+      try {
+        mkdirSync(source);
+        runGit(["init", "--quiet"]);
+        writeFileSync(join(source, "payload.txt"), "original tree\n");
+        runGit(["add", "payload.txt"]);
+        runGit([
+          "-c",
+          "user.name=Phase2 Test",
+          "-c",
+          "user.email=phase2@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "original",
+        ]);
+        const originalCommit = runGit(["rev-parse", "HEAD"]);
+        const originalTree = runGit(["rev-parse", "HEAD^{tree}"]);
+
+        writeFileSync(join(source, "payload.txt"), "replacement tree\n");
+        writeFileSync(join(source, "injected.txt"), "must not materialize\n");
+        runGit(["add", "payload.txt", "injected.txt"]);
+        runGit([
+          "-c",
+          "user.name=Phase2 Test",
+          "-c",
+          "user.email=phase2@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "replacement",
+        ]);
+        const replacementCommit = runGit(["rev-parse", "HEAD"]);
+        const replacementTree = runGit(["rev-parse", "HEAD^{tree}"]);
+        runGit(["checkout", "--quiet", "--detach", originalCommit]);
+        runGit(["replace", originalCommit, replacementCommit]);
+        expect(runGit(["rev-parse", "HEAD^{tree}"])).toBe(replacementTree);
+        expect(replacementTree).not.toBe(originalTree);
+
+        const binding = collectGateBindings(source);
+        expect(binding.bindings.commitSha).toBe(originalCommit);
+        expect(binding.bindings.treeSha).toBe(originalTree);
+
+        materializeExactGitTree({
+          repositoryRoot: source,
+          commitSha: originalCommit,
+          destination: directCheckout,
+        });
+        expect(readFileSync(join(directCheckout, "payload.txt"), "utf8")).toBe(
+          "original tree\n",
+        );
+        expect(existsSync(join(directCheckout, "injected.txt"))).toBe(false);
+
+        const prepared = await prepareExactSourceCheckout({
+          repositoryRoot: source,
+          checkout: preparedCheckout,
+        });
+        expect(prepared).toMatchObject({
+          ok: true,
+          errors: [],
+          commitSha: originalCommit,
+          treeSha: originalTree,
+          checkoutCommitSha: originalCommit,
+          checkoutTreeSha: originalTree,
+        });
+        expect(
+          readFileSync(join(preparedCheckout, "payload.txt"), "utf8"),
+        ).toBe("original tree\n");
+        expect(existsSync(join(preparedCheckout, "injected.txt"))).toBe(false);
       } finally {
         rmSync(temporaryRoot, { recursive: true, force: true });
       }

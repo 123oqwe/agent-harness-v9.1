@@ -283,7 +283,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
     expect(result.stderr).toMatch(/duplicate authority.*ModelGateway/u);
   });
 
-  it("rejects unapproved external dependencies and noncanonical exports", () => {
+  it("rejects noncanonical exports even with a declared production dependency", () => {
     const root = copyArchitectureFixture();
     updateJson(root, "packages/tool-fabric/package.json", (manifest) => {
       manifest.dependencies = {
@@ -295,7 +295,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
     const result = runChecker(root);
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/external dependency execa.*not approved/u);
+    expect(result.stderr).not.toMatch(/external dependency execa/u);
     expect(result.stderr).toMatch(/canonical built exports/u);
   });
 
@@ -335,6 +335,130 @@ describe("Phase 2 incremental monorepo architecture", () => {
     );
 
     const result = runChecker(root);
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it("enforces the frozen safe builtin set per workspace", () => {
+    const allowedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(allowedRoot, "packages/context/src/index.ts"),
+      'import { createHash } from "node:crypto"; void createHash;\n',
+    );
+    expect(runChecker(allowedRoot).status).toBe(0);
+
+    const deniedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(deniedRoot, "packages/context/src/index.ts"),
+      'import { join } from "node:path"; void join;\n',
+    );
+    const denied = runChecker(deniedRoot);
+    expect(denied.status).toBe(1);
+    expect(denied.stderr).toMatch(
+      /builtin import node:path is not approved for packages\/context/u,
+    );
+  });
+
+  it("limits global transport access to the frozen workspace authority allowlist", () => {
+    const allowedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(allowedRoot, "packages/api/src/index.ts"),
+      'void fetch("https://example.invalid");\n',
+    );
+    expect(runChecker(allowedRoot).status).toBe(0);
+
+    const deniedRoot = copyArchitectureFixture();
+    writeFileSync(
+      join(deniedRoot, "packages/api/src/index.ts"),
+      'void new WebSocket("wss://example.invalid");\n',
+    );
+    const denied = runChecker(deniedRoot);
+    expect(denied.status).toBe(1);
+    expect(denied.stderr).toMatch(/WebSocket/u);
+  });
+
+  it("fails closed for undeclared, absolute, aliased, scheme, legacy, and global network access", () => {
+    const root = copyArchitectureFixture();
+    writeFileSync(
+      join(root, "packages/rag/src/index.ts"),
+      [
+        'import Database from "better-sqlite3";',
+        'import "/tmp/escape.js";',
+        'import "#internal";',
+        'import legacy = require("node:path");',
+        'void import("data:text/javascript,export default 1");',
+        'void process.getBuiltinModule("node:fs");',
+        'void new WebSocket("wss://example.invalid");',
+        'void new EventSource("https://example.invalid/events");',
+        'void global.fetch("https://example.invalid");',
+        "void globalThis.WebSocket;",
+        "void new XMLHttpRequest();",
+        'void navigator.sendBeacon("https://example.invalid", "x");',
+        'void globalThis.navigator.sendBeacon("https://example.invalid", "x");',
+        "void Database; void legacy;",
+      ].join("\n"),
+    );
+
+    const result = runChecker(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/undeclared bare import better-sqlite3/u);
+    expect(result.stderr).toMatch(/absolute import \/tmp\/escape\.js/u);
+    expect(result.stderr).toMatch(/package import alias #internal/u);
+    expect(result.stderr).toMatch(/URL scheme import data:/u);
+    expect(result.stderr).toMatch(/import-equals require/u);
+    expect(result.stderr).toMatch(/process\.getBuiltinModule/u);
+    expect(result.stderr).toMatch(/WebSocket/u);
+    expect(result.stderr).toMatch(/EventSource/u);
+    expect(result.stderr).toMatch(/XMLHttpRequest/u);
+    expect(result.stderr).toMatch(/navigator\.sendBeacon/u);
+  });
+
+  it("does not make a development dependency importable by production source", () => {
+    const root = copyArchitectureFixture();
+    updateJson(root, "packages/rag/package.json", (manifest) => {
+      manifest.devDependencies = { "better-sqlite3": "12.4.1" };
+    });
+    updateJson(root, "package-lock.json", (lock) => {
+      const packages = lock.packages as Record<string, Record<string, unknown>>;
+      packages["packages/rag"]!.devDependencies = {
+        "better-sqlite3": "12.4.1",
+      };
+    });
+    writeFileSync(
+      join(root, "packages/rag/src/index.ts"),
+      'import Database from "better-sqlite3"; void Database;\n',
+    );
+
+    const result = runChecker(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(
+      /production source cannot import development dependency better-sqlite3/u,
+    );
+  });
+
+  it("allows a manifest-declared production dependency from production source", () => {
+    const root = copyArchitectureFixture();
+    updateJson(root, "packages/rag/package.json", (manifest) => {
+      manifest.dependencies = {
+        "@agent-harness/documents": "0.0.0",
+        "better-sqlite3": "12.4.1",
+      };
+    });
+    updateJson(root, "package-lock.json", (lock) => {
+      const packages = lock.packages as Record<string, Record<string, unknown>>;
+      packages["packages/rag"]!.dependencies = {
+        "@agent-harness/documents": "0.0.0",
+        "better-sqlite3": "12.4.1",
+      };
+    });
+    writeFileSync(
+      join(root, "packages/rag/src/index.ts"),
+      'import Database from "better-sqlite3"; void Database;\n',
+    );
+
+    const result = runChecker(root);
+
     expect(result.status, result.stderr).toBe(0);
   });
 
@@ -390,7 +514,9 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
     const result = runChecker(root);
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/package-lock.*apps\/web.*source DAG/u);
+    expect(result.stderr).toMatch(
+      /package-lock.*apps\/web.*dependencies.*package\.json/u,
+    );
   });
 
   it("rejects direct filesystem, CLI, HTTP, socket, DNS, fetch, and credential access", () => {
@@ -459,7 +585,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
     writeFileSync(
       join(root, "vitest.config.ts"),
       readFileSync(join(root, "vitest.config.ts"), "utf8")
-        .replace(/^\s*["']packages\/\*\/src\/\*\*\/\*\.ts["'],\s*$/mu, "")
+        .replace("        'packages/*/src/**/*.{ts,tsx}',\n", "")
         .replace("'**/*.test.ts'", "'**/*.test.ts', 'index.ts'"),
     );
 

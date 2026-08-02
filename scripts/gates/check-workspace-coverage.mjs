@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +19,35 @@ export const API_APP_BRANCH_THRESHOLD = 85;
 const metric = (entry, name) => {
   const value = entry?.[name];
   return value && typeof value === "object" ? value : null;
+};
+
+const collectTypeScriptSources = (directory, errors, root) => {
+  if (!existsSync(directory)) {
+    errors.push(
+      `${relative(root, directory).replaceAll("\\", "/")} is missing`,
+    );
+    return [];
+  }
+  if (lstatSync(directory).isSymbolicLink()) {
+    errors.push(
+      `${relative(root, directory).replaceAll("\\", "/")} must not be a symlink`,
+    );
+    return [];
+  }
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const path = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        errors.push(
+          `${relative(root, path).replaceAll("\\", "/")} must not be a symlink`,
+        );
+        return [];
+      }
+      if (entry.isDirectory())
+        return collectTypeScriptSources(path, errors, root);
+      return entry.isFile() && /\.tsx?$/u.test(entry.name) ? [path] : [];
+    });
 };
 
 export const checkWorkspaceCoverage = ({
@@ -33,35 +68,40 @@ export const checkWorkspaceCoverage = ({
   const entries = [];
   if (summary && typeof summary === "object") {
     for (const workspace of EXPECTED_WORKSPACES) {
-      const source = join(root, workspace.path, "src/index.ts");
-      const report = summary[source];
-      const lines = metric(report, "lines");
-      const branches = metric(report, "branches");
-      const label = relative(root, source).replaceAll("\\", "/");
-      if (!report) {
-        errors.push(`${label} is missing from coverage`);
-      } else if (
-        typeof lines?.total !== "number" ||
-        lines.total <= 0 ||
-        typeof lines.covered !== "number" ||
-        lines.covered <= 0
-      ) {
-        errors.push(`${label} must have non-zero line coverage`);
+      for (const source of collectTypeScriptSources(
+        join(root, workspace.path, "src"),
+        errors,
+        root,
+      )) {
+        const report = summary[source];
+        const lines = metric(report, "lines");
+        const branches = metric(report, "branches");
+        const label = relative(root, source).replaceAll("\\", "/");
+        if (!report) {
+          errors.push(`${label} is missing from coverage`);
+        } else if (
+          typeof lines?.total !== "number" ||
+          lines.total <= 0 ||
+          typeof lines.covered !== "number" ||
+          lines.covered <= 0
+        ) {
+          errors.push(`${label} must have non-zero line coverage`);
+        }
+        if (
+          label === "apps/api/src/index.ts" &&
+          (typeof branches?.pct !== "number" ||
+            branches.pct < API_APP_BRANCH_THRESHOLD)
+        ) {
+          errors.push(
+            `${label} branch coverage must be at least ${API_APP_BRANCH_THRESHOLD}%`,
+          );
+        }
+        entries.push({
+          path: label,
+          lines: lines?.pct ?? null,
+          branches: branches?.pct ?? null,
+        });
       }
-      if (
-        workspace.path === "apps/api" &&
-        (typeof branches?.pct !== "number" ||
-          branches.pct < API_APP_BRANCH_THRESHOLD)
-      ) {
-        errors.push(
-          `${label} branch coverage must be at least ${API_APP_BRANCH_THRESHOLD}%`,
-        );
-      }
-      entries.push({
-        path: label,
-        lines: lines?.pct ?? null,
-        branches: branches?.pct ?? null,
-      });
     }
   }
 
@@ -81,7 +121,7 @@ if (isMain) {
   const result = checkWorkspaceCoverage();
   if (result.ok) {
     process.stdout.write(
-      `workspace-coverage: valid (${result.entries.length} workspaces)\n`,
+      `workspace-coverage: valid (${result.entries.length} source files)\n`,
     );
   } else {
     for (const error of result.errors)

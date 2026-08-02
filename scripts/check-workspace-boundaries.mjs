@@ -5,7 +5,16 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, extname, join, relative, resolve, sep } from "node:path";
+import { builtinModules } from "node:module";
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import ts from "typescript";
@@ -15,12 +24,21 @@ export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "..");
 export const ROOT_INDEX_SHA256 =
   "59bbb6cd7e51405c92e224c6d92258e8a3de2d4c6f578d14d54c9fded07511cd";
 
-const workspace = (path, name, dependencies, role) =>
+const workspace = (
+  path,
+  name,
+  dependencies,
+  role,
+  safeBuiltins = [],
+  transportGlobals = [],
+) =>
   Object.freeze({
     path,
     name,
     dependencies: Object.freeze(dependencies),
     role,
+    safeBuiltins: Object.freeze(safeBuiltins),
+    transportGlobals: Object.freeze(transportGlobals),
   });
 
 export const EXPECTED_WORKSPACES = Object.freeze([
@@ -30,30 +48,35 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "@agent-harness/context",
     ["@agent-harness/contracts"],
     "package",
+    ["node:crypto"],
   ),
   workspace(
     "packages/documents",
     "@agent-harness/documents",
     ["@agent-harness/contracts"],
     "package",
+    ["node:buffer", "node:crypto"],
   ),
   workspace(
     "packages/rag",
     "@agent-harness/rag",
     ["@agent-harness/documents"],
     "package",
+    ["node:crypto"],
   ),
   workspace(
     "packages/multimodal",
     "@agent-harness/multimodal",
     ["@agent-harness/documents"],
     "package",
+    ["node:buffer", "node:crypto"],
   ),
   workspace(
     "packages/tool-fabric",
     "@agent-harness/tool-fabric",
     ["@agent-harness/context"],
     "package",
+    ["node:crypto"],
   ),
   workspace(
     "packages/api",
@@ -66,6 +89,8 @@ export const EXPECTED_WORKSPACES = Object.freeze([
       "@agent-harness/tool-fabric",
     ],
     "package",
+    ["node:crypto"],
+    ["fetch"],
   ),
   workspace(
     "packages/ui",
@@ -140,6 +165,28 @@ const FORBIDDEN_IMPORTS = new Map([
   ["DNS", new Set(["dns", "dns/promises", "node:dns", "node:dns/promises"])],
   ["module loader", new Set(["module", "node:module"])],
 ]);
+const NODE_BUILTINS = new Set(
+  builtinModules.flatMap((name) => {
+    const normalized = name.replace(/^node:/u, "");
+    return [normalized, `node:${normalized}`];
+  }),
+);
+const URL_SCHEME = /^[A-Za-z][A-Za-z\d+.-]*:/u;
+const WINDOWS_ABSOLUTE_PATH = /^[A-Za-z]:[\\/]/u;
+const GLOBAL_NETWORK_IDENTIFIERS = new Set([
+  "EventSource",
+  "WebSocket",
+  "XMLHttpRequest",
+]);
+const GLOBAL_OBJECTS = new Set(["global", "globalThis", "self", "window"]);
+
+const barePackageName = (specifier) => {
+  if (specifier.startsWith("@")) {
+    const [scope, name] = specifier.split("/");
+    return scope && name ? `${scope}/${name}` : specifier;
+  }
+  return specifier.split("/")[0];
+};
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const stable = (value) => JSON.stringify(value);
@@ -213,6 +260,15 @@ const moduleAccesses = (sourceFile) => {
     ) {
       specifiers.push(node.moduleSpecifier.text);
     }
+    if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference)
+    ) {
+      loaders.push("import-equals require");
+      const expression = node.moduleReference.expression;
+      if (expression && ts.isStringLiteral(expression))
+        specifiers.push(expression.text);
+    }
     if (ts.isCallExpression(node)) {
       const argument = node.arguments[0];
       if (
@@ -281,25 +337,93 @@ const elementAccessName = (node) =>
     ? node.argumentExpression.text
     : null;
 
-const sourceAuthorityViolations = (sourceFile) => {
+const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
   const violations = new Set();
   const visit = (node) => {
     if (
       ts.isIdentifier(node) &&
       node.text === "fetch" &&
-      !isDeclarationName(node)
+      !isDeclarationName(node) &&
+      !transportGlobals.has("fetch")
     ) {
       violations.add("direct global fetch access is forbidden");
     }
     if (
-      (ts.isPropertyAccessExpression(node) &&
-        node.expression.getText() === "globalThis" &&
-        node.name.text === "fetch") ||
-      (ts.isElementAccessExpression(node) &&
-        node.expression.getText() === "globalThis" &&
-        elementAccessName(node) === "fetch")
+      ts.isIdentifier(node) &&
+      GLOBAL_NETWORK_IDENTIFIERS.has(node.text) &&
+      !isDeclarationName(node) &&
+      !transportGlobals.has(node.text)
     ) {
-      violations.add("direct global fetch access is forbidden");
+      violations.add(
+        `direct global network access via ${node.text} is forbidden`,
+      );
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) &&
+        GLOBAL_OBJECTS.has(node.expression.getText()) &&
+        (node.name.text === "fetch" ||
+          GLOBAL_NETWORK_IDENTIFIERS.has(node.name.text))) ||
+      (ts.isElementAccessExpression(node) &&
+        GLOBAL_OBJECTS.has(node.expression.getText()) &&
+        (elementAccessName(node) === "fetch" ||
+          GLOBAL_NETWORK_IDENTIFIERS.has(elementAccessName(node))))
+    ) {
+      const name = ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : elementAccessName(node);
+      if (!transportGlobals.has(name))
+        violations.add(
+          name === "fetch"
+            ? "direct global fetch access is forbidden"
+            : `direct global network access via ${name} is forbidden`,
+        );
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) &&
+        node.expression.getText() === "process" &&
+        node.name.text === "getBuiltinModule") ||
+      (ts.isElementAccessExpression(node) &&
+        node.expression.getText() === "process" &&
+        elementAccessName(node) === "getBuiltinModule")
+    ) {
+      violations.add("direct process.getBuiltinModule access is forbidden");
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) &&
+        node.expression.getText() === "navigator" &&
+        node.name.text === "sendBeacon") ||
+      (ts.isElementAccessExpression(node) &&
+        node.expression.getText() === "navigator" &&
+        elementAccessName(node) === "sendBeacon")
+    ) {
+      if (!transportGlobals.has("navigator.sendBeacon"))
+        violations.add(
+          "direct global network access via navigator.sendBeacon is forbidden",
+        );
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node)) &&
+      GLOBAL_OBJECTS.has(node.expression.getText())
+    ) {
+      const name = ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : elementAccessName(node);
+      const parent = node.parent;
+      if (
+        name === "navigator" &&
+        ((ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node &&
+          parent.name.text === "sendBeacon") ||
+          (ts.isElementAccessExpression(parent) &&
+            parent.expression === node &&
+            elementAccessName(parent) === "sendBeacon"))
+      ) {
+        if (!transportGlobals.has("navigator.sendBeacon"))
+          violations.add(
+            "direct global network access via navigator.sendBeacon is forbidden",
+          );
+      }
     }
     if (
       (ts.isPropertyAccessExpression(node) &&
@@ -324,6 +448,19 @@ const sourceAuthorityViolations = (sourceFile) => {
       )
     ) {
       violations.add("direct credential environment read is forbidden");
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      node.initializer?.getText() === "process" &&
+      node.name.elements.some(
+        (element) =>
+          (element.propertyName ?? element.name)
+            .getText()
+            .replace(/["']/gu, "") === "getBuiltinModule",
+      )
+    ) {
+      violations.add("direct process.getBuiltinModule access is forbidden");
     }
     if (
       ts.isIdentifier(node) &&
@@ -426,7 +563,10 @@ const checkConfigBindings = (root, packageJson, errors) => {
     }
   }
   const coverage = files.get("vitest.config.ts") ?? "";
-  for (const pattern of ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"]) {
+  for (const pattern of [
+    "packages/*/src/**/*.{ts,tsx}",
+    "apps/*/src/**/*.{ts,tsx}",
+  ]) {
     if (!coverage.includes(pattern))
       errors.push(`coverage must include ${pattern}`);
   }
@@ -495,6 +635,7 @@ export const checkWorkspaceBoundaries = ({
   const expectedByName = new Map(
     EXPECTED_WORKSPACES.map((entry) => [entry.name, entry]),
   );
+  const manifestsByPath = new Map();
   const expectedPaths = new Set(EXPECTED_WORKSPACES.map((entry) => entry.path));
   for (const collection of ["packages", "apps"]) {
     const collectionRoot = join(root, collection);
@@ -523,6 +664,7 @@ export const checkWorkspaceBoundaries = ({
       `${expected.path}/package.json`,
     );
     if (!manifest) continue;
+    manifestsByPath.set(expected.path, manifest);
     if (manifest.name !== expected.name)
       errors.push(`${expected.path} has wrong package name`);
     if (manifest.private !== true)
@@ -544,7 +686,7 @@ export const checkWorkspaceBoundaries = ({
     if (!existsSync(join(directory, "tsconfig.json")))
       errors.push(`${expected.path} is missing tsconfig.json`);
 
-    const dependencyNames = [];
+    const dependencySections = new Map();
     for (const section of [
       "dependencies",
       "devDependencies",
@@ -552,14 +694,9 @@ export const checkWorkspaceBoundaries = ({
       "optionalDependencies",
     ]) {
       const dependencies = isRecord(manifest[section]) ? manifest[section] : {};
+      dependencySections.set(section, dependencies);
       for (const [name, version] of Object.entries(dependencies)) {
-        if (!expectedByName.has(name)) {
-          errors.push(
-            `${expected.path} external dependency ${name} is not approved in B0.4`,
-          );
-          continue;
-        }
-        dependencyNames.push(name);
+        if (!expectedByName.has(name)) continue;
         const target = expectedByName.get(name);
         if (version !== "0.0.0")
           errors.push(
@@ -573,9 +710,16 @@ export const checkWorkspaceBoundaries = ({
           errors.push(
             `app ${expected.path} must not depend on app ${target.path}`,
           );
+        if (section !== "dependencies")
+          errors.push(
+            `${expected.path} workspace dependency ${name} must be declared in dependencies`,
+          );
       }
     }
-    const uniqueDependencies = [...new Set(dependencyNames)].sort();
+    const productionDependencies = dependencySections.get("dependencies");
+    const uniqueDependencies = Object.keys(productionDependencies)
+      .filter((name) => expectedByName.has(name))
+      .sort();
     const allowedDependencies = [...expected.dependencies].sort();
     if (stable(uniqueDependencies) !== stable(allowedDependencies))
       errors.push(
@@ -588,6 +732,18 @@ export const checkWorkspaceBoundaries = ({
 
   for (const expected of EXPECTED_WORKSPACES) {
     const directory = join(root, expected.path);
+    const manifest = manifestsByPath.get(expected.path) ?? {};
+    const productionDependencies = new Set(
+      ["dependencies", "peerDependencies", "optionalDependencies"].flatMap(
+        (section) =>
+          Object.keys(isRecord(manifest[section]) ? manifest[section] : {}),
+      ),
+    );
+    const developmentDependencies = new Set(
+      Object.keys(
+        isRecord(manifest.devDependencies) ? manifest.devDependencies : {},
+      ),
+    );
     for (const file of sourceFiles(
       join(directory, "src"),
       errors,
@@ -650,6 +806,48 @@ export const checkWorkspaceBoundaries = ({
             errors.push(`${label}: package source must not import an app`);
           if (expected.role === "app" && target.role === "app")
             errors.push(`${label}: app source must not import another app`);
+        } else if (specifier.startsWith(".")) {
+          // Relative imports were resolved and confined above.
+        } else if (
+          isAbsolute(specifier) ||
+          WINDOWS_ABSOLUTE_PATH.test(specifier) ||
+          specifier.startsWith("\\\\")
+        ) {
+          errors.push(`${label}: absolute import ${specifier} is forbidden`);
+        } else if (specifier.startsWith("#")) {
+          errors.push(
+            `${label}: package import alias ${specifier} is forbidden`,
+          );
+        } else if (
+          specifier.startsWith("node:") ||
+          NODE_BUILTINS.has(specifier)
+        ) {
+          if (
+            !NODE_BUILTINS.has(specifier) ||
+            !expected.safeBuiltins.includes(specifier)
+          ) {
+            errors.push(
+              `${label}: builtin import ${specifier} is not approved for ${expected.path}`,
+            );
+          }
+        } else if (URL_SCHEME.test(specifier)) {
+          errors.push(
+            `${label}: URL scheme import ${specifier.split(":", 1)[0]}: is forbidden`,
+          );
+        } else {
+          const packageName = barePackageName(specifier);
+          if (
+            developmentDependencies.has(packageName) &&
+            !productionDependencies.has(packageName)
+          ) {
+            errors.push(
+              `${label}: production source cannot import development dependency ${packageName}`,
+            );
+          } else if (!productionDependencies.has(packageName)) {
+            errors.push(
+              `${label}: undeclared bare import ${packageName} is forbidden`,
+            );
+          }
         }
       }
       const visit = (node) => {
@@ -662,7 +860,10 @@ export const checkWorkspaceBoundaries = ({
         ts.forEachChild(node, visit);
       };
       visit(sourceFile);
-      for (const violation of sourceAuthorityViolations(sourceFile))
+      for (const violation of sourceAuthorityViolations(
+        sourceFile,
+        new Set(expected.transportGlobals),
+      ))
         errors.push(`${label}: ${violation}`);
     }
   }
@@ -685,23 +886,29 @@ export const checkWorkspaceBoundaries = ({
         errors.push(`package-lock is missing workspace ${expected.path}`);
         continue;
       }
-      const expectedDependencies = Object.fromEntries(
-        expected.dependencies.map((name) => [name, "0.0.0"]),
-      );
-      const lockedDependencies = isRecord(lockedWorkspace.dependencies)
-        ? lockedWorkspace.dependencies
-        : {};
       const dependencyEntries = (value) =>
         Object.entries(value).sort(([left], [right]) =>
           left.localeCompare(right),
         );
-      if (
-        stable(dependencyEntries(lockedDependencies)) !==
-        stable(dependencyEntries(expectedDependencies))
-      ) {
-        errors.push(
-          `package-lock workspace ${expected.path} dependencies do not match the frozen source DAG`,
-        );
+      const manifest = manifestsByPath.get(expected.path) ?? {};
+      for (const section of [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+      ]) {
+        const declared = isRecord(manifest[section]) ? manifest[section] : {};
+        const locked = isRecord(lockedWorkspace[section])
+          ? lockedWorkspace[section]
+          : {};
+        if (
+          stable(dependencyEntries(locked)) !==
+          stable(dependencyEntries(declared))
+        ) {
+          errors.push(
+            `package-lock workspace ${expected.path} ${section} do not match package.json`,
+          );
+        }
       }
     }
   }

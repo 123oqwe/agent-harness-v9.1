@@ -26,7 +26,10 @@ const fixture = () => {
   mkdirSync(join(root, "coverage"));
   const summary: Record<string, unknown> = {};
   for (const workspace of EXPECTED_WORKSPACES) {
-    summary[join(root, workspace.path, "src/index.ts")] = {
+    const source = join(root, workspace.path, "src/index.ts");
+    mkdirSync(join(root, workspace.path, "src"), { recursive: true });
+    writeFileSync(source, "export const covered = true;\n");
+    summary[source] = {
       lines: { total: 1, covered: 1, skipped: 0, pct: 100 },
       branches: { total: 2, covered: 2, skipped: 0, pct: 100 },
     };
@@ -85,5 +88,29 @@ describe("workspace coverage gate", () => {
     expect(result.ok).toBe(false);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toMatch(/unreadable/u);
+  });
+
+  it("requires non-zero coverage for every nested TypeScript source file", () => {
+    const { root, summary, write } = fixture();
+    const nested = join(root, "packages/context/src/nested/covered.ts");
+    const missing = join(root, "packages/context/src/nested/missing.tsx");
+    mkdirSync(join(root, "packages/context/src/nested"), { recursive: true });
+    writeFileSync(nested, "export const nested = true;\n");
+    writeFileSync(missing, "export const missing = true;\n");
+    summary[nested] = {
+      lines: { total: 1, covered: 1, skipped: 0, pct: 100 },
+      branches: { total: 0, covered: 0, skipped: 0, pct: 100 },
+    };
+    write();
+
+    const result = checkWorkspaceCoverage({ repositoryRoot: root });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toMatch(
+      /packages\/context\/src\/nested\/missing\.tsx.*missing/u,
+    );
+    expect(
+      result.entries.map((entry: { path: string }) => entry.path),
+    ).toContain("packages/context/src/nested/covered.ts");
   });
 });
