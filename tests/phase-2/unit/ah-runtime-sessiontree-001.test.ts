@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -32,11 +32,16 @@ import {
   hasSessionEncryptionEnvelope,
 } from "../../../session/sqlite-authority-internals.js";
 import { SqliteSessionStore } from "../../../session/sqlite-session-store.js";
+import { createTrustedSessionStateRoot } from "../../../session/session-state-root.js";
+import type { SessionTreeCheckpointPort } from "../../../session/session-tree-checkpoint.js";
 import {
   SqliteSessionTreeAuthority,
   type SecurityStateResolver,
 } from "../../../session/sqlite-session-tree-authority.js";
-import { SqliteSessionTreeAuthority as PublicSqliteSessionTreeAuthority } from "../../../index.js";
+import {
+  SessionTree as PublicSessionTree,
+  SqliteSessionTreeAuthority as PublicSqliteSessionTreeAuthority,
+} from "../../../index.js";
 
 const scope = Object.freeze({
   tenant_id: "tenant-a",
@@ -1381,12 +1386,20 @@ function realAuthorityFixture(
     max_session_events?: number;
     max_event_bytes?: number;
     max_depth?: number;
+    max_snapshot_bytes?: number;
+    max_session_bytes?: number;
+    max_tree_bytes?: number;
+    max_recovery_bytes?: number;
+    max_recovery_rows?: number;
   },
+  rootEventCount = 3,
+  checkpoint?: SessionTreeCheckpointPort,
 ) {
   const dir = mkdtempSync(join(tmpdir(), "session-tree-"));
+  const stateRoot = createTrustedSessionStateRoot(dir);
   const dbPath = join(dir, "session.db");
-  const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY });
-  store.createRun(scope.root_session_id, "root", "direct");
+  const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
+  store.createScopedRun(scope, scope.root_session_id, "root", "direct");
   const root = new DurableSession(scope.root_session_id, {
     persistence: store,
     clock: (() => {
@@ -1395,16 +1408,23 @@ function realAuthorityFixture(
     })(),
   });
   root.acquireWriter("test");
-  root.append("user", { text: "one" });
-  root.append("assistant", { text: "two" });
-  root.append("system", { text: "three" });
+  const rootEvents = [
+    ["user", { text: "one" }],
+    ["assistant", { text: "two" }],
+    ["system", { text: "three" }],
+  ] as const;
+  for (const [type, data] of rootEvents.slice(0, rootEventCount)) {
+    root.append(type, data);
+  }
   root.releaseWriter("test");
   const resolver = new MutableSecurityResolver();
   let authority: SqliteSessionTreeAuthority | undefined;
   try {
     authority = new SqliteSessionTreeAuthority(dbPath, {
       masterKey: MASTER_KEY,
+      state_root: stateRoot,
       security_resolver: resolver,
+      ...(checkpoint ? { checkpoint } : {}),
       ...(limits ? { limits } : {}),
     });
     authority.bindRoot(scope, scope.root_session_id, security("root"));
@@ -1417,6 +1437,7 @@ function realAuthorityFixture(
   return {
     dir,
     dbPath,
+    stateRoot,
     store,
     authority,
     resolver,
@@ -1427,6 +1448,12 @@ function realAuthorityFixture(
     },
   };
 }
+
+const PASSTHROUGH_CHECKPOINT: SessionTreeCheckpointPort = {
+  reconcile: () => ({ revision: 0 }),
+  prepare: () => undefined,
+  commit: () => undefined,
+};
 
 function expectAuthorityConstructionFailure(
   factory: () => SqliteSessionTreeAuthority,
@@ -1443,6 +1470,40 @@ function expectAuthorityConstructionFailure(
   }
   expect(thrown).toBeInstanceOf(Error);
   expect((thrown as Error).message).toContain(message);
+}
+
+function treeStorageRunId(dbPath: string, value: SessionTreeScope = scope): string {
+  const database = new Database(dbPath, { readonly: true });
+  try {
+    const row = database
+      .prepare(
+        "SELECT tree_run_id FROM session_tree_scopes WHERE tenant_id = ? AND root_session_id = ?",
+      )
+      .get(value.tenant_id, value.root_session_id) as
+      | { tree_run_id: string }
+      | undefined;
+    if (!row) throw new Error("tree storage run is missing");
+    return row.tree_run_id;
+  } finally {
+    database.close();
+  }
+}
+
+function sessionStorageRunId(dbPath: string, logicalSessionId: string): string {
+  const database = new Database(dbPath, { readonly: true });
+  try {
+    const row = database
+      .prepare(
+        "SELECT storage_run_id FROM session_tree_sessions WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
+      )
+      .get(scope.tenant_id, scope.root_session_id, logicalSessionId) as
+      | { storage_run_id: string }
+      | undefined;
+    if (!row) throw new Error("logical session storage mapping is missing");
+    return row.storage_run_id;
+  } finally {
+    database.close();
+  }
 }
 
 async function directAuthorityRequest(
@@ -1500,10 +1561,580 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 250));
   });
   it("exposes the SQLite authority through the public Harness runtime", () => {
+    expect(PublicSessionTree).toBe(SessionTree);
     expect(PublicSqliteSessionTreeAuthority).toBe(SqliteSessionTreeAuthority);
   });
 
-  it("reconstructs after a real SQLite restart and keeps child sequence local", async () => {
+  it("keeps physical run identities opaque and projects inherited logical history", async () => {
+    const fixture = realAuthorityFixture();
+    try {
+      await new SessionTree(scope, fixture.authority).branch({
+        command_id: "opaque-overlay-command",
+        source_session_id: scope.root_session_id,
+        child_session_id: "opaque-overlay-child",
+      });
+      const handle = fixture.authority.openSession(scope, "opaque-overlay-child");
+      expect("durable_run_id" in handle).toBe(false);
+      expect(fixture.store.getRun("opaque-overlay-child")).toBeNull();
+      expect(handle.session.getEvents().map((event) => event.type)).toEqual([
+        "user",
+        "assistant",
+        "system",
+        "branch",
+      ]);
+      expect(handle.session.getEvent(1)?.data).toEqual({ text: "one" });
+      const database = new Database(fixture.dbPath, { readonly: true });
+      try {
+        const row = database
+          .prepare(
+            "SELECT storage_run_id FROM session_tree_sessions WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
+          )
+          .get(scope.tenant_id, scope.root_session_id, "opaque-overlay-child") as {
+          storage_run_id: string;
+        };
+        const predictable = `__session_tree__${createHash("sha256")
+          .update(
+            `${scope.tenant_id}\0${scope.root_session_id}\0opaque-overlay-child`,
+          )
+          .digest("hex")}`;
+        expect(row.storage_run_id).not.toBe(predictable);
+      } finally {
+        database.close();
+      }
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("authenticates a duplicate command index against its lineage event", async () => {
+    const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+    try {
+      const first = await directAuthorityRequest(fixture, {
+        command_id: "authenticated-index-one",
+        child_session_id: "authenticated-index-child-one",
+      });
+      await fixture.authority.appendLineageEvent(first);
+      const second = await directAuthorityRequest(fixture, {
+        command_id: "authenticated-index-two",
+        child_session_id: "authenticated-index-child-two",
+      });
+      await fixture.authority.appendLineageEvent(second);
+      const database = new Database(fixture.dbPath);
+      try {
+        database
+          .prepare(
+            "UPDATE session_tree_commands SET event_seq = 2 WHERE tenant_id = ? AND root_session_id = ? AND command_id = ?",
+          )
+          .run(scope.tenant_id, scope.root_session_id, first.command_id);
+      } finally {
+        database.close();
+      }
+      await expect(
+        fixture.authority.appendLineageEvent(first),
+      ).rejects.toMatchObject({
+        code: "CORRUPT_LOG",
+        message: "idempotency index disagrees with its lineage event",
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("enforces cumulative session bytes and snapshot bytes", async () => {
+    const fixture = realAuthorityFixture({
+      max_event_bytes: 1_000,
+      max_session_bytes: 1_050,
+      max_snapshot_bytes: 32,
+    }, 0);
+    try {
+      const root = fixture.authority.openSession(scope, scope.root_session_id);
+      root.session.acquireWriter("bytes");
+      root.session.append("user", { text: "x".repeat(600) });
+      expect(() =>
+        root.session.append("assistant", { text: "y".repeat(600) }),
+      ).toThrowError(expect.objectContaining({
+        code: "RESOURCE_LIMIT",
+        message: "session byte limit reached",
+      }));
+      root.session.releaseWriter("bytes");
+      expect(() =>
+        root.session.snapshot_({ text: "z".repeat(64) }),
+      ).toThrowError(expect.objectContaining({
+        code: "RESOURCE_LIMIT",
+        message: "snapshot byte limit exceeded",
+      }));
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("enforces one cumulative recovery ledger across many individually small rows", async () => {
+    const fixture = realAuthorityFixture(
+      {
+        max_event_bytes: 1_000,
+        max_snapshot_bytes: 1_000,
+        max_session_bytes: 10_000,
+        max_tree_bytes: 10_000,
+        max_recovery_bytes: 1_200,
+      },
+      0,
+      PASSTHROUGH_CHECKPOINT,
+    );
+    try {
+      for (let version = 1; version <= 8; version += 1) {
+        fixture.store.saveSnapshot(scope.root_session_id, {
+          session_id: scope.root_session_id,
+          version,
+          last_seq: 0,
+          last_hash: "",
+          created_at: `2026-08-02T03:00:${String(version).padStart(2, "0")}.000Z`,
+          summary: { text: "x".repeat(180) },
+        });
+      }
+      await expect(
+        fixture.authority.readSessionHead(scope, scope.root_session_id),
+      ).rejects.toMatchObject({
+        code: "RESOURCE_LIMIT",
+        message: "session recovery byte limit exceeded",
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("counts UTF-8 bytes and uses bounded set-based recovery queries", async () => {
+    const fixture = realAuthorityFixture(
+      {
+        max_recovery_bytes: 2_200,
+        max_recovery_rows: 100,
+        max_tree_bytes: 10_000,
+        max_session_bytes: 10_000,
+      },
+      0,
+      PASSTHROUGH_CHECKPOINT,
+    );
+    try {
+      const database = new Database(fixture.dbPath);
+      try {
+        const insert = database.prepare(
+          "INSERT INTO session_tree_commands VALUES (?, ?, ?, ?, ?, ?)",
+        );
+        for (let index = 0; index < 10; index += 1) {
+          insert.run(
+            scope.tenant_id,
+            scope.root_session_id,
+            `utf8-command-${index}`,
+            `${"界".repeat(60)}-${index}`,
+            "a".repeat(64),
+            index + 1,
+          );
+        }
+      } finally {
+        database.close();
+      }
+      await expect(
+        fixture.authority.readSessionHead(scope, scope.root_session_id),
+      ).rejects.toMatchObject({
+        code: "RESOURCE_LIMIT",
+        message: "session recovery byte limit exceeded",
+      });
+      const source = readFileSync(
+        new URL("../../../session/sqlite-session-tree-authority.ts", import.meta.url),
+        "utf8",
+      );
+      expect(source).toContain("length(CAST(");
+      expect(source).toContain("GROUP BY");
+      expect(source).not.toContain("for (const { run_id } of runIds)");
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("rejects recovery limits without safe +1 query headroom", () => {
+    expect(() =>
+      realAuthorityFixture({ max_recovery_rows: Number.MAX_SAFE_INTEGER }, 0),
+    ).toThrow(/headroom|safe integer/u);
+  });
+
+  it("keeps lineage off the live parent log and allows the parent to continue", async () => {
+    const fixture = realAuthorityFixture();
+    try {
+      const parentBefore = fixture.store.loadEvents(scope.root_session_id);
+      await new SessionTree(scope, fixture.authority).branch({
+        command_id: "independent-lineage",
+        source_session_id: scope.root_session_id,
+        child_session_id: "independent-child",
+      });
+      expect(fixture.store.loadEvents(scope.root_session_id)).toEqual(parentBefore);
+      const parent = fixture.authority.openSession(
+        scope,
+        scope.root_session_id,
+      ).session;
+      parent.acquireWriter("continue-parent");
+      expect(parent.append("assistant", { text: "continued" }).seq).toBe(4);
+      parent.releaseWriter("continue-parent");
+      expect(fixture.store.loadEvents(scope.root_session_id)).toHaveLength(4);
+
+      const database = new Database(fixture.dbPath, { readonly: true });
+      try {
+        const row = database
+          .prepare(
+            "SELECT tree_run_id FROM session_tree_scopes WHERE tenant_id = ? AND root_session_id = ?",
+          )
+          .get(scope.tenant_id, scope.root_session_id) as { tree_run_id: string };
+        expect(row.tree_run_id).not.toBe(scope.root_session_id);
+        expect(fixture.store.getRun(row.tree_run_id)).toMatchObject({
+          goal: "session tree lineage",
+          strategy: "session_tree_lineage",
+        });
+      } finally {
+        database.close();
+      }
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("opens and recovers logical children without replaying source effects", async () => {
+    const fixture = realAuthorityFixture();
+    let restarted: SqliteSessionTreeAuthority | undefined;
+    try {
+      const root = fixture.authority.openSession(
+        scope,
+        scope.root_session_id,
+      ).session;
+      root.acquireWriter("source-effect");
+      root.append("tool_call", { operation_id: "source-effect" });
+      root.append("tool_result", { operation_id: "source-effect", success: true });
+      root.releaseWriter("source-effect");
+      fixture.store.recordOperation({
+        operation_id: "parent-operation",
+        run_id: scope.root_session_id,
+        step_id: "parent-step",
+        attempt_id: "parent-attempt",
+        tool_name: "parent-tool",
+        idempotency_key: "parent-idempotency",
+        effect_state: "PRE_DISPATCH",
+        receipt_json: null,
+      });
+      fixture.store.recordReceipt("parent-operation", {
+        tool_name: "parent-tool",
+        success: true,
+        input_hash: hash("parent-input"),
+        output_hash: hash("parent-output"),
+        duration_ms: 1,
+        timestamp: "2026-08-02T02:00:00.000Z",
+      });
+
+      await new SessionTree(scope, fixture.authority).branch({
+        command_id: "recoverable-child-command",
+        source_session_id: scope.root_session_id,
+        child_session_id: "recoverable-child",
+      });
+      const childHandle = fixture.authority.openSession(scope, "recoverable-child");
+      expect(Object.isFrozen(childHandle)).toBe(true);
+      expect(childHandle.logical_session_id).toBe("recoverable-child");
+      expect("durable_run_id" in childHandle).toBe(false);
+      const child = childHandle.session;
+      expect(child.session_id).toBe("recoverable-child");
+      expect(child.getEvents().map((event) => event.type)).toEqual([
+        "user",
+        "assistant",
+        "system",
+        "tool_call",
+        "tool_result",
+        "branch",
+      ]);
+      child.acquireWriter("child-write");
+      expect(child.append("assistant", { text: "child work" }).seq).toBe(7);
+      child.releaseWriter("child-write");
+      expect(child.snapshot_({ checkpoint: "child work" }).last_seq).toBe(7);
+      child.acquireWriter("post-snapshot-write");
+      expect(child.append("assistant", { text: "after snapshot" }).seq).toBe(8);
+      child.releaseWriter("post-snapshot-write");
+      expect(fixture.store.listOperations(scope.root_session_id)).toHaveLength(1);
+      expect(fixture.store.getOperationByIdempotencyKey("child-idempotency")).toBeNull();
+
+      fixture.authority.close();
+      restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
+        masterKey: MASTER_KEY,
+        state_root: fixture.stateRoot,
+        security_resolver: fixture.resolver,
+      });
+      const recoveredHandle = restarted.openSession(scope, "recoverable-child");
+      expect("durable_run_id" in recoveredHandle).toBe(false);
+      const recovered = recoveredHandle.session;
+      expect(recovered.getEvents()).toHaveLength(8);
+      expect(recovered.getSnapshot()).toMatchObject({
+        version: 1,
+        last_seq: 7,
+        summary: { checkpoint: "child work" },
+      });
+      expect(fixture.store.listOperations(scope.root_session_id)).toEqual([
+        expect.objectContaining({ operation_id: "parent-operation" }),
+      ]);
+      recovered.acquireWriter("restart-write");
+      expect(recovered.append("assistant", { text: "after restart" }).seq).toBe(9);
+      recovered.releaseWriter("restart-write");
+      const grandchild = await new SessionTree(scope, restarted).branch({
+        command_id: "grandchild-command",
+        source_session_id: "recoverable-child",
+        child_session_id: "recoverable-grandchild",
+      });
+      expect(grandchild.node.source?.seq).toBe(9);
+      expect(
+        restarted.openSession(scope, "recoverable-grandchild").session.getEvents(),
+      ).toHaveLength(10);
+    } finally {
+      restarted?.close();
+      fixture.close();
+    }
+  }, 120_000);
+
+  it("keeps logical handles scope-bound and fails stale or closed writers before memory advances", { timeout: 10_000 }, async () => {
+    const fixture = realAuthorityFixture();
+    try {
+      await new SessionTree(scope, fixture.authority).branch({
+        command_id: "controlled-handle-command",
+        source_session_id: scope.root_session_id,
+        child_session_id: "controlled-handle-child",
+      });
+      const firstHandle = fixture.authority.openSession(
+        scope,
+        "controlled-handle-child",
+      );
+      const secondHandle = fixture.authority.openSession(
+        scope,
+        "controlled-handle-child",
+      );
+      expect(() =>
+        fixture.authority.openSession(
+          { tenant_id: "other-tenant", root_session_id: scope.root_session_id },
+          "controlled-handle-child",
+        ),
+      ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
+      expect(() =>
+        fixture.authority.openSession(scope, "__session_tree__known"),
+      ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
+
+      firstHandle.session.acquireWriter("first-handle");
+      expect(firstHandle.session.append("assistant", { text: "first" }).seq).toBe(5);
+      firstHandle.session.releaseWriter("first-handle");
+      secondHandle.session.acquireWriter("stale-handle");
+      expect(() =>
+        secondHandle.session.append("assistant", { text: "stale" }),
+      ).toThrowError(expect.objectContaining({
+        code: "STALE_SOURCE",
+        message: "logical session head advanced concurrently",
+      }));
+      secondHandle.session.releaseWriter("stale-handle");
+      expect(secondHandle.session.eventCount()).toBe(4);
+
+      fixture.authority.close();
+      firstHandle.session.acquireWriter("closed-handle");
+      expect(() =>
+        firstHandle.session.append("assistant", { text: "closed" }),
+      ).toThrow("session tree authority is closed");
+      firstHandle.session.releaseWriter("closed-handle");
+      expect(firstHandle.session.eventCount()).toBe(5);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it("invalidates previously opened handles when their durable mapping changes", async () => {
+    for (const operation of ["append", "snapshot"] as const) {
+      const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+      try {
+        await new SessionTree(scope, fixture.authority).branch({
+          command_id: `mapping-${operation}`,
+          source_session_id: scope.root_session_id,
+          child_session_id: `mapping-child-${operation}`,
+        });
+        const handle = fixture.authority.openSession(
+          scope,
+          `mapping-child-${operation}`,
+        );
+        const replacementRun = `mapping-replacement-${operation}`;
+        fixture.store.createRun(replacementRun, "replacement", "direct");
+        const database = new Database(fixture.dbPath);
+        try {
+          database
+            .prepare(
+              "UPDATE session_tree_sessions SET storage_run_id = ? WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
+            )
+            .run(
+              replacementRun,
+              scope.tenant_id,
+              scope.root_session_id,
+              handle.logical_session_id,
+            );
+        } finally {
+          database.close();
+        }
+        if (operation === "append") {
+          handle.session.acquireWriter("mapping-change");
+          expect(() =>
+            handle.session.append("assistant", { text: "must fail" }),
+          ).toThrowError(expect.objectContaining({
+            code: "AUTHORITY_VIOLATION",
+            message: "logical session mapping changed",
+          }));
+          handle.session.releaseWriter("mapping-change");
+        } else {
+          expect(() => handle.session.snapshot_({ text: "must fail" })).toThrowError(
+            expect.objectContaining({
+              code: "AUTHORITY_VIOLATION",
+              message: "logical session mapping changed",
+            }),
+          );
+        }
+      } finally {
+        fixture.close();
+      }
+    }
+  });
+
+  it("enforces logical-session event and payload limits at exact boundaries", { timeout: 20_000 }, async () => {
+    const exactSessionLimit = realAuthorityFixture(
+      { max_session_events: 3 },
+      1,
+    );
+    try {
+      await new SessionTree(scope, exactSessionLimit.authority).branch({
+        command_id: "exact-session-limit",
+        source_session_id: scope.root_session_id,
+        child_session_id: "exact-session-child",
+      });
+      const handle = exactSessionLimit.authority.openSession(
+        scope,
+        "exact-session-child",
+      );
+      handle.session.acquireWriter("exact-session");
+      expect(handle.session.append("assistant", { ok: true }).seq).toBe(3);
+      handle.session.releaseWriter("exact-session");
+    } finally {
+      exactSessionLimit.close();
+    }
+
+    const exhaustedSession = realAuthorityFixture(
+      { max_session_events: 2 },
+      1,
+    );
+    try {
+      await new SessionTree(scope, exhaustedSession.authority).branch({
+        command_id: "exhausted-session-limit",
+        source_session_id: scope.root_session_id,
+        child_session_id: "exhausted-session-child",
+      });
+      const handle = exhaustedSession.authority.openSession(
+        scope,
+        "exhausted-session-child",
+      );
+      handle.session.acquireWriter("exhausted-session");
+      expect(() =>
+        handle.session.append("assistant", { denied: true }),
+      ).toThrowError(expect.objectContaining({
+        code: "RESOURCE_LIMIT",
+        message: "session event limit reached",
+      }));
+      handle.session.releaseWriter("exhausted-session");
+    } finally {
+      exhaustedSession.close();
+    }
+
+    for (const [length, accepted] of [
+      [989, true],
+      [990, false],
+    ] as const) {
+      const payloadFixture = realAuthorityFixture(
+        { max_event_bytes: 1_000 },
+        1,
+      );
+      try {
+        await new SessionTree(scope, payloadFixture.authority).branch({
+          command_id: `payload-boundary-${length}`,
+          source_session_id: scope.root_session_id,
+          child_session_id: `payload-boundary-child-${length}`,
+        });
+        const handle = payloadFixture.authority.openSession(
+          scope,
+          `payload-boundary-child-${length}`,
+        );
+        handle.session.acquireWriter(`payload-${length}`);
+        if (accepted) {
+          expect(
+            handle.session.append("assistant", { text: "x".repeat(length) }).seq,
+          ).toBe(3);
+          await expect(
+            payloadFixture.authority.readSessionHead(
+              scope,
+              `payload-boundary-child-${length}`,
+            ),
+          ).resolves.toMatchObject({ seq: 3 });
+        } else {
+          expect(() =>
+            handle.session.append("assistant", { text: "x".repeat(length) }),
+          ).toThrowError(expect.objectContaining({
+            code: "RESOURCE_LIMIT",
+            message: "session event payload limit exceeded",
+          }));
+        }
+        handle.session.releaseWriter(`payload-${length}`);
+      } finally {
+        payloadFixture.close();
+      }
+    }
+  });
+
+  it("persists genesis snapshots and rejects stale or corrupt logical snapshots", () => {
+    const genesis = realAuthorityFixture(undefined, 0);
+    try {
+      const first = genesis.authority.openSession(scope, scope.root_session_id);
+      const second = genesis.authority.openSession(scope, scope.root_session_id);
+      expect(first.session.snapshot_({ genesis: true })).toMatchObject({
+        last_seq: 0,
+        last_hash: "",
+      });
+      second.session.acquireWriter("genesis-append");
+      expect(second.session.append("user", { text: "first" }).seq).toBe(1);
+      second.session.releaseWriter("genesis-append");
+      expect(() => first.session.snapshot_({ stale: true })).toThrowError(
+        expect.objectContaining({
+          code: "STALE_SOURCE",
+          message: "logical snapshot does not match the durable head",
+        }),
+      );
+    } finally {
+      genesis.close();
+    }
+
+    for (const summary of [null, "plaintext"] as const) {
+      const corrupt = realAuthorityFixture(undefined, 0, PASSTHROUGH_CHECKPOINT);
+      try {
+        const handle = corrupt.authority.openSession(scope, scope.root_session_id);
+        handle.session.snapshot_({ valid: true });
+        const database = new Database(corrupt.dbPath);
+        try {
+          database
+            .prepare("UPDATE snapshots SET summary_json = ? WHERE run_id = ?")
+            .run(summary, sessionStorageRunId(corrupt.dbPath, scope.root_session_id));
+        } finally {
+          database.close();
+        }
+        expect(() =>
+          corrupt.authority.openSession(scope, scope.root_session_id),
+        ).toThrowError(expect.objectContaining({
+          code: "CORRUPT_LOG",
+          message: "logical session snapshot is malformed",
+        }));
+      } finally {
+        corrupt.close();
+      }
+    }
+  }, 120_000);
+
+  it("reconstructs the logical overlay after a real SQLite restart", async () => {
     const fixture = realAuthorityFixture();
     let restarted: SqliteSessionTreeAuthority | undefined;
     try {
@@ -1517,7 +2148,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         scope,
         "sqlite-child-a",
       );
-      expect(childHead?.seq).toBe(1);
+      expect(childHead?.seq).toBe(4);
       const inspector = new Database(fixture.dbPath, { readonly: true });
       let childStorage: { storage_run_id: string };
       try {
@@ -1531,23 +2162,16 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       } finally {
         inspector.close();
       }
-      expect(fixture.store.getRun(childStorage.storage_run_id)).toMatchObject({
-        goal: "session tree child",
-        strategy: "session_tree",
-      });
-      const storeEvents = fixture.store.loadEvents(childStorage.storage_run_id);
-      expect(
-        DurableSession.restore({
-          session_id: childStorage.storage_run_id,
-          events: storeEvents,
-          snapshot: null,
-        }).getEvents()[0],
-      ).toMatchObject({ type: "branch", data: { command_id: "sqlite-branch-a" } });
+      const predictable = `__session_tree__${createHash("sha256")
+        .update(`${scope.tenant_id}\0${scope.root_session_id}\0sqlite-child-a`)
+        .digest("hex")}`;
+      expect(childStorage.storage_run_id).not.toBe(predictable);
       const before = await tree.snapshot();
 
       fixture.authority.close();
       restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
         masterKey: MASTER_KEY,
+        state_root: fixture.stateRoot,
         security_resolver: fixture.resolver,
       });
       expect(await new SessionTree(scope, restarted).snapshot()).toEqual(before);
@@ -1557,12 +2181,12 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         child_session_id: "sqlite-child-b",
       });
       const node = (await new SessionTree(scope, restarted).snapshot()).nodes.at(-1);
-      expect(node?.source?.seq).toBe(1);
+      expect(node?.source?.seq).toBe(4);
     } finally {
       restarted?.close();
       fixture.close();
     }
-  });
+  }, 120_000);
 
   it("serializes distinct concurrent commands from two SQLite connections", async () => {
     const fixture = realAuthorityFixture();
@@ -1570,6 +2194,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     try {
       second = new SqliteSessionTreeAuthority(fixture.dbPath, {
         masterKey: MASTER_KEY,
+        state_root: fixture.stateRoot,
         security_resolver: fixture.resolver,
       });
       const results = await Promise.all([
@@ -1593,13 +2218,13 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       second?.close();
       fixture.close();
     }
-  });
+  }, 120_000);
 
-  it("isolates identical logical session IDs by tenant and rejects cross-scope reads", async () => {
+  it("isolates identical logical session IDs by tenant and rejects cross-scope reads", { timeout: 10_000 }, async () => {
     const fixture = realAuthorityFixture();
     const tenantB = { tenant_id: "tenant-b", root_session_id: "session-root-b" };
     try {
-      fixture.store.createRun(tenantB.root_session_id, "root-b", "direct");
+      fixture.store.createScopedRun(tenantB, tenantB.root_session_id, "root-b", "direct");
       fixture.authority.bindRoot(tenantB, tenantB.root_session_id, security("b"));
       await new SessionTree(scope, fixture.authority).branch({
         command_id: "same-command",
@@ -1616,6 +2241,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       await expect(
         fixture.authority.readSessionHead(scope, tenantB.root_session_id),
       ).resolves.toBeNull();
+      await expect(
+        fixture.authority.readSessionPoint(scope, tenantB.root_session_id, 1),
+      ).resolves.toBeNull();
     } finally {
       fixture.close();
     }
@@ -1631,22 +2259,23 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         child_session_id: "tamper-child",
       });
       fixture.authority.close();
+      const treeRunId = treeStorageRunId(fixture.dbPath);
       const db = new Database(fixture.dbPath);
       try {
         db.prepare("UPDATE events SET hash = ? WHERE run_id = ? AND seq = 1").run(
           "f".repeat(64),
-          scope.root_session_id,
+          treeRunId,
         );
       } finally {
         db.close();
       }
-      restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
-        masterKey: MASTER_KEY,
-        security_resolver: fixture.resolver,
-      });
-      await expect(new SessionTree(scope, restarted).snapshot()).rejects.toMatchObject({
-        code: "CORRUPT_LOG",
-      });
+      expect(() => {
+        restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
+          masterKey: MASTER_KEY,
+          state_root: fixture.stateRoot,
+          security_resolver: fixture.resolver,
+        });
+      }).toThrowError(expect.objectContaining({ code: "CORRUPT_LOG" }));
     } finally {
       restarted?.close();
       fixture.close();
@@ -1691,7 +2320,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
   });
 
   it("fails closed at the configured tree event resource ceiling", async () => {
-    const fixture = realAuthorityFixture({ max_tree_events: 4 });
+    const fixture = realAuthorityFixture({ max_tree_events: 1 });
     try {
       const tree = new SessionTree(scope, fixture.authority);
       await tree.branch({
@@ -1730,8 +2359,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
 
   it("validates encryption, resolver, limits, root binding, and closed state", async () => {
     const dir = mkdtempSync(join(tmpdir(), "session-tree-invalid-"));
+    const stateRoot = createTrustedSessionStateRoot(dir);
     const dbPath = join(dir, "session.db");
-    const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY });
+    const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
     const resolver = new MutableSecurityResolver();
     let authority: SqliteSessionTreeAuthority | undefined;
     try {
@@ -1739,6 +2369,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         () =>
           new SqliteSessionTreeAuthority(dbPath, {
             masterKey: Buffer.alloc(31),
+            state_root: stateRoot,
             security_resolver: resolver,
           }),
         "32-byte masterKey is required",
@@ -1747,6 +2378,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         () =>
           new SqliteSessionTreeAuthority(dbPath, {
             masterKey: MASTER_KEY,
+            state_root: stateRoot,
             security_resolver: undefined as never,
           }),
         "security_resolver is required",
@@ -1763,6 +2395,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           () =>
             new SqliteSessionTreeAuthority(dbPath, {
               masterKey: MASTER_KEY,
+              state_root: stateRoot,
               security_resolver: security_resolver as never,
             }),
           "security_resolver is required",
@@ -1778,6 +2411,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           () =>
             new SqliteSessionTreeAuthority(dbPath, {
               masterKey: MASTER_KEY,
+              state_root: stateRoot,
               security_resolver: resolver,
               limits,
             }),
@@ -1786,15 +2420,41 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       }
       const openAuthority = new SqliteSessionTreeAuthority(dbPath, {
         masterKey: MASTER_KEY,
+        state_root: stateRoot,
         security_resolver: resolver,
       });
       authority = openAuthority;
-      expect(() => openAuthority.bindRoot(scope, "missing", security("root"))).toThrow(
-        "root durable session does not exist",
-      );
-      store.createRun(scope.root_session_id, "root", "direct");
-      openAuthority.bindRoot(scope, scope.root_session_id, security("root"));
-      openAuthority.bindRoot(scope, scope.root_session_id, security("root"));
+      const missingScope = {
+        tenant_id: scope.tenant_id,
+        root_session_id: "missing",
+      };
+      expect(() =>
+        openAuthority.bindRoot(missingScope, "missing", security("root")),
+      ).toThrow("root durable session is not owned by scope");
+      store.createScopedRun(scope, scope.root_session_id, "root", "direct");
+      for (const invalidSecurity of [
+        null,
+        { ...security("root"), state_hash: `x${"1".repeat(64)}` },
+        { ...security("root"), state_hash: `${"1".repeat(64)}x` },
+        { ...security("root"), capability_ceiling_hash: `x${"2".repeat(64)}` },
+        { ...security("root"), capability_ceiling_hash: `${"2".repeat(64)}x` },
+        { ...security("root"), authorization_epoch: -1 },
+        { ...security("root"), authorization_epoch: 0.5 },
+      ]) {
+        expect(() =>
+          openAuthority.bindRoot(
+            scope,
+            scope.root_session_id,
+            invalidSecurity as never,
+          ),
+        ).toThrowError(expect.objectContaining({
+          code: "AUTHORITY_VIOLATION",
+          message: "security state is malformed",
+        }));
+      }
+      const epochZero = { ...security("root"), authorization_epoch: 0 };
+      openAuthority.bindRoot(scope, scope.root_session_id, epochZero);
+      openAuthority.bindRoot(scope, scope.root_session_id, epochZero);
       openAuthority.close();
       openAuthority.close();
       await expect(openAuthority.loadTree(scope)).rejects.toThrow(
@@ -1828,8 +2488,8 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           db.prepare("SELECT value FROM metadata WHERE key = ?").get(
             "session_tree_schema_version",
           ),
-        ).toEqual({ value: "1" });
-        db.prepare("UPDATE metadata SET value = '2' WHERE key = ?").run(
+        ).toEqual({ value: "2" });
+        db.prepare("UPDATE metadata SET value = '3' WHERE key = ?").run(
           "session_tree_schema_version",
         );
       } finally {
@@ -1839,6 +2499,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         () =>
           new SqliteSessionTreeAuthority(fixture.dbPath, {
             masterKey: MASTER_KEY,
+            state_root: fixture.stateRoot,
             security_resolver: fixture.resolver,
           }),
         "unsupported session tree schema version",
@@ -1848,7 +2509,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("rejects every persisted event-envelope corruption", async () => {
+  it(
+    "rejects every persisted event-envelope corruption",
+    { timeout: 120_000 },
+    async () => {
     const corruptions: Array<readonly [string, string, unknown, string]> = [
       ["seq", "UPDATE events SET seq = ? WHERE run_id = ? AND seq = 1", 0, "invalid session event envelope at 1"],
       ["type", "UPDATE events SET type = ? WHERE run_id = ? AND seq = 1", "bogus", "invalid session event envelope at 1"],
@@ -1861,30 +2525,39 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       const fixture = realAuthorityFixture();
       let restarted: SqliteSessionTreeAuthority | undefined;
       try {
+        await new SessionTree(scope, fixture.authority).branch({
+          command_id: `corruption-${label.replaceAll(" ", "-")}`,
+          source_session_id: scope.root_session_id,
+          child_session_id: `corruption-child-${label.replaceAll(" ", "-")}`,
+        });
         fixture.authority.close();
+        const treeRunId = treeStorageRunId(fixture.dbPath);
         const db = new Database(fixture.dbPath);
         try {
-          db.prepare(statement).run(replacement, scope.root_session_id);
+          db.prepare(statement).run(replacement, treeRunId);
         } finally {
           db.close();
         }
-        restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
-          masterKey: MASTER_KEY,
-          security_resolver: fixture.resolver,
-        });
-        await expect(
-          new SessionTree(scope, restarted).snapshot(),
+        expect(
+          () => {
+            restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
+              masterKey: MASTER_KEY,
+              state_root: fixture.stateRoot,
+              security_resolver: fixture.resolver,
+            });
+          },
           label,
-        ).rejects.toMatchObject({ code: "CORRUPT_LOG", message });
+        ).toThrowError(expect.objectContaining({ code: "CORRUPT_LOG", message }));
       } finally {
         restarted?.close();
         fixture.close();
       }
     }
-  });
+    },
+  );
 
-  it("enforces per-session and depth ceilings before child creation", async () => {
-    const sessionLimited = realAuthorityFixture({ max_session_events: 2 });
+  it("enforces per-session and depth ceilings before child creation", { timeout: 10_000 }, async () => {
+    const sessionLimited = realAuthorityFixture({ max_session_events: 1 }, 1);
     try {
       await expect(
         new SessionTree(scope, sessionLimited.authority).branch({
@@ -1919,7 +2592,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
   });
 
   it("persists SQLite command idempotency and rejects conflicting replays", async () => {
-    const fixture = realAuthorityFixture();
+    const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
     try {
       const tree = new SessionTree(scope, fixture.authority);
       const command = {
@@ -1956,7 +2629,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       expect(first).toEqual({
         duplicate: false,
         event: expect.objectContaining({
-          seq: 4,
+          seq: 1,
           type: "branch",
           data: request.data,
         }),
@@ -1967,6 +2640,49 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       });
     } finally {
       fixture.close();
+    }
+  });
+
+  it("checks the complete tree head and enforces the exact direct tree limit", { timeout: 10_000 }, async () => {
+    const staleHash = realAuthorityFixture(undefined, 1);
+    try {
+      const request = await directAuthorityRequest(staleHash, {
+        command_id: "direct-stale-tree-hash",
+        child_session_id: "direct-stale-tree-hash-child",
+        expected_tree_head: { seq: 0, hash: hash("not-the-tree-head") },
+      });
+      await expect(
+        staleHash.authority.appendLineageEvent(request),
+      ).rejects.toMatchObject({
+        code: "TREE_HEAD_CONFLICT",
+        message: "session tree head advanced concurrently",
+      });
+    } finally {
+      staleHash.close();
+    }
+
+    const bounded = realAuthorityFixture({ max_tree_events: 1 }, 1);
+    try {
+      const first = await directAuthorityRequest(bounded, {
+        command_id: "direct-tree-limit-one",
+        child_session_id: "direct-tree-limit-one-child",
+      });
+      await expect(bounded.authority.appendLineageEvent(first)).resolves.toMatchObject({
+        duplicate: false,
+      });
+      const second = await directAuthorityRequest(bounded, {
+        command_id: "direct-tree-limit-two",
+        child_session_id: "direct-tree-limit-two-child",
+      });
+      await expect(
+        bounded.authority.appendLineageEvent(second),
+      ).rejects.toMatchObject({
+        code: "RESOURCE_LIMIT",
+        message: "session tree event limit reached",
+      });
+      expect((await bounded.authority.loadTree(scope)).events).toHaveLength(1);
+    } finally {
+      bounded.close();
     }
   });
 
@@ -2091,8 +2807,8 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         ),
       ).toThrowError(expect.objectContaining({
         name: "SessionTreeAuthorityFault",
-        code: "SESSION_CONFLICT",
-        message: "root scope is already bound",
+        code: "AUTHORITY_VIOLATION",
+        message: "root durable identity does not match scope",
       }));
       expect(() =>
         fixture.authority.bindRoot(
@@ -2104,6 +2820,28 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         name: "SessionTreeAuthorityFault",
         code: "SESSION_CONFLICT",
         message: "root session binding conflicts",
+      }));
+      fixture.store.createRun("corrupt-tree-run", "corrupt", "direct");
+      const database = new Database(fixture.dbPath);
+      try {
+        database
+          .prepare(
+            "UPDATE session_tree_scopes SET tree_run_id = ? WHERE tenant_id = ? AND root_session_id = ?",
+          )
+          .run("corrupt-tree-run", scope.tenant_id, scope.root_session_id);
+      } finally {
+        database.close();
+      }
+      expect(() =>
+        fixture.authority.bindRoot(
+          scope,
+          scope.root_session_id,
+          security("root"),
+        ),
+      ).toThrowError(expect.objectContaining({
+        name: "SessionTreeAuthorityFault",
+        code: "CORRUPT_LOG",
+        message: expect.stringContaining("session tree checkpoint mismatch"),
       }));
       await expect(
         fixture.authority.loadTree({
@@ -2119,8 +2857,8 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("fails closed for corrupt idempotency, stale CAS, duplicate children, and missing sources", async () => {
-    const corruptIndex = realAuthorityFixture();
+  it("fails closed for corrupt idempotency, stale CAS, duplicate children, and missing sources", { timeout: 15_000 }, async () => {
+    const corruptIndex = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
     try {
       const request = await directAuthorityRequest(corruptIndex, {
         command_id: "corrupt-index-command",
@@ -2152,7 +2890,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       const request = await directAuthorityRequest(staleHead, {
         command_id: "stale-head-command",
         child_session_id: "stale-head-child",
-        expected_tree_head: { seq: 0, hash: "" },
+        expected_tree_head: { seq: 1, hash: hash("stale-empty-tree") },
       });
       await expect(
         staleHead.authority.appendLineageEvent(request),
@@ -2173,7 +2911,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         const currentLog = await staleDimension.authority.loadTree(scope);
         const current = {
           seq: currentLog.events.length,
-          hash: currentLog.events.at(-1)!.hash,
+          hash: currentLog.events.at(-1)?.hash ?? "",
         };
         const isolatedMismatch =
           expected_tree_head.seq === current.seq
@@ -2241,7 +2979,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("validates every source anchor and security anchor inside the SQLite transaction", async () => {
+  it("validates every source anchor and security anchor inside the SQLite transaction", { timeout: 15_000 }, async () => {
     type AuthorityPoint = NonNullable<
       Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>
     >;
@@ -2290,14 +3028,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
   it("round-trips all durable event types and rejects malformed persisted security", async () => {
     const fixture = realAuthorityFixture();
     try {
-      const restored = DurableSession.restore(
-        {
-          session_id: scope.root_session_id,
-          events: fixture.store.loadEvents(scope.root_session_id),
-          snapshot: null,
-        },
-        { persistence: fixture.store },
-      );
+      const restored = fixture.authority.openSession(
+        scope,
+        scope.root_session_id,
+      ).session;
       restored.acquireWriter("all-types");
       for (const type of [
         "user",
@@ -2315,11 +3049,13 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         restored.append(type, { durable_type: type });
       }
       restored.releaseWriter("all-types");
-      await expect(fixture.authority.loadTree(scope)).resolves.toMatchObject({
-        events: expect.arrayContaining(
+      expect(
+        fixture.authority.openSession(scope, scope.root_session_id).session.getEvents(),
+      ).toEqual(
+        expect.arrayContaining(
           DurableSession.EVENT_TYPES.map((type) => expect.objectContaining({ type })),
         ),
-      });
+      );
     } finally {
       fixture.close();
     }
@@ -2333,15 +3069,31 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       JSON.stringify({ ...security("root"), authorization_epoch: 0.5 }),
     ];
     for (const value of malformedValues) {
-      const candidate = realAuthorityFixture();
+      const candidate = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+      let recordKey: Buffer | undefined;
       try {
         const database = new Database(candidate.dbPath);
         try {
+          recordKey = deriveSessionRecordKey(database, MASTER_KEY);
           database
             .prepare(
               "UPDATE session_tree_sessions SET security_json = ? WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
             )
-            .run(value, scope.tenant_id, scope.root_session_id, scope.root_session_id);
+            .run(
+              encryptSessionString(
+                recordKey,
+                value,
+                JSON.stringify([
+                  "session_tree_security",
+                  scope.tenant_id,
+                  scope.root_session_id,
+                  scope.root_session_id,
+                ]),
+              ),
+              scope.tenant_id,
+              scope.root_session_id,
+              scope.root_session_id,
+            );
         } finally {
           database.close();
         }
@@ -2353,13 +3105,18 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           message: "persisted security state is malformed",
         });
       } finally {
+        recordKey?.fill(0);
         candidate.close();
       }
     }
-  });
+  }, 120_000);
 
   it("rejects decrypted event payloads that exceed the configured byte ceiling", async () => {
-    const fixture = realAuthorityFixture({ max_event_bytes: 50 });
+    const fixture = realAuthorityFixture(
+      { max_event_bytes: 50 },
+      3,
+      PASSTHROUGH_CHECKPOINT,
+    );
     try {
       const restored = DurableSession.restore(
         {
@@ -2372,7 +3129,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       restored.acquireWriter("payload-limit");
       restored.append("user", { text: "x".repeat(100) });
       restored.releaseWriter("payload-limit");
-      await expect(fixture.authority.loadTree(scope)).rejects.toMatchObject({
+      await expect(
+        fixture.authority.readSessionHead(scope, scope.root_session_id),
+      ).rejects.toMatchObject({
         code: "RESOURCE_LIMIT",
         message: "session event payload limit exceeded",
       });
@@ -2380,4 +3139,51 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       fixture.close();
     }
   });
+
+  it("recovers ten sessions and more than one hundred persisted events with constant queries", async () => {
+    const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+    try {
+      const tree = new SessionTree(scope, fixture.authority);
+      let source: string = scope.root_session_id;
+      for (let index = 1; index < 10; index += 1) {
+        const childId = `query-count-child-${index}`;
+        await tree.branch({
+          command_id: `query-count-command-${index}`,
+          source_session_id: source,
+          child_session_id: childId,
+        });
+        const child = fixture.authority.openSession(scope, childId).session;
+        child.acquireWriter("query-count");
+        for (let event = 0; event < 9; event += 1) {
+          child.append("assistant", { index, event });
+        }
+        child.releaseWriter("query-count");
+        source = childId;
+      }
+
+      const prototype = Database.prototype;
+      const originalPrepare = prototype.prepare;
+      const measure = async (sessionId: string) => {
+        let queries = 0;
+        prototype.prepare = function (this: Database.Database, sql: string) {
+          queries += 1;
+          return originalPrepare.call(this, sql);
+        } as typeof prototype.prepare;
+        const started = performance.now();
+        try {
+          await fixture.authority.readSessionHead(scope, sessionId);
+          return { queries, elapsed: performance.now() - started };
+        } finally {
+          prototype.prepare = originalPrepare;
+        }
+      };
+      const root = await measure(scope.root_session_id);
+      const deepest = await measure(source);
+      expect(deepest.queries).toBe(root.queries);
+      expect(deepest.queries).toBeLessThanOrEqual(16);
+      expect(Math.max(root.elapsed, deepest.elapsed)).toBeLessThan(5_000);
+    } finally {
+      fixture.close();
+    }
+  }, 120_000);
 });

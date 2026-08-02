@@ -18,6 +18,7 @@ import { createPhase1ToolDefinitions } from '../../tools/tool-definitions.js';
 import { createTestSecurityDeps, createScriptedGateway, createTestVerificationEngine } from '../helpers/test-security.js';
 import type { ParsedResponse } from '../../gateway/scripted-provider.js';
 import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
+import { createTrustedSessionStateRoot } from '../../session/session-state-root.js';
 import Database from 'better-sqlite3';
 
 function toolSpec(name: string): ToolSpec {
@@ -106,6 +107,7 @@ describe('Main chain integration: no bypasses', () => {
       expect(r.session.eventCount()).toBeGreaterThan(0);
       const store = new SqliteSessionStore(join(dataDir, 'session.db'), {
         masterKey: SESSION_MASTER_KEY,
+        state_root: createTrustedSessionStateRoot(dataDir),
       });
       try {
         expect(store.getLatestSnapshot(r.session.session_id)).toMatchObject({
@@ -257,6 +259,7 @@ describe('Main chain integration: no bypasses', () => {
       await h.run(task('read the files'), 'run-operations');
       const store = new SqliteSessionStore(join(dataDir, 'session.db'), {
         masterKey: SESSION_MASTER_KEY,
+        state_root: createTrustedSessionStateRoot(dataDir),
       });
       try {
         const operations = store.listOperations('run-operations');

@@ -33,6 +33,7 @@ import type {
 } from '../../verification/verification-engine.js';
 import { canonicalHash } from '../../runtime/harness-support.js';
 import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
+import { createTrustedSessionStateRoot } from '../../session/session-state-root.js';
 import { TransactionalWorkspace } from '../../vfs/transactional-workspace.js';
 import {
   createScriptedGateway,
@@ -807,6 +808,7 @@ describe('Harness composition-root authority', () => {
     const inputIdentity = canonicalHash(toolData.arguments, 24);
     const store = new SqliteSessionStore(join(directory, 'session.db'), {
       masterKey: MASTER_KEY,
+      state_root: createTrustedSessionStateRoot(directory),
     });
     try {
       expect(store.listOperations('run-react-authority')).toEqual([
@@ -1057,6 +1059,7 @@ describe('Harness composition-root authority', () => {
     expect(existsSync(transactionPath)).toBe(false);
     const store = new SqliteSessionStore(join(directory, 'session.db'), {
       masterKey: MASTER_KEY,
+      state_root: createTrustedSessionStateRoot(directory),
     });
     expect(store.getRun('run-unexpected')).toMatchObject({
       status: expect.any(String),

@@ -9,6 +9,7 @@ import {
   SqliteSessionStore,
   type RunRecord,
 } from './sqlite-session-store.js';
+import { createTrustedSessionStateRoot } from './session-state-root.js';
 
 export interface RunSessionConfig {
   runId: string;
@@ -37,6 +38,7 @@ export function openRunSession(config: RunSessionConfig): OpenRunSession {
       }
       store = new SqliteSessionStore(join(config.dataDir, 'session.db'), {
         masterKey: config.masterKey,
+        state_root: createTrustedSessionStateRoot(config.dataDir),
       });
       store.createRun(config.runId, config.goal, config.strategy);
     }

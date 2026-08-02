@@ -54,6 +54,7 @@ export * from './router/task-normalizer.js';
 export * from './session/durable-session.js';
 export * from './session/session-store.js';
 export * from './session/sqlite-session-store.js';
+export * from './session/session-state-root.js';
 export {
   LoopEngine,
   LoopError,

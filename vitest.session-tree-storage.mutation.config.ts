@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    testNamePattern: /AH-RUNTIME-SESSIONTREE-001 SQLite authority integration/,
+    testNamePattern:
+      /AH-RUNTIME-SESSIONTREE-001 (SQLite authority integration|security authority)/,
     exclude: [
       "**/node_modules/**",
       "**/dist/**",

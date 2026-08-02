@@ -25,7 +25,7 @@ import ts from "typescript";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPOSITORY_ROOT = resolve(scriptDirectory, "..");
 export const ROOT_INDEX_SHA256 =
-  "59bbb6cd7e51405c92e224c6d92258e8a3de2d4c6f578d14d54c9fded07511cd";
+  "01c4c7e8870d612b350677a758cb550033187a677cefb9f3441a32cde0f61f2a";
 
 const workspace = (
   path,

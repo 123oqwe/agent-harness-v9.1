@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -7,24 +8,35 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  symlinkSync,
 } from 'node:fs';
-import { createDecipheriv, hkdfSync } from 'node:crypto';
+import { createDecipheriv, createHash, hkdfSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
+import {
+  preflightExistingSessionDatabase,
+  SqliteSessionStore,
+} from '../../session/sqlite-session-store.js';
 import { DurableSession } from '../../session/durable-session.js';
 import { writeProgressAtomic, readProgress } from '../../session/progress-store.js';
+import {
+  createTrustedSessionStateRoot,
+  type TrustedSessionStateRoot,
+} from '../../session/session-state-root.js';
 
 describe('SQLite Session Store', () => {
   const MASTER_KEY = Buffer.alloc(32, 0x5a);
   let dir: string;
   let store: SqliteSessionStore;
+  let stateRoot: TrustedSessionStateRoot;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'sqlite-'));
+    stateRoot = createTrustedSessionStateRoot(dir);
     store = new SqliteSessionStore(join(dir, 'session.db'), {
       masterKey: MASTER_KEY,
+      state_root: stateRoot,
     });
   });
   afterEach(() => {
@@ -99,6 +111,7 @@ describe('SQLite Session Store', () => {
       () =>
         new SqliteSessionStore(join(dir, 'short-key.db'), {
           masterKey: Buffer.alloc(31),
+          state_root: stateRoot,
         }),
     ).toThrow('32-byte masterKey is required');
   });
@@ -113,11 +126,11 @@ describe('SQLite Session Store', () => {
     raw.close();
 
     expect(
-      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY }),
+      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot }),
     ).toThrow('session encryption salt invalid');
   });
 
-  it('fails if the database prevents creation of its encryption salt', () => {
+  it('rejects a partial existing schema before attempting salt creation', () => {
     const dbPath = join(dir, 'salt-blocked.db');
     const raw = new Database(dbPath);
     raw.exec(`
@@ -130,8 +143,8 @@ describe('SQLite Session Store', () => {
     raw.close();
 
     expect(
-      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY }),
-    ).toThrow('session encryption salt unavailable');
+      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot }),
+    ).toThrow('session store schema is malformed');
   });
 
   it('encrypts goals, event data, snapshot summaries, and operation outcomes at rest', () => {
@@ -166,7 +179,7 @@ describe('SQLite Session Store', () => {
       expect(databaseBytes.includes(Buffer.from(marker))).toBe(false);
     }
 
-    store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY });
+    store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
     expect(store.getRun('encrypted-run')?.goal).toBe('secret goal marker');
     expect(store.loadEvents('encrypted-run')[0]?.data).toEqual({
       text: 'secret event marker',
@@ -183,13 +196,167 @@ describe('SQLite Session Store', () => {
     const dbPath = join(dir, 'session.db');
     store.createRun('wrong-key-run', 'private goal');
     store.close();
-    store = new SqliteSessionStore(dbPath, {
-      masterKey: Buffer.alloc(32, 0x33),
-    });
-
-    expect(() => store.getRun('wrong-key-run')).toThrow(
-      'session field authentication failed',
+    expect(
+      () =>
+        new SqliteSessionStore(dbPath, {
+          masterKey: Buffer.alloc(32, 0x33),
+          state_root: stateRoot,
+        }),
+    ).toThrow(
+      'session record key authentication failed',
     );
+  });
+
+  it('wrong-key preflight leaves the existing database directory byte-for-byte unchanged', () => {
+    const dbPath = join(dir, 'session.db');
+    store.createRun('wrong-key-zero-write', 'private');
+    store.close();
+    const snapshot = () => ({
+      directoryMode: statSync(dir).mode & 0o777,
+      entries: readdirSync(dir)
+        .sort()
+        .map((name) => {
+          const path = join(dir, name);
+          const stat = statSync(path);
+          return {
+            name,
+            mode: stat.mode & 0o777,
+            size: stat.size,
+            hash: stat.isFile()
+              ? createHash('sha256').update(readFileSync(path)).digest('hex')
+              : null,
+          };
+        }),
+    });
+    const before = snapshot();
+    expect(
+      () =>
+        new SqliteSessionStore(dbPath, {
+          masterKey: Buffer.alloc(32, 0x33),
+          state_root: stateRoot,
+        }),
+    ).toThrow('session record key authentication failed');
+    expect(snapshot()).toEqual(before);
+  });
+
+  it('never lets createScopedRun claim a pre-existing generic run', () => {
+    const runId = 'pre-existing-generic-root';
+    store.createRun(runId, 'unowned run', 'direct');
+
+    expect(() =>
+      store.createScopedRun(
+        { tenant_id: 'tenant-claim', root_session_id: runId },
+        runId,
+        'unowned run',
+        'direct',
+      ),
+    ).toThrow('pre-existing generic run cannot be claimed');
+
+    const database = new Database(join(dir, 'session.db'));
+    try {
+      expect(
+        database.prepare('SELECT * FROM run_scopes WHERE run_id = ?').get(runId),
+      ).toBeUndefined();
+    } finally {
+      database.close();
+    }
+  });
+
+  it.each([
+    [
+      'trigger',
+      `CREATE TRIGGER unexpected_run_trigger AFTER INSERT ON runs
+       BEGIN UPDATE runs SET status = 'tampered' WHERE run_id = NEW.run_id; END;`,
+    ],
+    ['view', 'CREATE VIEW unexpected_runs AS SELECT run_id FROM runs;'],
+    ['index', 'CREATE INDEX unexpected_status_index ON runs(status);'],
+  ])('validates the exact base schema and rejects an extra %s', (_kind, sql) => {
+    const dbPath = join(dir, 'session.db');
+    store.close();
+    const database = new Database(dbPath);
+    try {
+      database.exec(sql);
+    } finally {
+      database.close();
+    }
+    expect(
+      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot }),
+    ).toThrow('session store schema is malformed');
+  });
+
+  it('rejects a malformed run_scopes ownership table', () => {
+    const dbPath = join(dir, 'session.db');
+    store.close();
+    const database = new Database(dbPath);
+    try {
+      database.exec(`
+        DROP TABLE run_scopes;
+        CREATE TABLE run_scopes (
+          run_id TEXT,
+          tenant_id TEXT,
+          root_session_id TEXT,
+          kind TEXT
+        );
+        INSERT INTO run_scopes VALUES ('first', 'duplicate-tenant', 'duplicate-root', 'root');
+        INSERT INTO run_scopes VALUES ('second', 'duplicate-tenant', 'duplicate-root', 'root');
+      `);
+    } finally {
+      database.close();
+    }
+    expect(
+      () => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot }),
+    ).toThrow('session store schema is malformed');
+  });
+
+  it('rejects NUL and oversized durable identifiers at the store boundary', () => {
+    expect(() => store.createRun('bad\0run', 'goal')).toThrow(
+      'run_id is malformed',
+    );
+    expect(() => store.createRun('x'.repeat(257), 'goal')).toThrow(
+      'run_id is malformed',
+    );
+    expect(() =>
+      store.createScopedRun(
+        { tenant_id: 'bad\0tenant', root_session_id: 'root' },
+        'root',
+        'goal',
+      ),
+    ).toThrow('tenant_id is malformed');
+  });
+
+  it('rejects malformed Unicode and non-NFC identifier aliases', () => {
+    for (const invalid of ['\ud800', '\ud801', 'e\u0301']) {
+      expect(() => store.createRun(invalid, 'goal')).toThrow(
+        'run_id is malformed',
+      );
+    }
+    expect(store.createRun('\u00e9', 'canonical NFC')).toBe(true);
+    expect(() => store.getRun('e\u0301')).toThrow('run_id is malformed');
+  });
+
+  it('sees and rejects malicious SessionTree schema committed only in WAL', () => {
+    const dbPath = join(dir, 'session.db');
+    const writer = new Database(dbPath);
+    try {
+      writer.pragma('journal_mode = WAL');
+      writer.exec('CREATE TABLE session_tree_evil (payload TEXT)');
+      expect(existsSync(`${dbPath}-wal`)).toBe(true);
+      expect(() =>
+        preflightExistingSessionDatabase(dbPath, MASTER_KEY, stateRoot),
+      ).toThrow('session store schema is malformed');
+    } finally {
+      writer.close();
+    }
+  });
+
+  it('rejects a symlinked SQLite main file during read-only preflight', () => {
+    const dbPath = join(dir, 'session.db');
+    store.close();
+    const linked = join(dir, 'linked.db');
+    symlinkSync(dbPath, linked);
+    expect(() =>
+      preflightExistingSessionDatabase(linked, MASTER_KEY, stateRoot),
+    ).toThrow(/symlink|descriptor|regular file/u);
   });
 
   it.each([
@@ -685,6 +852,7 @@ describe('SQLite Session Store', () => {
     // Simulate crash: open a new store instance on the same DB
     const recovered = new SqliteSessionStore(join(dir, 'session.db'), {
       masterKey: MASTER_KEY,
+      state_root: stateRoot,
     });
     const events = recovered.loadEvents('run-8');
     expect(events).toHaveLength(2);

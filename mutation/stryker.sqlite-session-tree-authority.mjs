@@ -3,7 +3,10 @@ import { strykerBase } from "./stryker.base.mjs";
 export default {
   ...strykerBase,
   mutate: ["session/sqlite-session-tree-authority.ts"],
-  testFiles: ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
+  testFiles: [
+    "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+    "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+  ],
   concurrency: 4,
   coverageAnalysis: "all",
   maxTestRunnerReuse: 1,

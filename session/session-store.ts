@@ -11,6 +11,7 @@ export {
 } from './sqlite-session-store.js';
 export {
   SqliteSessionTreeAuthority,
+  type LogicalSessionHandle,
   type SecurityStateResolver,
   type SessionTreeScopeValue,
   type SessionTreeSecurityValue,
@@ -22,3 +23,5 @@ export type {
   RunRecord,
   SqliteSessionStoreOptions,
 } from './sqlite-session-store.js';
+export * from './session-tree-checkpoint.js';
+export * from './session-state-root.js';

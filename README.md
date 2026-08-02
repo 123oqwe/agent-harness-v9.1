@@ -59,6 +59,18 @@ The authoritative Phase 2 source gate additionally requires protected
 target, and every ancestor must be root-owned and not group/world writable;
 the release gate fails explicitly when either protected tool is unavailable.
 
+Session persistence now has a fail-closed construction requirement: create a
+dedicated current-user/root-owned mode-`0700` directory with
+`createTrustedSessionStateRoot`, and pass that authority as `state_root` to
+`SqliteSessionStore` and `SqliteSessionTreeAuthority`. Databases outside that
+root, symlinked paths, changed directory/file identities, and unsafe ancestors
+are rejected. Because `better-sqlite3` opens pathnames rather than caller-owned
+descriptors, a malicious same-UID host process can still race an identity check;
+complete resistance requires an independent OS account, the Phase 2 rootless
+OCI boundary (`AH-SANDBOX-OCI-001`), or a descriptor-capable SQLite broker. The
+typed `SESSION_STORAGE_TRUST_BOUNDARY` export makes that residual boundary
+machine-visible.
+
 ```bash
 npm ci
 npm run typecheck

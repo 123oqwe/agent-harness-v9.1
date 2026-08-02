@@ -241,8 +241,16 @@ export class DurableSession {
       if (!Number.isSafeInteger(data.snapshot.version) || data.snapshot.version < 1) {
         throw new SessionError('snapshot version must be a positive integer');
       }
-      if (data.snapshot.last_seq !== s.events.length) throw new SessionError('snapshot version mismatch: last_seq');
-      if (data.snapshot.last_hash !== s.last_hash) throw new SessionError('snapshot version mismatch: last_hash');
+      if (data.snapshot.last_seq < 0 || data.snapshot.last_seq > s.events.length) {
+        throw new SessionError('snapshot version mismatch: last_seq');
+      }
+      const snapshotHash =
+        data.snapshot.last_seq === 0
+          ? ''
+          : s.events[data.snapshot.last_seq - 1]?.hash;
+      if (data.snapshot.last_hash !== snapshotHash) {
+        throw new SessionError('snapshot version mismatch: last_hash');
+      }
       s.snapshot = immutableSnapshot(data.snapshot);
     }
     return s;

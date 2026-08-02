@@ -10,16 +10,26 @@
  */
 import Database from 'better-sqlite3';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { chmodSync, existsSync, lstatSync } from 'node:fs';
 
 import type { SessionEvent, SessionEventType, SessionSnapshot } from './durable-session.js';
+import { launchTrustedPythonHost } from './trusted-python-host.js';
+import {
+  assertTrustedSessionStateRoot,
+  resolveSessionDatabaseLocation,
+  SessionStateRootError,
+  type TrustedSessionStateRoot,
+} from './session-state-root.js';
 import {
   decryptSessionString,
   deriveSessionRecordKey,
+  deriveSessionRecordKeyFromSalt,
+  authenticateSessionRecordMaterial,
+  ensureSessionRecordKeyCheck,
   encryptSessionString,
   hasSessionEncryptionEnvelope,
   insertCanonicalSessionEvent,
+  validateDurableIdentifier,
 } from './sqlite-authority-internals.js';
 
 export interface OperationRecord {
@@ -57,6 +67,12 @@ export interface RunRecord {
 export interface SqliteSessionStoreOptions {
   /** Caller-custodied device/master key. It is derived and never persisted. */
   masterKey: Uint8Array;
+  /** Issued by the trusted composition root; agent-selected paths are invalid. */
+  state_root: TrustedSessionStateRoot;
+  /** @internal failure-only key-disposal test seam. */
+  _test_after_record_key_derived?: () => void;
+  /** @internal exposes only whether the disposed key is all-zero. */
+  _test_on_record_key_disposed?: (allZero: boolean) => void;
 }
 
 const SCHEMA = `
@@ -75,6 +91,14 @@ CREATE TABLE IF NOT EXISTS runs (
   strategy      TEXT,
   status        TEXT DEFAULT 'running',
   created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS run_scopes (
+  run_id        TEXT PRIMARY KEY REFERENCES runs(run_id),
+  tenant_id     TEXT NOT NULL,
+  root_session_id TEXT NOT NULL,
+  kind          TEXT NOT NULL CHECK (kind = 'root'),
+  UNIQUE (tenant_id, root_session_id, kind)
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -127,6 +151,194 @@ CREATE INDEX IF NOT EXISTS idx_operations_run ON operations(run_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_op ON receipts(operation_id);
 `;
 
+type SchemaObject = Readonly<{
+  type: string;
+  name: string;
+  table: string;
+  sql: string;
+}>;
+
+interface ExistingSessionPreflight {
+  readonly parent_identity: Readonly<{ dev: number; ino: number }>;
+  readonly main_identity: Readonly<{ dev: number; ino: number }>;
+  readonly created: false;
+  readonly schema: SchemaObject[];
+  readonly salt: string;
+  readonly sentinel: string | null;
+  readonly legacy: Readonly<{ run_id: string; goal: string }> | null;
+}
+
+const SESSION_TREE_SCHEMA_FOR_PREFLIGHT = `
+CREATE TABLE session_tree_scopes (
+  tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL,
+  tree_run_id TEXT NOT NULL UNIQUE REFERENCES runs(run_id), created_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, root_session_id)
+);
+CREATE TABLE session_tree_sessions (
+  tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, session_id TEXT NOT NULL,
+  storage_run_id TEXT NOT NULL UNIQUE REFERENCES runs(run_id), parent_session_id TEXT,
+  depth INTEGER NOT NULL, security_json TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, root_session_id, session_id),
+  FOREIGN KEY (tenant_id, root_session_id) REFERENCES session_tree_scopes(tenant_id, root_session_id)
+);
+CREATE TABLE session_tree_commands (
+  tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, command_id TEXT NOT NULL,
+  child_session_id TEXT NOT NULL, fingerprint TEXT NOT NULL, event_seq INTEGER NOT NULL,
+  PRIMARY KEY (tenant_id, root_session_id, command_id),
+  UNIQUE (tenant_id, root_session_id, child_session_id),
+  FOREIGN KEY (tenant_id, root_session_id) REFERENCES session_tree_scopes(tenant_id, root_session_id)
+);`;
+
+function schemaObjects(db: Database.Database): SchemaObject[] {
+  return (db
+    .prepare(
+      "SELECT type, name, tbl_name AS 'table', sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type, name",
+    )
+    .all() as SchemaObject[]).map((value) => ({
+      ...value,
+      sql: value.sql.replace(/\s+/gu, ' ').trim(),
+    }));
+}
+
+let canonicalSchemaObjects: SchemaObject[] | undefined;
+let canonicalSessionTreeObjects: SchemaObject[] | undefined;
+
+function expectedSchemaObjects(): SchemaObject[] {
+  if (canonicalSchemaObjects) return canonicalSchemaObjects;
+  const canonical = new Database(':memory:');
+  try {
+    canonical.exec(SCHEMA);
+    canonicalSchemaObjects = schemaObjects(canonical);
+    return canonicalSchemaObjects;
+  } finally {
+    canonical.close();
+  }
+}
+
+function expectedSessionTreeObjects(): SchemaObject[] {
+  if (canonicalSessionTreeObjects) return canonicalSessionTreeObjects;
+  const canonical = new Database(':memory:');
+  try {
+    canonical.exec('CREATE TABLE runs (run_id TEXT PRIMARY KEY)');
+    canonical.exec(SESSION_TREE_SCHEMA_FOR_PREFLIGHT);
+    canonicalSessionTreeObjects = schemaObjects(canonical).filter(
+      (value) => value.name.startsWith('session_tree_') || value.table.startsWith('session_tree_'),
+    );
+    return canonicalSessionTreeObjects;
+  } finally {
+    canonical.close();
+  }
+}
+
+export function validateSessionStoreSchema(db: Database.Database): void {
+  validateSessionStoreSchemaObjects(schemaObjects(db));
+}
+
+function validateSessionStoreSchemaObjects(objects: readonly SchemaObject[]): void {
+  const baseObjects = objects.map((value) => ({
+    ...value,
+    sql: value.sql.replace(/\s+/gu, ' ').trim(),
+  })).filter(
+    (value) => !value.name.startsWith('session_tree_'),
+  );
+  if (JSON.stringify(baseObjects) !== JSON.stringify(expectedSchemaObjects())) {
+    throw new Error('session store schema is malformed');
+  }
+  const extensionObjects = objects
+    .map((value) => ({ ...value, sql: value.sql.replace(/\s+/gu, ' ').trim() }))
+    .filter(
+      (value) => value.name.startsWith('session_tree_') || value.table.startsWith('session_tree_'),
+    );
+  if (
+    extensionObjects.length > 0 &&
+    JSON.stringify(extensionObjects) !== JSON.stringify(expectedSessionTreeObjects())
+  ) {
+    throw new Error('session store schema is malformed');
+  }
+}
+
+export function preflightExistingSessionDatabase(
+  dbPath: string,
+  masterKey: Uint8Array,
+  stateRoot: TrustedSessionStateRoot,
+): ExistingSessionPreflight {
+  const location = resolveSessionDatabaseLocation(dbPath, stateRoot);
+  const value = launchTrustedPythonHost('sqlite_preflight', {
+    request: {
+      command: 'preflight',
+      root: stateRoot.path,
+      root_identity: stateRoot.identity,
+      name: location.name,
+    },
+    requestKeys: ['command', 'root', 'root_identity', 'name'],
+    responseKeys: [
+      'ok', 'parent_identity', 'main_identity', 'created',
+      'schema', 'salt', 'sentinel', 'legacy',
+    ],
+    timeoutMs: 15_000,
+    maxOutputBytes: 4 * 1024 * 1024,
+  }) as unknown as ExistingSessionPreflight & { ok: true };
+  validateSessionStoreSchemaObjects(value.schema);
+  const key = deriveSessionRecordKeyFromSalt(value.salt, masterKey);
+  try {
+    authenticateSessionRecordMaterial(key, value);
+  } finally {
+    key.fill(0);
+  }
+  return value;
+}
+
+function createSessionDatabaseFile(
+  dbPath: string,
+  stateRoot: TrustedSessionStateRoot,
+): Readonly<{
+  parent_identity: Readonly<{ dev: number; ino: number }>;
+  main_identity: Readonly<{ dev: number; ino: number }>;
+  created: true;
+}> {
+  const location = resolveSessionDatabaseLocation(dbPath, stateRoot);
+  return launchTrustedPythonHost('sqlite_preflight', {
+    request: {
+      command: 'create',
+      root: stateRoot.path,
+      root_identity: stateRoot.identity,
+      name: location.name,
+    },
+    requestKeys: ['command', 'root', 'root_identity', 'name'],
+    responseKeys: ['ok', 'parent_identity', 'main_identity', 'created'],
+    timeoutMs: 5_000,
+    maxOutputBytes: 64 * 1024,
+  }) as unknown as Readonly<{
+    parent_identity: Readonly<{ dev: number; ino: number }>;
+    main_identity: Readonly<{ dev: number; ino: number }>;
+    created: true;
+  }>;
+}
+
+export function assertSessionDatabaseIdentity(
+  dbPath: string,
+  stateRoot: TrustedSessionStateRoot,
+  expected: Readonly<{
+    parent_identity: Readonly<{ dev: number; ino: number }>;
+    main_identity: Readonly<{ dev: number; ino: number }>;
+  }>,
+): void {
+  assertTrustedSessionStateRoot(stateRoot);
+  const current = lstatSync(dbPath);
+  if (
+    stateRoot.identity.dev !== expected.parent_identity.dev ||
+    stateRoot.identity.ino !== expected.parent_identity.ino ||
+    !current.isFile() ||
+    current.dev !== expected.main_identity.dev ||
+    current.ino !== expected.main_identity.ino
+  ) {
+    throw new SessionStateRootError(
+      'DATABASE_IDENTITY_CHANGED',
+      'session database identity changed before SQLite initialization',
+    );
+  }
+}
+
 export class SqliteSessionStore {
   private readonly db: Database.Database;
   private readonly recordKey: Buffer;
@@ -138,13 +350,28 @@ export class SqliteSessionStore {
     ) {
       throw new Error('32-byte masterKey is required');
     }
-    mkdirSync(dirname(dbPath), { recursive: true });
-    this.db = new Database(dbPath);
-    chmodSync(dbPath, 0o600);
-    this.db.pragma('journal_mode = WAL');
+    assertTrustedSessionStateRoot(options.state_root);
+    const location = resolveSessionDatabaseLocation(dbPath, options.state_root);
+    const existingDatabase = existsSync(location.path);
+    const expectedIdentity = existingDatabase
+      ? preflightExistingSessionDatabase(location.path, options.masterKey, options.state_root)
+      : createSessionDatabaseFile(location.path, options.state_root);
+    this.db = new Database(location.path);
+    // This is deliberately the first operation after the pathname-only SQLite
+    // open. No chmod, pragma, schema, WAL, or metadata write precedes it.
+    try {
+      assertSessionDatabaseIdentity(location.path, options.state_root, expectedIdentity);
+    } catch (error) {
+      this.db.close();
+      throw error;
+    }
+    chmodSync(location.path, 0o600);
     this.db.pragma('foreign_keys = ON');
     this.db.pragma('busy_timeout = 5000');
-    this.db.exec(SCHEMA);
+    const isNewDatabase = !existingDatabase;
+    if (isNewDatabase) {
+      this.db.exec(SCHEMA);
+    }
 
     // Prepare statements
     this._getMetadata = this.db.prepare(
@@ -156,7 +383,7 @@ export class SqliteSessionStore {
     const existingSalt = this._getMetadata.get('encryption_salt') as
       | { value: string }
       | undefined;
-    if (!existingSalt) {
+    if (!existingSalt && isNewDatabase) {
       this._insertMetadata.run(
         'encryption_salt',
         randomBytes(32).toString('base64'),
@@ -169,9 +396,23 @@ export class SqliteSessionStore {
       this.db.close();
       throw new Error('session encryption salt unavailable');
     }
+    let derivedRecordKey: Buffer | undefined;
     try {
-      this.recordKey = deriveSessionRecordKey(this.db, options.masterKey);
+      derivedRecordKey = deriveSessionRecordKey(this.db, options.masterKey);
+      options._test_after_record_key_derived?.();
+      ensureSessionRecordKeyCheck(this.db, derivedRecordKey);
+      validateSessionStoreSchema(this.db);
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('wal_checkpoint(PASSIVE)');
+      this.recordKey = derivedRecordKey;
+      derivedRecordKey = undefined;
     } catch (error) {
+      if (derivedRecordKey) {
+        derivedRecordKey.fill(0);
+        options._test_on_record_key_disposed?.(
+          derivedRecordKey.every((value) => value === 0),
+        );
+      }
       this.db.close();
       throw error;
     }
@@ -243,6 +484,7 @@ export class SqliteSessionStore {
 
   /** Create a run record. */
   createRun(runId: string, goal: string, strategy?: string): boolean {
+    validateDurableIdentifier('run_id', runId);
     const result = this._insertRun.run(
       runId,
       this.encryptString(goal, `runs:${runId}:goal`),
@@ -261,7 +503,62 @@ export class SqliteSessionStore {
     return result.changes === 1;
   }
 
+  /**
+   * Create a root run and its tenant/root ownership in one transaction.
+   * Generic createRun() intentionally does not grant SessionTree bind rights.
+   */
+  createScopedRun(
+    scope: Readonly<{ tenant_id: string; root_session_id: string }>,
+    runId: string,
+    goal: string,
+    strategy?: string,
+  ): boolean {
+    if (
+      !scope ||
+      scope.tenant_id.trim().length === 0 ||
+      scope.root_session_id.trim().length === 0
+    ) {
+      throw new Error('run scope is required');
+    }
+    validateDurableIdentifier('tenant_id', scope.tenant_id);
+    validateDurableIdentifier('root_session_id', scope.root_session_id);
+    validateDurableIdentifier('run_id', runId);
+    if (runId !== scope.root_session_id) {
+      throw new Error('root run identity must equal root_session_id');
+    }
+    return this.db.transaction(() => {
+      const created = this.createRun(runId, goal, strategy);
+      const existing = this.db
+        .prepare(
+          'SELECT tenant_id, root_session_id, kind FROM run_scopes WHERE run_id = ?',
+        )
+        .get(runId) as
+        | { tenant_id: string; root_session_id: string; kind: string }
+        | undefined;
+      if (existing) {
+        if (
+          existing.tenant_id !== scope.tenant_id ||
+          existing.root_session_id !== scope.root_session_id ||
+          existing.kind !== 'root'
+        ) {
+          throw new Error(`run scope conflict: ${runId}`);
+        }
+        return created;
+      }
+      if (!created) {
+        throw new Error('pre-existing generic run cannot be claimed');
+      }
+      this.db
+        .prepare(
+          "INSERT INTO run_scopes (run_id, tenant_id, root_session_id, kind) VALUES (?, ?, ?, 'root')",
+        )
+        .run(runId, scope.tenant_id, scope.root_session_id);
+      return created;
+    })();
+  }
+
   getRun(runId: string): RunRecord | null {
+    validateDurableIdentifier('run_id', runId);
     const row = this._getRun.get(runId) as RunRecord | undefined;
     if (!row) return null;
     return {
@@ -271,12 +568,14 @@ export class SqliteSessionStore {
   }
 
   updateRunStatus(runId: string, status: string): void {
+    validateDurableIdentifier('run_id', runId);
     if (!this.getRun(runId)) throw new Error(`run not found: ${runId}`);
     this._updateRunStatus.run(status, runId);
   }
 
   /** Persist a single event immediately (crash-safe). */
   appendEvent(runId: string, ev: SessionEvent): void {
+    validateDurableIdentifier('run_id', runId);
     const existing = this._getEvent.get(runId, ev.seq) as
       | {
           seq: number;
@@ -307,6 +606,7 @@ export class SqliteSessionStore {
 
   /** Persist a snapshot. */
   saveSnapshot(runId: string, snap: SessionSnapshot): void {
+    validateDurableIdentifier('run_id', runId);
     if (snap.session_id !== runId) {
       throw new Error(`snapshot identity conflict: ${runId}`);
     }
@@ -324,6 +624,7 @@ export class SqliteSessionStore {
   }
 
   getLatestSnapshot(runId: string): SessionSnapshot | null {
+    validateDurableIdentifier('run_id', runId);
     const row = this._getLatestSnapshot.get(runId) as
       | (Omit<SessionSnapshot, 'summary'> & { summary_json: string })
       | undefined;
@@ -345,6 +646,12 @@ export class SqliteSessionStore {
 
  /** Record or update an operation with its effect state. */
  recordOperation(op: Omit<OperationRecord, 'created_at' | 'updated_at'>): void {
+   validateDurableIdentifier('operation_id', op.operation_id);
+   validateDurableIdentifier('run_id', op.run_id);
+   validateDurableIdentifier('step_id', op.step_id);
+   validateDurableIdentifier('attempt_id', op.attempt_id);
+   validateDurableIdentifier('tool_name', op.tool_name);
+   validateDurableIdentifier('idempotency_key', op.idempotency_key);
    // Check if operation exists by operation_id (update) or idempotency_key (reject duplicate)
    const existing = this.getOperation(op.operation_id);
    if (existing) {
@@ -431,6 +738,7 @@ export class SqliteSessionStore {
 
   /** Attach a receipt to an operation. */
   recordReceipt(opId: string, receipt: Omit<ReceiptRecord, 'receipt_id' | 'operation_id'>): void {
+    validateDurableIdentifier('operation_id', opId);
     const existing = this.getReceipt(opId);
     if (existing) {
       if (
@@ -449,6 +757,7 @@ export class SqliteSessionStore {
   }
 
   getReceipt(opId: string): ReceiptRecord | null {
+    validateDurableIdentifier('operation_id', opId);
     const row = this._getReceiptByOperation.get(opId) as
       | (Omit<ReceiptRecord, 'success'> & { success: number })
       | undefined;
@@ -457,17 +766,20 @@ export class SqliteSessionStore {
 
   /** Get an operation by ID. */
   getOperation(opId: string): OperationRecord | null {
+    validateDurableIdentifier('operation_id', opId);
     const row = this._getOperation.get(opId) as OperationRecord | undefined;
     return row ? this.decryptOperation(row) : null;
   }
 
   /** Get an operation by idempotency key (prevents duplicate side effects). */
   getOperationByIdempotencyKey(key: string): OperationRecord | null {
+    validateDurableIdentifier('idempotency_key', key);
     const row = this._getOperationByIdem.get(key) as OperationRecord | undefined;
     return row ? this.decryptOperation(row) : null;
   }
 
   listOperations(runId: string): readonly OperationRecord[] {
+    validateDurableIdentifier('run_id', runId);
     return Object.freeze(
       (this._listOperations.all(runId) as OperationRecord[]).map((row) =>
         Object.freeze(this.decryptOperation(row)),
@@ -477,6 +789,7 @@ export class SqliteSessionStore {
 
   /** Load all events for a run (crash recovery). */
   loadEvents(runId: string): SessionEvent[] {
+    validateDurableIdentifier('run_id', runId);
     const rows = this._getEvents.all(runId) as Array<{ seq: number; type: SessionEventType; timestamp: string; data_json: string; hash: string; prev_hash: string }>;
     return rows.map(r => ({
       seq: r.seq,

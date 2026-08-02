@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createCipheriv, createHash } from 'node:crypto';
 import {
   existsSync,
   readdirSync,
@@ -23,6 +23,32 @@ import {
 
 const FIXED_TIME = '2026-07-25T00:00:00.000Z';
 const FILE_OPTIONS = { encryptionKey: Buffer.alloc(32, 0x6b) };
+
+function encryptedFixtureRecord(
+  plaintext: string,
+  associatedData: string,
+  options: { nonceBytes?: number; tagBytes?: number } = {},
+): string {
+  const nonce = Buffer.alloc(options.nonceBytes ?? 12, 0x4d);
+  const tagBytes = options.tagBytes ?? 16;
+  const cipher = createCipheriv(
+    'aes-256-gcm',
+    FILE_OPTIONS.encryptionKey,
+    nonce,
+    { authTagLength: tagBytes },
+  );
+  cipher.setAAD(Buffer.from(associatedData));
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final(),
+  ]);
+  return [
+    'ahfile:v1',
+    nonce.toString('base64'),
+    cipher.getAuthTag().toString('base64'),
+    ciphertext.toString('base64'),
+  ].join(':');
+}
 
 describe('DurableSession authority boundaries', () => {
   const temporaryDirectories: string[] = [];
@@ -143,13 +169,18 @@ describe('DurableSession authority boundaries', () => {
     session.append('user', { text: 'one' });
 
     const first = session.snapshot_({ completed: 1 });
-    const second = session.snapshot_({ completed: 2 });
+    const second = session.snapshot_({ nested: { completed: 2 } });
 
     expect(first.version).toBe(1);
     expect(second.version).toBe(2);
     expect(snapshots).toEqual([first, second]);
     expect(Object.isFrozen(second)).toBe(true);
     expect(Object.isFrozen(second.summary)).toBe(true);
+    expect(
+      Object.isFrozen(
+        (second.summary as { nested: { completed: number } }).nested,
+      ),
+    ).toBe(true);
   });
 
   it('does not publish a snapshot when its durable write fails', () => {
@@ -219,6 +250,11 @@ describe('DurableSession authority boundaries', () => {
     expect(Object.isFrozen(events)).toBe(true);
     expect(Object.isFrozen(event)).toBe(true);
     expect(Object.isFrozen(event.data)).toBe(true);
+    expect(
+      Object.isFrozen(
+        (event.data as { nested: { value: number } }).nested,
+      ),
+    ).toBe(true);
     (exported.events[0]!.data as { nested: { value: number } }).nested.value = 99;
 
     expect(
@@ -281,6 +317,28 @@ describe('DurableSession authority boundaries', () => {
         snapshot: { ...snapshot, last_seq: 2 },
       }),
     ).toThrow('snapshot version mismatch: last_seq');
+    expect(() =>
+      DurableSession.import_({
+        ...exported,
+        snapshot: { ...snapshot, last_seq: -1 },
+      }),
+    ).toThrow('snapshot version mismatch: last_seq');
+
+    const genesis = DurableSession.import_({
+      ...exported,
+      snapshot: {
+        ...snapshot,
+        last_seq: 0,
+        last_hash: '',
+        summary: { checkpoint: 'before replay' },
+      },
+    });
+    expect(genesis.getSnapshot()).toMatchObject({
+      last_seq: 0,
+      last_hash: '',
+      summary: { checkpoint: 'before replay' },
+    });
+    expect(genesis.eventCount()).toBe(1);
   });
 
   it('rejects malformed imported event envelopes before accepting authority', () => {
@@ -479,6 +537,69 @@ describe('DurableSession authority boundaries', () => {
     );
   });
 
+  it('rejects authenticated malformed event JSON with the exact durable line', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'authenticated-bad-json-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'session.ndjson');
+    writeFileSync(
+      path,
+      `AH-SESSION-LOG:1\n${encryptedFixtureRecord(
+        '{',
+        'event:authenticated-bad-json:1',
+      )}\n`,
+      'utf8',
+    );
+
+    expect(() =>
+      loadSession('authenticated-bad-json', path, FILE_OPTIONS),
+    ).toThrow('invalid encrypted session event at line 2');
+  });
+
+  it.each([
+    ['non-standard nonce', { nonceBytes: 8 }],
+    ['truncated authentication tag', { tagBytes: 4 }],
+  ])('rejects a cryptographically valid record with %s', (_name, envelopeOptions) => {
+    const directory = mkdtempSync(join(tmpdir(), 'noncanonical-envelope-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'session.ndjson');
+    const event = {
+      seq: 1,
+      type: 'user',
+      timestamp: FIXED_TIME,
+      data: { text: 'authenticated' },
+      hash: '0'.repeat(64),
+      prev_hash: '',
+    };
+    writeFileSync(
+      path,
+      `AH-SESSION-LOG:1\n${encryptedFixtureRecord(
+        JSON.stringify(event),
+        'event:noncanonical-envelope:1',
+        envelopeOptions,
+      )}\n`,
+      'utf8',
+    );
+
+    expect(() =>
+      loadSession('noncanonical-envelope', path, FILE_OPTIONS),
+    ).toThrow('session file authentication failed');
+  });
+
+  it('rejects extra encrypted-envelope fields before authentication', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'extra-envelope-field-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'session.ndjson');
+    const record = encryptedFixtureRecord(
+      '{}',
+      'event:extra-envelope-field:1',
+    );
+    writeFileSync(path, `AH-SESSION-LOG:1\n${record}:extra\n`, 'utf8');
+
+    expect(() =>
+      loadSession('extra-envelope-field', path, FILE_OPTIONS),
+    ).toThrow('invalid encrypted session record');
+  });
+
   it('wraps malformed snapshot JSON as a typed SessionError', () => {
     const directory = mkdtempSync(join(tmpdir(), 'bad-snapshot-'));
     temporaryDirectories.push(directory);
@@ -492,6 +613,18 @@ describe('DurableSession authority boundaries', () => {
 
     expect(() => loadSession('bad-snapshot', path, FILE_OPTIONS)).toThrow(
       'invalid encrypted session record',
+    );
+  });
+
+  it('rejects a snapshot with a noncanonical file header', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'bad-snapshot-header-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'session.ndjson');
+    writeFileSync(path, 'AH-SESSION-LOG:1\n', 'utf8');
+    writeFileSync(`${path}.snapshot.json`, 'WRONG\n', 'utf8');
+
+    expect(() => loadSession('bad-snapshot-header', path, FILE_OPTIONS)).toThrow(
+      'invalid encrypted session snapshot',
     );
   });
 

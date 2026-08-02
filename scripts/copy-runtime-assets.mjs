@@ -16,3 +16,17 @@ for (const filename of readdirSync(join(harnessRoot, 'skills'))) {
     join(destinationRoot, 'skills', filename),
   );
 }
+
+mkdirSync(join(harnessRoot, 'dist', 'session'), { recursive: true });
+cpSync(
+  join(harnessRoot, 'session', 'secure-checkpoint-host.py'),
+  join(harnessRoot, 'dist', 'session', 'secure-checkpoint-host.py'),
+);
+cpSync(
+  join(harnessRoot, 'session', 'secure-sqlite-preflight.py'),
+  join(harnessRoot, 'dist', 'session', 'secure-sqlite-preflight.py'),
+);
+cpSync(
+  join(harnessRoot, 'session', 'trusted-python-supervisor.py'),
+  join(harnessRoot, 'dist', 'session', 'trusted-python-supervisor.py'),
+);
