@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+
+import { EXPECTED_WORKSPACES } from './check-workspace-boundaries.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const productionRoots = [
@@ -36,8 +38,18 @@ const files = [
   resolve(root, 'harness.ts'),
   resolve(root, 'index.ts'),
   ...productionRoots.flatMap((directory) => sourceFiles(resolve(root, directory))),
+  ...EXPECTED_WORKSPACES.flatMap(({ path }) => {
+    const source = resolve(root, path, 'src');
+    return existsSync(source) ? sourceFiles(source) : [];
+  }),
 ];
 const knownFiles = new Set(files);
+const workspaceEntrypoints = new Map(
+  EXPECTED_WORKSPACES.map(({ name, path }) => [
+    name,
+    resolve(root, path, 'src/index.ts'),
+  ]),
+);
 
 function isValueImport(statement) {
   if (ts.isImportDeclaration(statement)) {
@@ -56,6 +68,9 @@ function isValueImport(statement) {
 }
 
 function resolveImport(sourceFile, specifier) {
+  if (workspaceEntrypoints.has(specifier)) {
+    return workspaceEntrypoints.get(specifier);
+  }
   if (!specifier.startsWith('.')) return undefined;
   const candidate = resolve(dirname(sourceFile), specifier);
   const options = specifier.endsWith('.js')

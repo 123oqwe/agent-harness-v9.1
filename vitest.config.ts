@@ -27,9 +27,11 @@ export default defineConfig({
         'ingestion/**/*.ts',
         'domains/**/*.ts',
         'ui/**/*.ts',
+        'packages/*/src/**/*.ts',
+        'apps/*/src/**/*.ts',
         'harness.ts',
       ],
-      exclude: ['**/*.d.ts', '**/*.test.ts', 'index.ts'],
+      exclude: ['**/*.d.ts', '**/*.test.ts'],
       reporter: ['text', 'json', 'json-summary', 'html'],
       thresholds: {
         lines: 80,

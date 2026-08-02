@@ -43,6 +43,9 @@ export const RUNNER_BINDING_PATHS = Object.freeze([
   "scripts/gates/run-phase2-evals.mjs",
   "scripts/gates/run-phase2-data.mjs",
   "scripts/gates/package-smoke.mjs",
+  "scripts/gates/materialize-git-tree.mjs",
+  "scripts/check-workspace-boundaries.mjs",
+  "scripts/gates/check-workspace-coverage.mjs",
 ]);
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -64,6 +67,12 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
   const vitest = join(root, "node_modules/vitest/vitest.mjs");
   const bootstrap = [
     nodeScript(root, "manifest", "scripts/gates/check-phase2-manifest.mjs"),
+    nodeScript(
+      root,
+      "workspace-boundaries",
+      "scripts/check-workspace-boundaries.mjs",
+      ["--root", root],
+    ),
     nodeScript(root, "assets", "scripts/gates/check-phase2-assets.mjs", [
       "--root",
       root,
@@ -107,6 +116,12 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
     command("build", "npm", ["run", "build", "--silent"], {
       timeoutMs: 300_000,
     }),
+    command(
+      "phase2-architecture",
+      process.execPath,
+      [vitest, "run", "tests/phase-2/architecture"],
+      { timeoutMs: 300_000 },
+    ),
     command("lint", "npm", ["run", "lint", "--silent"], { timeoutMs: 300_000 }),
     command(
       "phase1-regression",
@@ -119,6 +134,11 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
       "npm",
       ["run", "test:coverage", "--silent", "--", "--maxWorkers=1"],
       { timeoutMs: 900_000 },
+    ),
+    nodeScript(
+      root,
+      "workspace-coverage",
+      "scripts/gates/check-workspace-coverage.mjs",
     ),
     command(
       "phase2-unit",

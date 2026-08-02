@@ -20,6 +20,11 @@
     "url": "https://github.com/123oqwe/agentharness91/issues"
   },
   "type": "module",
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },
@@ -38,14 +43,17 @@
     "qs": "6.15.3"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && turbo run typecheck --filter=@agent-harness/*",
     "check:cycles": "node scripts/check-cycles.mjs",
-    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
-    "lint": "eslint gateway security runtime router sandbox session skills tools ui verification vfs domains ingestion harness.ts index.ts scripts benchmarks",
+    "check:workspaces": "node scripts/check-workspace-boundaries.mjs",
+    "build": "npm run build:root --silent && npm run build:workspaces --silent",
+    "build:root": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "build:workspaces": "turbo run build --filter=@agent-harness/*",
+    "lint": "eslint gateway security runtime router sandbox session skills tools ui verification vfs domains ingestion harness.ts index.ts scripts benchmarks packages apps tests/phase-2/architecture",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contracts tests/api tests/packaging",
-    "test:architecture": "vitest run tests/architecture",
+    "test:architecture": "vitest run tests/architecture tests/phase-2/architecture",
     "test:unit": "vitest run tests/gateway tests/policy tests/security tests/capability tests/state-machines tests/runtime tests/router tests/vfs tests/session tests/tools tests/evidence tests/verification tests/ingestion tests/packaging",
     "test:integration": "vitest run tests/integration tests/domain tests/tools/tool-executor.test.ts tests/session/file-persistence.test.ts",
     "test:security": "vitest run tests/threat-model tests/gateway tests/policy tests/security tests/capability tests/sandbox tests/tools/execute-command-security.test.ts tests/tools/read-file-security.test.ts",
@@ -69,6 +77,7 @@
     "test:phase2:integration": "vitest run tests/phase-2/integration",
     "test:phase2:security": "vitest run tests/phase-2/security",
     "test:phase2:e2e": "vitest run tests/phase-2/e2e",
+    "test:phase2:architecture": "vitest run tests/phase-2/architecture",
     "test:mutation:phase2": "node scripts/run-mutation.mjs phase2",
     "test:phase2:evals": "node scripts/gates/run-phase2-evals.mjs --mode bootstrap",
     "test:phase2:data": "node scripts/gates/run-phase2-data.mjs --mode bootstrap",
@@ -92,7 +101,8 @@
     "prettier": "^3.9.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "turbo": "2.10.5"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.3.2",

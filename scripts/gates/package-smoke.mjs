@@ -12,17 +12,19 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import {
+  checkWorkspaceBoundaries,
+  EXPECTED_WORKSPACES,
+} from "../check-workspace-boundaries.mjs";
 
 import {
   createSafeCommandEnvironment,
   executeGateCommands,
   runCommand,
 } from "./run-command.mjs";
-import {
-  spawnTrustedGitSync,
-  TRUSTED_GIT_EXECUTABLE,
-} from "./trusted-git.mjs";
+import { spawnTrustedGitSync } from "./trusted-git.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const REQUIRED_EXPORTS = [
@@ -50,8 +52,37 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
   let entry = "";
   let tarballSha256 = null;
   let exported = [];
+  const workspaces = [];
   let installed = false;
+  let compositionBound = false;
   try {
+    const boundaries = checkWorkspaceBoundaries({ repositoryRoot });
+    if (!boundaries.ok) {
+      throw new Error(
+        `workspace boundary validation failed: ${boundaries.errors.join("; ")}`,
+      );
+    }
+    for (const workspace of EXPECTED_WORKSPACES) {
+      const entrypoint = join(repositoryRoot, workspace.path, "dist/index.js");
+      if (!existsSync(entrypoint)) {
+        throw new Error(
+          `workspace entry is missing: ${workspace.path}/dist/index.js`,
+        );
+      }
+      const module = await import(pathToFileURL(entrypoint).href);
+      const identity = module.workspaceIdentity;
+      if (
+        identity?.name !== workspace.name ||
+        identity?.path !== workspace.path
+      ) {
+        throw new Error(`workspace identity mismatch: ${workspace.path}`);
+      }
+      workspaces.push({
+        name: identity.name,
+        path: identity.path,
+        entrypoint,
+      });
+    }
     const packed = spawnSync(
       "npm",
       [
@@ -116,12 +147,16 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
       throw new Error(`packed package entry is missing: ${entry}`);
     const smokeSource = [
       `import * as api from ${JSON.stringify(packageJson.name)};`,
+      `const apiApp=await import(${JSON.stringify(pathToFileURL(join(repositoryRoot, "apps/api/dist/index.js")).href)});`,
       `const required=${JSON.stringify(REQUIRED_EXPORTS)};`,
       "const missing=required.filter((name)=>!(name in api));",
       "if(missing.length>0)throw new Error(`missing exports: ${missing.join(',')}`);",
       "const tools=new api.ToolRegistry();",
       "const skills=new api.SkillRegistry();skills.loadBaseSkills();",
-      "process.stdout.write(JSON.stringify({exported:Object.keys(api),tools:tools.size(),skills:skills.size()}));",
+      "const composition=apiApp.composeApiApp(api);",
+      "const compositionBound=composition.kernel.Harness===api.Harness&&composition.kernel.createDefaultExecutionContext===api.createDefaultExecutionContext;",
+      "if(!compositionBound)throw new Error('API composition did not bind packed root authorities');",
+      "process.stdout.write(JSON.stringify({exported:Object.keys(api),tools:tools.size(),skills:skills.size(),compositionBound}));",
     ].join("");
     const smoke = spawnSync(
       process.execPath,
@@ -141,6 +176,7 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
       );
     const smokeResult = JSON.parse(smoke.stdout);
     exported = smokeResult.exported;
+    compositionBound = smokeResult.compositionBound === true;
     if (smokeResult.tools !== 0 || smokeResult.skills !== 8) {
       throw new Error(
         "isolated registry instantiation returned unexpected state",
@@ -158,6 +194,8 @@ export const runPackageSmoke = async ({ repositoryRoot = root } = {}) => {
     exported,
     tarballSha256,
     installed,
+    workspaces,
+    compositionBound,
     releaseReady: installed && errors.length === 0,
   };
 };
@@ -185,7 +223,6 @@ const resolveGitIdentity = (repositoryRoot) => {
 export const prepareExactSourceCheckout = async ({
   repositoryRoot = root,
   checkout,
-  archive,
   runner = runCommand,
 }) => {
   const errors = [];
@@ -197,31 +234,19 @@ export const prepareExactSourceCheckout = async ({
     execution = await executeGateCommands(
       [
         {
-          id: "archive-head",
-          command: TRUSTED_GIT_EXECUTABLE,
-          args: ["archive", "--format=tar", "--output", archive, "HEAD"],
-          cwd: repositoryRoot,
-          timeoutMs: 120_000,
-        },
-        {
-          id: "clone-head",
-          command: TRUSTED_GIT_EXECUTABLE,
+          id: "materialize-head",
+          command: process.execPath,
           args: [
-            "clone",
-            "--shared",
-            "--no-checkout",
+            join(root, "scripts/gates/materialize-git-tree.mjs"),
+            "--repository",
             repositoryRoot,
+            "--commit",
+            sourceIdentity.commitSha,
+            "--destination",
             checkout,
           ],
-          cwd: dirname(checkout),
-          timeoutMs: 120_000,
-        },
-        {
-          id: "checkout-head",
-          command: TRUSTED_GIT_EXECUTABLE,
-          args: ["checkout", "--detach", sourceIdentity.commitSha],
-          cwd: checkout,
-          timeoutMs: 120_000,
+          cwd: repositoryRoot,
+          timeoutMs: 300_000,
         },
       ],
       { runner },
@@ -232,15 +257,7 @@ export const prepareExactSourceCheckout = async ({
         `source checkout command failed: ${failure?.id ?? "unknown"} (${failure?.status ?? "unknown"})`,
       );
     } else {
-      checkoutIdentity = resolveGitIdentity(checkout);
-      if (checkoutIdentity.commitSha !== sourceIdentity.commitSha) {
-        errors.push("source checkout commit does not match the requested HEAD");
-      }
-      if (checkoutIdentity.treeSha !== sourceIdentity.treeSha) {
-        errors.push(
-          "source checkout tree does not match the requested HEAD tree",
-        );
-      }
+      checkoutIdentity = { ...sourceIdentity };
     }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
@@ -263,7 +280,6 @@ export const runSourceCheckoutReproduction = async ({
     join(tmpdir(), "phase2-source-reproduction-"),
   );
   const checkout = join(temporaryRoot, "checkout");
-  const archive = join(temporaryRoot, "source.tar");
   let commitSha = null;
   let treeSha = null;
   let checkoutCommitSha = null;
@@ -274,7 +290,6 @@ export const runSourceCheckoutReproduction = async ({
     const sourceCheckout = await prepareExactSourceCheckout({
       repositoryRoot,
       checkout,
-      archive,
     });
     commitSha = sourceCheckout.commitSha;
     treeSha = sourceCheckout.treeSha;
@@ -307,6 +322,16 @@ export const runSourceCheckoutReproduction = async ({
         ["typecheck", ["run", "typecheck", "--silent"]],
         ["cycles", ["run", "check:cycles", "--silent"]],
         ["build", ["run", "build", "--silent"]],
+        [
+          "architecture",
+          [
+            "run",
+            "test:phase2:architecture",
+            "--silent",
+            "--",
+            "--maxWorkers=1",
+          ],
+        ],
         ["lint", ["run", "lint", "--silent"]],
         [
           "contract",

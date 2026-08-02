@@ -1,6 +1,7 @@
 dist/
 node_modules
 .stryker-tmp/
+.turbo/
 coverage/
 reports/
 *.tsbuildinfo

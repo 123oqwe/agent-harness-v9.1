@@ -2,10 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -210,6 +212,24 @@ describe("Phase 2 real release gate", () => {
         "node_modules/agent-harness/dist/index.js",
       );
       expect(result.entry.startsWith(repositoryRoot)).toBe(false);
+      expect(result.workspaces).toHaveLength(12);
+      expect(result.compositionBound).toBe(true);
+      expect(
+        result.workspaces.map((workspace: { path: string }) => workspace.path),
+      ).toEqual([
+        "packages/contracts",
+        "packages/context",
+        "packages/documents",
+        "packages/rag",
+        "packages/multimodal",
+        "packages/tool-fabric",
+        "packages/api",
+        "packages/ui",
+        "apps/api",
+        "apps/web",
+        "apps/desktop",
+        "apps/tui",
+      ]);
     },
   );
 
@@ -263,25 +283,137 @@ describe("Phase 2 real release gate", () => {
         join(tmpdir(), "phase2-exact-source-test-"),
       );
       const checkout = join(temporaryRoot, "checkout");
-      const archive = join(temporaryRoot, "source.tar");
       try {
         const result = await prepareExactSourceCheckout({
           repositoryRoot,
           checkout,
-          archive,
         });
         expect(result).toMatchObject({ ok: true, errors: [] });
         expect(result.checkoutCommitSha).toBe(result.commitSha);
         expect(result.checkoutTreeSha).toBe(result.treeSha);
-        expect(existsSync(join(checkout, ".git"))).toBe(true);
+        expect(existsSync(join(checkout, ".git"))).toBe(false);
         expect(
           result.commands.map((command: { id: string }) => command.id),
-        ).toEqual(["archive-head", "clone-head", "checkout-head"]);
+        ).toEqual(["materialize-head"]);
       } finally {
         rmSync(temporaryRoot, { recursive: true, force: true });
       }
     },
   );
+
+  it(
+    "reproduces an exact source archive without executing a local smudge filter",
+    { timeout: 120_000 },
+    async () => {
+      const temporaryRoot = mkdtempSync(
+        join(tmpdir(), "phase2-local-filter-source-"),
+      );
+      const source = join(temporaryRoot, "source");
+      const checkout = join(temporaryRoot, "checkout");
+      const marker = join(temporaryRoot, "filter-marker");
+      const runGit = (args: string[]) => {
+        const result = spawnSync("/usr/bin/git", args, {
+          cwd: source,
+          encoding: "utf8",
+          shell: false,
+        });
+        expect(result.status, result.stderr).toBe(0);
+      };
+      try {
+        mkdirSync(source);
+        runGit(["init", "--quiet"]);
+        runGit(["config", "filter.evil.smudge", `/usr/bin/touch ${marker}`]);
+        runGit(["config", "filter.evil.clean", "/bin/cat"]);
+        runGit(["config", "filter.evil.required", "true"]);
+        writeFileSync(
+          join(source, ".gitattributes"),
+          [
+            "payload filter=evil",
+            "ignored export-ignore",
+            "substituted export-subst",
+            "",
+          ].join("\n"),
+        );
+        writeFileSync(join(source, "payload"), "trusted payload\n");
+        writeFileSync(join(source, "ignored"), "must remain\n");
+        writeFileSync(join(source, "substituted"), "$Format:%H$\n");
+        runGit(["add", ".gitattributes", "payload", "ignored", "substituted"]);
+        runGit([
+          "-c",
+          "user.name=Phase2 Test",
+          "-c",
+          "user.email=phase2@example.invalid",
+          "commit",
+          "--quiet",
+          "-m",
+          "local filter fixture",
+        ]);
+        rmSync(marker, { force: true });
+
+        const result = await prepareExactSourceCheckout({
+          repositoryRoot: source,
+          checkout,
+        });
+
+        expect(result).toMatchObject({ ok: true, errors: [] });
+        expect(existsSync(marker)).toBe(false);
+        expect(readFileSync(join(checkout, "payload"), "utf8")).toBe(
+          "trusted payload\n",
+        );
+        expect(readFileSync(join(checkout, "ignored"), "utf8")).toBe(
+          "must remain\n",
+        );
+        expect(readFileSync(join(checkout, "substituted"), "utf8")).toBe(
+          "$Format:%H$\n",
+        );
+        expect(existsSync(join(checkout, ".git"))).toBe(false);
+      } finally {
+        rmSync(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("rejects symlink entries before exact source materialization", async () => {
+    const temporaryRoot = mkdtempSync(join(tmpdir(), "phase2-symlink-source-"));
+    const source = join(temporaryRoot, "source");
+    const checkout = join(temporaryRoot, "checkout");
+    const runGit = (args: string[]) => {
+      const result = spawnSync("/usr/bin/git", args, {
+        cwd: source,
+        encoding: "utf8",
+        shell: false,
+      });
+      expect(result.status, result.stderr).toBe(0);
+    };
+    try {
+      mkdirSync(source);
+      runGit(["init", "--quiet"]);
+      writeFileSync(join(source, "payload"), "trusted payload\n");
+      symlinkSync("payload", join(source, "payload-link"));
+      runGit(["add", "payload", "payload-link"]);
+      runGit([
+        "-c",
+        "user.name=Phase2 Test",
+        "-c",
+        "user.email=phase2@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "symlink fixture",
+      ]);
+
+      const result = await prepareExactSourceCheckout({
+        repositoryRoot: source,
+        checkout,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors.join("\n")).toMatch(/materialize-head/u);
+      expect(existsSync(checkout)).toBe(false);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
 
   it("recognizes a symlinked script path as the CLI entry", () => {
     const temporaryRoot = mkdtempSync(join(tmpdir(), "phase2-gate-symlink-"));

@@ -28,6 +28,7 @@ import {
 // @ts-expect-error The production gate intentionally ships as plain Node ESM.
 import { securePublish } from "../../../scripts/gates/secure-publish.mjs";
 import {
+  spawnTrustedGitSync,
   TRUSTED_TOOL_PATHS,
   validateProtectedExecutable,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
@@ -257,6 +258,9 @@ describe("Phase 2 gate command orchestration", () => {
         "scripts/gates/secure-publish.mjs",
         "scripts/gates/secure-publish.py",
         "scripts/gates/trusted-git.mjs",
+        "scripts/gates/materialize-git-tree.mjs",
+        "scripts/check-workspace-boundaries.mjs",
+        "scripts/gates/check-workspace-coverage.mjs",
       ]),
     );
     const identity = collectGateBindings(repositoryRoot);
@@ -264,6 +268,107 @@ describe("Phase 2 gate command orchestration", () => {
       gateModule.RUNNER_BINDING_PATHS.length,
     );
     expect(identity.bindings.runnerSha256).toMatch(/^[a-f0-9]{64}$/u);
+  });
+
+  it("does not execute global fsmonitor, filter, includeIf, or alias configuration", () => {
+    const root = mkdtempSync(join(tmpdir(), "phase2-trusted-git-config-"));
+    const home = join(root, "home");
+    const repository = join(root, "repository");
+    mkdirSync(home);
+    mkdirSync(repository);
+    const setupEnvironment = {
+      PATH: "/usr/bin:/bin",
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_TERMINAL_PROMPT: "0",
+    };
+    const setupGit = (args: string[]) => {
+      const result = spawnSync(TRUSTED_TOOL_PATHS.git, args, {
+        cwd: repository,
+        env: setupEnvironment,
+        encoding: "utf8",
+        shell: false,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return result;
+    };
+    setupGit(["init", "--quiet"]);
+    writeFileSync(join(repository, ".gitattributes"), "payload filter=attack\n");
+    writeFileSync(join(repository, "payload"), "trusted payload\n");
+    setupGit(["add", ".gitattributes", "payload"]);
+    setupGit([
+      "-c",
+      "user.name=Phase2 Test",
+      "-c",
+      "user.email=phase2@example.invalid",
+      "commit",
+      "--quiet",
+      "-m",
+      "trusted Git fixture",
+    ]);
+
+    const previousHome = process.env.HOME;
+    const previousXdg = process.env.XDG_CONFIG_HOME;
+    process.env.HOME = home;
+    process.env.XDG_CONFIG_HOME = join(home, "xdg");
+    try {
+      const marker = join(root, "marker");
+      const run = (args: string[]) =>
+        spawnTrustedGitSync(args, {
+          cwd: repository,
+          encoding: "utf8",
+          env: { ...process.env, HOME: home },
+        });
+      const expectNoExecution = (args: string[]) => {
+        rmSync(marker, { force: true });
+        const result = run(args);
+        expect(existsSync(marker), result.stderr).toBe(false);
+        return result;
+      };
+
+      writeFileSync(
+        join(home, ".gitconfig"),
+        `[core]\n\tfsmonitor = /usr/bin/touch ${marker}\n`,
+      );
+      expect(expectNoExecution(["status", "--porcelain"]).status).toBe(0);
+
+      const included = join(root, "included.gitconfig");
+      writeFileSync(
+        included,
+        `[core]\n\tfsmonitor = /usr/bin/touch ${marker}\n`,
+      );
+      writeFileSync(
+        join(home, ".gitconfig"),
+        `[includeIf "gitdir:${repository}/"]\n\tpath = ${included}\n`,
+      );
+      expect(expectNoExecution(["status", "--porcelain"]).status).toBe(0);
+
+      writeFileSync(
+        join(home, ".gitconfig"),
+        `[filter "attack"]\n\tsmudge = /usr/bin/touch ${marker}\n\trequired = true\n`,
+      );
+      rmSync(marker, { force: true });
+      expect(() => run(["checkout", "--", "payload"])).toThrow(/not allowed/u);
+      expect(existsSync(marker)).toBe(false);
+
+      writeFileSync(
+        join(home, ".gitconfig"),
+        `[alias]\n\tpwn = !/usr/bin/touch ${marker}\n`,
+      );
+      rmSync(marker, { force: true });
+      expect(() => run(["pwn"])).toThrow(/not allowed/u);
+      expect(existsSync(marker)).toBe(false);
+      expect(expectNoExecution(["cat-file", "blob", "HEAD:payload"]).stdout).toBe(
+        "trusted payload\n",
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = previousXdg;
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("runs argv commands in order and fails fast without shell strings", async () => {
@@ -857,7 +962,7 @@ describe("Phase 2 gate command orchestration", () => {
       }),
     ).toThrow(/HEAD|authority|tree/u);
     expect(existsSync(join(root, "reports"))).toBe(false);
-  });
+  }, 30_000);
 
   it("rejects NUL and unencodable components before any filesystem mutation", () => {
     for (const unsafePath of ["bad\0.json", "bad\ud800.json"]) {

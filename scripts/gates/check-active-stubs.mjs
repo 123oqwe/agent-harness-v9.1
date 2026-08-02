@@ -40,15 +40,18 @@ const MAX_JSON_DEPTH = 64;
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".rs"]);
 const GLOBAL_RELEASE_RECEIPTS = [
   "manifest",
+  "workspace-boundaries",
   "assets",
   "contract-drift",
   "active-stubs",
   "typecheck",
   "cycles",
   "build",
+  "phase2-architecture",
   "lint",
   "phase1-regression",
   "coverage",
+  "workspace-coverage",
   "mutation",
   "evaluations",
   "data",

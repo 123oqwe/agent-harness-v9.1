@@ -31,15 +31,18 @@ import {
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const releaseCommandIds = [
   "manifest",
+  "workspace-boundaries",
   "assets",
   "contract-drift",
   "active-stubs",
   "typecheck",
   "cycles",
   "build",
+  "phase2-architecture",
   "lint",
   "phase1-regression",
   "coverage",
+  "workspace-coverage",
   "phase2-unit",
   "phase2-integration",
   "phase2-security",

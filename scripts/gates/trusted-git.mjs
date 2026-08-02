@@ -35,7 +35,9 @@ const assertProtectedNode = (path, stats, { final }) => {
   if (stats.uid !== 0)
     throw new Error(`trusted executable chain is not root-owned: ${path}`);
   if (!stats.isSymbolicLink() && (stats.mode & 0o022) !== 0)
-    throw new Error(`trusted executable chain is group/world writable: ${path}`);
+    throw new Error(
+      `trusted executable chain is group/world writable: ${path}`,
+    );
   if (!final && !stats.isDirectory() && !stats.isSymbolicLink())
     throw new Error(`trusted executable ancestor is not a directory: ${path}`);
 };
@@ -57,11 +59,7 @@ export const validateProtectedExecutable = (
     });
   }
   const target = filesystem.statSync(resolved);
-  if (
-    target.uid !== 0 ||
-    (target.mode & 0o022) !== 0 ||
-    !target.isFile()
-  )
+  if (target.uid !== 0 || (target.mode & 0o022) !== 0 || !target.isFile())
     throw new Error("trusted executable target ownership or mode is unsafe");
   filesystem.accessSync(resolved, constants.X_OK);
   return resolved;
@@ -73,17 +71,70 @@ export const TRUSTED_GIT_EXECUTABLE = validateProtectedExecutable(
 export const TRUSTED_PYTHON_EXECUTABLE = validateProtectedExecutable(
   TRUSTED_TOOL_PATHS.python3,
 );
+export const TRUSTED_GIT_CONFIG_ARGUMENTS = Object.freeze([
+  "-c",
+  "core.fsmonitor=false",
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "core.pager=cat",
+  "-c",
+  "credential.helper=",
+  "-c",
+  "protocol.ext.allow=never",
+  "-c",
+  "protocol.file.allow=user",
+]);
 
-const gitEnvironment = () =>
-  Object.fromEntries(
-    ["HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL"].flatMap((name) =>
+export const TRUSTED_GIT_ENVIRONMENT = Object.freeze({
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_OPTIONAL_LOCKS: "0",
+  GIT_TERMINAL_PROMPT: "0",
+  GCM_INTERACTIVE: "Never",
+  GIT_ASKPASS: "/usr/bin/false",
+  SSH_ASKPASS: "/usr/bin/false",
+});
+
+const READ_ONLY_GIT_COMMANDS = new Set([
+  "cat-file",
+  "diff-index",
+  "diff-files",
+  "ls-files",
+  "ls-tree",
+  "rev-parse",
+  "status",
+]);
+
+const trustedArguments = (args, allowedCommands) => {
+  if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string"))
+    throw new TypeError("trusted Git arguments must be an array of strings");
+  if (!allowedCommands.has(args[0]))
+    throw new TypeError(
+      `trusted Git command is not allowed: ${String(args[0])}`,
+    );
+  return [...TRUSTED_GIT_CONFIG_ARGUMENTS, ...args];
+};
+
+export const trustedGitReadArguments = (args) =>
+  trustedArguments(args, READ_ONLY_GIT_COMMANDS);
+
+const gitEnvironment = () => ({
+  ...Object.fromEntries(
+    ["TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL"].flatMap((name) =>
       typeof process.env[name] === "string" ? [[name, process.env[name]]] : [],
     ),
-  );
+  ),
+  ...TRUSTED_GIT_ENVIRONMENT,
+});
 
-export const spawnTrustedGitSync = (args, options = {}) =>
-  spawnSync(TRUSTED_GIT_EXECUTABLE, args, {
+export const spawnTrustedGitSync = (args, options = {}) => {
+  const safeOptions = { ...options };
+  delete safeOptions.env;
+  delete safeOptions.shell;
+  return spawnSync(TRUSTED_GIT_EXECUTABLE, trustedGitReadArguments(args), {
+    ...safeOptions,
     env: gitEnvironment(),
     shell: false,
-    ...options,
   });
+};
