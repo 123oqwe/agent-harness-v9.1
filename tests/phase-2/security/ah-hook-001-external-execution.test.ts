@@ -418,7 +418,11 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
 
   it('executes a user-trust descriptor without inventing a reviewed hash', async () => {
     const fixture = externalFixture();
-    const reviewed = externalRegistration(fixture.scriptPath, fixture.contentHash);
+    const reviewed = externalRegistration(
+      fixture.scriptPath,
+      fixture.contentHash,
+      10_000,
+    );
     const { content_hash: _reviewedHash, ...descriptor } = reviewed;
     const registration = { ...descriptor, trust: 'user' as const };
     await expect(
