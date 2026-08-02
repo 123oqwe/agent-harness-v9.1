@@ -361,9 +361,15 @@ describe("Phase 2 mutation authority", () => {
         "node scripts/run-phase2-mutation-launcher.mjs phase2",
       );
       const bootstrap = readFileSync(resolve(repositoryRoot, "scripts/run-phase2-mutation-bootstrap.mjs"), "utf8");
+      const mutationVitest = readFileSync(
+        resolve(repositoryRoot, "vitest.mutation.config.ts"),
+        "utf8",
+      );
       expect(bootstrap).toMatch(/batch_sha256.*report_sha256.*path.*status/su);
       expect(bootstrap).toMatch(/explicitReady\s*!==\s*64/u);
       expect(bootstrap).not.toContain("mutation-bundles");
+      expect(mutationVitest).toMatch(/testTimeout:\s*120_000/u);
+      expect(mutationVitest).toMatch(/hookTimeout:\s*120_000/u);
     },
   );
 });

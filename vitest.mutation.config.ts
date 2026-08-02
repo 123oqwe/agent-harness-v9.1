@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
