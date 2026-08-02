@@ -907,8 +907,58 @@ describe('AH-HOOK-001 HookSystem', () => {
         },
         'managed hook handler is required',
       ],
+      [
+        {
+          ...registration('managed-external', 'pre_tool_use', noop),
+          execution: {
+            executable_path: '/usr/bin/true',
+            argv: [],
+            source_path: '/usr/bin/true',
+          },
+        },
+        'managed hooks cannot use external execution',
+      ],
+      [
+        registration('fractional-priority', 'pre_tool_use', noop, {
+          priority: 1.5,
+        }),
+        'hook priority must be a safe integer',
+      ],
+      [
+        registration('fractional-timeout', 'pre_tool_use', noop, {
+          timeout_ms: 1.5,
+        }),
+        'hook timeout_ms must be a positive safe integer',
+      ],
     ] as const) {
       expect(() => new HookSystem([invalid as never])).toThrow(message);
+    }
+
+    const reviewedBase = {
+      id: 'reviewed-invalid-execution',
+      event: 'pre_tool_use',
+      trust: 'hash_reviewed',
+      content_hash: validHash,
+      priority: 1,
+      timeout_ms: 100,
+    } as const;
+    for (const execution of [
+      undefined,
+      null,
+      {},
+      { executable_path: '', argv: [], source_path: '/hook.mjs' },
+      { executable_path: 1, argv: [], source_path: '/hook.mjs' },
+      { executable_path: '/usr/bin/node', argv: null, source_path: '/hook.mjs' },
+      { executable_path: '/usr/bin/node', argv: [1], source_path: '/hook.mjs' },
+      { executable_path: '/usr/bin/node', argv: [], source_path: '' },
+      { executable_path: '/usr/bin/node', argv: [], source_path: 1 },
+    ]) {
+      expect(
+        () =>
+          new HookSystem([
+            { ...reviewedBase, execution } as never,
+          ]),
+      ).toThrow('external hook execution descriptor is required');
     }
 
     const system = new HookSystem([]);
@@ -928,6 +978,13 @@ describe('AH-HOOK-001 HookSystem', () => {
       [
         {
           ...request('pre_tool_use', 'valid', {}),
+          scope: { ...scope, tenant_id: null },
+        },
+        'tenant_id is required',
+      ],
+      [
+        {
+          ...request('pre_tool_use', 'valid', {}),
           scope: { ...scope, run_id: 1 },
         },
         'run_id is required',
@@ -938,6 +995,20 @@ describe('AH-HOOK-001 HookSystem', () => {
           scope: { ...scope, session_id: null },
         },
         'session_id is required',
+      ],
+      [
+        {
+          ...request('pre_tool_use', 'valid', {}),
+          scope: { ...scope, operation_id: '' },
+        },
+        'operation_id must be non-empty when provided',
+      ],
+      [
+        {
+          ...request('pre_tool_use', 'valid', {}),
+          scope: { ...scope, attempt_id: 1 },
+        },
+        'attempt_id must be non-empty when provided',
       ],
     ] as const) {
       await expect(system.dispatch(invalid as never)).rejects.toThrow(message);

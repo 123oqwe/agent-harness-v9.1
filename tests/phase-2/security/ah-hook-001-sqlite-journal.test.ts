@@ -416,4 +416,142 @@ db.close();`,
     ).toEqual({ count: 0 });
     after.close();
   });
+
+  it('validates constructor identity, key length and lease before use', () => {
+    for (const [options, message] of [
+      [undefined, 'ownerId is required'],
+      [{ masterKey, ownerId: '', leaseMs: 1_000 }, 'ownerId is required'],
+      [
+        { masterKey: Buffer.alloc(31), ownerId: 'owner', leaseMs: 1_000 },
+        '32-byte Hook journal masterKey is required',
+      ],
+      [
+        { masterKey: Buffer.alloc(33), ownerId: 'owner', leaseMs: 1_000 },
+        '32-byte Hook journal masterKey is required',
+      ],
+      [
+        { masterKey, ownerId: 'owner', leaseMs: 0 },
+        'Hook journal leaseMs must be a positive safe integer',
+      ],
+      [
+        { masterKey, ownerId: 'owner', leaseMs: 1.5 },
+        'Hook journal leaseMs must be a positive safe integer',
+      ],
+    ] as const) {
+      expect(() => new SqliteHookJournal(fixture(), options as never)).toThrow(
+        message,
+      );
+    }
+    expect(
+      () =>
+        new SqliteHookJournal('', {
+          masterKey,
+          ownerId: 'owner',
+          leaseMs: 1_000,
+        }),
+    ).toThrow('databasePath is required');
+  });
+
+  it('rejects malformed claim input before creating a row', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'validator',
+      leaseMs: 1_000,
+    });
+    const valid = claimInput('validation-key');
+    const invalid: Array<[unknown, string]> = [
+      [{ ...valid, scope: null }, 'tenant_id is required'],
+      [{ ...valid, scope: { ...scope(), tenant_id: '' } }, 'tenant_id is required'],
+      [{ ...valid, scope: { ...scope(), run_id: '' } }, 'run_id is required'],
+      [{ ...valid, scope: { ...scope(), session_id: '' } }, 'session_id is required'],
+      [{ ...valid, scope: { ...scope(), operation_id: '' } }, 'operation_id is required'],
+      [{ ...valid, scope: { ...scope(), attempt_id: '' } }, 'attempt_id is required'],
+      [{ ...valid, idempotency_key: '' }, 'idempotency_key is required'],
+      [{ ...valid, event: 'unknown' }, 'unknown Hook event'],
+      [{ ...valid, input_hash: '' }, 'Hook journal input_hash must be SHA-256'],
+      [
+        { ...valid, input_hash: `g${'0'.repeat(63)}` },
+        'Hook journal input_hash must be SHA-256',
+      ],
+    ];
+    for (const [input, message] of invalid) {
+      await expect(journal.claim(input as never)).rejects.toThrow(message);
+    }
+    const raw = new Database(path, { readonly: true });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM hook_journal').get()).toEqual({
+      count: 0,
+    });
+    raw.close();
+    journal.close();
+  });
+
+  it('binds a claim to optional scope, event and input hash identity', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'identity-owner',
+      leaseMs: 1_000,
+    });
+    const changes: Array<(input: ReturnType<typeof claimInput>) => typeof input> = [
+      (input) => ({ ...input, scope: { ...input.scope, operation_id: 'other' } }),
+      (input) => ({ ...input, scope: { ...input.scope, attempt_id: 'other' } }),
+      (input) => ({ ...input, event: 'post_tool_use' as never }),
+      (input) => ({ ...input, input_hash: 'a'.repeat(64) }),
+    ];
+    for (const [index, change] of changes.entries()) {
+      const input = claimInput(`identity-${index}`);
+      expect((await journal.claim(input)).status).toBe('claimed');
+      await expect(journal.claim(change(input))).rejects.toThrow(
+        'Hook journal idempotency key collision',
+      );
+    }
+    journal.close();
+  });
+
+  it('fails closed on invalid clocks with zero journal writes', async () => {
+    for (const invalidNow of [-1, 1.5, Number.POSITIVE_INFINITY]) {
+      const path = fixture();
+      const journal = new SqliteHookJournal(path, {
+        masterKey,
+        ownerId: 'clock-owner',
+        leaseMs: 1_000,
+        nowMs: () => invalidNow,
+      });
+      await expect(journal.claim(claimInput(`clock-${invalidNow}`))).rejects.toThrow(
+        'Hook journal clock must return non-negative milliseconds',
+      );
+      const raw = new Database(path, { readonly: true });
+      expect(raw.prepare('SELECT COUNT(*) AS count FROM hook_journal').get()).toEqual({
+        count: 0,
+      });
+      raw.close();
+      journal.close();
+    }
+  });
+
+  it('rejects invalid tokens and all operations after close', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'closed-owner',
+      leaseMs: 1_000,
+    });
+    const input = claimInput('closed-key');
+    const token = claimedToken(await journal.claim(input));
+    await expect(journal.commit('', record(input, 'secret'))).rejects.toThrow(
+      'claimToken is required',
+    );
+    await expect(journal.release('unknown-token')).rejects.toThrow(
+      'invalid Hook journal claim',
+    );
+    await journal.release(token);
+    journal.close();
+    journal.close();
+    await expect(journal.claim(input)).rejects.toThrow('Hook journal is closed');
+    await expect(journal.commit(token, record(input, 'secret'))).rejects.toThrow(
+      'Hook journal is closed',
+    );
+    await expect(journal.release(token)).rejects.toThrow('Hook journal is closed');
+  });
 });
