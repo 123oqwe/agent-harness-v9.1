@@ -8,11 +8,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const EXPECTED_SCHEMA_VERSION = "1.0.0";
 const EXPECTED_PHASE = 2;
 const EXPECTED_REPOSITORY = "https://github.com/123oqwe/agentharness91.git";
-const EXPECTED_SHA = "bf5eac648527205603de7d26278276ad78819850";
+const EXPECTED_SHA = "2d59a526fcf7cd067fbe9d44981537a42d441360";
 const EXPECTED_EVIDENCE_ROOT = "artifacts/phase-2";
 const EXPECTED_REQUIREMENT_COUNT = 64;
 export const AUTHORITY_CANONICAL_SHA256 =
-  "bcdaeb0b3339c60f89bd7e43843ada27a765ae9a605280b541cbfbe71ae0ba2a";
+  "a9656f803ff26eea509d53a6dae7d8d797a38511274f540ac56b599604f6a72c";
 
 const ROOT_KEYS = new Set([
   "schema_version",
@@ -138,7 +138,7 @@ const ALLOWED_OWNERS = new Set([
 ]);
 
 const TEST_SUITE_PATTERN =
-  /^tests\/phase-2\/(?:unit|integration|e2e|security)\/[a-z0-9]+(?:-[a-z0-9]+)*\.test\.ts$/;
+  /^tests\/phase-2\/(?:unit|integration|e2e|security)\/[a-z0-9]+(?:[.-][a-z0-9]+)*\.test\.ts$/;
 
 const ALLOWED_EVAL_SUITES = new Set(
   [

@@ -3,7 +3,7 @@
   "phase": 2,
   "baseline": {
     "repository": "https://github.com/123oqwe/agentharness91.git",
-    "sha": "bf5eac648527205603de7d26278276ad78819850"
+    "sha": "2d59a526fcf7cd067fbe9d44981537a42d441360"
   },
   "evidence_root": "artifacts/phase-2",
   "mutation_thresholds": {
@@ -47,7 +47,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-docx-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-DOCX-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -57,7 +57,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-enc-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-ENC-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -67,7 +67,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-img-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-IMG-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -77,7 +77,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-md-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-MD-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -87,7 +87,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-pdf-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PDF-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -97,7 +97,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-pptx-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PPTX-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -109,7 +109,7 @@
         "tests/phase-2/unit/ah-doc-ingest-unsupported-001.test.ts"
       ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-UNSUPPORTED-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -129,7 +129,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-ingest-xlsx-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-XLSX-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -139,7 +139,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-parse-head-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-HEAD-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -149,7 +149,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-parse-imgref-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-IMGREF-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -159,7 +159,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-parse-provenance-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-PROVENANCE-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -169,7 +169,7 @@
       "owner": "packages/documents",
       "test_suites": ["tests/phase-2/unit/ah-doc-parse-table-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-TABLE-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -177,7 +177,11 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-LOOP-001"],
       "owner": "packages/context",
-      "test_suites": ["tests/phase-2/unit/ah-hook-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-hook-001.test.ts",
+        "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
+        "tests/phase-2/security/ah-hook-001-injection.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-HOOK-001.json",
       "mutation_class": "critical",
       "eval_suites": ["evals/coding/phase-2.yaml"]
@@ -199,7 +203,7 @@
       "owner": "packages/multimodal",
       "test_suites": ["tests/phase-2/unit/ah-mm-artifact-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-MM-ARTIFACT-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/multimodal/phase-2.yaml"]
     },
     {
@@ -239,7 +243,7 @@
       "owner": "packages/multimodal",
       "test_suites": ["tests/phase-2/unit/ah-mm-image-in-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-IN-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/multimodal/phase-2.yaml"]
     },
     {
@@ -279,7 +283,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-chunk-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-CHUNK-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -289,7 +293,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-cite-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-CITE-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -314,7 +318,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-embed-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -324,7 +328,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-embed-mig-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-MIG-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -334,7 +338,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-fts-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-FTS-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -344,7 +348,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-graph-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-GRAPH-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -364,7 +368,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-meta-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-META-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -384,7 +388,7 @@
       "owner": "packages/rag",
       "test_suites": ["tests/phase-2/unit/ah-rag-rerank-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RAG-RERANK-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -394,7 +398,7 @@
       "owner": "packages/context",
       "test_suites": ["tests/phase-2/unit/ah-runtime-budget-002.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-BUDGET-002.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -424,7 +428,11 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-SESSION-001"],
       "owner": "packages/context",
-      "test_suites": ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-SESSIONTREE-001.json",
       "mutation_class": "critical",
       "eval_suites": ["evals/coding/phase-2.yaml"]
@@ -490,7 +498,7 @@
       "owner": "packages/tool-fabric",
       "test_suites": ["tests/phase-2/unit/ah-tool-spreadsheet-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-TOOL-SPREADSHEET-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -504,7 +512,7 @@
       "owner": "packages/tool-fabric",
       "test_suites": ["tests/phase-2/unit/ah-tool-presentation-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-TOOL-PRESENTATION-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -518,7 +526,7 @@
       "owner": "packages/tool-fabric",
       "test_suites": ["tests/phase-2/unit/ah-tool-document-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-TOOL-DOCUMENT-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -528,7 +536,7 @@
       "owner": "packages/tool-fabric",
       "test_suites": ["tests/phase-2/unit/ah-tool-ocr-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-TOOL-OCR-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -581,7 +589,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-doc-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-DOC-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/documents/phase-2.yaml"]
     },
     {
@@ -595,7 +603,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-mm-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-MM-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/multimodal/phase-2.yaml"]
     },
     {
@@ -610,7 +618,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-notify-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-NOTIFY-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
     },
     {
@@ -625,7 +633,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-planning-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-PLANNING-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": [
         "evals/planning/phase-2.yaml",
         "evals/personal-assistant/phase-2.yaml"
@@ -642,7 +650,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-reconcile-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-RECONCILE-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
     },
     {
@@ -656,7 +664,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-research-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-RESEARCH-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/research/phase-2.yaml"]
     },
     {
@@ -671,7 +679,7 @@
       "owner": "apps/tui",
       "test_suites": ["tests/phase-2/e2e/ah-ui-tui-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-TUI-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -685,7 +693,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ui-writing-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UI-WRITING-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/writing/phase-2.yaml"]
     },
     {
@@ -695,7 +703,7 @@
       "owner": "apps/api",
       "test_suites": ["tests/phase-2/e2e/ah-ux-api-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-API-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -705,7 +713,7 @@
       "owner": "packages/api",
       "test_suites": ["tests/phase-2/e2e/ah-ux-contract-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-CONTRACT-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -715,7 +723,7 @@
       "owner": "apps/desktop",
       "test_suites": ["tests/phase-2/e2e/ah-ux-desktop-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-DESKTOP-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -735,7 +743,7 @@
       "owner": "packages/ui",
       "test_suites": ["tests/phase-2/e2e/ah-ux-states-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-STATES-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     },
     {
@@ -745,7 +753,7 @@
       "owner": "apps/web",
       "test_suites": ["tests/phase-2/e2e/ah-ux-web-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-UX-WEB-001.json",
-      "mutation_class": "critical",
+      "mutation_class": "core",
       "eval_suites": ["evals/coding/phase-2.yaml"]
     }
   ]

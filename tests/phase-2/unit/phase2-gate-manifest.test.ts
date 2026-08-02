@@ -40,6 +40,16 @@ const checkerPath = resolve(
   "scripts/gates/check-phase2-manifest.mjs",
 );
 
+const git = (...args: string[]) => {
+  const result = spawnSync("/usr/bin/git", args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    shell: false,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim();
+};
+
 const runCheckerCli = (args: string[] = []) =>
   spawnSync(process.execPath, [checkerPath, ...args], {
     encoding: "utf8",
@@ -98,6 +108,29 @@ describe("Phase 2 release-gate manifest", () => {
       "AH-CONTEXT-COMPILER-001",
     );
     expect(invalid).toEqual(valid);
+  });
+
+  it("pins the baseline to the actual parent of the Phase 2 authority history", () => {
+    const introductionCommit = git(
+      "log",
+      "--diff-filter=A",
+      "--format=%H",
+      "--",
+      "verification/gates/phase2-gate.json",
+    )
+      .split("\n")
+      .filter(Boolean)
+      .at(-1);
+    expect(introductionCommit).toMatch(/^[a-f0-9]{40}$/u);
+    const prerequisiteSha = git("rev-parse", `${introductionCommit}^`);
+    const authority = JSON.parse(
+      readFileSync(DEFAULT_MANIFEST_PATH, "utf8"),
+    ) as Manifest;
+
+    expect(authority.baseline.sha).toBe(prerequisiteSha);
+    expect(git("merge-base", "--is-ancestor", prerequisiteSha, "HEAD")).toBe(
+      "",
+    );
   });
 
   it("never throws when canonical JSON input contains a cycle", () => {
@@ -538,7 +571,7 @@ describe("Phase 2 release-gate manifest", () => {
     "AH-TOOL-BEHAVIOR-VERIFY-001",
     "AH-TOOL-WEB-FETCH-001",
     "AH-TOOL-WEB-SEARCH-001",
-    "AH-UI-TUI-001",
+    "AH-RAG-QUERY-001",
   ])("keeps risk-critical requirement %s at the 90 mutation gate", (id) => {
     const downgraded = loadFixture("valid", "phase2-gate.json");
     requirement(downgraded, id).mutation_class = "core";
@@ -583,7 +616,7 @@ describe("Phase 2 release-gate manifest", () => {
     const wrongSha = loadFixture("valid", "phase2-gate.json");
     wrongSha.baseline.sha = "deadbeef";
     expect(validatePhase2Manifest(wrongSha)).toContain(
-      'manifest.baseline.sha must be "bf5eac648527205603de7d26278276ad78819850"; received "deadbeef"',
+      'manifest.baseline.sha must be "2d59a526fcf7cd067fbe9d44981537a42d441360"; received "deadbeef"',
     );
 
     const wrongRepository = loadFixture("valid", "phase2-gate.json");

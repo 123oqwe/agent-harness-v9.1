@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -79,5 +79,43 @@ describe('manual Phase 1 GLM acceptance workflow', () => {
         workflow.match(/persist-credentials: false/gu)?.length ?? 0,
       );
     }
+  });
+
+  it('fetches full history in every workflow job that executes ancestry-sensitive tests or gates', () => {
+    const workflowRoot = resolve(root, '.github/workflows');
+    const ancestrySensitiveCommand =
+      /(?:npm test\b|npm run test:coverage\b|npm run verify:phase2:local\b|node scripts\/gates\/check-phase2-manifest\.mjs\b|vitest run tests\/phase-2\/unit\b)/u;
+    const auditedJobs: string[] = [];
+
+    for (const file of readdirSync(workflowRoot).filter((name) =>
+      name.endsWith('.yml'),
+    )) {
+      const workflow = readFileSync(resolve(workflowRoot, file), 'utf8');
+      const jobs = workflow.slice(workflow.indexOf('\njobs:') + 6);
+      for (const match of jobs.matchAll(
+        /^  ([a-zA-Z0-9_-]+):\n([\s\S]*?)(?=^  [a-zA-Z0-9_-]+:\n|(?![\s\S]))/gmu,
+      )) {
+        const [, jobName, body = ''] = match;
+        if (!ancestrySensitiveCommand.test(body)) continue;
+        auditedJobs.push(`${file}:${jobName}`);
+        const checkoutBlocks = body
+          .split(/(?=^      - uses: actions\/checkout@)/gmu)
+          .filter((block) =>
+            block.startsWith('      - uses: actions/checkout@'),
+          );
+        expect(checkoutBlocks, `${file}:${jobName} checkout`).toHaveLength(1);
+        expect(checkoutBlocks[0], `${file}:${jobName} history`).toContain(
+          'fetch-depth: 0',
+        );
+        expect(checkoutBlocks[0], `${file}:${jobName} credentials`).toContain(
+          'persist-credentials: false',
+        );
+      }
+    }
+
+    expect(auditedJobs.sort()).toEqual([
+      'ci.yml:deterministic',
+      'glm-acceptance.yml:deterministic',
+    ]);
   });
 });

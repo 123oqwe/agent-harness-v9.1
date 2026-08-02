@@ -1,0 +1,544 @@
+import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  phase2MutationRequirements,
+  phase2MutationThresholds,
+  // @ts-expect-error The mutation registry intentionally ships as plain Node ESM.
+} from "../../../mutation/phase2-modules.mjs";
+import {
+  buildPhase2MutationReport,
+  inspectPhase2MutationReadiness,
+  loadPhase2MutationAuthority,
+  resolvePhase2MutationTarget,
+  validatePhase2MutationReport,
+  // @ts-expect-error The mutation gate intentionally ships as plain Node ESM.
+} from "../../../scripts/gates/phase2-mutation.mjs";
+
+const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const manifest = JSON.parse(
+  readFileSync(
+    resolve(repositoryRoot, "verification/gates/phase2-gate.json"),
+    "utf8",
+  ),
+);
+
+const cloneRegistry = () => structuredClone(phase2MutationRequirements);
+
+const readyAuthority = () => {
+  const registry = cloneRegistry().map(
+    (requirement: { id: string; mutationClass: string; tests: string[] }) => ({
+      ...requirement,
+      status: "ready",
+      sources: [`packages/synthetic/src/${requirement.id.toLowerCase()}.ts`],
+    }),
+  );
+  const authority = loadPhase2MutationAuthority({ manifest, registry });
+  expect(authority.errors).toEqual([]);
+  return authority;
+};
+
+const counts = (killed = 9, survived = 1) => ({
+  total: killed + survived,
+  killed,
+  timeout: 0,
+  survived,
+  noCoverage: 0,
+  ignored: 0,
+});
+
+const passingResults = (authority: ReturnType<typeof readyAuthority>) =>
+  authority.requirements.map(
+    (requirement: {
+      id: string;
+      mutationClass: "critical" | "core";
+      threshold: number;
+      sources: string[];
+      integrationSources: string[];
+      integrationSourceModules: Record<string, string[]>;
+      tests: string[];
+    }) => {
+      const source = requirement.sources[0]!;
+      return {
+        requirement_id: requirement.id,
+        mutation_class: requirement.mutationClass,
+        threshold: requirement.threshold,
+        status: "PASS",
+        commit_sha: "a".repeat(40),
+        tree_sha: "f".repeat(40),
+        registry_sha256: authority.registrySha256,
+        manifest_sha256: authority.manifestSha256,
+        phase1_mutation_registry_sha256: authority.phase1MutationSha256,
+        configuration_hash: "b".repeat(64),
+        sources: requirement.sources,
+        integration_sources: requirement.integrationSources,
+        integration_source_modules: requirement.integrationSourceModules,
+        tests: requirement.tests,
+        counts: counts(),
+        score: 90,
+        per_file: {
+          [source]: { ...counts(), score: 90 },
+        },
+        expected_chunk_count: 1,
+        chunks: [
+          {
+            chunk_id: `${requirement.id.toLowerCase()}-1-10`,
+            source_file: source,
+            start_line: 1,
+            end_line: 10,
+            complete: true,
+            raw_report_sha256: "c".repeat(64),
+            config_sha256: "d".repeat(64),
+            mutant_identity_sha256: "e".repeat(64),
+          },
+        ],
+      };
+    },
+  );
+
+describe("Phase 2 mutation authority", () => {
+  it("freezes exact thresholds and all 64 manifest IDs/classes/test paths", () => {
+    const authority = loadPhase2MutationAuthority({ manifest });
+
+    expect(phase2MutationThresholds).toEqual({ critical: 90, core: 85 });
+    expect(authority.errors).toEqual([]);
+    expect(authority.requirements).toHaveLength(64);
+    expect(
+      authority.requirements.map(
+        (entry: { id: string; mutationClass: string; tests: string[] }) => [
+          entry.id,
+          entry.mutationClass,
+          entry.tests,
+        ],
+      ),
+    ).toEqual(
+      manifest.requirements.map(
+        (entry: {
+          id: string;
+          mutation_class: string;
+          test_suites: string[];
+        }) => [entry.id, entry.mutation_class, entry.test_suites],
+      ),
+    );
+  });
+
+  it("classifies only security, recovery, permission, and egress boundaries as critical", () => {
+    const criticalIds = phase2MutationRequirements
+      .filter(
+        (entry: { mutationClass: string }) =>
+          entry.mutationClass === "critical",
+      )
+      .map((entry: { id: string }) => entry.id);
+    expect(criticalIds).toEqual([
+      "AH-CONTEXT-COMPILER-001",
+      "AH-DOC-INGEST-WEB-001",
+      "AH-HOOK-001",
+      "AH-MCP-STDIO-001",
+      "AH-MM-DOC-VISION-001",
+      "AH-MM-IMAGE-EDIT-001",
+      "AH-MM-IMAGE-GEN-001",
+      "AH-MM-VISION-VERIFY-001",
+      "AH-PAUSE-RESUME-001",
+      "AH-SANDBOX-OCI-001",
+      "AH-RAG-DELETE-001",
+      "AH-RAG-INJECTION-001",
+      "AH-RAG-QUERY-001",
+      "AH-RUNTIME-COMPACTION-001",
+      "AH-RUNTIME-MODELFALLBACK-001",
+      "AH-RUNTIME-SESSIONTREE-001",
+      "AH-RUNTIME-STEERING-001",
+      "AH-TOOL-BEHAVIOR-VERIFY-001",
+      "AH-TOOL-IMAGE-GEN-001",
+      "AH-TOOL-SPEECH-GEN-001",
+      "AH-TOOL-TRANSCRIBE-001",
+      "AH-TOOL-ESCALATE-001",
+      "AH-TOOL-WEB-FETCH-001",
+      "AH-TOOL-WEB-SEARCH-001",
+    ]);
+    expect(
+      phase2MutationRequirements.filter(
+        (entry: { mutationClass: string }) => entry.mutationClass === "core",
+      ),
+    ).toHaveLength(40);
+  });
+
+  it("binds Hook and SessionTree to every dedicated suite, including integration and security", () => {
+    const authority = loadPhase2MutationAuthority({ manifest });
+    const testsFor = (id: string) =>
+      authority.requirements.find((entry: { id: string }) => entry.id === id)
+        ?.tests;
+
+    expect(testsFor("AH-HOOK-001")).toEqual([
+      "tests/phase-2/unit/ah-hook-001.test.ts",
+      "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
+      "tests/phase-2/security/ah-hook-001-injection.test.ts",
+    ]);
+    expect(testsFor("AH-RUNTIME-SESSIONTREE-001")).toEqual([
+      "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+      "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
+      "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+    ]);
+  });
+
+  it("separates owned mutation sources from shared integration sources covered by Phase 1", () => {
+    const registry = cloneRegistry();
+    const hook = registry.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    );
+    hook.integrationSources = ["harness.ts"];
+    const authority = loadPhase2MutationAuthority({ manifest, registry });
+    const requirement = authority.requirements.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    );
+
+    expect(authority.errors).toEqual([]);
+    expect(requirement.sources).toEqual([]);
+    expect(requirement.integrationSources).toEqual(["harness.ts"]);
+    expect(requirement.integrationSourceModules).toEqual({
+      "harness.ts": ["runtime"],
+    });
+  });
+
+  it("rejects a shared integration source that escapes every Phase 1 mutation module", () => {
+    const registry = cloneRegistry();
+    const hook = registry.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    );
+    hook.integrationSources = ["runtime/uncovered-shared-consumer.ts"];
+
+    expect(
+      loadPhase2MutationAuthority({ manifest, registry }).errors.join("\n"),
+    ).toMatch(/integration source.*not covered.*Phase 1 mutation module/u);
+  });
+
+  it.each([
+    [
+      "missing",
+      (registry: unknown[]) => registry.slice(1),
+      /missing requirement/u,
+    ],
+    [
+      "duplicate",
+      (registry: unknown[]) => [...registry, structuredClone(registry[0])],
+      /duplicate requirement/u,
+    ],
+    [
+      "unknown",
+      (registry: unknown[]) => [
+        ...registry,
+        {
+          id: "AH-UNKNOWN-001",
+          mutationClass: "critical",
+          status: "not_started",
+          sources: [],
+          tests: [],
+        },
+      ],
+      /unknown requirement/u,
+    ],
+  ])("rejects a %s registry entry set", (_name, mutate, pattern) => {
+    const authority = loadPhase2MutationAuthority({
+      manifest,
+      registry: mutate(cloneRegistry()),
+    });
+    expect(authority.errors.join("\n")).toMatch(pattern);
+  });
+
+  it("fails closed when the manifest class or threshold differs", () => {
+    const classDrift = structuredClone(manifest);
+    classDrift.requirements[0].mutation_class = "core";
+    expect(
+      loadPhase2MutationAuthority({ manifest: classDrift }).errors.join("\n"),
+    ).toMatch(/mutation class.*exactly match/u);
+
+    const thresholdDrift = structuredClone(manifest);
+    thresholdDrift.mutation_thresholds.critical = 91;
+    expect(
+      loadPhase2MutationAuthority({
+        manifest: thresholdDrift,
+      }).errors.join("\n"),
+    ).toMatch(/critical threshold.*exactly 90/u);
+  });
+
+  it("does not let an empty full-phase scope pass and resolves diagnostics exactly", () => {
+    const authority = loadPhase2MutationAuthority({ manifest });
+    const readiness = inspectPhase2MutationReadiness({
+      authority,
+      repositoryRoot,
+    });
+
+    expect(readiness).toMatchObject({
+      ok: false,
+      completed: 0,
+      required: 64,
+    });
+    expect(readiness.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "mutation_incomplete" }),
+      ]),
+    );
+    expect(resolvePhase2MutationTarget("AH-RAG-QUERY-001", authority).id).toBe(
+      "AH-RAG-QUERY-001",
+    );
+    expect(() =>
+      resolvePhase2MutationTarget("AH-UNKNOWN-001", authority),
+    ).toThrow(/unknown Phase 2 mutation target/u);
+  });
+
+  it("does not treat symlinked source or test paths as mutation-ready files", () => {
+    const root = mkdtempSync(resolve(tmpdir(), "phase2-mutation-paths-"));
+    try {
+      const sourceTarget = resolve(root, "source-target.ts");
+      const testTarget = resolve(root, "test-target.ts");
+      writeFileSync(sourceTarget, "export const value = true;\n", "utf8");
+      writeFileSync(testTarget, "export {};\n", "utf8");
+      symlinkSync(sourceTarget, resolve(root, "source.ts"));
+      symlinkSync(testTarget, resolve(root, "test.ts"));
+
+      const readiness = inspectPhase2MutationReadiness({
+        repositoryRoot: root,
+        authority: {
+          errors: [],
+          manifestSha256: "a".repeat(64),
+          registrySha256: "b".repeat(64),
+          thresholds: phase2MutationThresholds,
+          requirements: [
+            {
+              id: "AH-SYNTHETIC-001",
+              mutationClass: "critical",
+              threshold: 90,
+              status: "ready",
+              sources: ["source.ts"],
+              tests: ["test.ts"],
+            },
+          ],
+        },
+      });
+
+      expect(readiness.ready).toEqual([]);
+      expect(readiness.incomplete[0]?.missingSources).toEqual(["source.ts"]);
+      expect(readiness.incomplete[0]?.missingTests).toEqual(["test.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it(
+    "wires the package command to the real runner and reports 0/64 as mutation_incomplete",
+    { timeout: 30_000 },
+    () => {
+      const packageJson = JSON.parse(
+        readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
+      );
+      expect(packageJson.scripts["test:mutation:phase2"]).toBe(
+        "node scripts/run-phase2-mutation.mjs phase2",
+      );
+      const run = spawnSync(
+        "npm",
+        ["run", "test:mutation:phase2", "--silent"],
+        {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          shell: false,
+          timeout: 30_000,
+        },
+      );
+      expect(run.status, run.stderr).toBe(1);
+      expect(JSON.parse(run.stdout)).toMatchObject({
+        target: "phase2",
+        status: "FAIL",
+        completed: 0,
+        required: 64,
+        blockers: [{ code: "mutation_incomplete", completed: 0, required: 64 }],
+      });
+    },
+  );
+});
+
+describe("Phase 2 mutation report integrity", () => {
+  it("accepts only a complete threshold-passing 64-requirement report", () => {
+    const authority = readyAuthority();
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: passingResults(authority),
+    });
+
+    expect(report.status).toBe("PASS");
+    expect(report.evidence_eligible).toBe(true);
+    expect(report.phase1_mutation_registry_sha256).toBe(
+      authority.phase1MutationSha256,
+    );
+    expect(report.tree_sha).toBe("f".repeat(40));
+    expect(report.completed).toBe(64);
+    expect(validatePhase2MutationReport(report, authority)).toEqual([]);
+  });
+
+  it.each([
+    [
+      "missing result",
+      (results: unknown[]) => results.slice(1),
+      /partial|missing/u,
+    ],
+    [
+      "duplicate result",
+      (results: unknown[]) => [...results, structuredClone(results[0])],
+      /duplicate/u,
+    ],
+    [
+      "unknown result",
+      (results: Array<Record<string, unknown>>) => [
+        ...results,
+        { ...structuredClone(results[0]), requirement_id: "AH-UNKNOWN-001" },
+      ],
+      /unknown/u,
+    ],
+  ])("rejects a %s in full mode", (_name, mutate, pattern) => {
+    const authority = readyAuthority();
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: mutate(passingResults(authority)),
+    });
+    expect(validatePhase2MutationReport(report, authority).join("\n")).toMatch(
+      pattern,
+    );
+    expect(report.status).toBe("FAIL");
+    expect(report.evidence_eligible).toBe(false);
+  });
+
+  it("rejects mixed SHAs, partial chunks, and a below-threshold result", () => {
+    const authority = readyAuthority();
+    const results = passingResults(authority);
+    results[0].commit_sha = "f".repeat(40);
+    results[0].tree_sha = "e".repeat(40);
+    results[1].expected_chunk_count = 2;
+    results[3].configuration_hash = "f".repeat(64);
+    results[2].counts = counts(8, 2);
+    results[2].score = 80;
+    results[2].per_file[results[2].sources[0]] = {
+      ...counts(8, 2),
+      score: 80,
+    };
+    results[2].status = "FAIL";
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results,
+    });
+    const errors = validatePhase2MutationReport(report, authority).join("\n");
+
+    expect(errors).toMatch(/mixed commit SHA/u);
+    expect(errors).toMatch(/mixed tree SHA/u);
+    expect(errors).toMatch(/partial chunk/u);
+    expect(errors).toMatch(/below.*85/u);
+    expect(errors).toMatch(/configuration_hash mismatch/u);
+    expect(report.status).toBe("FAIL");
+  });
+
+  it("rejects an aggregate pass when any source file is below its requirement threshold", () => {
+    const authority = readyAuthority();
+    const requirement = authority.requirements[0];
+    const secondSource = "packages/synthetic/src/second-source.ts";
+    requirement.sources.push(secondSource);
+    const results = passingResults(authority);
+    const result = results[0];
+    result.counts = counts(9, 1);
+    result.score = 90;
+    result.per_file[result.sources[0]] = {
+      ...counts(9, 0),
+      score: 100,
+    };
+    result.per_file[secondSource] = { ...counts(0, 1), score: 0 };
+    result.expected_chunk_count = 2;
+    result.chunks.push({
+      ...result.chunks[0],
+      chunk_id: `${requirement.id.toLowerCase()}-second-source-1-10`,
+      source_file: secondSource,
+    });
+
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results,
+    });
+
+    expect(report.status).toBe("FAIL");
+    expect(report.errors.join("\n")).toMatch(/per-file.*below.*90/u);
+  });
+
+  it("binds the formal report to the exact frozen thresholds", () => {
+    const authority = readyAuthority();
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: passingResults(authority),
+    });
+    report.thresholds.critical = 89;
+
+    expect(validatePhase2MutationReport(report, authority).join("\n")).toMatch(
+      /thresholds mismatch/u,
+    );
+  });
+
+  it("rejects report drift in shared integration sources or their Phase 1 coverage", () => {
+    const authority = readyAuthority();
+    const results = passingResults(authority);
+    results[0].integration_sources = ["harness.ts"];
+    results[0].integration_source_modules = { "harness.ts": ["runtime"] };
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results,
+    });
+
+    expect(report.status).toBe("FAIL");
+    expect(report.errors.join("\n")).toMatch(/integration source/u);
+  });
+
+  it("rejects an empty full report instead of treating an empty aggregate as PASS", () => {
+    const authority = readyAuthority();
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: [],
+    });
+
+    expect(report.status).toBe("FAIL");
+    expect(report.evidence_eligible).toBe(false);
+    expect(validatePhase2MutationReport(report, authority).join("\n")).toMatch(
+      /empty|partial|missing/u,
+    );
+  });
+});

@@ -14,6 +14,10 @@ import { fileURLToPath } from "node:url";
 
 import { checkPhase2ContractDrift } from "./check-contract-drift.mjs";
 import {
+  inspectPhase2MutationReadiness,
+  loadPhase2MutationAuthority,
+} from "./phase2-mutation.mjs";
+import {
   checkActivePhase2Stubs,
   createPhase2EvidenceRecords,
   loadPhase2Authority,
@@ -46,6 +50,9 @@ export const RUNNER_BINDING_PATHS = Object.freeze([
   "scripts/gates/materialize-git-tree.mjs",
   "scripts/check-workspace-boundaries.mjs",
   "scripts/gates/check-workspace-coverage.mjs",
+  "scripts/gates/phase2-mutation.mjs",
+  "scripts/run-phase2-mutation.mjs",
+  "scripts/run-process-tree.mjs",
 ]);
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -314,7 +321,10 @@ export const collectGateBindings = (repositoryRoot) => {
     "mutation",
     "vitest.mutation.config.ts",
     "scripts/run-mutation.mjs",
+    "scripts/run-phase2-mutation.mjs",
+    "scripts/run-process-tree.mjs",
     "scripts/check-mutation-thresholds.mjs",
+    "scripts/gates/phase2-mutation.mjs",
   ]);
   const runner = hashPaths(root, RUNNER_BINDING_PATHS);
   const contracts = checkPhase2ContractDrift({ repositoryRoot: root });
@@ -610,16 +620,19 @@ export const publishPhase2Evidence = ({
 
 const RELEASE_AUTHORITY = Symbol("phase2-release-authority");
 
-const verifyPhase2Implementation = async ({
-  repositoryRoot = DEFAULT_REPOSITORY_ROOT,
-  mode = "dev",
-  runner = runCommand,
-  identityCollector = collectGateBindings,
-  evidencePublisher = publishPhase2Evidence,
-  evidenceFailureInjector,
-  reportPath,
-  signal,
-} = {}, authorityToken) => {
+const verifyPhase2Implementation = async (
+  {
+    repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+    mode = "dev",
+    runner = runCommand,
+    identityCollector = collectGateBindings,
+    evidencePublisher = publishPhase2Evidence,
+    evidenceFailureInjector,
+    reportPath,
+    signal,
+  } = {},
+  authorityToken,
+) => {
   if (!new Set(["dev", "local"]).has(mode))
     throw new Error(`unsupported Phase 2 gate mode: ${String(mode)}`);
   const root = resolve(repositoryRoot);
@@ -632,6 +645,36 @@ const verifyPhase2Implementation = async ({
   const identity = identityCollector(root);
   const errors = [...identity.errors];
   const blockers = [];
+  let mutationReadiness = {
+    ok: false,
+    completed: 0,
+    required: 64,
+    manifestSha256: null,
+    registrySha256: null,
+    phase1MutationSha256: null,
+  };
+  let mutationIncompleteError = null;
+  if (mode === "local") {
+    try {
+      mutationReadiness = inspectPhase2MutationReadiness({
+        authority: loadPhase2MutationAuthority({ repositoryRoot: root }),
+        repositoryRoot: root,
+      });
+      if (!mutationReadiness.ok) {
+        blockers.push(...mutationReadiness.blockers);
+        if (mutationReadiness.errors.length > 0) {
+          errors.push(...mutationReadiness.errors);
+        } else {
+          mutationIncompleteError = `Phase 2 mutation incomplete: ${mutationReadiness.completed}/${mutationReadiness.required}`;
+        }
+      }
+    } catch (error) {
+      errors.push(
+        `Phase 2 mutation authority failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      blockers.push({ code: "mutation_configuration_invalid" });
+    }
+  }
   const hasReleaseAuthority = authorityToken === RELEASE_AUTHORITY;
   if (mode === "local" && !hasReleaseAuthority) {
     blockers.push({ code: "non_authoritative_export" });
@@ -660,6 +703,7 @@ const verifyPhase2Implementation = async ({
       });
     }
   }
+  if (mutationIncompleteError !== null) errors.push(mutationIncompleteError);
   const postIdentity = mode === "local" ? identityCollector(root) : identity;
   let identityStable = mode !== "local";
   if (mode === "local") {
@@ -796,6 +840,7 @@ const verifyPhase2Implementation = async ({
   const releaseReady =
     mode === "local" &&
     hasReleaseAuthority &&
+    mutationReadiness.ok &&
     execution.ok &&
     evidence.count === 64 &&
     errors.length === 0;
@@ -812,6 +857,14 @@ const verifyPhase2Implementation = async ({
         : { requirementsVerified: 0, evidencePassed: 0 },
     errors,
     blockers,
+    mutation: {
+      ready: mutationReadiness.ok,
+      completed: mutationReadiness.completed,
+      required: mutationReadiness.required,
+      manifestSha256: mutationReadiness.manifestSha256,
+      registrySha256: mutationReadiness.registrySha256,
+      phase1MutationSha256: mutationReadiness.phase1MutationSha256,
+    },
     bindings: postIdentity.bindings,
     evidence,
     commands: execution.results,
