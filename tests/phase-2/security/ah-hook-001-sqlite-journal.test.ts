@@ -430,6 +430,10 @@ db.close();`,
         '32-byte Hook journal masterKey is required',
       ],
       [
+        { masterKey: undefined, ownerId: 'owner', leaseMs: 1_000 },
+        '32-byte Hook journal masterKey is required',
+      ],
+      [
         { masterKey, ownerId: 'owner', leaseMs: 0 },
         'Hook journal leaseMs must be a positive safe integer',
       ],
@@ -483,6 +487,36 @@ db.close();`,
       count: 0,
     });
     raw.close();
+    journal.close();
+  });
+
+  it('accepts an exact required-only scope and replays without optional keys', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'required-scope-owner',
+      leaseMs: 1_000,
+      nowMs: () => 0,
+    });
+    const requiredScope: HookScope = {
+      tenant_id: 'tenant-required',
+      run_id: 'run-required',
+      session_id: 'session-required',
+    };
+    const input = claimInput('required-scope', requiredScope);
+    await journal.commit(
+      claimedToken(await journal.claim(input)),
+      record(input, 'required-secret'),
+    );
+    const replay = await journal.claim(input);
+    expect(replay.status).toBe('replay');
+    if (replay.status !== 'replay') throw new Error('expected replay');
+    expect(replay.record.scope).toEqual(requiredScope);
+    expect(Object.keys(replay.record.scope).sort()).toEqual([
+      'run_id',
+      'session_id',
+      'tenant_id',
+    ]);
     journal.close();
   });
 
@@ -673,4 +707,92 @@ db.close();`,
       reopened.close();
     },
   );
+
+  it('fails closed on invalid encryption metadata and legacy populated migration', () => {
+    const invalidSaltPath = fixture();
+    new SqliteHookJournal(invalidSaltPath, {
+      masterKey,
+      ownerId: 'salt-initializer',
+      leaseMs: 1_000,
+    }).close();
+    const invalidSalt = new Database(invalidSaltPath);
+    invalidSalt
+      .prepare("UPDATE hook_journal_metadata SET value = '' WHERE key = 'encryption_salt'")
+      .run();
+    invalidSalt.close();
+    expect(
+      () =>
+        new SqliteHookJournal(invalidSaltPath, {
+          masterKey,
+          ownerId: 'salt-reader',
+          leaseMs: 1_000,
+        }),
+    ).toThrow('Hook journal encryption salt invalid');
+
+    const legacyPath = fixture();
+    new SqliteHookJournal(legacyPath, {
+      masterKey,
+      ownerId: 'legacy-initializer',
+      leaseMs: 1_000,
+    }).close();
+    const legacy = new Database(legacyPath);
+    legacy.prepare("DELETE FROM hook_journal_metadata WHERE key = 'encryption_key_check'").run();
+    legacy
+      .prepare(
+        `INSERT INTO hook_journal (
+          tenant_id, run_id, session_id, operation_id, attempt_id,
+          idempotency_key, event, input_hash, state, owner_id,
+          claim_token_hash, lease_expires_at_ms, outcome_ciphertext,
+          created_at_ms, updated_at_ms
+        ) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, 'RECONCILIATION', NULL, NULL, NULL, NULL, 0, 0)`,
+      )
+      .run(
+        'legacy-tenant',
+        'legacy-run',
+        'legacy-session',
+        'legacy-key',
+        'pre_tool_use',
+        'a'.repeat(64),
+      );
+    legacy.close();
+    expect(
+      () =>
+        new SqliteHookJournal(legacyPath, {
+          masterKey,
+          ownerId: 'legacy-reader',
+          leaseMs: 1_000,
+        }),
+    ).toThrow('Hook journal key-check migration requires an empty journal');
+  });
+
+  it('rejects a committed row without authenticated outcome bytes', async () => {
+    const path = fixture();
+    const input = claimInput('incomplete-commit');
+    const writer = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'incomplete-writer',
+      leaseMs: 1_000,
+    });
+    await writer.claim(input);
+    writer.close();
+    const raw = new Database(path);
+    raw
+      .prepare(
+        `UPDATE hook_journal
+         SET state = 'COMMITTED', owner_id = NULL, claim_token_hash = NULL,
+             lease_expires_at_ms = NULL, outcome_ciphertext = NULL
+         WHERE idempotency_key = ?`,
+      )
+      .run(input.idempotency_key);
+    raw.close();
+    const reader = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'incomplete-reader',
+      leaseMs: 1_000,
+    });
+    await expect(reader.claim(input)).rejects.toThrow(
+      'Hook journal committed row is incomplete',
+    );
+    reader.close();
+  });
 });

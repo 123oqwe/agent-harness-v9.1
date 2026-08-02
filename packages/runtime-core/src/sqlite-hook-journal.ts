@@ -98,16 +98,6 @@ function validateScope(scope: HookScope): void {
     requiredId("attempt_id", scope.attempt_id);
 }
 
-function sameScope(left: HookScope, right: HookScope): boolean {
-  return (
-    left.tenant_id === right.tenant_id &&
-    left.run_id === right.run_id &&
-    left.session_id === right.session_id &&
-    left.operation_id === right.operation_id &&
-    left.attempt_id === right.attempt_id
-  );
-}
-
 function rowScope(row: JournalRow): HookScope {
   return Object.freeze({
     tenant_id: row.tenant_id,
@@ -438,7 +428,8 @@ export class SqliteHookJournal implements HookJournalPort {
     inputHash: string,
   ): void {
     if (
-      !sameScope(rowScope(row), scope) ||
+      (row.operation_id ?? undefined) !== scope.operation_id ||
+      (row.attempt_id ?? undefined) !== scope.attempt_id ||
       row.event !== event ||
       row.input_hash !== inputHash
     ) {
