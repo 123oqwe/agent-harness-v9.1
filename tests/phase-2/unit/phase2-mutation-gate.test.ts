@@ -151,47 +151,25 @@ describe("Phase 2 mutation authority", () => {
     );
   });
 
-  it("classifies only security, recovery, permission, and egress boundaries as critical", () => {
+  it("preserves the frozen all-critical Phase 2 mutation classification", () => {
     const criticalIds = phase2MutationRequirements
       .filter(
         (entry: { mutationClass: string }) =>
           entry.mutationClass === "critical",
       )
       .map((entry: { id: string }) => entry.id);
-    expect(criticalIds).toEqual([
-      "AH-CONTEXT-COMPILER-001",
-      "AH-DOC-INGEST-WEB-001",
-      "AH-HOOK-001",
-      "AH-MCP-STDIO-001",
-      "AH-MM-DOC-VISION-001",
-      "AH-MM-IMAGE-EDIT-001",
-      "AH-MM-IMAGE-GEN-001",
-      "AH-MM-VISION-VERIFY-001",
-      "AH-PAUSE-RESUME-001",
-      "AH-SANDBOX-OCI-001",
-      "AH-RAG-DELETE-001",
-      "AH-RAG-INJECTION-001",
-      "AH-RAG-QUERY-001",
-      "AH-RUNTIME-COMPACTION-001",
-      "AH-RUNTIME-MODELFALLBACK-001",
-      "AH-RUNTIME-SESSIONTREE-001",
-      "AH-RUNTIME-STEERING-001",
-      "AH-TOOL-BEHAVIOR-VERIFY-001",
-      "AH-TOOL-IMAGE-GEN-001",
-      "AH-TOOL-SPEECH-GEN-001",
-      "AH-TOOL-TRANSCRIBE-001",
-      "AH-TOOL-ESCALATE-001",
-      "AH-TOOL-WEB-FETCH-001",
-      "AH-TOOL-WEB-SEARCH-001",
-    ]);
+    expect(criticalIds).toHaveLength(64);
+    expect(criticalIds).toEqual(
+      phase2MutationRequirements.map((entry: { id: string }) => entry.id),
+    );
     expect(
       phase2MutationRequirements.filter(
         (entry: { mutationClass: string }) => entry.mutationClass === "core",
       ),
-    ).toHaveLength(40);
+    ).toHaveLength(0);
   });
 
-  it("binds Hook and SessionTree to every dedicated suite, including integration and security", () => {
+  it("does not pre-bind Hook or SessionTree suites before those batches integrate", () => {
     const authority = loadPhase2MutationAuthority({ manifest });
     const testsFor = (id: string) =>
       authority.requirements.find((entry: { id: string }) => entry.id === id)
@@ -199,13 +177,9 @@ describe("Phase 2 mutation authority", () => {
 
     expect(testsFor("AH-HOOK-001")).toEqual([
       "tests/phase-2/unit/ah-hook-001.test.ts",
-      "tests/phase-2/integration/ah-hook-001-pipeline.test.ts",
-      "tests/phase-2/security/ah-hook-001-injection.test.ts",
     ]);
     expect(testsFor("AH-RUNTIME-SESSIONTREE-001")).toEqual([
       "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
-      "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
-      "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
     ]);
   });
 
@@ -618,7 +592,7 @@ describe("Phase 2 mutation report integrity", () => {
     expect(errors).toMatch(/mixed commit SHA/u);
     expect(errors).toMatch(/mixed tree SHA/u);
     expect(errors).toMatch(/partial chunk/u);
-    expect(errors).toMatch(/below.*85/u);
+    expect(errors).toMatch(/below.*90/u);
     expect(errors).toMatch(/configuration_hash mismatch/u);
     expect(report.status).toBe("FAIL");
   });

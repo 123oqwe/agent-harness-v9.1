@@ -122,8 +122,12 @@ const matchesGrammar = (args) => {
         (rest[0] === "--reverse" && rest[1] === "HEAD"))
     );
   if (command === "cat-file")
-    return rest.length === 2 && rest[0] === "blob" &&
-      (/^[0-9a-f]{40}$/u.test(rest[1]) || OBJECT_PATH.test(rest[1]));
+    return (
+      rest.length === 2 &&
+      ((rest[0] === "blob" &&
+        (/^[0-9a-f]{40}$/u.test(rest[1]) || OBJECT_PATH.test(rest[1]))) ||
+        (rest[0] === "-p" && OBJECT_PATH.test(rest[1])))
+    );
   if (command === "status")
     return JSON.stringify(rest) === JSON.stringify(["--porcelain=v1", "--untracked-files=all"]) ||
       JSON.stringify(rest) === JSON.stringify(["--porcelain=v1", "-z", "--untracked-files=all", "--", "."]);

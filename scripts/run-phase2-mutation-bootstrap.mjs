@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 
 const GIT = "/usr/bin/git";
-const PHASE1_BASELINE = "2d59a526fcf7cd067fbe9d44981537a42d441360";
+const PHASE1_BASELINE = "8dca581e11b8043aed257cb07c5161237633c40e";
 export const PHASE2_BOOTSTRAP_AUTHORITY_PATHS = Object.freeze([
   "mutation/modules.mjs",
   "mutation/phase2-modules.mjs",
@@ -958,6 +958,27 @@ const run = async () => {
   git(root, ["merge-base", "--is-ancestor", PHASE1_BASELINE, commitSha]);
   for (const path of AUTHORITY_PATHS) assertWorkingRegular(root, commitSha, path);
   assertRegularCommitTree(root, commitSha);
+
+  // This is fail-fast only: source inspection can reject a not-ready registry,
+  // but only the isolated snapshot verifier below can authorize execution.
+  const committedRegistrySource = git(root, [
+    "cat-file",
+    "blob",
+    `${commitSha}:mutation/phase2-modules.mjs`,
+  ]);
+  const committedExplicitReady =
+    committedRegistrySource.match(/status\s*:\s*["']ready["']/gu)?.length ?? 0;
+  const committedReadyByDefault = /status\s*=\s*["']ready["']/u.test(
+    committedRegistrySource,
+  );
+  if (!committedReadyByDefault && committedExplicitReady !== 64) {
+    safeWrite(
+      process.stdout,
+      `${JSON.stringify({ batch_sha256: null, report_sha256: null, path: null, status: "FAIL" })}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const parent = mkdtempSync(join(tmpdir(), "phase2-candidate-snapshot-"));
   const snapshot = join(parent, "repository");

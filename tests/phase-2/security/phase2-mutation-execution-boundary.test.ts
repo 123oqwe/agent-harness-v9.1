@@ -330,9 +330,12 @@ describe("Phase 2 mutation execution security boundary", () => {
       git(root, "update-index", "--assume-unchanged", "mutation/phase2-modules.mjs");
       expect(git(root, "status", "--porcelain=v1")).toBe("");
 
-      copyFileSync(
-        join(harnessRoot, "scripts/run-phase2-mutation-bootstrap.mjs"),
+      writeFileSync(
         join(root, "scripts/run-phase2-mutation-bootstrap.mjs"),
+        `${readFileSync(
+          join(harnessRoot, "scripts/run-phase2-mutation-bootstrap.mjs"),
+          "utf8",
+        )}\n`,
       );
       git(root, "add", "scripts/run-phase2-mutation-bootstrap.mjs");
       git(

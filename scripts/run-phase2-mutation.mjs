@@ -55,7 +55,7 @@ const EXACT_STRYKER_BASE = Object.freeze({
   cleanTempDir: "always",
 });
 export const PHASE2_EXPECTED_PHASE1_SHA =
-  "2d59a526fcf7cd067fbe9d44981537a42d441360";
+  "8dca581e11b8043aed257cb07c5161237633c40e";
 export const PHASE2_MUTATION_AUTHORITY_PATHS = Object.freeze([
   "mutation/phase2-modules.mjs",
   "mutation/modules.mjs",

@@ -27,7 +27,7 @@ import {
 } from "../../../scripts/run-phase2-mutation-bootstrap.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
-const expectedPhase1Sha = "2d59a526fcf7cd067fbe9d44981537a42d441360";
+const expectedPhase1Sha = "8dca581e11b8043aed257cb07c5161237633c40e";
 const requiredAuthorityPaths = [
   "mutation/modules.mjs",
   "mutation/phase2-modules.mjs",
