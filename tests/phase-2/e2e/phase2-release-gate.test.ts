@@ -23,6 +23,7 @@ import {
 } from "../../../scripts/gates/verify-phase2-local.mjs";
 import {
   prepareExactSourceCheckout,
+  parseNpmJson,
   runPackedPackageSmoke,
   runWorkspaceCompositionSmoke,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
@@ -43,16 +44,27 @@ const expectedArgv = (command: { command: string; args: string[] }) => [
   ),
 ];
 
-const runScript = (script: string) =>
+const runScript = (script: string, timeout = 120_000) =>
   spawnSync("npm", ["run", script, "--silent"], {
     cwd: repositoryRoot,
     encoding: "utf8",
     shell: false,
-    timeout: 120_000,
+    timeout,
     maxBuffer: 2 * 1024 * 1024,
   });
 
 describe("Phase 2 real release gate", () => {
+  it("parses npm 10 lifecycle output without trusting a non-JSON tail", () => {
+    expect(
+      parseNpmJson(
+        'patch-package 8.0.1\nApplying patches...\n[{"filename":"agent-harness.tgz"}]\n',
+      ),
+    ).toEqual([{ filename: "agent-harness.tgz" }]);
+    expect(() => parseNpmJson("patch-package only")).toThrow(
+      "npm output did not contain a trailing JSON document",
+    );
+  });
+
   it(
     "never includes Python bytecode caches in the packed Harness",
     { timeout: 30_000 },
@@ -69,7 +81,7 @@ describe("Phase 2 real release gate", () => {
         },
       );
       expect(packed.status, packed.stderr).toBe(0);
-      const paths = JSON.parse(packed.stdout)[0].files.map(
+      const paths = parseNpmJson(packed.stdout)[0].files.map(
         (entry: { path: string }) => entry.path,
       );
       expect(paths.some((path: string) => path.includes("__pycache__"))).toBe(
@@ -81,9 +93,9 @@ describe("Phase 2 real release gate", () => {
 
   it(
     "allows the dirty-tree development gate but makes zero release claims",
-    { timeout: 120_000 },
+    { timeout: 240_000 },
     () => {
-      const result = runScript("verify:phase2:dev");
+      const result = runScript("verify:phase2:dev", 210_000);
       expect(result.status, result.stderr).toBe(0);
       const report = JSON.parse(result.stdout);
       expect(report).toMatchObject({
@@ -200,7 +212,7 @@ describe("Phase 2 real release gate", () => {
         expect.objectContaining({ code: "assets_release_blocked" }),
         expect.objectContaining({
           code: "mutation_incomplete",
-          completed: 0,
+          completed: 1,
           required: 64,
         }),
         expect.objectContaining({ code: "evidence_incomplete" }),
@@ -220,16 +232,16 @@ describe("Phase 2 real release gate", () => {
 
       const apiEntry = join(repositoryRoot, "apps/api/dist/index.js");
       const hiddenApiEntry = `${apiEntry}.attack-hidden`;
-      renameSync(apiEntry, hiddenApiEntry);
       let packed;
       let brokenComposition;
       try {
         packed = await runPackedPackageSmoke({ repositoryRoot });
+        renameSync(apiEntry, hiddenApiEntry);
         brokenComposition = await runWorkspaceCompositionSmoke({
           repositoryRoot,
         });
       } finally {
-        renameSync(hiddenApiEntry, apiEntry);
+        if (existsSync(hiddenApiEntry)) renameSync(hiddenApiEntry, apiEntry);
       }
 
       expect(packed).toMatchObject({

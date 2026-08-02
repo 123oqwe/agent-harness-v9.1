@@ -18,7 +18,7 @@ const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
 const EXPECTED_REQUIREMENT_COUNT = 64;
 const SUPERSEDED_PHASE1_SHA = "bf5eac648527205603de7d26278276ad78819850";
 export const AUTHORITY_CANONICAL_SHA256 =
-  "f0ee8953eea22b141a7b56dd3ecf4602ff616e6f760699997f8cdd20f8883df9";
+  "479249631363af1ec55115d8767c98dfb3898e6ceaa98374effe8aaa8505d0c7";
 export const PHASE1_HARDENING_BINDING_SHA256 =
   "13623818373a47cc0bc240b259d759fb96aa28b9c81bbe07e08fdbd0b904ab78";
 
@@ -292,6 +292,12 @@ const REQUIREMENT_KEYS = new Set([
   "mutation_class",
   "source_files",
   "test_files",
+  "owned_sources",
+  "integration_sources",
+  "runtime_assets",
+  "behavioral_tests",
+  "security_tests",
+  "mutation_configs",
 ]);
 const SOURCE_AUTHORITY_KEYS = new Set([
   "id",
@@ -1102,6 +1108,12 @@ const addFrozenAuthorityErrors = (
     "mutation_class",
     "source_files",
     "test_files",
+    "owned_sources",
+    "integration_sources",
+    "runtime_assets",
+    "behavioral_tests",
+    "security_tests",
+    "mutation_configs",
   ];
   for (const id of REQUIRED_REQUIREMENT_IDS) {
     const expected = frozenAuthority.requirementsById.get(id);
@@ -1498,6 +1510,52 @@ const validatePhase2ManifestInternal = (manifest, manifestCanonicalHash) => {
       validateStringList(errors, entry[field], `requirement ${id} ${field}`, {
         nonEmpty: true,
       });
+    }
+    const ownershipFields = [
+      "owned_sources",
+      "integration_sources",
+      "runtime_assets",
+      "behavioral_tests",
+      "security_tests",
+      "mutation_configs",
+    ];
+    const declaredOwnershipFields = ownershipFields.filter((field) =>
+      Object.hasOwn(entry, field),
+    );
+    if (
+      declaredOwnershipFields.length > 0 &&
+      declaredOwnershipFields.length !== ownershipFields.length
+    ) {
+      errors.push(
+        `requirement ${id} must declare the complete ownership graph fields together`,
+      );
+    }
+    for (const field of declaredOwnershipFields) {
+      validateStringList(errors, entry[field], `requirement ${id} ${field}`, {
+        nonEmpty: true,
+      });
+    }
+    if (
+      Array.isArray(entry.owned_sources) &&
+      Array.isArray(entry.integration_sources)
+    ) {
+      const overlap = entry.owned_sources.filter((path) =>
+        entry.integration_sources.includes(path),
+      );
+      if (overlap.length > 0) {
+        errors.push(
+          `requirement ${id} owned_sources and integration_sources overlap: ${overlap.join(", ")}`,
+        );
+      }
+    }
+    if (
+      Array.isArray(entry.source_files) &&
+      Array.isArray(entry.owned_sources) &&
+      !entry.source_files.some((path) => entry.owned_sources.includes(path))
+    ) {
+      errors.push(
+        `requirement ${id} source_files must include at least one owned source`,
+      );
     }
     if (
       Object.hasOwn(entry, "source_files") !==

@@ -202,15 +202,15 @@ const quotedValues = (source) => [...source.matchAll(/"([^"\\]*(?:\\.[^"\\]*)*)"
 
 const parseCommittedMutationRegistry = (source) => {
   const requirements = [];
-  const call = /requirement\(\s*"([A-Z0-9-]+)"\s*,\s*"(critical|core)"\s*,\s*(\[[\s\S]*?\])\s*(?:,\s*(\{[\s\S]*?\}))?\s*\),/gu;
+  const call = /requirement\(\s*"([A-Z0-9-]+)"\s*(?:,\s*\{([\s\S]*?)\})?\s*\),/gu;
   for (const match of source.matchAll(call)) {
-    const options = match[4] ?? "";
+    const options = match[2] ?? "";
     const array = (field) => {
       const found = new RegExp(`${field}\\s*:\\s*(\\[[\\s\\S]*?\\])`, "u").exec(options);
       return found ? quotedValues(found[1]) : [];
     };
-    requirements.push({ id: match[1], mutation_class: match[2], tests: quotedValues(match[3]),
-      sources: array("sources"), integration_sources: array("integrationSources") });
+    requirements.push({ id: match[1], sources: array("sources"),
+      integration_sources: array("integrationSources") });
   }
   if (requirements.length !== 64 || new Set(requirements.map((entry) => entry.id)).size !== 64)
     throw new Error(`committed mutation registry must contain 64 unique restricted entries; received ${requirements.length}`);
@@ -248,7 +248,10 @@ const validateIndependentCandidateSemantics = ({ report, files, authority }) => 
     const threshold = authority.manifest.mutation_thresholds?.[manifest.mutation_class];
     if (result.mutation_class !== manifest.mutation_class || result.threshold !== threshold)
       errors.push(`${result.requirement_id} threshold authority mismatch`);
-    if (canonicalJson(result.tests) !== canonicalJson(registry.tests) ||
+    if (canonicalJson(registry.sources) !== canonicalJson(manifest.owned_sources ?? []) ||
+        canonicalJson(registry.integration_sources) !== canonicalJson(manifest.integration_sources ?? []))
+      errors.push(`${result.requirement_id} registry/gate source authority mismatch`);
+    if (canonicalJson(result.tests) !== canonicalJson(manifest.test_suites) ||
         canonicalJson(result.sources) !== canonicalJson(registry.sources) ||
         canonicalJson(result.integration_sources) !== canonicalJson(registry.integration_sources))
       errors.push(`${result.requirement_id} source/test authority mismatch`);

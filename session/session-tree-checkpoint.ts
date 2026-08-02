@@ -82,7 +82,10 @@ const CHECKPOINT_MAX_COUNT = 1_000_000;
 
 type DirectoryIdentity = Readonly<{ dev: number; ino: number }>;
 
-function exactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+function exactKeys(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
   return (
     !!value &&
     typeof value === "object" &&
@@ -92,11 +95,18 @@ function exactKeys(value: unknown, keys: readonly string[]): value is Record<str
 }
 
 function safeCount(value: unknown): value is number {
-  return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= CHECKPOINT_MAX_COUNT;
+  return (
+    Number.isSafeInteger(value) &&
+    (value as number) >= 0 &&
+    (value as number) <= CHECKPOINT_MAX_COUNT
+  );
 }
 
 function hash(value: unknown, allowEmpty = false): value is string {
-  return typeof value === "string" && ((allowEmpty && value === "") || /^[0-9a-f]{64}$/.test(value));
+  return (
+    typeof value === "string" &&
+    ((allowEmpty && value === "") || /^[0-9a-f]{64}$/.test(value))
+  );
 }
 
 function validScope(value: unknown): value is SessionTreeCheckpointScope {
@@ -111,41 +121,82 @@ function validScope(value: unknown): value is SessionTreeCheckpointScope {
 }
 
 function validHeads(value: unknown): value is SessionTreeCheckpointHeads {
-  if (!exactKeys(value, [
-    "version", "bound", "tree", "session_count", "command_count",
-    "sessions_hash", "security_hash", "snapshot_hash", "ownership_hash", "state_hash",
-  ])) return false;
+  if (
+    !exactKeys(value, [
+      "version",
+      "bound",
+      "tree",
+      "session_count",
+      "command_count",
+      "sessions_hash",
+      "security_hash",
+      "snapshot_hash",
+      "ownership_hash",
+      "state_hash",
+    ])
+  )
+    return false;
   if (!exactKeys(value.tree, ["seq", "hash"])) return false;
-  return value.version === 1 && typeof value.bound === "boolean" &&
-    safeCount(value.tree.seq) && hash(value.tree.hash, value.tree.seq === 0) &&
-    safeCount(value.session_count) && safeCount(value.command_count) &&
-    hash(value.sessions_hash) && hash(value.security_hash) &&
-    hash(value.snapshot_hash) && hash(value.ownership_hash) && hash(value.state_hash);
+  return (
+    value.version === 1 &&
+    typeof value.bound === "boolean" &&
+    safeCount(value.tree.seq) &&
+    hash(value.tree.hash, value.tree.seq === 0) &&
+    safeCount(value.session_count) &&
+    safeCount(value.command_count) &&
+    hash(value.sessions_hash) &&
+    hash(value.security_hash) &&
+    hash(value.snapshot_hash) &&
+    hash(value.ownership_hash) &&
+    hash(value.state_hash)
+  );
 }
 
 function validPrepare(value: unknown): value is SessionTreeCheckpointPrepare {
-  if (!exactKeys(value, [
-    "operation_id", "old_revision", "new_revision", "old_heads", "new_heads",
-  ])) return false;
+  if (
+    !exactKeys(value, [
+      "operation_id",
+      "old_revision",
+      "new_revision",
+      "old_heads",
+      "new_heads",
+    ])
+  )
+    return false;
   try {
     validateDurableIdentifier("operation_id", value.operation_id);
   } catch {
     return false;
   }
-  return safeCount(value.old_revision) && safeCount(value.new_revision) &&
+  return (
+    safeCount(value.old_revision) &&
+    safeCount(value.new_revision) &&
     value.new_revision === value.old_revision + 1 &&
-    validHeads(value.old_heads) && validHeads(value.new_heads);
+    validHeads(value.old_heads) &&
+    validHeads(value.new_heads)
+  );
 }
 
-function validState(value: unknown, scope: SessionTreeCheckpointScope): value is CheckpointState {
-  if (!exactKeys(value, ["version", "scope", "committed", "pending"]) ||
-      value.version !== 1 || !validScope(value.scope) || !same(value.scope, scope) ||
-      !exactKeys(value.committed, ["revision", "heads"]) ||
-      !safeCount(value.committed.revision) || !validHeads(value.committed.heads)) return false;
+function validState(
+  value: unknown,
+  scope: SessionTreeCheckpointScope,
+): value is CheckpointState {
+  if (
+    !exactKeys(value, ["version", "scope", "committed", "pending"]) ||
+    value.version !== 1 ||
+    !validScope(value.scope) ||
+    !same(value.scope, scope) ||
+    !exactKeys(value.committed, ["revision", "heads"]) ||
+    !safeCount(value.committed.revision) ||
+    !validHeads(value.committed.heads)
+  )
+    return false;
   return value.pending === null || validPrepare(value.pending);
 }
 
-function checkpointHost(request: Record<string, unknown>): Record<string, unknown> {
+function checkpointHost(
+  request: Record<string, unknown>,
+): Record<string, unknown> {
   const command = request.command;
   const requestKeys =
     command === "ensure"
@@ -183,6 +234,7 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
   readonly #directory: string;
   readonly #identity: DirectoryIdentity;
   readonly #key: Buffer;
+  readonly #knownAbsent = new Set<string>();
   #closed = false;
 
   constructor(directory: string, masterKey: Uint8Array) {
@@ -207,20 +259,28 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
     current: SessionTreeCheckpointHeads,
   ): Readonly<{ revision: number }> {
     this.#assertOpen();
+    const checkpointPath = this.#path(scope);
+    if (!current.bound && this.#knownAbsent.has(checkpointPath)) {
+      return { revision: 0 };
+    }
     const state = this.#read(scope);
     if (!state) {
       if (current.bound) {
         throw new Error("session tree checkpoint is missing for a bound scope");
       }
+      this.#knownAbsent.add(checkpointPath);
       return { revision: 0 };
     }
+    this.#knownAbsent.delete(checkpointPath);
     if (state.pending) {
       if (
         state.pending.old_revision !== state.committed.revision ||
         !same(state.pending.old_heads, state.committed.heads) ||
         state.pending.new_revision !== state.committed.revision + 1
       ) {
-        throw new Error("session tree checkpoint pending transition is malformed");
+        throw new Error(
+          "session tree checkpoint pending transition is malformed",
+        );
       }
       if (same(current, state.pending.old_heads)) {
         this.#write(scope, { ...state, pending: null });
@@ -312,7 +372,9 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
           !same(state.pending.old_heads, state.committed.heads) ||
           state.pending.new_revision !== state.committed.revision + 1
         ) {
-          throw new Error("session tree checkpoint pending transition is malformed");
+          throw new Error(
+            "session tree checkpoint pending transition is malformed",
+          );
         }
         if (same(current, state.pending.old_heads)) {
           state = { ...state, pending: null };
@@ -348,7 +410,8 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
     };
     let prepared: CheckpointState | undefined;
     const stage = (newHeads: SessionTreeCheckpointHeads): void => {
-      if (prepared) throw new Error("session tree checkpoint transition staged twice");
+      if (prepared)
+        throw new Error("session tree checkpoint transition staged twice");
       const pending: SessionTreeCheckpointPrepare = {
         operation_id: operationId,
         old_revision: revision,
@@ -393,6 +456,7 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
 
   close(): void {
     if (this.#closed) return;
+    this.#knownAbsent.clear();
     this.#key.fill(0);
     this.#closed = true;
   }
@@ -412,7 +476,11 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
   }
 
   #aad(scope: SessionTreeCheckpointScope): string {
-    return stable(["session_tree_checkpoint", scope.tenant_id, scope.root_session_id]);
+    return stable([
+      "session_tree_checkpoint",
+      scope.tenant_id,
+      scope.root_session_id,
+    ]);
   }
 
   #read(scope: SessionTreeCheckpointScope): CheckpointState | null {
@@ -424,10 +492,15 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
       max_bytes: CHECKPOINT_MAX_BYTES,
     });
     if (response.missing === true) return null;
-    const envelope = Buffer.from(String(response.content), "base64").toString("utf8");
+    const envelope = Buffer.from(String(response.content), "base64").toString(
+      "utf8",
+    );
     try {
       const parts = envelope.split(":");
-      if (parts.length !== 5 || `${parts[0]}:${parts[1]}` !== "ahcheckpoint:v1") {
+      if (
+        parts.length !== 5 ||
+        `${parts[0]}:${parts[1]}` !== "ahcheckpoint:v1"
+      ) {
         throw new Error("session tree checkpoint envelope is malformed");
       }
       const nonce = Buffer.from(parts[2]!, "base64");
@@ -471,7 +544,10 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
     const nonce = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.#key, nonce);
     cipher.setAAD(Buffer.from(this.#aad(scope)));
-    const ciphertext = Buffer.concat([cipher.update(stable(state)), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(stable(state)),
+      cipher.final(),
+    ]);
     const envelope = [
       "ahcheckpoint:v1",
       nonce.toString("base64"),
@@ -486,6 +562,7 @@ export class FileSessionTreeCheckpoint implements SessionTreeCheckpointPort {
       max_bytes: CHECKPOINT_MAX_BYTES,
       content: Buffer.from(envelope).toString("base64"),
     });
+    this.#knownAbsent.delete(this.#path(scope));
   }
 
   #assertOpen(): void {

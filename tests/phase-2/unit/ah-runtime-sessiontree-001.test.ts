@@ -38,10 +38,8 @@ import {
   SqliteSessionTreeAuthority,
   type SecurityStateResolver,
 } from "../../../session/sqlite-session-tree-authority.js";
-import {
-  SessionTree as PublicSessionTree,
-  SqliteSessionTreeAuthority as PublicSqliteSessionTreeAuthority,
-} from "../../../index.js";
+import { SessionTree as PublicSessionTree } from "../../../packages/runtime-core/src/index.js";
+import { SqliteSessionTreeAuthority as PublicSqliteSessionTreeAuthority } from "../../../index.js";
 
 const scope = Object.freeze({
   tenant_id: "tenant-a",
@@ -76,7 +74,8 @@ describe("AH-RUNTIME-SESSIONTREE-001 canonical session event codec", () => {
       "summary",
     ]);
     expect(Object.isFrozen(SESSION_EVENT_TYPES)).toBe(true);
-    for (const type of SESSION_EVENT_TYPES) expect(isSessionEventType(type)).toBe(true);
+    for (const type of SESSION_EVENT_TYPES)
+      expect(isSessionEventType(type)).toBe(true);
     for (const invalid of [undefined, null, 1, {}, "", "User", "branch "]) {
       expect(isSessionEventType(invalid)).toBe(false);
     }
@@ -114,21 +113,27 @@ describe("AH-RUNTIME-SESSIONTREE-001 canonical session event codec", () => {
       second.prev_hash,
     );
     expect(first.hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(hashSessionEvent(2, first.type, first.timestamp, first.data, "")).not.toBe(
-      first.hash,
-    );
-    expect(hashSessionEvent(1, second.type, first.timestamp, first.data, "")).not.toBe(
-      first.hash,
-    );
-    expect(hashSessionEvent(1, first.type, second.timestamp, first.data, "")).not.toBe(
-      first.hash,
-    );
-    expect(hashSessionEvent(1, first.type, first.timestamp, second.data, "")).not.toBe(
-      first.hash,
-    );
-    expect(hashSessionEvent(1, first.type, first.timestamp, first.data, hash("prev"))).not.toBe(
-      first.hash,
-    );
+    expect(
+      hashSessionEvent(2, first.type, first.timestamp, first.data, ""),
+    ).not.toBe(first.hash);
+    expect(
+      hashSessionEvent(1, second.type, first.timestamp, first.data, ""),
+    ).not.toBe(first.hash);
+    expect(
+      hashSessionEvent(1, first.type, second.timestamp, first.data, ""),
+    ).not.toBe(first.hash);
+    expect(
+      hashSessionEvent(1, first.type, first.timestamp, second.data, ""),
+    ).not.toBe(first.hash);
+    expect(
+      hashSessionEvent(
+        1,
+        first.type,
+        first.timestamp,
+        first.data,
+        hash("prev"),
+      ),
+    ).not.toBe(first.hash);
     expect(() => verifySessionEventChain([first, second])).not.toThrow();
     expect(() =>
       verifySessionEventChain([first, { ...second, seq: 3 }]),
@@ -146,12 +151,16 @@ describe("AH-RUNTIME-SESSIONTREE-001 shared SQLite cryptographic authority", () 
   it("derives only from a valid persisted salt and the frozen HKDF context", () => {
     const database = new Database(":memory:");
     try {
-      database.exec("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      database.exec(
+        "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+      );
       expect(() => deriveSessionRecordKey(database, MASTER_KEY)).toThrow(
         "session encryption salt unavailable",
       );
       database
-        .prepare("INSERT INTO metadata (key, value) VALUES ('encryption_salt', ?)")
+        .prepare(
+          "INSERT INTO metadata (key, value) VALUES ('encryption_salt', ?)",
+        )
         .run(Buffer.alloc(31).toString("base64"));
       expect(() => deriveSessionRecordKey(database, MASTER_KEY)).toThrow(
         "session encryption salt invalid",
@@ -179,7 +188,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 shared SQLite cryptographic authority", () 
     try {
       const encrypted = encryptSessionString(key, "secret-value", "row:a");
       expect(hasSessionEncryptionEnvelope(encrypted)).toBe(true);
-      expect(decryptSessionString(key, encrypted, "row:a")).toBe("secret-value");
+      expect(decryptSessionString(key, encrypted, "row:a")).toBe(
+        "secret-value",
+      );
       expect(() => decryptSessionString(key, encrypted, "row:b")).toThrow();
       for (const invalid of [
         "",
@@ -196,14 +207,14 @@ describe("AH-RUNTIME-SESSIONTREE-001 shared SQLite cryptographic authority", () 
       const parts = encrypted.split(":");
       const badNonce = [...parts];
       badNonce[2] = Buffer.alloc(11).toString("base64");
-      expect(() => decryptSessionString(key, badNonce.join(":"), "row:a")).toThrow(
-        "invalid encrypted envelope",
-      );
+      expect(() =>
+        decryptSessionString(key, badNonce.join(":"), "row:a"),
+      ).toThrow("invalid encrypted envelope");
       const badTag = [...parts];
       badTag[3] = Buffer.alloc(15).toString("base64");
-      expect(() => decryptSessionString(key, badTag.join(":"), "row:a")).toThrow(
-        "invalid encrypted envelope",
-      );
+      expect(() =>
+        decryptSessionString(key, badTag.join(":"), "row:a"),
+      ).toThrow("invalid encrypted envelope");
     } finally {
       key.fill(0);
     }
@@ -359,7 +370,7 @@ class TestDurableSessionAuthority implements SessionTreeAuthorityPort {
     const sourcePoint =
       request.source.seq === 0 && request.source.hash === "" && sourcePoints
         ? request.source
-        : sourcePoints?.[request.source.seq - 1] ?? null;
+        : (sourcePoints?.[request.source.seq - 1] ?? null);
     if (!sourcePoint || sourcePoint.hash !== request.source.hash) {
       throw new SessionTreeError("STALE_SOURCE", "source point changed");
     }
@@ -404,8 +415,8 @@ class TestDurableSessionAuthority implements SessionTreeAuthorityPort {
       event: this.commit_event_transform
         ? this.commit_event_transform(clone(event))
         : this.misreport_commit_event
-        ? { ...clone(event), type: event.type === "fork" ? "branch" : "fork" }
-        : clone(event),
+          ? { ...clone(event), type: event.type === "fork" ? "branch" : "fork" }
+          : clone(event),
       duplicate: false,
     };
   }
@@ -852,17 +863,19 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     ]) {
       expect(
         () => new SessionTree(invalidScope as never, authority),
-      ).toThrowError(expect.objectContaining({
-        code: "INVALID_INPUT",
-        message: "tenant_id is invalid",
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          code: "INVALID_INPUT",
+          message: "tenant_id is invalid",
+        }),
+      );
     }
-    expect(
-      () => new SessionTree(scope, null as never),
-    ).toThrowError(expect.objectContaining({
-      code: "INVALID_INPUT",
-      message: "session tree authority is required",
-    }));
+    expect(() => new SessionTree(scope, null as never)).toThrowError(
+      expect.objectContaining({
+        code: "INVALID_INPUT",
+        message: "session tree authority is required",
+      }),
+    );
     for (const method of [
       "loadTree",
       "readSessionHead",
@@ -906,15 +919,20 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
       { seq: 1, hash: `${hash("target")}0` },
       { seq: 1, hash: `0${hash("target")}` },
     ]) {
-      await expectTreeError(tree.fork({
-        command_id: `target-${String(target.seq)}-${target.hash.length}`,
-        source_session_id: scope.root_session_id,
-        child_session_id: `target-child-${target.hash.length}`,
-        at: target,
-      }), target.seq < 1 || !Number.isSafeInteger(target.seq) ? "INVALID_TARGET" : "CORRUPT_LOG",
-      target.seq < 1 || !Number.isSafeInteger(target.seq)
-        ? "target.seq must be a positive safe integer"
-        : "target.hash must be a SHA-256 hash");
+      await expectTreeError(
+        tree.fork({
+          command_id: `target-${String(target.seq)}-${target.hash.length}`,
+          source_session_id: scope.root_session_id,
+          child_session_id: `target-child-${target.hash.length}`,
+          at: target,
+        }),
+        target.seq < 1 || !Number.isSafeInteger(target.seq)
+          ? "INVALID_TARGET"
+          : "CORRUPT_LOG",
+        target.seq < 1 || !Number.isSafeInteger(target.seq)
+          ? "target.seq must be a positive safe integer"
+          : "target.hash must be a SHA-256 hash",
+      );
     }
     const maxIdentifier = `a${"b".repeat(127)}`;
     await expect(
@@ -987,12 +1005,36 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     );
     const cases: Array<readonly [unknown, string, string]> = [
       [7, "AUTHORITY_VIOLATION", "source head is malformed"],
-      [{ ...valid, tenant_id: "tenant-b" }, "AUTHORITY_VIOLATION", "source head escaped its tenant/session scope"],
-      [{ ...valid, root_session_id: "other" }, "AUTHORITY_VIOLATION", "source head escaped its tenant/session scope"],
-      [{ ...valid, session_id: "other" }, "AUTHORITY_VIOLATION", "source head escaped its tenant/session scope"],
-      [{ ...valid, seq: -1 }, "INVALID_TARGET", "source head.seq must be a positive safe integer"],
-      [{ ...valid, hash: "bad" }, "CORRUPT_LOG", "source head.hash must be a SHA-256 hash"],
-      [{ ...valid, security: null }, "AUTHORITY_VIOLATION", "source head security is missing"],
+      [
+        { ...valid, tenant_id: "tenant-b" },
+        "AUTHORITY_VIOLATION",
+        "source head escaped its tenant/session scope",
+      ],
+      [
+        { ...valid, root_session_id: "other" },
+        "AUTHORITY_VIOLATION",
+        "source head escaped its tenant/session scope",
+      ],
+      [
+        { ...valid, session_id: "other" },
+        "AUTHORITY_VIOLATION",
+        "source head escaped its tenant/session scope",
+      ],
+      [
+        { ...valid, seq: -1 },
+        "INVALID_TARGET",
+        "source head.seq must be a positive safe integer",
+      ],
+      [
+        { ...valid, hash: "bad" },
+        "CORRUPT_LOG",
+        "source head.hash must be a SHA-256 hash",
+      ],
+      [
+        { ...valid, security: null },
+        "AUTHORITY_VIOLATION",
+        "source head security is missing",
+      ],
       [
         { ...valid, security: { ...valid!.security, authorization_epoch: -1 } },
         "AUTHORITY_VIOLATION",
@@ -1049,7 +1091,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     ] as const) {
       const authority = new TestDurableSessionAuthority();
       authority.raw_log_override = { ...scope, events: [validEvent(type)] };
-      await expect(new SessionTree(scope, authority).snapshot()).resolves.toMatchObject({
+      await expect(
+        new SessionTree(scope, authority).snapshot(),
+      ).resolves.toMatchObject({
         authority_head: { seq: 1, hash: hash(`event:${type}`) },
         nodes: [{ session_id: scope.root_session_id }],
       });
@@ -1058,26 +1102,89 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
     const cases: Array<readonly [unknown, string, string]> = [
-      [null, "AUTHORITY_VIOLATION", "authority returned a cross-scope tree log"],
+      [
+        null,
+        "AUTHORITY_VIOLATION",
+        "authority returned a cross-scope tree log",
+      ],
       [[], "AUTHORITY_VIOLATION", "authority returned a cross-scope tree log"],
-      [{ ...scope, tenant_id: "tenant-b", events: [] }, "AUTHORITY_VIOLATION", "authority returned a cross-scope tree log"],
-      [{ ...scope, root_session_id: "other", events: [] }, "AUTHORITY_VIOLATION", "authority returned a cross-scope tree log"],
-      [{ ...scope, events: {} }, "AUTHORITY_VIOLATION", "authority returned a cross-scope tree log"],
-      [{ ...scope, events: [null] }, "CORRUPT_LOG", "authority event 1 is malformed"],
-      [{ ...scope, events: [{ ...validEvent("user"), seq: 2 }] }, "CORRUPT_LOG", "authority event sequence is not contiguous at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), type: 7 }] }, "CORRUPT_LOG", "authority event type is invalid at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), type: "unknown" }] }, "CORRUPT_LOG", "authority event type is invalid at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), timestamp: 7 }] }, "CORRUPT_LOG", "authority event timestamp is invalid at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), timestamp: "" }] }, "CORRUPT_LOG", "authority event timestamp is invalid at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), prev_hash: hash("wrong") }] }, "CORRUPT_LOG", "authority event ancestry is broken at 1"],
-      [{ ...scope, events: [{ ...validEvent("user"), hash: "bad" }] }, "CORRUPT_LOG", "authority event 1.hash must be a SHA-256 hash"],
-      [{ ...scope, events: [{ ...validEvent("user"), data: undefined }] }, "AUTHORITY_VIOLATION", "authority event 1.data is not JSON-serializable"],
-      [{ ...scope, events: [{ ...validEvent("user"), data: circular }] }, "AUTHORITY_VIOLATION", "authority event 1.data is not JSON-serializable"],
+      [
+        { ...scope, tenant_id: "tenant-b", events: [] },
+        "AUTHORITY_VIOLATION",
+        "authority returned a cross-scope tree log",
+      ],
+      [
+        { ...scope, root_session_id: "other", events: [] },
+        "AUTHORITY_VIOLATION",
+        "authority returned a cross-scope tree log",
+      ],
+      [
+        { ...scope, events: {} },
+        "AUTHORITY_VIOLATION",
+        "authority returned a cross-scope tree log",
+      ],
+      [
+        { ...scope, events: [null] },
+        "CORRUPT_LOG",
+        "authority event 1 is malformed",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), seq: 2 }] },
+        "CORRUPT_LOG",
+        "authority event sequence is not contiguous at 1",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), type: 7 }] },
+        "CORRUPT_LOG",
+        "authority event type is invalid at 1",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), type: "unknown" }] },
+        "CORRUPT_LOG",
+        "authority event type is invalid at 1",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), timestamp: 7 }] },
+        "CORRUPT_LOG",
+        "authority event timestamp is invalid at 1",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), timestamp: "" }] },
+        "CORRUPT_LOG",
+        "authority event timestamp is invalid at 1",
+      ],
+      [
+        {
+          ...scope,
+          events: [{ ...validEvent("user"), prev_hash: hash("wrong") }],
+        },
+        "CORRUPT_LOG",
+        "authority event ancestry is broken at 1",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), hash: "bad" }] },
+        "CORRUPT_LOG",
+        "authority event 1.hash must be a SHA-256 hash",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), data: undefined }] },
+        "AUTHORITY_VIOLATION",
+        "authority event 1.data is not JSON-serializable",
+      ],
+      [
+        { ...scope, events: [{ ...validEvent("user"), data: circular }] },
+        "AUTHORITY_VIOLATION",
+        "authority event 1.data is not JSON-serializable",
+      ],
     ];
     for (const [rawLog, code, message] of cases) {
       const authority = new TestDurableSessionAuthority();
       authority.raw_log_override = rawLog;
-      await expectTreeError(new SessionTree(scope, authority).snapshot(), code, message);
+      await expectTreeError(
+        new SessionTree(scope, authority).snapshot(),
+        code,
+        message,
+      );
     }
   });
 
@@ -1092,30 +1199,95 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     const data = valid.data as Record<string, unknown>;
     const source = data.source as Record<string, unknown>;
     const sourceHead = data.source_head as Record<string, unknown>;
-    const malformed: Array<readonly [Record<string, unknown>, string, string]> = [
-      [{ ...data, version: 2 }, "CORRUPT_LOG", "lineage event has an unsupported payload"],
-      [{ ...data, operation: "unknown" }, "CORRUPT_LOG", "lineage operation is invalid"],
-      [{ ...data, operation: "fork" }, "CORRUPT_LOG", "lineage event type does not match its operation"],
-      [{ ...data, child_session_id: "../bad" }, "INVALID_INPUT", "lineage child_session_id is invalid"],
-      [{ ...data, source: null }, "CORRUPT_LOG", "lineage source anchors are missing"],
-      [{ ...data, source_head: null }, "CORRUPT_LOG", "lineage source anchors are missing"],
-      [{ ...data, source: { ...source, session_id: "../bad" } }, "INVALID_INPUT", "lineage source_session_id is invalid"],
-      [{ ...data, source_head: { ...sourceHead, session_id: "other" } }, "CORRUPT_LOG", "lineage source and source head disagree"],
-      [{ ...data, source: { ...source, seq: 6, hash: hash("later") } }, "CORRUPT_LOG", "lineage source is later than its recorded head"],
-      [{ ...data, source: { ...source, seq: 4, hash: hash("different") } }, "CORRUPT_LOG", "branch is not bound to the source head"],
-      [{ ...data, operation: "rewind" }, "CORRUPT_LOG", "rewind does not target historical state"],
-      [{ ...data, replay_policy: "unsafe" }, "CORRUPT_LOG", "lineage replay policy is unsafe"],
-      [{ ...data, command_id: "../bad" }, "INVALID_INPUT", "lineage command_id is invalid"],
-      [{ ...data, source: { ...source, tenant_id: "other" } }, "AUTHORITY_VIOLATION", "lineage source escaped its tenant/session scope"],
-      [{ ...data, source: { ...source, security: null } }, "AUTHORITY_VIOLATION", "lineage source security is missing"],
-    ];
+    const malformed: Array<readonly [Record<string, unknown>, string, string]> =
+      [
+        [
+          { ...data, version: 2 },
+          "CORRUPT_LOG",
+          "lineage event has an unsupported payload",
+        ],
+        [
+          { ...data, operation: "unknown" },
+          "CORRUPT_LOG",
+          "lineage operation is invalid",
+        ],
+        [
+          { ...data, operation: "fork" },
+          "CORRUPT_LOG",
+          "lineage event type does not match its operation",
+        ],
+        [
+          { ...data, child_session_id: "../bad" },
+          "INVALID_INPUT",
+          "lineage child_session_id is invalid",
+        ],
+        [
+          { ...data, source: null },
+          "CORRUPT_LOG",
+          "lineage source anchors are missing",
+        ],
+        [
+          { ...data, source_head: null },
+          "CORRUPT_LOG",
+          "lineage source anchors are missing",
+        ],
+        [
+          { ...data, source: { ...source, session_id: "../bad" } },
+          "INVALID_INPUT",
+          "lineage source_session_id is invalid",
+        ],
+        [
+          { ...data, source_head: { ...sourceHead, session_id: "other" } },
+          "CORRUPT_LOG",
+          "lineage source and source head disagree",
+        ],
+        [
+          { ...data, source: { ...source, seq: 6, hash: hash("later") } },
+          "CORRUPT_LOG",
+          "lineage source is later than its recorded head",
+        ],
+        [
+          { ...data, source: { ...source, seq: 4, hash: hash("different") } },
+          "CORRUPT_LOG",
+          "branch is not bound to the source head",
+        ],
+        [
+          { ...data, operation: "rewind" },
+          "CORRUPT_LOG",
+          "rewind does not target historical state",
+        ],
+        [
+          { ...data, replay_policy: "unsafe" },
+          "CORRUPT_LOG",
+          "lineage replay policy is unsafe",
+        ],
+        [
+          { ...data, command_id: "../bad" },
+          "INVALID_INPUT",
+          "lineage command_id is invalid",
+        ],
+        [
+          { ...data, source: { ...source, tenant_id: "other" } },
+          "AUTHORITY_VIOLATION",
+          "lineage source escaped its tenant/session scope",
+        ],
+        [
+          { ...data, source: { ...source, security: null } },
+          "AUTHORITY_VIOLATION",
+          "lineage source security is missing",
+        ],
+      ];
     for (const [badData, code, message] of malformed) {
       const candidate = new TestDurableSessionAuthority();
       candidate.raw_log_override = {
         ...scope,
         events: [{ ...valid, data: badData }],
       };
-      await expectTreeError(new SessionTree(scope, candidate).snapshot(), code, message);
+      await expectTreeError(
+        new SessionTree(scope, candidate).snapshot(),
+        code,
+        message,
+      );
     }
 
     await new SessionTree(scope, authority).branch({
@@ -1127,13 +1299,24 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
     const second = duplicateEvents[1]!;
     const secondData = second.data as Record<string, unknown>;
     for (const [field, value, message] of [
-      ["command_id", "valid-lineage", "lineage command_id appears more than once"],
-      ["child_session_id", "valid-lineage-child", "lineage child creates a duplicate or cycle"],
+      [
+        "command_id",
+        "valid-lineage",
+        "lineage command_id appears more than once",
+      ],
+      [
+        "child_session_id",
+        "valid-lineage-child",
+        "lineage child creates a duplicate or cycle",
+      ],
     ] as const) {
       const candidate = new TestDurableSessionAuthority();
       candidate.raw_log_override = {
         ...scope,
-        events: [duplicateEvents[0], { ...second, data: { ...secondData, [field]: value } }],
+        events: [
+          duplicateEvents[0],
+          { ...second, data: { ...secondData, [field]: value } },
+        ],
       };
       await expectTreeError(
         new SessionTree(scope, candidate).snapshot(),
@@ -1237,7 +1420,11 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
   });
 
   it("rejects malformed, missing, and inconsistent authority commit responses", async () => {
-    for (const [index, response] of [null, 7, { duplicate: "false" }].entries()) {
+    for (const [index, response] of [
+      null,
+      7,
+      { duplicate: "false" },
+    ].entries()) {
       const authority = new TestDurableSessionAuthority();
       authority.commit_override = response;
       await expectTreeError(
@@ -1296,7 +1483,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
       ]
     > = [
       [() => null as never, "commit result disagrees with durable log"],
-      [(event) => ({ ...event, data: null }), "commit result has invalid lineage data"],
+      [
+        (event) => ({ ...event, data: null }),
+        "commit result has invalid lineage data",
+      ],
       [
         (event) => ({
           ...event,
@@ -1307,8 +1497,14 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
         }),
         "commit result disagrees with durable log",
       ],
-      [(event) => ({ ...event, seq: event.seq + 1 }), "commit result disagrees with durable log"],
-      [(event) => ({ ...event, hash: hash("different") }), "commit result disagrees with durable log"],
+      [
+        (event) => ({ ...event, seq: event.seq + 1 }),
+        "commit result disagrees with durable log",
+      ],
+      [
+        (event) => ({ ...event, hash: hash("different") }),
+        "commit result disagrees with durable log",
+      ],
     ];
     for (const [index, [transform, message]] of transforms.entries()) {
       const authority = new TestDurableSessionAuthority();
@@ -1334,7 +1530,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SessionTree", () => {
       "typed-log",
     );
     for (const [failure, message] of [
-      [new Error("append exploded"), "session tree authority failed: append exploded"],
+      [
+        new Error("append exploded"),
+        "session tree authority failed: append exploded",
+      ],
       [7, "session tree authority failed: unknown error"],
     ] as const) {
       const authority = new TestDurableSessionAuthority();
@@ -1398,7 +1597,10 @@ function realAuthorityFixture(
   const dir = mkdtempSync(join(tmpdir(), "session-tree-"));
   const stateRoot = createTrustedSessionStateRoot(dir);
   const dbPath = join(dir, "session.db");
-  const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
+  const store = new SqliteSessionStore(dbPath, {
+    masterKey: MASTER_KEY,
+    state_root: stateRoot,
+  });
   store.createScopedRun(scope, scope.root_session_id, "root", "direct");
   const root = new DurableSession(scope.root_session_id, {
     persistence: store,
@@ -1472,7 +1674,10 @@ function expectAuthorityConstructionFailure(
   expect((thrown as Error).message).toContain(message);
 }
 
-function treeStorageRunId(dbPath: string, value: SessionTreeScope = scope): string {
+function treeStorageRunId(
+  dbPath: string,
+  value: SessionTreeScope = scope,
+): string {
   const database = new Database(dbPath, { readonly: true });
   try {
     const row = database
@@ -1480,8 +1685,7 @@ function treeStorageRunId(dbPath: string, value: SessionTreeScope = scope): stri
         "SELECT tree_run_id FROM session_tree_scopes WHERE tenant_id = ? AND root_session_id = ?",
       )
       .get(value.tenant_id, value.root_session_id) as
-      | { tree_run_id: string }
-      | undefined;
+      { tree_run_id: string } | undefined;
     if (!row) throw new Error("tree storage run is missing");
     return row.tree_run_id;
   } finally {
@@ -1497,8 +1701,7 @@ function sessionStorageRunId(dbPath: string, logicalSessionId: string): string {
         "SELECT storage_run_id FROM session_tree_sessions WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
       )
       .get(scope.tenant_id, scope.root_session_id, logicalSessionId) as
-      | { storage_run_id: string }
-      | undefined;
+      { storage_run_id: string } | undefined;
     if (!row) throw new Error("logical session storage mapping is missing");
     return row.storage_run_id;
   } finally {
@@ -1513,7 +1716,9 @@ async function directAuthorityRequest(
     child_session_id: string;
     operation?: "branch" | "fork" | "rewind";
     source?: Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>;
-    source_head?: Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>;
+    source_head?: Awaited<
+      ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>
+    >;
     expected_tree_head?: { seq: number; hash: string };
   },
 ) {
@@ -1573,7 +1778,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         source_session_id: scope.root_session_id,
         child_session_id: "opaque-overlay-child",
       });
-      const handle = fixture.authority.openSession(scope, "opaque-overlay-child");
+      const handle = fixture.authority.openSession(
+        scope,
+        "opaque-overlay-child",
+      );
       expect("durable_run_id" in handle).toBe(false);
       expect(fixture.store.getRun("opaque-overlay-child")).toBeNull();
       expect(handle.session.getEvents().map((event) => event.type)).toEqual([
@@ -1589,7 +1797,11 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           .prepare(
             "SELECT storage_run_id FROM session_tree_sessions WHERE tenant_id = ? AND root_session_id = ? AND session_id = ?",
           )
-          .get(scope.tenant_id, scope.root_session_id, "opaque-overlay-child") as {
+          .get(
+            scope.tenant_id,
+            scope.root_session_id,
+            "opaque-overlay-child",
+          ) as {
           storage_run_id: string;
         };
         const predictable = `__session_tree__${createHash("sha256")
@@ -1641,28 +1853,35 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
   });
 
   it("enforces cumulative session bytes and snapshot bytes", async () => {
-    const fixture = realAuthorityFixture({
-      max_event_bytes: 1_000,
-      max_session_bytes: 1_050,
-      max_snapshot_bytes: 32,
-    }, 0);
+    const fixture = realAuthorityFixture(
+      {
+        max_event_bytes: 1_000,
+        max_session_bytes: 1_050,
+        max_snapshot_bytes: 32,
+      },
+      0,
+    );
     try {
       const root = fixture.authority.openSession(scope, scope.root_session_id);
       root.session.acquireWriter("bytes");
       root.session.append("user", { text: "x".repeat(600) });
       expect(() =>
         root.session.append("assistant", { text: "y".repeat(600) }),
-      ).toThrowError(expect.objectContaining({
-        code: "RESOURCE_LIMIT",
-        message: "session byte limit reached",
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          code: "RESOURCE_LIMIT",
+          message: "session byte limit reached",
+        }),
+      );
       root.session.releaseWriter("bytes");
       expect(() =>
         root.session.snapshot_({ text: "z".repeat(64) }),
-      ).toThrowError(expect.objectContaining({
-        code: "RESOURCE_LIMIT",
-        message: "snapshot byte limit exceeded",
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          code: "RESOURCE_LIMIT",
+          message: "snapshot byte limit exceeded",
+        }),
+      );
     } finally {
       fixture.close();
     }
@@ -1739,7 +1958,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         message: "session recovery byte limit exceeded",
       });
       const source = readFileSync(
-        new URL("../../../session/sqlite-session-tree-authority.ts", import.meta.url),
+        new URL(
+          "../../../session/sqlite-session-tree-authority.ts",
+          import.meta.url,
+        ),
         "utf8",
       );
       expect(source).toContain("length(CAST(");
@@ -1756,44 +1978,52 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     ).toThrow(/headroom|safe integer/u);
   });
 
-  it("keeps lineage off the live parent log and allows the parent to continue", async () => {
-    const fixture = realAuthorityFixture();
-    try {
-      const parentBefore = fixture.store.loadEvents(scope.root_session_id);
-      await new SessionTree(scope, fixture.authority).branch({
-        command_id: "independent-lineage",
-        source_session_id: scope.root_session_id,
-        child_session_id: "independent-child",
-      });
-      expect(fixture.store.loadEvents(scope.root_session_id)).toEqual(parentBefore);
-      const parent = fixture.authority.openSession(
-        scope,
-        scope.root_session_id,
-      ).session;
-      parent.acquireWriter("continue-parent");
-      expect(parent.append("assistant", { text: "continued" }).seq).toBe(4);
-      parent.releaseWriter("continue-parent");
-      expect(fixture.store.loadEvents(scope.root_session_id)).toHaveLength(4);
-
-      const database = new Database(fixture.dbPath, { readonly: true });
+  it(
+    "keeps lineage off the live parent log and allows the parent to continue",
+    { timeout: 30_000 },
+    async () => {
+      const fixture = realAuthorityFixture();
       try {
-        const row = database
-          .prepare(
-            "SELECT tree_run_id FROM session_tree_scopes WHERE tenant_id = ? AND root_session_id = ?",
-          )
-          .get(scope.tenant_id, scope.root_session_id) as { tree_run_id: string };
-        expect(row.tree_run_id).not.toBe(scope.root_session_id);
-        expect(fixture.store.getRun(row.tree_run_id)).toMatchObject({
-          goal: "session tree lineage",
-          strategy: "session_tree_lineage",
+        const parentBefore = fixture.store.loadEvents(scope.root_session_id);
+        await new SessionTree(scope, fixture.authority).branch({
+          command_id: "independent-lineage",
+          source_session_id: scope.root_session_id,
+          child_session_id: "independent-child",
         });
+        expect(fixture.store.loadEvents(scope.root_session_id)).toEqual(
+          parentBefore,
+        );
+        const parent = fixture.authority.openSession(
+          scope,
+          scope.root_session_id,
+        ).session;
+        parent.acquireWriter("continue-parent");
+        expect(parent.append("assistant", { text: "continued" }).seq).toBe(4);
+        parent.releaseWriter("continue-parent");
+        expect(fixture.store.loadEvents(scope.root_session_id)).toHaveLength(4);
+
+        const database = new Database(fixture.dbPath, { readonly: true });
+        try {
+          const row = database
+            .prepare(
+              "SELECT tree_run_id FROM session_tree_scopes WHERE tenant_id = ? AND root_session_id = ?",
+            )
+            .get(scope.tenant_id, scope.root_session_id) as {
+            tree_run_id: string;
+          };
+          expect(row.tree_run_id).not.toBe(scope.root_session_id);
+          expect(fixture.store.getRun(row.tree_run_id)).toMatchObject({
+            goal: "session tree lineage",
+            strategy: "session_tree_lineage",
+          });
+        } finally {
+          database.close();
+        }
       } finally {
-        database.close();
+        fixture.close();
       }
-    } finally {
-      fixture.close();
-    }
-  });
+    },
+  );
 
   it("opens and recovers logical children without replaying source effects", async () => {
     const fixture = realAuthorityFixture();
@@ -1805,7 +2035,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       ).session;
       root.acquireWriter("source-effect");
       root.append("tool_call", { operation_id: "source-effect" });
-      root.append("tool_result", { operation_id: "source-effect", success: true });
+      root.append("tool_result", {
+        operation_id: "source-effect",
+        success: true,
+      });
       root.releaseWriter("source-effect");
       fixture.store.recordOperation({
         operation_id: "parent-operation",
@@ -1831,7 +2064,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         source_session_id: scope.root_session_id,
         child_session_id: "recoverable-child",
       });
-      const childHandle = fixture.authority.openSession(scope, "recoverable-child");
+      const childHandle = fixture.authority.openSession(
+        scope,
+        "recoverable-child",
+      );
       expect(Object.isFrozen(childHandle)).toBe(true);
       expect(childHandle.logical_session_id).toBe("recoverable-child");
       expect("durable_run_id" in childHandle).toBe(false);
@@ -1852,8 +2088,12 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       child.acquireWriter("post-snapshot-write");
       expect(child.append("assistant", { text: "after snapshot" }).seq).toBe(8);
       child.releaseWriter("post-snapshot-write");
-      expect(fixture.store.listOperations(scope.root_session_id)).toHaveLength(1);
-      expect(fixture.store.getOperationByIdempotencyKey("child-idempotency")).toBeNull();
+      expect(fixture.store.listOperations(scope.root_session_id)).toHaveLength(
+        1,
+      );
+      expect(
+        fixture.store.getOperationByIdempotencyKey("child-idempotency"),
+      ).toBeNull();
 
       fixture.authority.close();
       restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
@@ -1874,7 +2114,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         expect.objectContaining({ operation_id: "parent-operation" }),
       ]);
       recovered.acquireWriter("restart-write");
-      expect(recovered.append("assistant", { text: "after restart" }).seq).toBe(9);
+      expect(recovered.append("assistant", { text: "after restart" }).seq).toBe(
+        9,
+      );
       recovered.releaseWriter("restart-write");
       const grandchild = await new SessionTree(scope, restarted).branch({
         command_id: "grandchild-command",
@@ -1883,7 +2125,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       });
       expect(grandchild.node.source?.seq).toBe(9);
       expect(
-        restarted.openSession(scope, "recoverable-grandchild").session.getEvents(),
+        restarted
+          .openSession(scope, "recoverable-grandchild")
+          .session.getEvents(),
       ).toHaveLength(10);
     } finally {
       restarted?.close();
@@ -1891,60 +2135,75 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   }, 120_000);
 
-  it("keeps logical handles scope-bound and fails stale or closed writers before memory advances", { timeout: 10_000 }, async () => {
-    const fixture = realAuthorityFixture();
-    try {
-      await new SessionTree(scope, fixture.authority).branch({
-        command_id: "controlled-handle-command",
-        source_session_id: scope.root_session_id,
-        child_session_id: "controlled-handle-child",
-      });
-      const firstHandle = fixture.authority.openSession(
-        scope,
-        "controlled-handle-child",
-      );
-      const secondHandle = fixture.authority.openSession(
-        scope,
-        "controlled-handle-child",
-      );
-      expect(() =>
-        fixture.authority.openSession(
-          { tenant_id: "other-tenant", root_session_id: scope.root_session_id },
+  it(
+    "keeps logical handles scope-bound and fails stale or closed writers before memory advances",
+    { timeout: 10_000 },
+    async () => {
+      const fixture = realAuthorityFixture();
+      try {
+        await new SessionTree(scope, fixture.authority).branch({
+          command_id: "controlled-handle-command",
+          source_session_id: scope.root_session_id,
+          child_session_id: "controlled-handle-child",
+        });
+        const firstHandle = fixture.authority.openSession(
+          scope,
           "controlled-handle-child",
-        ),
-      ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
-      expect(() =>
-        fixture.authority.openSession(scope, "__session_tree__known"),
-      ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
+        );
+        const secondHandle = fixture.authority.openSession(
+          scope,
+          "controlled-handle-child",
+        );
+        expect(() =>
+          fixture.authority.openSession(
+            {
+              tenant_id: "other-tenant",
+              root_session_id: scope.root_session_id,
+            },
+            "controlled-handle-child",
+          ),
+        ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
+        expect(() =>
+          fixture.authority.openSession(scope, "__session_tree__known"),
+        ).toThrowError(expect.objectContaining({ code: "SOURCE_NOT_FOUND" }));
 
-      firstHandle.session.acquireWriter("first-handle");
-      expect(firstHandle.session.append("assistant", { text: "first" }).seq).toBe(5);
-      firstHandle.session.releaseWriter("first-handle");
-      secondHandle.session.acquireWriter("stale-handle");
-      expect(() =>
-        secondHandle.session.append("assistant", { text: "stale" }),
-      ).toThrowError(expect.objectContaining({
-        code: "STALE_SOURCE",
-        message: "logical session head advanced concurrently",
-      }));
-      secondHandle.session.releaseWriter("stale-handle");
-      expect(secondHandle.session.eventCount()).toBe(4);
+        firstHandle.session.acquireWriter("first-handle");
+        expect(
+          firstHandle.session.append("assistant", { text: "first" }).seq,
+        ).toBe(5);
+        firstHandle.session.releaseWriter("first-handle");
+        secondHandle.session.acquireWriter("stale-handle");
+        expect(() =>
+          secondHandle.session.append("assistant", { text: "stale" }),
+        ).toThrowError(
+          expect.objectContaining({
+            code: "STALE_SOURCE",
+            message: "logical session head advanced concurrently",
+          }),
+        );
+        secondHandle.session.releaseWriter("stale-handle");
+        expect(secondHandle.session.eventCount()).toBe(4);
 
-      fixture.authority.close();
-      firstHandle.session.acquireWriter("closed-handle");
-      expect(() =>
-        firstHandle.session.append("assistant", { text: "closed" }),
-      ).toThrow("session tree authority is closed");
-      firstHandle.session.releaseWriter("closed-handle");
-      expect(firstHandle.session.eventCount()).toBe(5);
-    } finally {
-      fixture.close();
-    }
-  });
+        fixture.authority.close();
+        firstHandle.session.acquireWriter("closed-handle");
+        expect(() =>
+          firstHandle.session.append("assistant", { text: "closed" }),
+        ).toThrow("session tree authority is closed");
+        firstHandle.session.releaseWriter("closed-handle");
+        expect(firstHandle.session.eventCount()).toBe(5);
+      } finally {
+        fixture.close();
+      }
+    },
+  );
 
   it("invalidates previously opened handles when their durable mapping changes", async () => {
     for (const operation of ["append", "snapshot"] as const) {
-      const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+      const fixture = realAuthorityFixture(
+        undefined,
+        3,
+        PASSTHROUGH_CHECKPOINT,
+      );
       try {
         await new SessionTree(scope, fixture.authority).branch({
           command_id: `mapping-${operation}`,
@@ -1976,13 +2235,17 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           handle.session.acquireWriter("mapping-change");
           expect(() =>
             handle.session.append("assistant", { text: "must fail" }),
-          ).toThrowError(expect.objectContaining({
-            code: "AUTHORITY_VIOLATION",
-            message: "logical session mapping changed",
-          }));
+          ).toThrowError(
+            expect.objectContaining({
+              code: "AUTHORITY_VIOLATION",
+              message: "logical session mapping changed",
+            }),
+          );
           handle.session.releaseWriter("mapping-change");
         } else {
-          expect(() => handle.session.snapshot_({ text: "must fail" })).toThrowError(
+          expect(() =>
+            handle.session.snapshot_({ text: "must fail" }),
+          ).toThrowError(
             expect.objectContaining({
               code: "AUTHORITY_VIOLATION",
               message: "logical session mapping changed",
@@ -1995,103 +2258,115 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("enforces logical-session event and payload limits at exact boundaries", { timeout: 20_000 }, async () => {
-    const exactSessionLimit = realAuthorityFixture(
-      { max_session_events: 3 },
-      1,
-    );
-    try {
-      await new SessionTree(scope, exactSessionLimit.authority).branch({
-        command_id: "exact-session-limit",
-        source_session_id: scope.root_session_id,
-        child_session_id: "exact-session-child",
-      });
-      const handle = exactSessionLimit.authority.openSession(
-        scope,
-        "exact-session-child",
-      );
-      handle.session.acquireWriter("exact-session");
-      expect(handle.session.append("assistant", { ok: true }).seq).toBe(3);
-      handle.session.releaseWriter("exact-session");
-    } finally {
-      exactSessionLimit.close();
-    }
-
-    const exhaustedSession = realAuthorityFixture(
-      { max_session_events: 2 },
-      1,
-    );
-    try {
-      await new SessionTree(scope, exhaustedSession.authority).branch({
-        command_id: "exhausted-session-limit",
-        source_session_id: scope.root_session_id,
-        child_session_id: "exhausted-session-child",
-      });
-      const handle = exhaustedSession.authority.openSession(
-        scope,
-        "exhausted-session-child",
-      );
-      handle.session.acquireWriter("exhausted-session");
-      expect(() =>
-        handle.session.append("assistant", { denied: true }),
-      ).toThrowError(expect.objectContaining({
-        code: "RESOURCE_LIMIT",
-        message: "session event limit reached",
-      }));
-      handle.session.releaseWriter("exhausted-session");
-    } finally {
-      exhaustedSession.close();
-    }
-
-    for (const [length, accepted] of [
-      [989, true],
-      [990, false],
-    ] as const) {
-      const payloadFixture = realAuthorityFixture(
-        { max_event_bytes: 1_000 },
+  it(
+    "enforces logical-session event and payload limits at exact boundaries",
+    { timeout: 20_000 },
+    async () => {
+      const exactSessionLimit = realAuthorityFixture(
+        { max_session_events: 3 },
         1,
       );
       try {
-        await new SessionTree(scope, payloadFixture.authority).branch({
-          command_id: `payload-boundary-${length}`,
+        await new SessionTree(scope, exactSessionLimit.authority).branch({
+          command_id: "exact-session-limit",
           source_session_id: scope.root_session_id,
-          child_session_id: `payload-boundary-child-${length}`,
+          child_session_id: "exact-session-child",
         });
-        const handle = payloadFixture.authority.openSession(
+        const handle = exactSessionLimit.authority.openSession(
           scope,
-          `payload-boundary-child-${length}`,
+          "exact-session-child",
         );
-        handle.session.acquireWriter(`payload-${length}`);
-        if (accepted) {
-          expect(
-            handle.session.append("assistant", { text: "x".repeat(length) }).seq,
-          ).toBe(3);
-          await expect(
-            payloadFixture.authority.readSessionHead(
-              scope,
-              `payload-boundary-child-${length}`,
-            ),
-          ).resolves.toMatchObject({ seq: 3 });
-        } else {
-          expect(() =>
-            handle.session.append("assistant", { text: "x".repeat(length) }),
-          ).toThrowError(expect.objectContaining({
-            code: "RESOURCE_LIMIT",
-            message: "session event payload limit exceeded",
-          }));
-        }
-        handle.session.releaseWriter(`payload-${length}`);
+        handle.session.acquireWriter("exact-session");
+        expect(handle.session.append("assistant", { ok: true }).seq).toBe(3);
+        handle.session.releaseWriter("exact-session");
       } finally {
-        payloadFixture.close();
+        exactSessionLimit.close();
       }
-    }
-  });
+
+      const exhaustedSession = realAuthorityFixture(
+        { max_session_events: 2 },
+        1,
+      );
+      try {
+        await new SessionTree(scope, exhaustedSession.authority).branch({
+          command_id: "exhausted-session-limit",
+          source_session_id: scope.root_session_id,
+          child_session_id: "exhausted-session-child",
+        });
+        const handle = exhaustedSession.authority.openSession(
+          scope,
+          "exhausted-session-child",
+        );
+        handle.session.acquireWriter("exhausted-session");
+        expect(() =>
+          handle.session.append("assistant", { denied: true }),
+        ).toThrowError(
+          expect.objectContaining({
+            code: "RESOURCE_LIMIT",
+            message: "session event limit reached",
+          }),
+        );
+        handle.session.releaseWriter("exhausted-session");
+      } finally {
+        exhaustedSession.close();
+      }
+
+      for (const [length, accepted] of [
+        [989, true],
+        [990, false],
+      ] as const) {
+        const payloadFixture = realAuthorityFixture(
+          { max_event_bytes: 1_000 },
+          1,
+        );
+        try {
+          await new SessionTree(scope, payloadFixture.authority).branch({
+            command_id: `payload-boundary-${length}`,
+            source_session_id: scope.root_session_id,
+            child_session_id: `payload-boundary-child-${length}`,
+          });
+          const handle = payloadFixture.authority.openSession(
+            scope,
+            `payload-boundary-child-${length}`,
+          );
+          handle.session.acquireWriter(`payload-${length}`);
+          if (accepted) {
+            expect(
+              handle.session.append("assistant", { text: "x".repeat(length) })
+                .seq,
+            ).toBe(3);
+            await expect(
+              payloadFixture.authority.readSessionHead(
+                scope,
+                `payload-boundary-child-${length}`,
+              ),
+            ).resolves.toMatchObject({ seq: 3 });
+          } else {
+            expect(() =>
+              handle.session.append("assistant", { text: "x".repeat(length) }),
+            ).toThrowError(
+              expect.objectContaining({
+                code: "RESOURCE_LIMIT",
+                message: "session event payload limit exceeded",
+              }),
+            );
+          }
+          handle.session.releaseWriter(`payload-${length}`);
+        } finally {
+          payloadFixture.close();
+        }
+      }
+    },
+  );
 
   it("persists genesis snapshots and rejects stale or corrupt logical snapshots", () => {
     const genesis = realAuthorityFixture(undefined, 0);
     try {
       const first = genesis.authority.openSession(scope, scope.root_session_id);
-      const second = genesis.authority.openSession(scope, scope.root_session_id);
+      const second = genesis.authority.openSession(
+        scope,
+        scope.root_session_id,
+      );
       expect(first.session.snapshot_({ genesis: true })).toMatchObject({
         last_seq: 0,
         last_hash: "",
@@ -2110,24 +2385,36 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
 
     for (const summary of [null, "plaintext"] as const) {
-      const corrupt = realAuthorityFixture(undefined, 0, PASSTHROUGH_CHECKPOINT);
+      const corrupt = realAuthorityFixture(
+        undefined,
+        0,
+        PASSTHROUGH_CHECKPOINT,
+      );
       try {
-        const handle = corrupt.authority.openSession(scope, scope.root_session_id);
+        const handle = corrupt.authority.openSession(
+          scope,
+          scope.root_session_id,
+        );
         handle.session.snapshot_({ valid: true });
         const database = new Database(corrupt.dbPath);
         try {
           database
             .prepare("UPDATE snapshots SET summary_json = ? WHERE run_id = ?")
-            .run(summary, sessionStorageRunId(corrupt.dbPath, scope.root_session_id));
+            .run(
+              summary,
+              sessionStorageRunId(corrupt.dbPath, scope.root_session_id),
+            );
         } finally {
           database.close();
         }
         expect(() =>
           corrupt.authority.openSession(scope, scope.root_session_id),
-        ).toThrowError(expect.objectContaining({
-          code: "CORRUPT_LOG",
-          message: "logical session snapshot is malformed",
-        }));
+        ).toThrowError(
+          expect.objectContaining({
+            code: "CORRUPT_LOG",
+            message: "logical session snapshot is malformed",
+          }),
+        );
       } finally {
         corrupt.close();
       }
@@ -2174,13 +2461,17 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         state_root: fixture.stateRoot,
         security_resolver: fixture.resolver,
       });
-      expect(await new SessionTree(scope, restarted).snapshot()).toEqual(before);
+      expect(await new SessionTree(scope, restarted).snapshot()).toEqual(
+        before,
+      );
       await new SessionTree(scope, restarted).branch({
         command_id: "sqlite-branch-b",
         source_session_id: "sqlite-child-a",
         child_session_id: "sqlite-child-b",
       });
-      const node = (await new SessionTree(scope, restarted).snapshot()).nodes.at(-1);
+      const node = (
+        await new SessionTree(scope, restarted).snapshot()
+      ).nodes.at(-1);
       expect(node?.source?.seq).toBe(4);
     } finally {
       restarted?.close();
@@ -2213,41 +2504,63 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         "sqlite-concurrent-child-a",
         "sqlite-concurrent-child-b",
       ]);
-      expect((await new SessionTree(scope, second).snapshot()).nodes).toHaveLength(3);
+      expect(
+        (await new SessionTree(scope, second).snapshot()).nodes,
+      ).toHaveLength(3);
     } finally {
       second?.close();
       fixture.close();
     }
   }, 120_000);
 
-  it("isolates identical logical session IDs by tenant and rejects cross-scope reads", { timeout: 10_000 }, async () => {
-    const fixture = realAuthorityFixture();
-    const tenantB = { tenant_id: "tenant-b", root_session_id: "session-root-b" };
-    try {
-      fixture.store.createScopedRun(tenantB, tenantB.root_session_id, "root-b", "direct");
-      fixture.authority.bindRoot(tenantB, tenantB.root_session_id, security("b"));
-      await new SessionTree(scope, fixture.authority).branch({
-        command_id: "same-command",
-        source_session_id: scope.root_session_id,
-        child_session_id: "same-child",
-      });
-      await new SessionTree(tenantB, fixture.authority).branch({
-        command_id: "same-command",
-        source_session_id: tenantB.root_session_id,
-        child_session_id: "same-child",
-      });
-      expect((await new SessionTree(scope, fixture.authority).snapshot()).nodes).toHaveLength(2);
-      expect((await new SessionTree(tenantB, fixture.authority).snapshot()).nodes).toHaveLength(2);
-      await expect(
-        fixture.authority.readSessionHead(scope, tenantB.root_session_id),
-      ).resolves.toBeNull();
-      await expect(
-        fixture.authority.readSessionPoint(scope, tenantB.root_session_id, 1),
-      ).resolves.toBeNull();
-    } finally {
-      fixture.close();
-    }
-  });
+  it(
+    "isolates identical logical session IDs by tenant and rejects cross-scope reads",
+    { timeout: 10_000 },
+    async () => {
+      const fixture = realAuthorityFixture();
+      const tenantB = {
+        tenant_id: "tenant-b",
+        root_session_id: "session-root-b",
+      };
+      try {
+        fixture.store.createScopedRun(
+          tenantB,
+          tenantB.root_session_id,
+          "root-b",
+          "direct",
+        );
+        fixture.authority.bindRoot(
+          tenantB,
+          tenantB.root_session_id,
+          security("b"),
+        );
+        await new SessionTree(scope, fixture.authority).branch({
+          command_id: "same-command",
+          source_session_id: scope.root_session_id,
+          child_session_id: "same-child",
+        });
+        await new SessionTree(tenantB, fixture.authority).branch({
+          command_id: "same-command",
+          source_session_id: tenantB.root_session_id,
+          child_session_id: "same-child",
+        });
+        expect(
+          (await new SessionTree(scope, fixture.authority).snapshot()).nodes,
+        ).toHaveLength(2);
+        expect(
+          (await new SessionTree(tenantB, fixture.authority).snapshot()).nodes,
+        ).toHaveLength(2);
+        await expect(
+          fixture.authority.readSessionHead(scope, tenantB.root_session_id),
+        ).resolves.toBeNull();
+        await expect(
+          fixture.authority.readSessionPoint(scope, tenantB.root_session_id, 1),
+        ).resolves.toBeNull();
+      } finally {
+        fixture.close();
+      }
+    },
+  );
 
   it("rejects persisted hash tampering during restart reconstruction", async () => {
     const fixture = realAuthorityFixture();
@@ -2262,10 +2575,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       const treeRunId = treeStorageRunId(fixture.dbPath);
       const db = new Database(fixture.dbPath);
       try {
-        db.prepare("UPDATE events SET hash = ? WHERE run_id = ? AND seq = 1").run(
-          "f".repeat(64),
-          treeRunId,
-        );
+        db.prepare(
+          "UPDATE events SET hash = ? WHERE run_id = ? AND seq = 1",
+        ).run("f".repeat(64), treeRunId);
       } finally {
         db.close();
       }
@@ -2361,7 +2673,10 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     const dir = mkdtempSync(join(tmpdir(), "session-tree-invalid-"));
     const stateRoot = createTrustedSessionStateRoot(dir);
     const dbPath = join(dir, "session.db");
-    const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
+    const store = new SqliteSessionStore(dbPath, {
+      masterKey: MASTER_KEY,
+      state_root: stateRoot,
+    });
     const resolver = new MutableSecurityResolver();
     let authority: SqliteSessionTreeAuthority | undefined;
     try {
@@ -2447,10 +2762,12 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
             scope.root_session_id,
             invalidSecurity as never,
           ),
-        ).toThrowError(expect.objectContaining({
-          code: "AUTHORITY_VIOLATION",
-          message: "security state is malformed",
-        }));
+        ).toThrowError(
+          expect.objectContaining({
+            code: "AUTHORITY_VIOLATION",
+            message: "security state is malformed",
+          }),
+        );
       }
       const epochZero = { ...security("root"), authorization_epoch: 0 };
       openAuthority.bindRoot(scope, scope.root_session_id, epochZero);
@@ -2485,9 +2802,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           { name: "session_tree_sessions" },
         ]);
         expect(
-          db.prepare("SELECT value FROM metadata WHERE key = ?").get(
-            "session_tree_schema_version",
-          ),
+          db
+            .prepare("SELECT value FROM metadata WHERE key = ?")
+            .get("session_tree_schema_version"),
         ).toEqual({ value: "2" });
         db.prepare("UPDATE metadata SET value = '3' WHERE key = ?").run(
           "session_tree_schema_version",
@@ -2513,83 +2830,116 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     "rejects every persisted event-envelope corruption",
     { timeout: 120_000 },
     async () => {
-    const corruptions: Array<readonly [string, string, unknown, string]> = [
-      ["seq", "UPDATE events SET seq = ? WHERE run_id = ? AND seq = 1", 0, "invalid session event envelope at 1"],
-      ["type", "UPDATE events SET type = ? WHERE run_id = ? AND seq = 1", "bogus", "invalid session event envelope at 1"],
-      ["timestamp", "UPDATE events SET timestamp = ? WHERE run_id = ? AND seq = 1", "", "invalid session event envelope at 1"],
-      ["prev_hash", "UPDATE events SET prev_hash = ? WHERE run_id = ? AND seq = 1", "f".repeat(64), "invalid session event envelope at 1"],
-      ["hash", "UPDATE events SET hash = ? WHERE run_id = ? AND seq = 1", "f".repeat(64), "session event hash mismatch at 1"],
-      ["encrypted data", "UPDATE events SET data_json = ? WHERE run_id = ? AND seq = 1", "plaintext", "invalid session event data at 1"],
-    ];
-    for (const [label, statement, replacement, message] of corruptions) {
-      const fixture = realAuthorityFixture();
-      let restarted: SqliteSessionTreeAuthority | undefined;
-      try {
-        await new SessionTree(scope, fixture.authority).branch({
-          command_id: `corruption-${label.replaceAll(" ", "-")}`,
-          source_session_id: scope.root_session_id,
-          child_session_id: `corruption-child-${label.replaceAll(" ", "-")}`,
-        });
-        fixture.authority.close();
-        const treeRunId = treeStorageRunId(fixture.dbPath);
-        const db = new Database(fixture.dbPath);
+      const corruptions: Array<readonly [string, string, unknown, string]> = [
+        [
+          "seq",
+          "UPDATE events SET seq = ? WHERE run_id = ? AND seq = 1",
+          0,
+          "invalid session event envelope at 1",
+        ],
+        [
+          "type",
+          "UPDATE events SET type = ? WHERE run_id = ? AND seq = 1",
+          "bogus",
+          "invalid session event envelope at 1",
+        ],
+        [
+          "timestamp",
+          "UPDATE events SET timestamp = ? WHERE run_id = ? AND seq = 1",
+          "",
+          "invalid session event envelope at 1",
+        ],
+        [
+          "prev_hash",
+          "UPDATE events SET prev_hash = ? WHERE run_id = ? AND seq = 1",
+          "f".repeat(64),
+          "invalid session event envelope at 1",
+        ],
+        [
+          "hash",
+          "UPDATE events SET hash = ? WHERE run_id = ? AND seq = 1",
+          "f".repeat(64),
+          "session event hash mismatch at 1",
+        ],
+        [
+          "encrypted data",
+          "UPDATE events SET data_json = ? WHERE run_id = ? AND seq = 1",
+          "plaintext",
+          "invalid session event data at 1",
+        ],
+      ];
+      for (const [label, statement, replacement, message] of corruptions) {
+        const fixture = realAuthorityFixture();
+        let restarted: SqliteSessionTreeAuthority | undefined;
         try {
-          db.prepare(statement).run(replacement, treeRunId);
-        } finally {
-          db.close();
-        }
-        expect(
-          () => {
+          await new SessionTree(scope, fixture.authority).branch({
+            command_id: `corruption-${label.replaceAll(" ", "-")}`,
+            source_session_id: scope.root_session_id,
+            child_session_id: `corruption-child-${label.replaceAll(" ", "-")}`,
+          });
+          fixture.authority.close();
+          const treeRunId = treeStorageRunId(fixture.dbPath);
+          const db = new Database(fixture.dbPath);
+          try {
+            db.prepare(statement).run(replacement, treeRunId);
+          } finally {
+            db.close();
+          }
+          expect(() => {
             restarted = new SqliteSessionTreeAuthority(fixture.dbPath, {
               masterKey: MASTER_KEY,
               state_root: fixture.stateRoot,
               security_resolver: fixture.resolver,
             });
-          },
-          label,
-        ).toThrowError(expect.objectContaining({ code: "CORRUPT_LOG", message }));
-      } finally {
-        restarted?.close();
-        fixture.close();
+          }, label).toThrowError(
+            expect.objectContaining({ code: "CORRUPT_LOG", message }),
+          );
+        } finally {
+          restarted?.close();
+          fixture.close();
+        }
       }
-    }
     },
   );
 
-  it("enforces per-session and depth ceilings before child creation", { timeout: 10_000 }, async () => {
-    const sessionLimited = realAuthorityFixture({ max_session_events: 1 }, 1);
-    try {
-      await expect(
-        new SessionTree(scope, sessionLimited.authority).branch({
-          command_id: "session-limit",
-          source_session_id: scope.root_session_id,
-          child_session_id: "session-limit-child",
-        }),
-      ).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
-    } finally {
-      sessionLimited.close();
-    }
+  it(
+    "enforces per-session and depth ceilings before child creation",
+    { timeout: 10_000 },
+    async () => {
+      const sessionLimited = realAuthorityFixture({ max_session_events: 1 }, 1);
+      try {
+        await expect(
+          new SessionTree(scope, sessionLimited.authority).branch({
+            command_id: "session-limit",
+            source_session_id: scope.root_session_id,
+            child_session_id: "session-limit-child",
+          }),
+        ).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
+      } finally {
+        sessionLimited.close();
+      }
 
-    const depthLimited = realAuthorityFixture({ max_depth: 1 });
-    try {
-      const tree = new SessionTree(scope, depthLimited.authority);
-      await tree.branch({
-        command_id: "depth-one",
-        source_session_id: scope.root_session_id,
-        child_session_id: "depth-child",
-      });
-      await expect(
-        tree.branch({
-          command_id: "depth-two",
-          source_session_id: "depth-child",
-          child_session_id: "depth-grandchild",
-        }),
-      ).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
-      expect((await tree.snapshot()).nodes).toHaveLength(2);
-    } finally {
-      depthLimited.close();
-    }
-  });
+      const depthLimited = realAuthorityFixture({ max_depth: 1 });
+      try {
+        const tree = new SessionTree(scope, depthLimited.authority);
+        await tree.branch({
+          command_id: "depth-one",
+          source_session_id: scope.root_session_id,
+          child_session_id: "depth-child",
+        });
+        await expect(
+          tree.branch({
+            command_id: "depth-two",
+            source_session_id: "depth-child",
+            child_session_id: "depth-grandchild",
+          }),
+        ).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
+        expect((await tree.snapshot()).nodes).toHaveLength(2);
+      } finally {
+        depthLimited.close();
+      }
+    },
+  );
 
   it("persists SQLite command idempotency and rejects conflicting replays", async () => {
     const fixture = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
@@ -2601,7 +2951,9 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
         child_session_id: "sqlite-idempotent-child",
       };
       const first = await tree.branch(command);
-      const repeated = await new SessionTree(scope, fixture.authority).branch(command);
+      const repeated = await new SessionTree(scope, fixture.authority).branch(
+        command,
+      );
       expect(first.replayed).toBe(false);
       expect(repeated.replayed).toBe(true);
       await expect(
@@ -2643,48 +2995,56 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("checks the complete tree head and enforces the exact direct tree limit", { timeout: 10_000 }, async () => {
-    const staleHash = realAuthorityFixture(undefined, 1);
-    try {
-      const request = await directAuthorityRequest(staleHash, {
-        command_id: "direct-stale-tree-hash",
-        child_session_id: "direct-stale-tree-hash-child",
-        expected_tree_head: { seq: 0, hash: hash("not-the-tree-head") },
-      });
-      await expect(
-        staleHash.authority.appendLineageEvent(request),
-      ).rejects.toMatchObject({
-        code: "TREE_HEAD_CONFLICT",
-        message: "session tree head advanced concurrently",
-      });
-    } finally {
-      staleHash.close();
-    }
+  it(
+    "checks the complete tree head and enforces the exact direct tree limit",
+    { timeout: 10_000 },
+    async () => {
+      const staleHash = realAuthorityFixture(undefined, 1);
+      try {
+        const request = await directAuthorityRequest(staleHash, {
+          command_id: "direct-stale-tree-hash",
+          child_session_id: "direct-stale-tree-hash-child",
+          expected_tree_head: { seq: 0, hash: hash("not-the-tree-head") },
+        });
+        await expect(
+          staleHash.authority.appendLineageEvent(request),
+        ).rejects.toMatchObject({
+          code: "TREE_HEAD_CONFLICT",
+          message: "session tree head advanced concurrently",
+        });
+      } finally {
+        staleHash.close();
+      }
 
-    const bounded = realAuthorityFixture({ max_tree_events: 1 }, 1);
-    try {
-      const first = await directAuthorityRequest(bounded, {
-        command_id: "direct-tree-limit-one",
-        child_session_id: "direct-tree-limit-one-child",
-      });
-      await expect(bounded.authority.appendLineageEvent(first)).resolves.toMatchObject({
-        duplicate: false,
-      });
-      const second = await directAuthorityRequest(bounded, {
-        command_id: "direct-tree-limit-two",
-        child_session_id: "direct-tree-limit-two-child",
-      });
-      await expect(
-        bounded.authority.appendLineageEvent(second),
-      ).rejects.toMatchObject({
-        code: "RESOURCE_LIMIT",
-        message: "session tree event limit reached",
-      });
-      expect((await bounded.authority.loadTree(scope)).events).toHaveLength(1);
-    } finally {
-      bounded.close();
-    }
-  });
+      const bounded = realAuthorityFixture({ max_tree_events: 1 }, 1);
+      try {
+        const first = await directAuthorityRequest(bounded, {
+          command_id: "direct-tree-limit-one",
+          child_session_id: "direct-tree-limit-one-child",
+        });
+        await expect(
+          bounded.authority.appendLineageEvent(first),
+        ).resolves.toMatchObject({
+          duplicate: false,
+        });
+        const second = await directAuthorityRequest(bounded, {
+          command_id: "direct-tree-limit-two",
+          child_session_id: "direct-tree-limit-two-child",
+        });
+        await expect(
+          bounded.authority.appendLineageEvent(second),
+        ).rejects.toMatchObject({
+          code: "RESOURCE_LIMIT",
+          message: "session tree event limit reached",
+        });
+        expect((await bounded.authority.loadTree(scope)).events).toHaveLength(
+          1,
+        );
+      } finally {
+        bounded.close();
+      }
+    },
+  );
 
   it("binds command idempotency to the event type and complete lineage payload", async () => {
     const fixture = realAuthorityFixture();
@@ -2805,22 +3165,26 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           "other-root-storage",
           security("root"),
         ),
-      ).toThrowError(expect.objectContaining({
-        name: "SessionTreeAuthorityFault",
-        code: "AUTHORITY_VIOLATION",
-        message: "root durable identity does not match scope",
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          name: "SessionTreeAuthorityFault",
+          code: "AUTHORITY_VIOLATION",
+          message: "root durable identity does not match scope",
+        }),
+      );
       expect(() =>
         fixture.authority.bindRoot(
           scope,
           scope.root_session_id,
           security("different"),
         ),
-      ).toThrowError(expect.objectContaining({
-        name: "SessionTreeAuthorityFault",
-        code: "SESSION_CONFLICT",
-        message: "root session binding conflicts",
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          name: "SessionTreeAuthorityFault",
+          code: "SESSION_CONFLICT",
+          message: "root session binding conflicts",
+        }),
+      );
       fixture.store.createRun("corrupt-tree-run", "corrupt", "direct");
       const database = new Database(fixture.dbPath);
       try {
@@ -2838,11 +3202,13 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
           scope.root_session_id,
           security("root"),
         ),
-      ).toThrowError(expect.objectContaining({
-        name: "SessionTreeAuthorityFault",
-        code: "CORRUPT_LOG",
-        message: expect.stringContaining("session tree checkpoint mismatch"),
-      }));
+      ).toThrowError(
+        expect.objectContaining({
+          name: "SessionTreeAuthorityFault",
+          code: "CORRUPT_LOG",
+          message: expect.stringContaining("session tree checkpoint mismatch"),
+        }),
+      );
       await expect(
         fixture.authority.loadTree({
           tenant_id: scope.tenant_id,
@@ -2857,173 +3223,191 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
     }
   });
 
-  it("fails closed for corrupt idempotency, stale CAS, duplicate children, and missing sources", { timeout: 15_000 }, async () => {
-    const corruptIndex = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
-    try {
-      const request = await directAuthorityRequest(corruptIndex, {
-        command_id: "corrupt-index-command",
-        child_session_id: "corrupt-index-child",
-      });
-      await corruptIndex.authority.appendLineageEvent(request);
-      const database = new Database(corruptIndex.dbPath);
+  it(
+    "fails closed for corrupt idempotency, stale CAS, duplicate children, and missing sources",
+    { timeout: 15_000 },
+    async () => {
+      const corruptIndex = realAuthorityFixture(
+        undefined,
+        3,
+        PASSTHROUGH_CHECKPOINT,
+      );
       try {
-        database
-          .prepare(
-            "UPDATE session_tree_commands SET event_seq = 999 WHERE tenant_id = ? AND root_session_id = ? AND command_id = ?",
-          )
-          .run(scope.tenant_id, scope.root_session_id, request.command_id);
-      } finally {
-        database.close();
-      }
-      await expect(
-        corruptIndex.authority.appendLineageEvent(request),
-      ).rejects.toMatchObject({
-        code: "CORRUPT_LOG",
-        message: "idempotency index points to a missing event",
-      });
-    } finally {
-      corruptIndex.close();
-    }
-
-    const staleHead = realAuthorityFixture();
-    try {
-      const request = await directAuthorityRequest(staleHead, {
-        command_id: "stale-head-command",
-        child_session_id: "stale-head-child",
-        expected_tree_head: { seq: 1, hash: hash("stale-empty-tree") },
-      });
-      await expect(
-        staleHead.authority.appendLineageEvent(request),
-      ).rejects.toMatchObject({
-        code: "TREE_HEAD_CONFLICT",
-        message: "session tree head advanced concurrently",
-      });
-    } finally {
-      staleHead.close();
-    }
-
-    for (const expected_tree_head of [
-      { seq: 4, hash: hash("valid-hash-wrong-seq") },
-      { seq: 3, hash: hash("wrong-hash-valid-seq") },
-    ]) {
-      const staleDimension = realAuthorityFixture();
-      try {
-        const currentLog = await staleDimension.authority.loadTree(scope);
-        const current = {
-          seq: currentLog.events.length,
-          hash: currentLog.events.at(-1)?.hash ?? "",
-        };
-        const isolatedMismatch =
-          expected_tree_head.seq === current.seq
-            ? { seq: current.seq, hash: expected_tree_head.hash }
-            : { seq: expected_tree_head.seq, hash: current.hash };
+        const request = await directAuthorityRequest(corruptIndex, {
+          command_id: "corrupt-index-command",
+          child_session_id: "corrupt-index-child",
+        });
+        await corruptIndex.authority.appendLineageEvent(request);
+        const database = new Database(corruptIndex.dbPath);
+        try {
+          database
+            .prepare(
+              "UPDATE session_tree_commands SET event_seq = 999 WHERE tenant_id = ? AND root_session_id = ? AND command_id = ?",
+            )
+            .run(scope.tenant_id, scope.root_session_id, request.command_id);
+        } finally {
+          database.close();
+        }
         await expect(
-          staleDimension.authority.appendLineageEvent(
-            await directAuthorityRequest(staleDimension, {
-              command_id: `stale-${isolatedMismatch.seq}-${isolatedMismatch.hash.slice(0, 4)}`,
-              child_session_id: `stale-child-${isolatedMismatch.seq}-${isolatedMismatch.hash.slice(0, 4)}`,
-              expected_tree_head: isolatedMismatch,
-            }),
-          ),
+          corruptIndex.authority.appendLineageEvent(request),
+        ).rejects.toMatchObject({
+          code: "CORRUPT_LOG",
+          message: "idempotency index points to a missing event",
+        });
+      } finally {
+        corruptIndex.close();
+      }
+
+      const staleHead = realAuthorityFixture();
+      try {
+        const request = await directAuthorityRequest(staleHead, {
+          command_id: "stale-head-command",
+          child_session_id: "stale-head-child",
+          expected_tree_head: { seq: 1, hash: hash("stale-empty-tree") },
+        });
+        await expect(
+          staleHead.authority.appendLineageEvent(request),
         ).rejects.toMatchObject({
           code: "TREE_HEAD_CONFLICT",
           message: "session tree head advanced concurrently",
         });
       } finally {
-        staleDimension.close();
+        staleHead.close();
       }
-    }
 
-    const childConflict = realAuthorityFixture();
-    try {
-      const first = await directAuthorityRequest(childConflict, {
-        command_id: "child-first-command",
-        child_session_id: "same-durable-child",
-      });
-      await childConflict.authority.appendLineageEvent(first);
-      const second = await directAuthorityRequest(childConflict, {
-        command_id: "child-second-command",
-        child_session_id: "same-durable-child",
-      });
-      await expect(
-        childConflict.authority.appendLineageEvent(second),
-      ).rejects.toMatchObject({
-        code: "SESSION_CONFLICT",
-        message: "child session already exists",
-      });
-    } finally {
-      childConflict.close();
-    }
+      for (const expected_tree_head of [
+        { seq: 4, hash: hash("valid-hash-wrong-seq") },
+        { seq: 3, hash: hash("wrong-hash-valid-seq") },
+      ]) {
+        const staleDimension = realAuthorityFixture();
+        try {
+          const currentLog = await staleDimension.authority.loadTree(scope);
+          const current = {
+            seq: currentLog.events.length,
+            hash: currentLog.events.at(-1)?.hash ?? "",
+          };
+          const isolatedMismatch =
+            expected_tree_head.seq === current.seq
+              ? { seq: current.seq, hash: expected_tree_head.hash }
+              : { seq: expected_tree_head.seq, hash: current.hash };
+          await expect(
+            staleDimension.authority.appendLineageEvent(
+              await directAuthorityRequest(staleDimension, {
+                command_id: `stale-${isolatedMismatch.seq}-${isolatedMismatch.hash.slice(0, 4)}`,
+                child_session_id: `stale-child-${isolatedMismatch.seq}-${isolatedMismatch.hash.slice(0, 4)}`,
+                expected_tree_head: isolatedMismatch,
+              }),
+            ),
+          ).rejects.toMatchObject({
+            code: "TREE_HEAD_CONFLICT",
+            message: "session tree head advanced concurrently",
+          });
+        } finally {
+          staleDimension.close();
+        }
+      }
 
-    const missingSource = realAuthorityFixture();
-    try {
-      const existing = await missingSource.authority.readSessionHead(
-        scope,
-        scope.root_session_id,
-      );
-      const missing = { ...existing!, session_id: "missing-source" };
-      const request = await directAuthorityRequest(missingSource, {
-        command_id: "missing-source-command",
-        child_session_id: "missing-source-child",
-        source: missing,
-        source_head: missing,
-      });
-      await expect(
-        missingSource.authority.appendLineageEvent(request),
-      ).rejects.toMatchObject({
-        code: "SOURCE_NOT_FOUND",
-        message: "source session does not exist",
-      });
-    } finally {
-      missingSource.close();
-    }
-  });
-
-  it("validates every source anchor and security anchor inside the SQLite transaction", { timeout: 15_000 }, async () => {
-    type AuthorityPoint = NonNullable<
-      Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>
-    >;
-    const variants: Array<{
-      source?: Partial<AuthorityPoint>;
-      source_head?: Partial<AuthorityPoint>;
-      message: string;
-    }> = [
-      { source: { seq: 99 }, message: "source session point changed" },
-      { source: { hash: hash("stale-source") }, message: "source session point changed" },
-      { source_head: { seq: 99 }, message: "source session point changed" },
-      { source_head: { hash: hash("stale-head") }, message: "source session point changed" },
-      {
-        source: { security: security("stale-source-security") },
-        message: "source security state is stale or broader",
-      },
-      {
-        source_head: { security: security("stale-head-security") },
-        message: "source security state is stale or broader",
-      },
-    ];
-    for (const [index, variant] of variants.entries()) {
-      const fixture = realAuthorityFixture();
+      const childConflict = realAuthorityFixture();
       try {
-        const current = await fixture.authority.readSessionHead(
+        const first = await directAuthorityRequest(childConflict, {
+          command_id: "child-first-command",
+          child_session_id: "same-durable-child",
+        });
+        await childConflict.authority.appendLineageEvent(first);
+        const second = await directAuthorityRequest(childConflict, {
+          command_id: "child-second-command",
+          child_session_id: "same-durable-child",
+        });
+        await expect(
+          childConflict.authority.appendLineageEvent(second),
+        ).rejects.toMatchObject({
+          code: "SESSION_CONFLICT",
+          message: "child session already exists",
+        });
+      } finally {
+        childConflict.close();
+      }
+
+      const missingSource = realAuthorityFixture();
+      try {
+        const existing = await missingSource.authority.readSessionHead(
           scope,
           scope.root_session_id,
         );
-        const source = { ...current!, ...(variant.source ?? {}) };
-        const source_head = { ...current!, ...(variant.source_head ?? {}) };
-        const request = await directAuthorityRequest(fixture, {
-          command_id: `stale-anchor-${index}`,
-          child_session_id: `stale-anchor-child-${index}`,
-          source,
-          source_head,
+        const missing = { ...existing!, session_id: "missing-source" };
+        const request = await directAuthorityRequest(missingSource, {
+          command_id: "missing-source-command",
+          child_session_id: "missing-source-child",
+          source: missing,
+          source_head: missing,
         });
         await expect(
-          fixture.authority.appendLineageEvent(request),
-        ).rejects.toMatchObject({ message: variant.message });
+          missingSource.authority.appendLineageEvent(request),
+        ).rejects.toMatchObject({
+          code: "SOURCE_NOT_FOUND",
+          message: "source session does not exist",
+        });
       } finally {
-        fixture.close();
+        missingSource.close();
       }
-    }
-  });
+    },
+  );
+
+  it(
+    "validates every source anchor and security anchor inside the SQLite transaction",
+    { timeout: 15_000 },
+    async () => {
+      type AuthorityPoint = NonNullable<
+        Awaited<ReturnType<SqliteSessionTreeAuthority["readSessionHead"]>>
+      >;
+      const variants: Array<{
+        source?: Partial<AuthorityPoint>;
+        source_head?: Partial<AuthorityPoint>;
+        message: string;
+      }> = [
+        { source: { seq: 99 }, message: "source session point changed" },
+        {
+          source: { hash: hash("stale-source") },
+          message: "source session point changed",
+        },
+        { source_head: { seq: 99 }, message: "source session point changed" },
+        {
+          source_head: { hash: hash("stale-head") },
+          message: "source session point changed",
+        },
+        {
+          source: { security: security("stale-source-security") },
+          message: "source security state is stale or broader",
+        },
+        {
+          source_head: { security: security("stale-head-security") },
+          message: "source security state is stale or broader",
+        },
+      ];
+      for (const [index, variant] of variants.entries()) {
+        const fixture = realAuthorityFixture();
+        try {
+          const current = await fixture.authority.readSessionHead(
+            scope,
+            scope.root_session_id,
+          );
+          const source = { ...current!, ...(variant.source ?? {}) };
+          const source_head = { ...current!, ...(variant.source_head ?? {}) };
+          const request = await directAuthorityRequest(fixture, {
+            command_id: `stale-anchor-${index}`,
+            child_session_id: `stale-anchor-child-${index}`,
+            source,
+            source_head,
+          });
+          await expect(
+            fixture.authority.appendLineageEvent(request),
+          ).rejects.toMatchObject({ message: variant.message });
+        } finally {
+          fixture.close();
+        }
+      }
+    },
+  );
 
   it("round-trips all durable event types and rejects malformed persisted security", async () => {
     const fixture = realAuthorityFixture();
@@ -3050,10 +3434,14 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       }
       restored.releaseWriter("all-types");
       expect(
-        fixture.authority.openSession(scope, scope.root_session_id).session.getEvents(),
+        fixture.authority
+          .openSession(scope, scope.root_session_id)
+          .session.getEvents(),
       ).toEqual(
         expect.arrayContaining(
-          DurableSession.EVENT_TYPES.map((type) => expect.objectContaining({ type })),
+          DurableSession.EVENT_TYPES.map((type) =>
+            expect.objectContaining({ type }),
+          ),
         ),
       );
     } finally {
@@ -3069,7 +3457,11 @@ describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
       JSON.stringify({ ...security("root"), authorization_epoch: 0.5 }),
     ];
     for (const value of malformedValues) {
-      const candidate = realAuthorityFixture(undefined, 3, PASSTHROUGH_CHECKPOINT);
+      const candidate = realAuthorityFixture(
+        undefined,
+        3,
+        PASSTHROUGH_CHECKPOINT,
+      );
       let recordKey: Buffer | undefined;
       try {
         const database = new Database(candidate.dbPath);

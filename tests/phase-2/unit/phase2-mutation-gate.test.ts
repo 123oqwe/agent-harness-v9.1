@@ -16,7 +16,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   phase2MutationRequirements,
-  phase2MutationThresholds,
   // @ts-expect-error The mutation registry intentionally ships as plain Node ESM.
 } from "../../../mutation/phase2-modules.mjs";
 import {
@@ -51,14 +50,23 @@ const manifest = JSON.parse(
 const cloneRegistry = () => structuredClone(phase2MutationRequirements);
 
 const readyAuthority = () => {
+  const readyManifest = structuredClone(manifest);
   const registry = cloneRegistry().map(
-    (requirement: { id: string; mutationClass: string; tests: string[] }) => ({
+    (requirement: { id: string }) => ({
       ...requirement,
       status: "ready",
       sources: [`packages/synthetic/src/${requirement.id.toLowerCase()}.ts`],
     }),
   );
-  const authority = loadPhase2MutationAuthority({ manifest, registry });
+  for (const requirement of readyManifest.requirements) {
+    requirement.owned_sources = [
+      `packages/synthetic/src/${requirement.id.toLowerCase()}.ts`,
+    ];
+  }
+  const authority = loadPhase2MutationAuthority({
+    manifest: readyManifest,
+    registry,
+  });
   expect(authority.errors).toEqual([]);
   return authority;
 };
@@ -126,12 +134,19 @@ const passingResults = (authority: ReturnType<typeof readyAuthority>) =>
   );
 
 describe("Phase 2 mutation authority", () => {
-  it("freezes exact thresholds and all 64 manifest IDs/classes/test paths", () => {
+  it("derives thresholds, classes, and tests from the gate instead of duplicating them", () => {
     const authority = loadPhase2MutationAuthority({ manifest });
 
-    expect(phase2MutationThresholds).toEqual({ critical: 90, core: 85 });
+    expect(authority.thresholds).toEqual(manifest.mutation_thresholds);
     expect(authority.errors).toEqual([]);
     expect(authority.requirements).toHaveLength(64);
+    expect(
+      phase2MutationRequirements.every(
+        (entry: Record<string, unknown>) =>
+          JSON.stringify(Object.keys(entry).sort()) ===
+          JSON.stringify(["id", "integrationSources", "sources", "status"]),
+      ),
+    ).toBe(true);
     expect(
       authority.requirements.map(
         (entry: { id: string; mutationClass: string; tests: string[] }) => [
@@ -152,7 +167,8 @@ describe("Phase 2 mutation authority", () => {
   });
 
   it("preserves the frozen all-critical Phase 2 mutation classification", () => {
-    const criticalIds = phase2MutationRequirements
+    const authority = loadPhase2MutationAuthority({ manifest });
+    const criticalIds = authority.requirements
       .filter(
         (entry: { mutationClass: string }) =>
           entry.mutationClass === "critical",
@@ -163,7 +179,7 @@ describe("Phase 2 mutation authority", () => {
       phase2MutationRequirements.map((entry: { id: string }) => entry.id),
     );
     expect(
-      phase2MutationRequirements.filter(
+      authority.requirements.filter(
         (entry: { mutationClass: string }) => entry.mutationClass === "core",
       ),
     ).toHaveLength(0);
@@ -189,7 +205,14 @@ describe("Phase 2 mutation authority", () => {
       (entry: { id: string }) => entry.id === "AH-HOOK-001",
     );
     hook.integrationSources = ["harness.ts"];
-    const authority = loadPhase2MutationAuthority({ manifest, registry });
+    const projectedManifest = structuredClone(manifest);
+    projectedManifest.requirements.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    ).integration_sources = ["harness.ts"];
+    const authority = loadPhase2MutationAuthority({
+      manifest: projectedManifest,
+      registry,
+    });
     const requirement = authority.requirements.find(
       (entry: { id: string }) => entry.id === "AH-HOOK-001",
     );
@@ -208,9 +231,16 @@ describe("Phase 2 mutation authority", () => {
       (entry: { id: string }) => entry.id === "AH-HOOK-001",
     );
     hook.integrationSources = ["runtime/uncovered-shared-consumer.ts"];
+    const projectedManifest = structuredClone(manifest);
+    projectedManifest.requirements.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    ).integration_sources = ["runtime/uncovered-shared-consumer.ts"];
 
     expect(
-      loadPhase2MutationAuthority({ manifest, registry }).errors.join("\n"),
+      loadPhase2MutationAuthority({
+        manifest: projectedManifest,
+        registry,
+      }).errors.join("\n"),
     ).toMatch(/integration source.*not covered.*Phase 1 mutation module/u);
   });
 
@@ -247,13 +277,7 @@ describe("Phase 2 mutation authority", () => {
     expect(authority.errors.join("\n")).toMatch(pattern);
   });
 
-  it("fails closed when the manifest class or threshold differs", () => {
-    const classDrift = structuredClone(manifest);
-    classDrift.requirements[0].mutation_class = "core";
-    expect(
-      loadPhase2MutationAuthority({ manifest: classDrift }).errors.join("\n"),
-    ).toMatch(/mutation class.*exactly match/u);
-
+  it("fails closed when a gate threshold leaves the frozen 90/85 policy", () => {
     const thresholdDrift = structuredClone(manifest);
     thresholdDrift.mutation_thresholds.critical = 91;
     expect(
@@ -272,7 +296,7 @@ describe("Phase 2 mutation authority", () => {
 
     expect(readiness).toMatchObject({
       ok: false,
-      completed: 0,
+      completed: 1,
       required: 64,
     });
     expect(readiness.blockers).toEqual(
@@ -304,7 +328,7 @@ describe("Phase 2 mutation authority", () => {
           errors: [],
           manifestSha256: "a".repeat(64),
           registrySha256: "b".repeat(64),
-          thresholds: phase2MutationThresholds,
+          thresholds: manifest.mutation_thresholds,
           requirements: [
             {
               id: "AH-SYNTHETIC-001",

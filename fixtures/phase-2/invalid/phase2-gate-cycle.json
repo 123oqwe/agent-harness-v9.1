@@ -445,7 +445,52 @@
       "test_suites": ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-SESSIONTREE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": [
+        "packages/runtime-core/src/index.ts",
+        "packages/runtime-core/src/session-tree.ts"
+      ],
+      "test_files": ["tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts"],
+      "owned_sources": [
+        "packages/runtime-core/src/session-tree.ts",
+        "session/session-event-codec.ts",
+        "session/session-state-root.ts",
+        "session/session-tree-checkpoint.ts",
+        "session/sqlite-authority-internals.ts",
+        "session/sqlite-session-tree-authority.ts",
+        "session/trusted-python-host.ts"
+      ],
+      "integration_sources": [
+        "session/durable-session.ts",
+        "session/run-session.ts",
+        "session/sqlite-session-store.ts"
+      ],
+      "runtime_assets": [
+        "index.ts",
+        "package.json",
+        "scripts/copy-runtime-assets.mjs",
+        "session/secure-checkpoint-host.py",
+        "session/secure-sqlite-preflight.py",
+        "session/session-store.ts",
+        "session/trusted-python-supervisor.py"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts"
+      ],
+      "security_tests": [
+        "tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts",
+        "tests/phase-2/security/ah-runtime-sessiontree-001-round6-security.test.ts",
+        "tests/phase-2/security/trusted-python-host.security.test.ts"
+      ],
+      "mutation_configs": [
+        "mutation/stryker.session-tree-core.mjs",
+        "mutation/stryker.session-event-codec.mjs",
+        "mutation/stryker.sqlite-authority-internals.mjs",
+        "mutation/stryker.sqlite-session-tree-authority.mjs",
+        "mutation/stryker.durable-session.mjs",
+        "mutation/stryker.sqlite-session-store.mjs"
+      ]
     },
     {
       "id": "AH-RUNTIME-STEERING-001",

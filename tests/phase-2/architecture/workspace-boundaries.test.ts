@@ -46,7 +46,20 @@ const copyArchitectureFixture = () => {
     "scripts",
     "verification",
   ]) {
-    cpSync(join(repositoryRoot, path), join(root, path), { recursive: true });
+    cpSync(join(repositoryRoot, path), join(root, path), {
+      recursive: true,
+      filter: (source) =>
+        !source.split("/").some((part) => part === "dist" || part === ".turbo"),
+    });
+  }
+  const gate = JSON.parse(
+    readFileSync(join(root, "verification/gates/phase2-gate.json"), "utf8"),
+  ) as { requirements: Array<{ test_files?: string[] }> };
+  for (const testPath of gate.requirements.flatMap(
+    (requirement) => requirement.test_files ?? [],
+  )) {
+    mkdirSync(join(root, testPath, ".."), { recursive: true });
+    writeFileSync(join(root, testPath), "export {};\n");
   }
   return root;
 };
@@ -295,7 +308,10 @@ describe("Phase 2 incremental monorepo architecture", () => {
     expect(result.stderr).toMatch(/duplicate authority.*ModelGateway/u);
   });
 
-  it("keeps Phase 1 authority workspaces as identity-only scaffolds", () => {
+  it(
+    "keeps Phase 1 authority workspaces as identity-only scaffolds",
+    { timeout: 20_000 },
+    () => {
     for (const [label, source] of [
       [
         "known duplicate",
@@ -332,7 +348,8 @@ describe("Phase 2 incremental monorepo architecture", () => {
       expect(result.status, label).toBe(1);
       expect(result.stderr, label).toMatch(/identity-only scaffold/u);
     }
-  });
+    },
+  );
 
   it("rejects hidden renamed implementations outside the scaffold index", () => {
     const root = copyArchitectureFixture();

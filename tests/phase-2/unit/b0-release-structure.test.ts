@@ -48,16 +48,17 @@ describe("Phase 2 batch-zero release structure", () => {
     );
   });
 
-  it("keeps the accepted Phase 1 root symbol surface byte-for-byte unchanged", () => {
+  it("preserves the accepted Phase 1 root exports and limits the Phase 2 integration port", () => {
     const accepted = spawnSync(
       "/usr/bin/git",
       ["show", `${acceptedPhase1Sha}:index.ts`],
       { cwd: repositoryRoot, encoding: "utf8", shell: false },
     );
     expect(accepted.status, accepted.stderr).toBe(0);
-    expect(readFileSync(join(repositoryRoot, "index.ts"), "utf8")).toBe(
-      accepted.stdout,
-    );
+    const current = readFileSync(join(repositoryRoot, "index.ts"), "utf8");
+    const addition = "export * from './session/session-state-root.js';\n";
+    expect(current.replace(addition, "")).toBe(accepted.stdout);
+    expect(current.split(addition)).toHaveLength(2);
   });
 
   it("proves the accepted baseline is in HEAD history and includes all 30 hardening files", () => {

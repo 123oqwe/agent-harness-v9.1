@@ -9,7 +9,6 @@ import { validateSchemaDocument } from "./json-schema.mjs";
 
 import {
   phase2MutationRequirements,
-  phase2MutationThresholds,
 } from "../../mutation/phase2-modules.mjs";
 import { mutationModules as phase1MutationModules } from "../../mutation/modules.mjs";
 
@@ -227,14 +226,14 @@ export function loadPhase2MutationAuthority({
 } = {}) {
   const errors = [];
   const thresholds = manifest?.mutation_thresholds ?? {};
-  if (thresholds.critical !== phase2MutationThresholds.critical) {
+  if (thresholds.critical !== 90) {
     errors.push(
-      `Phase 2 critical threshold must be exactly ${phase2MutationThresholds.critical}; received ${String(thresholds.critical)}`,
+      `Phase 2 critical threshold must be exactly 90; received ${String(thresholds.critical)}`,
     );
   }
-  if (thresholds.core !== phase2MutationThresholds.core) {
+  if (thresholds.core !== 85) {
     errors.push(
-      `Phase 2 core threshold must be exactly ${phase2MutationThresholds.core}; received ${String(thresholds.core)}`,
+      `Phase 2 core threshold must be exactly 85; received ${String(thresholds.core)}`,
     );
   }
 
@@ -289,14 +288,16 @@ export function loadPhase2MutationAuthority({
     if (!manifestEntry || typeof manifestEntry.id !== "string") continue;
     const entry = registryById.get(manifestEntry.id);
     if (!entry) continue;
-    if (entry.mutationClass !== manifestEntry.mutation_class) {
+    const entryKeys = Object.keys(entry).sort();
+    if (!exactArray(entryKeys, ["id", "integrationSources", "sources", "status"])) {
       errors.push(
-        `requirement ${manifestEntry.id} mutation class must exactly match manifest: expected ${String(manifestEntry.mutation_class)}, received ${String(entry.mutationClass)}`,
+        `requirement ${manifestEntry.id} mutation registry fields must be exactly id, integrationSources, sources, status`,
       );
     }
-    if (!Object.hasOwn(phase2MutationThresholds, entry.mutationClass)) {
+    const mutationClass = manifestEntry.mutation_class;
+    if (!Object.hasOwn(thresholds, mutationClass)) {
       errors.push(
-        `requirement ${manifestEntry.id} has unknown mutation class ${String(entry.mutationClass)}`,
+        `requirement ${manifestEntry.id} has unknown mutation class ${String(mutationClass)}`,
       );
     }
     if (!STATUSES.has(entry.status)) {
@@ -320,14 +321,19 @@ export function loadPhase2MutationAuthority({
         `requirement ${manifestEntry.id} integration sources must be explicit safe paths`,
       );
     }
-    if (!Array.isArray(entry.tests) || !entry.tests.every(safeRelativePath)) {
+    if (!Array.isArray(manifestEntry.test_suites) || !manifestEntry.test_suites.every(safeRelativePath)) {
       errors.push(
         `requirement ${manifestEntry.id} tests must be explicit safe paths`,
       );
     }
-    if (!exactArray(entry.tests, manifestEntry.test_suites)) {
+    if (!exactArray(entry.sources, manifestEntry.owned_sources ?? [])) {
       errors.push(
-        `requirement ${manifestEntry.id} test files must exactly match manifest test_suites`,
+        `requirement ${manifestEntry.id} owned mutation sources must exactly match gate owned_sources`,
+      );
+    }
+    if (!exactArray(entry.integrationSources, manifestEntry.integration_sources ?? [])) {
+      errors.push(
+        `requirement ${manifestEntry.id} integration sources must exactly match gate integration_sources`,
       );
     }
     if (duplicateValues(entry.sources ?? []).length > 0) {
@@ -358,7 +364,7 @@ export function loadPhase2MutationAuthority({
       }
       integrationSourceModules[source] = [...modules];
     }
-    if (duplicateValues(entry.tests ?? []).length > 0) {
+    if (duplicateValues(manifestEntry.test_suites ?? []).length > 0) {
       errors.push(
         `requirement ${manifestEntry.id} contains duplicate test files`,
       );
@@ -370,19 +376,19 @@ export function loadPhase2MutationAuthority({
     }
     requirements.push({
       id: entry.id,
-      mutationClass: entry.mutationClass,
-      threshold: phase2MutationThresholds[entry.mutationClass],
+      mutationClass,
+      threshold: thresholds[mutationClass],
       status: entry.status,
       sources: [...entry.sources],
       integrationSources: [...entry.integrationSources],
       integrationSourceModules,
-      tests: [...entry.tests],
+      tests: [...manifestEntry.test_suites],
     });
   }
 
   return {
     errors,
-    thresholds: { ...phase2MutationThresholds },
+    thresholds: { ...thresholds },
     requirements,
     manifestSha256: sha256(canonicalJson(manifest)),
     registrySha256: sha256(canonicalJson(registryEntries)),

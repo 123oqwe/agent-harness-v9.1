@@ -31,6 +31,10 @@ const { mutationModules: rawMutationModules, phase1Minimum: rawPhase1Minimum } =
     // @ts-expect-error The mutation manifest is intentionally plain ESM for Node.
     '../../mutation/modules.mjs'
   );
+const { phase2MutationRequirements } = await import(
+  // @ts-expect-error The Phase 2 execution registry is intentionally plain ESM.
+  '../../mutation/phase2-modules.mjs'
+);
 const { strykerBase } = await import(
   // @ts-expect-error The Stryker configuration is intentionally plain ESM.
   '../../mutation/stryker.base.mjs'
@@ -182,6 +186,11 @@ describe('Phase 1 mutation manifest', () => {
   });
 
   it('owns every executable Phase 1 TypeScript source exactly once', () => {
+    const phase2OwnedSources = new Set<string>(
+      phase2MutationRequirements.flatMap(
+        (requirement: { sources: readonly string[] }) => requirement.sources,
+      ),
+    );
     const assigned = new Map<string, string[]>();
     for (const [moduleName, module] of Object.entries(mutationModules)) {
       expect(module.mutate.length, moduleName).toBeGreaterThan(0);
@@ -223,10 +232,14 @@ describe('Phase 1 mutation manifest', () => {
           !sourceFile.endsWith('.d.ts') &&
           sourceFile !== 'session/session-store.ts' &&
           sourceFile !== 'runtime/reasoning-strategy.ts' &&
-          sourceFile !== 'ui/ui-state.ts',
+          sourceFile !== 'ui/ui-state.ts' &&
+          !phase2OwnedSources.has(sourceFile),
       )
       .sort();
     expect([...assigned.keys()].sort()).toEqual(executableSources);
+    expect(
+      [...assigned.keys()].filter((source) => phase2OwnedSources.has(source)),
+    ).toEqual([]);
     for (const [sourceFile, owners] of assigned) {
       expect(owners, `${sourceFile} has duplicate owners`).toHaveLength(1);
     }
