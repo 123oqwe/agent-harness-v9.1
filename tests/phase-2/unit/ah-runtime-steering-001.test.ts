@@ -51,6 +51,14 @@ const request = (
 });
 
 describe("AH-RUNTIME-STEERING-001 steering authority", () => {
+  it("preserves the typed steering error identity", () => {
+    const error = new SteeringError("typed-boundary");
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toBeInstanceOf(SteeringError);
+    expect(error.name).toBe("SteeringError");
+    expect(error.message).toBe("typed-boundary");
+  });
+
   it("delivers each queue only at its exact boundary", () => {
     const journal = new MemorySteeringJournal();
     const steering = new SteeringController({ scope: scope(), journal });
@@ -268,18 +276,25 @@ describe("AH-RUNTIME-STEERING-001 steering authority", () => {
 
   it("validates constructor scope and both journal methods independently", () => {
     const validJournal = new MemorySteeringJournal();
-    for (const options of [
-      undefined,
-      null,
-      { scope: null, journal: validJournal },
-      { scope: [], journal: validJournal },
-      { scope: { ...scope(), tenant_id: " " }, journal: validJournal },
-      { scope: { ...scope(), run_id: "" }, journal: validJournal },
-      { scope: { ...scope(), session_id: 1 }, journal: validJournal },
-    ]) {
-      expect(() => new SteeringController(options as never)).toThrow(
-        SteeringError,
-      );
+    for (const [options, message] of [
+      [undefined, "steering scope is required"],
+      [null, "steering scope is required"],
+      [{ scope: null, journal: validJournal }, "steering scope is required"],
+      [{ scope: [], journal: validJournal }, "steering scope is required"],
+      [
+        { scope: { ...scope(), tenant_id: " " }, journal: validJournal },
+        "tenant_id is required",
+      ],
+      [
+        { scope: { ...scope(), run_id: "" }, journal: validJournal },
+        "run_id is required",
+      ],
+      [
+        { scope: { ...scope(), session_id: 1 }, journal: validJournal },
+        "session_id is required",
+      ],
+    ] as const) {
+      expect(() => new SteeringController(options as never)).toThrow(message);
     }
     for (const journal of [
       undefined,
