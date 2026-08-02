@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HookSystem } from '../../../packages/runtime-core/src/index.js';
 import {
+  assertTrustedHookPlatform,
   assertTrustedHookSandboxResult,
   SandboxedHookExecutionPort,
 } from '../../../runtime/sandboxed-hook-execution-port.js';
@@ -119,6 +120,20 @@ const externalRegistration = (
   }) as const;
 
 describe('AH-HOOK-001 external Hook execution boundary', () => {
+  it('binds each trusted sandbox mechanism to its real host platform', () => {
+    expect(assertTrustedHookPlatform('seatbelt', 'darwin')).toBe('seatbelt');
+    expect(assertTrustedHookPlatform('bubblewrap', 'linux')).toBe('bubblewrap');
+    expect(() => assertTrustedHookPlatform('seatbelt', 'linux')).toThrow(
+      'simulated Seatbelt is not a trusted Hook boundary',
+    );
+    expect(() => assertTrustedHookPlatform('bubblewrap', 'darwin')).toThrow(
+      'simulated bubblewrap is not a trusted Hook boundary',
+    );
+    expect(() => assertTrustedHookPlatform('none', process.platform)).toThrow(
+      'no trusted external Hook sandbox',
+    );
+  });
+
   it('rejects a simulated fallback or mechanism change after trusted detection', () => {
     expect(() => assertTrustedHookSandboxResult('seatbelt', 'none')).toThrow(
       'changed from seatbelt to none',

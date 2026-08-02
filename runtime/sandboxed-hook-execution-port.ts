@@ -54,19 +54,20 @@ function assertSource(path: string): string {
   return resolved;
 }
 
-function trustedMechanism(): SandboxMechanism {
-  const mechanism = detectMechanism();
+export function assertTrustedHookPlatform(
+  mechanism: SandboxMechanism,
+  platform: NodeJS.Platform,
+): SandboxMechanism {
   if (mechanism === 'seatbelt') {
-    if (process.platform !== 'darwin') {
+    if (platform !== 'darwin') {
       throw new SandboxError(
         'simulated Seatbelt is not a trusted Hook boundary',
       );
     }
-    accessSync('/usr/bin/sandbox-exec', constants.X_OK);
     return mechanism;
   }
   if (mechanism === 'bubblewrap') {
-    if (process.platform !== 'linux') {
+    if (platform !== 'linux') {
       throw new SandboxError(
         'simulated bubblewrap is not a trusted Hook boundary',
       );
@@ -76,6 +77,14 @@ function trustedMechanism(): SandboxMechanism {
   throw new SandboxError(
     'no trusted external Hook sandbox with enforced file, network, env and process-tree isolation',
   );
+}
+
+function trustedMechanism(): SandboxMechanism {
+  const mechanism = assertTrustedHookPlatform(detectMechanism(), process.platform);
+  if (mechanism === 'seatbelt') {
+    accessSync('/usr/bin/sandbox-exec', constants.X_OK);
+  }
+  return mechanism;
 }
 
 export function assertTrustedHookSandboxResult(
