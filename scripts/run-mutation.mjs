@@ -28,7 +28,7 @@ import { resolveSpecRoot } from './repository-paths.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
 const harnessRoot = resolve(dirname(scriptPath), '..');
 const reportsDir = join(harnessRoot, 'reports', 'mutation');
-const mutationAuthorityFiles = [
+export const mutationAuthorityFiles = [
   'mutation/modules.mjs',
   'mutation/thresholds.json',
   'mutation/stryker.base.mjs',
@@ -41,6 +41,10 @@ const mutationAuthorityFiles = [
   'scripts/run-mutation.mjs',
   'scripts/check-mutation-thresholds.mjs',
   'scripts/repository-paths.mjs',
+  'scripts/trusted-git.mjs',
+  'scripts/secure-release-io.mjs',
+  'scripts/secure-release-io.py',
+  'benchmarks/phase1/final-evidence.schema.json',
 ];
 const securityCriticalModules = new Set([
   'router',
@@ -230,6 +234,13 @@ export function loadEquivalentMutants(path, commitSha, configurationHash) {
   if (!Array.isArray(entries)) {
     throw new Error('equivalent-mutants.json must be an array');
   }
+  return parseEquivalentMutants(entries, commitSha, configurationHash);
+}
+
+export function parseEquivalentMutants(entries, commitSha, configurationHash) {
+  if (!Array.isArray(entries)) {
+    throw new Error('equivalent-mutants.json must be an array');
+  }
   const keys = new Set();
   for (const [index, entry] of entries.entries()) {
     const prefix = `equivalent mutant waiver ${index}`;
@@ -365,6 +376,28 @@ export function planMutationChunks(
     }
   }
   return chunks;
+}
+
+export function buildMutationChunkConfig(moduleName, chunk, runId) {
+  const module = mutationModules[moduleName];
+  if (!module) throw new Error(`unknown mutation module: ${moduleName}`);
+  const chunkRoot =
+    `reports/mutation/runs/${runId}/${moduleName}/chunks/${chunk.chunk_id}`;
+  return {
+    ...strykerBase,
+    mutate: [chunk.mutate_pattern],
+    tempDirName: `.stryker-tmp/${runId}/${moduleName}/${chunk.chunk_id}`,
+    jsonReporter: { fileName: `${chunkRoot}/mutation.json` },
+    htmlReporter: { fileName: `${chunkRoot}/mutation.html` },
+    ...(moduleName === 'sandbox'
+      ? { concurrency: 1, timeoutMS: 60_000 }
+      : {}),
+    thresholds: {
+      high: module.minimum,
+      low: Math.max(0, module.minimum - 5),
+      break: null,
+    },
+  };
 }
 
 function mutantIdentity(sourceFile, mutant) {
@@ -571,12 +604,11 @@ function moduleResultFromReport(
     status: passed ? 'PASS' : 'FAIL',
     counts,
     per_file: perFile,
-    chunks: chunks.map((chunk) => ({
-      chunk_id: chunk.chunk_id,
-      source_file: chunk.source_file,
-      start_line: chunk.start_line,
-      end_line: chunk.end_line,
-    })),
+    chunks: chunks.map((chunk) => {
+      const evidence = { ...chunk };
+      delete evidence.mutate_pattern;
+      return evidence;
+    }),
     raw_report_sha256: sha256(rawReportText),
     started_at: context.moduleStartedAt,
     completed_at: new Date().toISOString(),
@@ -686,7 +718,13 @@ export function validatePhase1Report(report, expected) {
       start_line: chunk.start_line,
       end_line: chunk.end_line,
     }));
-    if (canonicalJson(result.chunks) !== canonicalJson(expectedChunks)) {
+    const actualChunks = (result.chunks ?? []).map((chunk) => ({
+      chunk_id: chunk.chunk_id,
+      source_file: chunk.source_file,
+      start_line: chunk.start_line,
+      end_line: chunk.end_line,
+    }));
+    if (canonicalJson(actualChunks) !== canonicalJson(expectedChunks)) {
       throw new Error(`module ${result.module} chunk coverage mismatch`);
     }
     const perFilePassed = Object.values(result.per_file).every(
@@ -807,32 +845,8 @@ function runModule(moduleName, context) {
   for (const [index, chunk] of chunks.entries()) {
     const chunkRoot = join(moduleRoot, 'chunks', chunk.chunk_id);
     const chunkReportPath = join(chunkRoot, 'mutation.json');
-    const chunkHtmlPath = join(chunkRoot, 'mutation.html');
     const configPath = join(chunkRoot, 'stryker.config.json');
-    const config = {
-      ...strykerBase,
-      mutate: [chunk.mutate_pattern],
-      tempDirName: join(
-        '.stryker-tmp',
-        context.runId,
-        moduleName,
-        chunk.chunk_id,
-      ),
-      jsonReporter: {
-        fileName: relative(harnessRoot, chunkReportPath),
-      },
-      htmlReporter: {
-        fileName: relative(harnessRoot, chunkHtmlPath),
-      },
-      ...(moduleName === 'sandbox'
-        ? { concurrency: 1, timeoutMS: 60_000 }
-        : {}),
-      thresholds: {
-        high: module.minimum,
-        low: Math.max(0, module.minimum - 5),
-        break: null,
-      },
-    };
+    const config = buildMutationChunkConfig(moduleName, chunk, context.runId);
     atomicWriteJson(configPath, config);
     console.log(`\n[${index + 1}/${chunks.length}] ${chunk.mutate_pattern}`);
     const run = spawnSync(stryker, ['run', configPath], {
@@ -871,6 +885,22 @@ function runModule(moduleName, context) {
       );
     }
   }
+  const chunkEvidence = chunks.map((chunk, index) => {
+    const chunkRoot = join(moduleRoot, 'chunks', chunk.chunk_id);
+    const rawText = readFileSync(join(chunkRoot, 'mutation.json'), 'utf8');
+    const configText = readFileSync(join(chunkRoot, 'stryker.config.json'), 'utf8');
+    const raw = chunkReports[index];
+    const mutantCount = Object.values(raw?.files ?? {}).reduce(
+      (total, file) => total + (Array.isArray(file?.mutants) ? file.mutants.length : 0),
+      0,
+    );
+    return {
+      ...chunk,
+      raw_report_sha256: sha256(rawText),
+      config_sha256: sha256(configText),
+      mutant_count: mutantCount,
+    };
+  });
   const rawReport = mergeChunkReports(chunks, chunkReports);
   atomicWriteJson(rawReportPath, rawReport);
   const rawReportText = readFileSync(rawReportPath, 'utf8');
@@ -882,7 +912,7 @@ function runModule(moduleName, context) {
       moduleStartedAt: context.moduleStartedAt,
     },
     rawReportText,
-    chunks,
+    chunkEvidence,
   );
   atomicWriteJson(join(moduleRoot, 'result.json'), result);
   printModuleResult(result);

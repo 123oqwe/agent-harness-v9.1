@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_sha:
-        description: Full commit SHA to verify
+        description: Full default-branch commit SHA to verify
         required: true
         type: string
 
@@ -12,10 +12,10 @@ permissions:
   contents: read
 
 jobs:
-  acceptance:
+  deterministic:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-22.04
-    timeout-minutes: 150
+    timeout-minutes: 45
     steps:
       - name: Bind request to the default-branch workflow SHA
         env:
@@ -24,7 +24,7 @@ jobs:
         run: |
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$EXPECTED_SHA" == "$WORKFLOW_SHA" ]]
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -33,26 +33,130 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes bubblewrap util-linux
           bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
           cache: npm
-      - name: Install dependencies without model credentials
-        run: npm ci
-      - name: Build without model credentials
-        run: npm run build
-      - name: Run exact-SHA GLM acceptance
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:cycles
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test -- --maxWorkers=1
+      - run: npm run test:coverage -- --maxWorkers=1
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm pack --dry-run --ignore-scripts
+
+  mutation:
+    needs: deterministic
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    outputs:
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Linux sandbox authority
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap util-linux
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run all 15 Phase 1 mutation modules
+        run: node scripts/run-mutation.mjs phase1
+      - name: Upload exact mutation evidence
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase1-mutation-${{ github.sha }}
+          path: reports/mutation/
+          if-no-files-found: error
+          retention-days: 90
+
+  verify_mutation:
+    needs: mutation
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    outputs:
+      artifact_digest: ${{ needs.mutation.outputs.artifact_digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Download and validate uploaded mutation artifact digest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: phase1-mutation-${{ github.sha }}
+          path: reports/mutation
+      - name: Independently reconstruct and verify mutation evidence
         env:
           EXPECTED_SHA: ${{ inputs.expected_sha }}
+          MUTATION_ARTIFACT_DIGEST: ${{ needs.mutation.outputs.artifact_digest }}
+          MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}
+        run: node scripts/check-mutation-thresholds.mjs phase1
+
+  acceptance:
+    needs: verify_mutation
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Linux sandbox authority
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap util-linux
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Download and validate uploaded mutation artifact digest again
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: phase1-mutation-${{ github.sha }}
+          path: reports/mutation
+      - name: Reverify mutation evidence without model credentials
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          MUTATION_ARTIFACT_DIGEST: ${{ needs.verify_mutation.outputs.artifact_digest }}
+          MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}
+        run: node scripts/check-mutation-thresholds.mjs phase1
+      - name: Create controlled external evidence directory
+        run: mkdir -p "${{ runner.temp }}/phase1-evidence"
+      - name: Run exact-SHA GLM acceptance
+        env:
+          ACCEPTANCE_EVIDENCE_ROOT: ${{ runner.temp }}/phase1-evidence
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          MUTATION_ARTIFACT_DIGEST: ${{ needs.verify_mutation.outputs.artifact_digest }}
+          MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}
           GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
           GLM_MODEL: glm-5.2
           GLM_REASONING_EFFORT: xhigh
           GLM_ALLOW_REMOTE: "1"
         run: npm run test:glm:live
       - name: Upload exact-SHA acceptance evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: glm-acceptance-${{ inputs.expected_sha }}
-          path: reports/acceptance/glm-5.2-xhigh-phase1-${{ inputs.expected_sha }}.json
+          path: ${{ runner.temp }}/phase1-evidence/glm-5.2-xhigh-phase1-${{ inputs.expected_sha }}.json
           if-no-files-found: error
           retention-days: 90

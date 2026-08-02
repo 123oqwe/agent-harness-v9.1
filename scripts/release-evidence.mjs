@@ -1,92 +1,88 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { Buffer } from 'node:buffer';
 import {
   existsSync,
-  linkSync,
-  lstatSync,
-  mkdirSync,
   readFileSync,
-  rmSync,
-  writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
+import {
+  readTrustedGitBlob,
+  runTrustedGit,
+  spawnTrustedGitSync,
+  validateProtectedExecutable,
+} from './trusted-git.mjs';
+import { secureReleaseIo } from './secure-release-io.mjs';
 
-const trustedGitCandidates = ['/usr/bin/git', '/bin/git'];
+const isolatedReleaseTrees = new Map();
 
-export function assertTrustedExecutablePath(
-  executable,
-  { inspect = lstatSync } = {},
-) {
-  if (!isAbsolute(executable)) {
-    throw new Error(`trusted executable path must be absolute: ${executable}`);
+export const assertTrustedExecutablePath = validateProtectedExecutable;
+export { readTrustedGitBlob, runTrustedGit, spawnTrustedGitSync };
+
+function splitNullRecords(bytes) {
+  const records = [];
+  let start = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    if (bytes[index] !== 0) continue;
+    if (index > start) records.push(bytes.subarray(start, index));
+    start = index + 1;
   }
-  const target = resolve(executable);
-  const ancestors = [];
-  for (let cursor = dirname(target); ; cursor = dirname(cursor)) {
-    ancestors.push(cursor);
-    if (dirname(cursor) === cursor) break;
+  if (start !== bytes.length) {
+    throw new Error('Git tree listing is not NUL terminated');
   }
-  for (const path of ancestors.reverse()) {
-    const metadata = inspect(path);
+  return records;
+}
+
+function exactUtf8(bytes) {
+  const decoded = bytes.toString('utf8');
+  if (!Buffer.from(decoded, 'utf8').equals(bytes)) {
+    throw new Error('Git tree path is not canonical UTF-8');
+  }
+  return decoded;
+}
+
+export function parseGitTreeEntries(listing) {
+  if (!Buffer.isBuffer(listing)) {
+    throw new Error('Git tree listing must be raw bytes');
+  }
+  const entries = [];
+  const portablePaths = new Set();
+  for (const record of splitNullRecords(listing)) {
+    const separator = record.indexOf(0x09);
+    if (separator < 0) {
+      throw new Error('unsupported or unsafe entry in release tree');
+    }
+    const metadataBytes = record.subarray(0, separator);
+    const metadata = metadataBytes.toString('ascii');
+    const path = exactUtf8(record.subarray(separator + 1));
+    const [mode, type, objectSha, extra] = metadata.split(' ');
+    const portablePath = path.normalize('NFC').toLocaleLowerCase('en-US');
     if (
-      metadata.isSymbolicLink() ||
-      !metadata.isDirectory() ||
-      metadata.uid !== 0 ||
-      (metadata.mode & 0o022) !== 0
+      !Buffer.from(metadata, 'ascii').equals(metadataBytes) ||
+      extra !== undefined ||
+      type !== 'blob' ||
+      !['100644', '100755'].includes(mode) ||
+      !/^[0-9a-f]{40}$/u.test(objectSha ?? '') ||
+      path.startsWith('/') ||
+      path.includes('\\') ||
+      path.includes('\0') ||
+      path.split('/').some((part) => !part || part === '.' || part === '..')
     ) {
-      throw new Error(`trusted executable parent is not root-protected: ${path}`);
+      throw new Error('unsupported or unsafe entry in release tree');
     }
-  }
-  const metadata = inspect(target);
-  if (
-    metadata.isSymbolicLink() ||
-    !metadata.isFile() ||
-    metadata.uid !== 0 ||
-    (metadata.mode & 0o022) !== 0 ||
-    (metadata.mode & 0o111) === 0
-  ) {
-    throw new Error(`trusted executable is not a root-protected real file: ${target}`);
-  }
-  return target;
-}
-
-function trustedGitExecutable() {
-  for (const candidate of trustedGitCandidates) {
-    try {
-      return assertTrustedExecutablePath(candidate);
-    } catch {
-      // Continue only through the fixed absolute candidate set.
+    if (portablePaths.has(portablePath)) {
+      throw new Error(`portable Git tree path collision: ${path}`);
     }
+    portablePaths.add(portablePath);
+    entries.push({ mode, type, objectSha, path });
   }
-  throw new Error('trusted absolute Git executable is unavailable');
-}
-
-function git(root, args) {
-  const executable = trustedGitExecutable();
-  const result = spawnSync(executable, args, {
-    cwd: root,
-    encoding: 'utf8',
-    shell: false,
-    env: {
-      PATH: '/usr/bin:/bin',
-      LANG: 'C.UTF-8',
-      LC_ALL: 'C.UTF-8',
-    },
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(
-      `${executable} ${args.join(' ')} failed: ${result.stderr.trim()}`,
-    );
-  }
-  return result.stdout;
+  return entries;
 }
 
 function dirtyPaths(root) {
-  const records = git(root, [
+  const records = runTrustedGit(root, [
     'status',
     '--porcelain=v1',
     '-z',
@@ -113,7 +109,7 @@ export function verifyReleaseRepository(root, expectedSha, allowedDirtyPaths = [
   if (!/^[0-9a-f]{40}$/u.test(expectedSha ?? '')) {
     throw new Error('EXPECTED_SHA is required and must be a full lowercase Git SHA');
   }
-  const commitSha = git(root, ['rev-parse', 'HEAD']).trim();
+  const commitSha = runTrustedGit(root, ['rev-parse', 'HEAD']).trim();
   if (commitSha !== expectedSha) {
     throw new Error(`HEAD ${commitSha} does not match EXPECTED_SHA ${expectedSha}`);
   }
@@ -126,8 +122,94 @@ export function verifyReleaseRepository(root, expectedSha, allowedDirtyPaths = [
   }
   return {
     commit_sha: commitSha,
-    source_tree: git(root, ['rev-parse', 'HEAD^{tree}']).trim(),
+    source_tree: runTrustedGit(root, ['rev-parse', 'HEAD^{tree}']).trim(),
   };
+}
+
+export function prepareIsolatedReleaseTree(
+  repositoryRoot,
+  expectedSha,
+  destination,
+) {
+  if (!/^[0-9a-f]{40}$/u.test(expectedSha ?? '')) {
+    throw new Error('isolated release tree requires a full lowercase commit SHA');
+  }
+  if (!isAbsolute(destination) || existsSync(destination)) {
+    throw new Error('isolated release destination must be an absent absolute path');
+  }
+  const sourceTree = runTrustedGit(repositoryRoot, [
+    'rev-parse',
+    `${expectedSha}^{tree}`,
+  ]).trim();
+  const listing = runTrustedGit(
+    repositoryRoot,
+    ['ls-tree', '-rz', '--full-tree', expectedSha],
+    { encoding: 'buffer', maxBuffer: 16 * 1024 * 1024 },
+  );
+  const files = [];
+  const expectedSet = createHash('sha256');
+  for (const { mode, objectSha, path } of parseGitTreeEntries(listing)) {
+    const payload = runTrustedGit(
+      repositoryRoot,
+      ['cat-file', 'blob', objectSha],
+      { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 },
+    );
+    files.push({
+      path,
+      contentBase64: payload.toString('base64'),
+      mode: mode === '100755' ? 0o700 : 0o600,
+    });
+    expectedSet.update(path);
+    expectedSet.update('\0');
+    expectedSet.update(payload);
+    expectedSet.update('\0');
+  }
+  const parent = dirname(destination);
+  const name = basename(destination);
+  const authority = { repositoryRoot, commitSha: expectedSha };
+  const receipt = secureReleaseIo({
+    authority,
+    ioRoot: parent,
+    operation: 'publish_tree',
+    temporary: `.${name}.${process.pid}.${randomUUID()}.tmp`,
+    final: name,
+    files,
+  });
+  const verified = secureReleaseIo({
+    authority,
+    ioRoot: parent,
+    operation: 'read_tree',
+    path: name,
+  });
+  if (
+    verified.count !== files.length ||
+    verified.setSha256 !== expectedSet.digest('hex')
+  ) {
+    throw new Error('isolated release tree bytes do not match Git objects');
+  }
+  isolatedReleaseTrees.set(resolve(destination), {
+    authority,
+    ioRoot: parent,
+    path: name,
+    expected: { dev: receipt.dev, ino: receipt.ino },
+  });
+  return { commit_sha: expectedSha, source_tree: sourceTree };
+}
+
+export function removeIsolatedReleaseTree(repositoryRoot, destination) {
+  const key = resolve(destination);
+  const owned = isolatedReleaseTrees.get(key);
+  if (!owned || resolve(owned.authority.repositoryRoot) !== resolve(repositoryRoot)) {
+    throw new Error('isolated release tree ownership receipt is missing');
+  }
+  secureReleaseIo({
+    authority: owned.authority,
+    ioRoot: owned.ioRoot,
+    operation: 'remove_tree',
+    path: owned.path,
+    expected: owned.expected,
+  });
+  isolatedReleaseTrees.delete(key);
 }
 
 export function buildReleaseEnvironment({
@@ -264,85 +346,4 @@ export function validateAcceptanceReport({
     }
   }
   return true;
-}
-
-function verifiedEvidenceParent(destination, allowedRoot) {
-  const root = resolve(allowedRoot);
-  if (!existsSync(root)) {
-    throw new Error(`evidence root does not exist: ${root}`);
-  }
-  const rootMetadata = lstatSync(root);
-  if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) {
-    throw new Error(`evidence root must be a real directory, not a symlink: ${root}`);
-  }
-  const target = resolve(destination);
-  const targetRelative = relative(root, target);
-  if (
-    targetRelative === '' ||
-    targetRelative === '..' ||
-    targetRelative.startsWith(`..${sep}`)
-  ) {
-    throw new Error(`evidence destination is outside its allowed root: ${target}`);
-  }
-
-  const parent = dirname(target);
-  const parentRelative = relative(root, parent);
-  let cursor = root;
-  for (const component of parentRelative.split(sep).filter(Boolean)) {
-    cursor = resolve(cursor, component);
-    let metadata;
-    try {
-      metadata = lstatSync(cursor);
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
-    }
-    if (!metadata) {
-      mkdirSync(cursor, { mode: 0o700 });
-      continue;
-    }
-    if (metadata.isSymbolicLink()) {
-      throw new Error(`evidence path contains a symlink: ${cursor}`);
-    }
-    if (!metadata.isDirectory()) {
-      throw new Error(`evidence path component is not a directory: ${cursor}`);
-    }
-  }
-  let targetMetadata;
-  try {
-    targetMetadata = lstatSync(target);
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error;
-  }
-  if (targetMetadata?.isSymbolicLink()) {
-    throw new Error(`evidence destination is a symlink: ${target}`);
-  }
-  return { parent, target };
-}
-
-export function writeEvidenceAtomicExclusive(
-  destination,
-  serialized,
-  allowedRoot = dirname(resolve(destination)),
-) {
-  const { target } = verifiedEvidenceParent(destination, allowedRoot);
-  const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
-  try {
-    writeFileSync(temporary, serialized, {
-      encoding: 'utf8',
-      flag: 'wx',
-      mode: 0o600,
-    });
-    try {
-      linkSync(temporary, target);
-    } catch (error) {
-      if (error?.code === 'EEXIST') {
-        throw new Error(`formal evidence already exists: ${target}`, {
-          cause: error,
-        });
-      }
-      throw error;
-    }
-  } finally {
-    rmSync(temporary, { force: true });
-  }
 }

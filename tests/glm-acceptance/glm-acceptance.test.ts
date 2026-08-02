@@ -14,6 +14,18 @@ describe('live GLM acceptance entrypoint', () => {
     expect(runner).toContain('xhigh');
     expect(runner).toContain('phase1-24-v1');
     expect(runner).toContain('run-agent.mjs');
+    expect(runner).not.toContain("'--formal-acceptance'");
+    expect(runner).toContain('prepareIsolatedReleaseTree');
+    expect(runner).toContain('ACCEPTANCE_EVIDENCE_ROOT');
+    expect(runner).toContain('MUTATION_ARTIFACT_DIGEST');
+    expect(runner).toContain('phase1/mutation.json');
+    expect(runner).toContain('final-evidence.schema.json');
+    expect(runner).not.toContain("'--mutation-run-id'");
+    expect(runner).not.toContain("'--mutation-configuration-hash'");
+    expect(runner).toContain('rawReport');
+    expect(runner).toContain('const report = { ...rawReport, provenance };');
+    expect(runner).toContain('result_schema_sha256: sha256File(finalEvidenceSchemaPath)');
+    expect(runner).toContain("'ci'");
     expect(runner).not.toContain('fetch(');
   });
 
@@ -37,5 +49,12 @@ describe('live GLM acceptance entrypoint', () => {
       'utf8',
     );
     expect(runner).toContain("'--ignore-scripts'");
+    expect(
+      runner.match(
+        /\['rebuild', 'better-sqlite3', '--foreground-scripts'\]/gu,
+      ),
+    ).toHaveLength(2);
+    expect(runner.match(/smokeSqliteSessionStore\(/gu)).toHaveLength(3);
+    expect(runner).not.toContain("['rebuild', '--foreground-scripts']");
   });
 });

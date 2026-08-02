@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
@@ -8,19 +9,20 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   buildReleaseEnvironment,
+  prepareIsolatedReleaseTree,
+  removeIsolatedReleaseTree,
   sha256File,
   validateAcceptanceReport,
   verifyReleaseRepository,
 } from './release-evidence.mjs';
+import { secureReleaseIo } from './secure-release-io.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const root = resolve(dirname(scriptPath), '..');
-const fixturePath = resolve(root, 'benchmarks/phase1/cases/cases.json');
-const resultSchemaPath = resolve(root, 'benchmarks/phase1/result.schema.json');
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -57,12 +59,98 @@ function assertLiveConfiguration(source) {
   }
 }
 
+function smokeSqliteSessionStore(packageEntrypoint, databasePath, options) {
+  const program = [
+    "import { Buffer } from 'node:buffer';",
+    `import { SqliteSessionStore } from ${JSON.stringify(packageEntrypoint)};`,
+    `const store = new SqliteSessionStore(${JSON.stringify(databasePath)},`,
+    '  { masterKey: Buffer.alloc(32, 7) });',
+    'store.close();',
+  ].join('\n');
+  run(process.execPath, ['--input-type=module', '--eval', program], options);
+}
+
+function readVerifiedMutationProvenance(source, commitSha) {
+  const digest = source.MUTATION_ARTIFACT_DIGEST;
+  const name = source.MUTATION_ARTIFACT_NAME;
+  if (!/^[0-9a-f]{64}$/u.test(digest ?? '')) {
+    throw new Error('MUTATION_ARTIFACT_DIGEST must be an external upload digest');
+  }
+  if (name !== `phase1-mutation-${commitSha}`) {
+    throw new Error('MUTATION_ARTIFACT_NAME does not match the release commit');
+  }
+  const read = secureReleaseIo({
+    authority: { repositoryRoot: root, commitSha },
+    ioRoot: resolve(root, 'reports'),
+    operation: 'read_tree',
+    path: 'mutation',
+  });
+  const entry = read.files.find((file) => file.path === 'phase1/mutation.json');
+  if (!entry) throw new Error('verified Phase 1 mutation report is missing');
+  const bytes = Buffer.from(entry.contentBase64, 'base64');
+  const text = bytes.toString('utf8');
+  if (!Buffer.from(text, 'utf8').equals(bytes)) {
+    throw new Error('verified Phase 1 mutation report is not UTF-8');
+  }
+  const report = JSON.parse(text);
+  if (
+    report?.commit_sha !== commitSha ||
+    !/^[0-9a-f]{64}$/u.test(report?.configuration_hash ?? '') ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+      report?.run_id ?? '',
+    ) ||
+    report?.aggregate?.status !== 'PASS'
+  ) {
+    throw new Error('verified Phase 1 mutation report identity is invalid');
+  }
+  return {
+    mutation_artifact_digest: digest,
+    mutation_artifact_name: name,
+    mutation_configuration_hash: report.configuration_hash,
+    mutation_run_id: report.run_id,
+  };
+}
+
 export function runGlmAcceptance(source = process.env) {
   const repository = verifyReleaseRepository(root, source.EXPECTED_SHA);
   assertLiveConfiguration(source);
+  const mutationProvenance = readVerifiedMutationProvenance(
+    source,
+    repository.commit_sha,
+  );
+  if (!isAbsolute(source.ACCEPTANCE_EVIDENCE_ROOT ?? '')) {
+    throw new Error('ACCEPTANCE_EVIDENCE_ROOT must be an absolute external directory');
+  }
+  const evidenceRoot = resolve(source.ACCEPTANCE_EVIDENCE_ROOT);
+  const evidenceRelative = relative(root, evidenceRoot);
+  if (
+    evidenceRelative === '' ||
+    (evidenceRelative !== '..' && !evidenceRelative.startsWith(`..${sep}`))
+  ) {
+    throw new Error('ACCEPTANCE_EVIDENCE_ROOT must be outside the source repository');
+  }
 
   const temporary = mkdtempSync(resolve(tmpdir(), 'phase1-glm-acceptance-'));
+  const isolatedRoot = resolve(temporary, 'source');
+  let isolatedCreated = false;
   try {
+    const isolated = prepareIsolatedReleaseTree(
+      root,
+      repository.commit_sha,
+      isolatedRoot,
+    );
+    isolatedCreated = true;
+    if (isolated.source_tree !== repository.source_tree) {
+      throw new Error('isolated release source tree does not match repository authority');
+    }
+    const fixturePath = resolve(
+      isolatedRoot,
+      'benchmarks/phase1/cases/cases.json',
+    );
+    const finalEvidenceSchemaPath = resolve(
+      isolatedRoot,
+      'benchmarks/phase1/final-evidence.schema.json',
+    );
     const home = resolve(temporary, 'home');
     const npmCache = resolve(temporary, 'npm-cache');
     mkdirSync(home, { mode: 0o700 });
@@ -74,7 +162,23 @@ export function runGlmAcceptance(source = process.env) {
       includeModelCredential: false,
     });
 
-    run('npm', ['run', 'build'], { env: nonModelEnvironment });
+    run('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], {
+      cwd: isolatedRoot,
+      env: nonModelEnvironment,
+    });
+    run('npm', ['rebuild', 'better-sqlite3', '--foreground-scripts'], {
+      cwd: isolatedRoot,
+      env: nonModelEnvironment,
+    });
+    run('npm', ['run', 'build'], {
+      cwd: isolatedRoot,
+      env: nonModelEnvironment,
+    });
+    smokeSqliteSessionStore(
+      pathToFileURL(resolve(isolatedRoot, 'dist/index.js')).href,
+      resolve(temporary, 'source-sqlite-smoke.sqlite'),
+      { cwd: isolatedRoot, env: nonModelEnvironment },
+    );
     const packedJson = run(
       'npm',
       [
@@ -84,7 +188,7 @@ export function runGlmAcceptance(source = process.env) {
         '--pack-destination',
         temporary,
       ],
-      { capture: true, env: nonModelEnvironment },
+      { cwd: isolatedRoot, capture: true, env: nonModelEnvironment },
     );
     const packed = JSON.parse(packedJson);
     if (!Array.isArray(packed) || packed.length !== 1 || !packed[0]?.filename) {
@@ -109,27 +213,37 @@ export function runGlmAcceptance(source = process.env) {
       ],
       { cwd: consumer, env: nonModelEnvironment },
     );
+    run('npm', ['rebuild', 'better-sqlite3', '--foreground-scripts'], {
+      cwd: consumer,
+      env: nonModelEnvironment,
+    });
 
     const provenance = {
+      commit_sha: repository.commit_sha,
       source_tree: repository.source_tree,
       fixture_sha256: sha256File(fixturePath),
-      result_schema_sha256: sha256File(resultSchemaPath),
+      result_schema_sha256: sha256File(finalEvidenceSchemaPath),
       package_tarball_sha256: sha256File(tarball),
-      package_lock_sha256: sha256File(resolve(root, 'package-lock.json')),
+      package_lock_sha256: sha256File(resolve(isolatedRoot, 'package-lock.json')),
       consumer_lock_sha256: sha256File(resolve(consumer, 'package-lock.json')),
+      ...mutationProvenance,
       model: 'glm-5.2',
       reasoning_effort: 'xhigh',
       temperature: 1,
       seed: null,
       seed_support: 'unsupported',
     };
-    const output = resolve(
-      root,
-      `reports/acceptance/glm-5.2-xhigh-phase1-${repository.commit_sha}.json`,
-    );
+    const outputName =
+      `glm-5.2-xhigh-phase1-${repository.commit_sha}.json`;
+    const output = resolve(evidenceRoot, outputName);
     const packageEntrypoint = pathToFileURL(
       resolve(consumer, 'node_modules/agent-harness/dist/index.js'),
     ).href;
+    smokeSqliteSessionStore(
+      packageEntrypoint,
+      resolve(temporary, 'sqlite-smoke.sqlite'),
+      { cwd: consumer, env: nonModelEnvironment },
+    );
     const modelEnvironment = buildReleaseEnvironment({
       source,
       home,
@@ -137,41 +251,30 @@ export function runGlmAcceptance(source = process.env) {
       includeModelCredential: true,
       packageSpecifier: packageEntrypoint,
     });
-    run(
+    const serialized = run(
       process.execPath,
       [
-        resolve(root, 'benchmarks/phase1/runner/run-agent.mjs'),
+        resolve(isolatedRoot, 'benchmarks/phase1/runner/run-agent.mjs'),
         '--agent',
         'harness',
         '--commit-sha',
         repository.commit_sha,
-        '--output',
-        output,
-        '--evidence-root',
-        root,
-        '--source-tree',
-        provenance.source_tree,
-        '--fixture-sha256',
-        provenance.fixture_sha256,
-        '--result-schema-sha256',
-        provenance.result_schema_sha256,
-        '--package-tarball-sha256',
-        provenance.package_tarball_sha256,
-        '--package-lock-sha256',
-        provenance.package_lock_sha256,
-        '--consumer-lock-sha256',
-        provenance.consumer_lock_sha256,
       ],
       {
+        cwd: isolatedRoot,
         env: modelEnvironment,
         capture: true,
         timeout: 24 * 300_000,
       },
     );
 
-    const report = JSON.parse(readFileSync(output, 'utf8'));
+    const rawReport = JSON.parse(serialized);
+    if (Object.hasOwn(rawReport, 'provenance')) {
+      throw new Error('raw benchmark result must not contain final provenance');
+    }
+    const report = { ...rawReport, provenance };
     const manifest = JSON.parse(readFileSync(fixturePath, 'utf8'));
-    const schema = JSON.parse(readFileSync(resultSchemaPath, 'utf8'));
+    const schema = JSON.parse(readFileSync(finalEvidenceSchemaPath, 'utf8'));
     validateAcceptanceReport({
       report,
       manifest,
@@ -183,12 +286,24 @@ export function runGlmAcceptance(source = process.env) {
       },
       forbiddenSecrets: [source.GLM_API_KEY],
     });
+    secureReleaseIo({
+      authority: { repositoryRoot: root, commitSha: repository.commit_sha },
+      ioRoot: evidenceRoot,
+      operation: 'write_file_exclusive',
+      path: outputName,
+      contentBase64: Buffer.from(`${JSON.stringify(report, null, 2)}\n`).toString(
+        'base64',
+      ),
+    });
     process.stdout.write(
       `GLM-5.2 xhigh acceptance PASS: ${report.summary.passed}/24, safety hard gate PASS\n`,
     );
     process.stdout.write(`Evidence: ${output}\n`);
     return output;
   } finally {
+    if (isolatedCreated) {
+      removeIsolatedReleaseTree(root, isolatedRoot);
+    }
     rmSync(temporary, { recursive: true, force: true });
   }
 }

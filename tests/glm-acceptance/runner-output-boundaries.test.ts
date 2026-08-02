@@ -9,11 +9,10 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 interface RunnerModule {
+  assertRawBenchmarkMode: (args: string[]) => true;
   writeRunnerOutput: (options: {
     outputPath: string;
     serialized: string;
-    formalAcceptance: boolean;
-    evidenceRoot?: string;
   }) => void;
 }
 
@@ -22,7 +21,36 @@ const runnerUrl = pathToFileURL(
 ).href;
 
 describe('benchmark runner output compatibility', () => {
-  it('keeps ordinary outputs replaceable while formal evidence is exclusive', async () => {
+  it('rejects every final-Evidence argument and keeps the runner raw-only', async () => {
+    const runner = (await import(runnerUrl)) as RunnerModule;
+    expect(runner.assertRawBenchmarkMode([])).toBe(true);
+    for (const argument of [
+      '--formal-acceptance',
+      '--source-tree',
+      '--fixture-sha256',
+      '--result-schema-sha256',
+      '--package-tarball-sha256',
+      '--package-lock-sha256',
+      '--consumer-lock-sha256',
+      '--mutation-artifact-digest',
+      '--mutation-artifact-name',
+      '--mutation-configuration-hash',
+      '--mutation-run-id',
+    ]) {
+      expect(() => runner.assertRawBenchmarkMode([argument, 'forged'])).toThrow(
+        /wrapper|Evidence|raw-only/u,
+      );
+    }
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../../benchmarks/phase1/runner/run-agent.mjs'),
+      'utf8',
+    );
+    expect(source).not.toContain('final-evidence.schema.json');
+    expect(source).not.toContain('validateAcceptanceReport');
+    expect(source).not.toContain('secureReleaseIo');
+  });
+
+  it('keeps ordinary raw outputs replaceable', async () => {
     const runner = (await import(runnerUrl)) as RunnerModule;
     const directory = mkdtempSync(join(tmpdir(), 'phase1-runner-output-'));
     try {
@@ -30,31 +58,12 @@ describe('benchmark runner output compatibility', () => {
       runner.writeRunnerOutput({
         outputPath: ordinary,
         serialized: 'first\n',
-        formalAcceptance: false,
       });
       runner.writeRunnerOutput({
         outputPath: ordinary,
         serialized: 'second\n',
-        formalAcceptance: false,
       });
       expect(readFileSync(ordinary, 'utf8')).toBe('second\n');
-
-      const formal = join(directory, 'formal.json');
-      runner.writeRunnerOutput({
-        outputPath: formal,
-        serialized: 'first\n',
-        formalAcceptance: true,
-        evidenceRoot: directory,
-      });
-      expect(() =>
-        runner.writeRunnerOutput({
-          outputPath: formal,
-          serialized: 'second\n',
-          formalAcceptance: true,
-          evidenceRoot: directory,
-        }),
-      ).toThrow(/already exists/u);
-      expect(readFileSync(formal, 'utf8')).toBe('first\n');
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

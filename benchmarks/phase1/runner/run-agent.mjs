@@ -18,14 +18,9 @@ import {
   summarizeResults,
   workspaceManifest,
 } from '../grader/grade.mjs';
-import {
-  validateAcceptanceReport,
-  writeEvidenceAtomicExclusive,
-} from '../../../scripts/release-evidence.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultManifest = resolve(here, '../cases/cases.json');
-const defaultResultSchema = resolve(here, '../result.schema.json');
 const supportedAgents = new Set([
   'harness',
   'codex',
@@ -385,23 +380,38 @@ function loadManusImport(path, fixtureVersion) {
 export function writeRunnerOutput({
   outputPath,
   serialized,
-  formalAcceptance,
-  evidenceRoot,
 }) {
   const destination = resolve(outputPath);
-  if (formalAcceptance) {
-    writeEvidenceAtomicExclusive(
-      destination,
-      serialized,
-      resolve(evidenceRoot ?? dirname(destination)),
-    );
-    return;
-  }
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, serialized);
 }
 
+const finalEvidenceArguments = new Set([
+  '--formal-acceptance',
+  '--source-tree',
+  '--fixture-sha256',
+  '--result-schema-sha256',
+  '--package-tarball-sha256',
+  '--package-lock-sha256',
+  '--consumer-lock-sha256',
+  '--mutation-artifact-digest',
+  '--mutation-artifact-name',
+  '--mutation-configuration-hash',
+  '--mutation-run-id',
+]);
+
+export function assertRawBenchmarkMode(args) {
+  const forbidden = args.find((argument) => finalEvidenceArguments.has(argument));
+  if (forbidden) {
+    throw new Error(
+      `${forbidden} is reserved to the isolated Evidence wrapper; the benchmark runner is raw-only`,
+    );
+  }
+  return true;
+}
+
 async function main() {
+  assertRawBenchmarkMode(process.argv.slice(2));
   const agent = requiredArgument('--agent');
   if (!supportedAgents.has(agent)) throw new Error(`unsupported agent: ${agent}`);
   const manifestPath = resolve(argument('--manifest', defaultManifest));
@@ -412,22 +422,6 @@ async function main() {
   }
   const outputPath = argument('--output');
   const oneCase = argument('--case');
-  const formalAcceptance = agent === 'harness' && !oneCase;
-  const provenance = formalAcceptance
-    ? {
-        source_tree: requiredArgument('--source-tree'),
-        fixture_sha256: requiredArgument('--fixture-sha256'),
-        result_schema_sha256: requiredArgument('--result-schema-sha256'),
-        package_tarball_sha256: requiredArgument('--package-tarball-sha256'),
-        package_lock_sha256: requiredArgument('--package-lock-sha256'),
-        consumer_lock_sha256: requiredArgument('--consumer-lock-sha256'),
-        model: 'glm-5.2',
-        reasoning_effort: 'xhigh',
-        temperature: 1,
-        seed: null,
-        seed_support: 'unsupported',
-      }
-    : null;
   const selected = oneCase
     ? manifest.cases.filter((entry) => entry.id === oneCase)
     : manifest.cases;
@@ -535,32 +529,14 @@ async function main() {
     agent_version: versionFor(agent),
     started_at,
     completed_at: new Date().toISOString(),
-    ...(provenance ? { provenance } : {}),
     cases: results,
     summary: summarizeResults(results),
   };
-  if (formalAcceptance) {
-    const schemaPath = resolve(argument('--result-schema', defaultResultSchema));
-    const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
-    validateAcceptanceReport({
-      report: result,
-      manifest,
-      schema,
-      expected: {
-        commit_sha,
-        fixture_version: manifest.fixture_version,
-        provenance,
-      },
-      forbiddenSecrets: [process.env.GLM_API_KEY],
-    });
-  }
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   if (outputPath) {
     writeRunnerOutput({
       outputPath,
       serialized,
-      formalAcceptance,
-      evidenceRoot: argument('--evidence-root'),
     });
   }
   process.stdout.write(serialized);

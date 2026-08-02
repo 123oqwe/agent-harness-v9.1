@@ -14,6 +14,7 @@ const {
   acquireRunLock,
   buildPhase1Report,
   computeMutationConfigurationHash,
+  mutationAuthorityFiles,
   loadEquivalentMutants,
   mergeChunkReports,
   planMutationChunks,
@@ -629,7 +630,15 @@ describe('Phase 1 mutation report integrity', () => {
       join(root, 'scripts', 'repository-paths.mjs'),
       'paths',
     );
+    writeFileSync(join(root, 'scripts', 'trusted-git.mjs'), 'trusted-git');
+    writeFileSync(join(root, 'scripts', 'secure-release-io.mjs'), 'secure-js');
+    writeFileSync(join(root, 'scripts', 'secure-release-io.py'), 'secure-py');
     writeFileSync(join(root, 'vitest.mutation.config.ts'), 'vitest');
+    mkdirSync(join(root, 'benchmarks', 'phase1'), { recursive: true });
+    writeFileSync(
+      join(root, 'benchmarks', 'phase1', 'final-evidence.schema.json'),
+      'final-schema',
+    );
 
     const first = computeMutationConfigurationHash(root);
     writeFileSync(
@@ -637,6 +646,18 @@ describe('Phase 1 mutation report integrity', () => {
       'modules-a\nexport const gatewayChunkTimeoutMs = 1800000;',
     );
     expect(computeMutationConfigurationHash(root)).not.toBe(first);
+  });
+
+  it('binds the independent verifier and secure object readers into mutation authority', () => {
+    expect(mutationAuthorityFiles).toEqual(
+      expect.arrayContaining([
+        'scripts/check-mutation-thresholds.mjs',
+        'scripts/trusted-git.mjs',
+        'scripts/secure-release-io.mjs',
+        'scripts/secure-release-io.py',
+        'benchmarks/phase1/final-evidence.schema.json',
+      ]),
+    );
   });
 
   it('requires all 15 modules from one run, commit and configuration', () => {
