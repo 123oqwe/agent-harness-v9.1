@@ -13,7 +13,7 @@ import {
   parseEquivalentMutants,
 } from './run-mutation.mjs';
 import { secureReleaseIo } from './secure-release-io.mjs';
-import { readTrustedGitBlob, runTrustedGit } from './trusted-git.mjs';
+import { readTrustedGitBlob, runTrustedGit } from './gates/trusted-git.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const harnessRoot = resolve(dirname(scriptPath), '..');

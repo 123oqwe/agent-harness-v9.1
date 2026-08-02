@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-harness.local/verification/schemas/phase2-mutation-attestation-receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "repository", "workflow_ref", "run_id", "run_attempt", "head_sha", "conclusion", "artifact_name", "artifact_id", "artifact_size", "artifact_digest", "verification_method", "issuer"],
+  "properties": {
+    "schema_version": { "const": "phase2-mutation-attestation-receipt/v1" },
+    "repository": { "const": "123oqwe/agentharness91" },
+    "workflow_ref": { "type": "string", "pattern": "^123oqwe/agentharness91/.github/workflows/phase2-mutation.yml@refs/" },
+    "run_id": { "type": "integer", "minimum": 1 },
+    "run_attempt": { "type": "integer", "minimum": 1 },
+    "head_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "conclusion": { "const": "success" },
+    "artifact_name": { "type": "string", "pattern": "^phase2-mutation-[a-f0-9]{40}$" },
+    "artifact_id": { "type": "integer", "minimum": 1 },
+    "artifact_size": { "type": "integer", "minimum": 1 },
+    "artifact_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "verification_method": { "enum": ["github_sigstore", "github_actions_api"] },
+    "issuer": { "enum": ["https://token.actions.githubusercontent.com", "https://api.github.com"] }
+  }
+}

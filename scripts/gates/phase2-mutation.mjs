@@ -5,6 +5,8 @@ import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateSchemaDocument } from "./json-schema.mjs";
+
 import {
   phase2MutationRequirements,
   phase2MutationThresholds,
@@ -12,11 +14,26 @@ import {
 import { mutationModules as phase1MutationModules } from "../../mutation/modules.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const schemaDirectory = resolve(scriptDirectory, "../../verification/schemas");
+const productionSchemas = [
+  "phase2-mutation-draft.schema.json",
+  "phase2-mutation-candidate.schema.json",
+  "phase2-mutation-execution-receipt.schema.json",
+].map((name) => JSON.parse(readFileSync(join(schemaDirectory, name), "utf8")));
+const productionSchemasById = new Map(productionSchemas.map((schema) => [schema.$id, schema]));
+const productionSchema = (suffix) => productionSchemas.find((schema) => schema.$id.endsWith(suffix));
 export const DEFAULT_PHASE2_MUTATION_ROOT = resolve(scriptDirectory, "../..");
 export const PHASE2_MUTATION_MANIFEST = "verification/gates/phase2-gate.json";
 export const PHASE2_MUTATION_REGISTRY = "mutation/phase2-modules.mjs";
 export const PHASE2_MUTATION_CHUNK_LINES = 150;
-export const PHASE2_MUTATION_SCHEMA_VERSION = "phase2-mutation-report/v1";
+export const PHASE2_MUTATION_DRAFT_SCHEMA_VERSION =
+  "phase2-mutation-draft/v1";
+export const PHASE2_MUTATION_FINAL_SCHEMA_VERSION =
+  "phase2-mutation-candidate/v1";
+export const PHASE2_MUTATION_CANDIDATE_SCHEMA_VERSION =
+  PHASE2_MUTATION_FINAL_SCHEMA_VERSION;
+export const PHASE2_MUTATION_SCHEMA_VERSION =
+  PHASE2_MUTATION_DRAFT_SCHEMA_VERSION;
 const STATUSES = new Set(["not_started", "ready"]);
 const HASH_64 = /^[0-9a-f]{64}$/u;
 const SHA_40 = /^[0-9a-f]{40}$/u;
@@ -66,6 +83,122 @@ const duplicateValues = (values) => {
     seen.add(value);
     return false;
   });
+};
+
+const DRAFT_FIELDS = new Set([
+  "schema_version", "phase", "target", "status", "evidence_eligible",
+  "commit_sha", "tree_sha", "registry_sha256", "manifest_sha256",
+  "phase1_mutation_registry_sha256", "configuration_hash", "thresholds",
+  "completed", "required", "aggregate", "aggregate_score", "results",
+  "errors", "readiness", "blockers",
+]);
+const CANDIDATE_FIELDS = new Set([
+  ...DRAFT_FIELDS,
+  "batch_sha256", "source_root", "artifact_root", "execution_receipt",
+]);
+const RESULT_FIELDS = new Set([
+  "requirement_id", "mutation_class", "threshold", "status", "evidence_eligible",
+  "synthetic_fixture", "execution_provenance", "isolation_mechanism", "candidate_run_id",
+  "snapshot_sha256", "batch_sha256", "commit_sha", "tree_sha", "registry_sha256",
+  "manifest_sha256", "phase1_mutation_registry_sha256", "configuration_hash", "run_id",
+  "vitest_config_path", "sources", "integration_sources", "integration_source_modules",
+  "tests", "counts", "score", "per_file", "expected_chunk_count", "chunks",
+  "mutant_identity_sha256",
+]);
+const CANDIDATE_CHUNK_FIELDS = new Set([
+  "chunk_id", "source_file", "start_line", "end_line", "mutate_pattern", "complete",
+  "raw_report_uri", "config_uri", "raw_report_sha256",
+  "config_sha256", "raw_source_path_sha256", "normalized_source_file", "mutant_identity_sha256",
+]);
+const DRAFT_CHUNK_FIELDS = new Set([...CANDIDATE_CHUNK_FIELDS, "raw_report_path", "config_path"]);
+const EXECUTION_RECEIPT_FIELDS = new Set([
+  "schema_version", "child_exit_status", "runner_sha256", "configuration_sha256",
+  "source_snapshot_sha256", "dependency_snapshot_sha256", "dependency_manifest_sha256",
+  "authority_closure_sha256", "mutant_completeness_sha256", "toolchain", "isolation_mechanism",
+]);
+const TOOLCHAIN_FIELDS = new Set([
+  "node_version", "node_sha256", "npm_version", "npm_sha256", "registry",
+  "bubblewrap_version", "bubblewrap_sha256", "prlimit_sha256",
+]);
+const exactFieldErrors = (value, allowed, label) => {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return [`${label} must be an object`];
+  return Object.keys(value)
+    .filter((field) => !allowed.has(field))
+    .map((field) => `${label} unknown field: ${field}`);
+};
+
+export const validatePhase2MutationDraftSchema = (report) => {
+  const errors = validateSchemaDocument(report, productionSchema("phase2-mutation-draft/v1"), productionSchemasById);
+  errors.push(...exactFieldErrors(report, DRAFT_FIELDS, "draft"));
+  for (const required of ["schema_version", "phase", "target", "status", "evidence_eligible", "commit_sha", "tree_sha", "results", "errors"])
+    if (!Object.hasOwn(report ?? {}, required)) errors.push(`draft required field missing: ${required}`);
+  if (report?.schema_version !== PHASE2_MUTATION_DRAFT_SCHEMA_VERSION)
+    errors.push("draft schema_version mismatch");
+  if (report?.evidence_eligible !== false)
+    errors.push("draft can never be Evidence-eligible");
+  if (report?.phase !== 2) errors.push("draft phase must be 2");
+  if (typeof report?.target !== "string" || report.target.length === 0)
+    errors.push("draft target must be a non-empty string");
+  if (!['PASS', 'FAIL'].includes(report?.status))
+    errors.push("draft status is invalid");
+  if (!SHA_40.test(report?.commit_sha ?? ""))
+    errors.push("draft commit SHA is invalid");
+  if (!SHA_40.test(report?.tree_sha ?? ""))
+    errors.push("draft tree SHA is invalid");
+  if (!Array.isArray(report?.results)) errors.push("draft results must be an array");
+  if (!Array.isArray(report?.errors) || !report.errors.every((value) => typeof value === 'string'))
+    errors.push("draft errors must be an array of strings");
+  for (const result of Array.isArray(report?.results) ? report.results : []) {
+    errors.push(...exactFieldErrors(result, RESULT_FIELDS, `${String(result?.requirement_id)} result`));
+    for (const chunk of Array.isArray(result?.chunks) ? result.chunks : [])
+      errors.push(...exactFieldErrors(chunk, DRAFT_CHUNK_FIELDS, `${String(chunk?.chunk_id)} chunk`));
+  }
+  return errors;
+};
+
+export const validatePhase2MutationCandidateSchema = (report) => {
+  const errors = validateSchemaDocument(report, productionSchema("phase2-mutation-candidate/v1"), productionSchemasById);
+  errors.push(...exactFieldErrors(report, CANDIDATE_FIELDS, "candidate"));
+  for (const required of ["schema_version", "phase", "target", "status", "evidence_eligible", "commit_sha", "tree_sha", "batch_sha256", "source_root", "artifact_root", "execution_receipt", "results", "errors"])
+    if (!Object.hasOwn(report ?? {}, required)) errors.push(`candidate required field missing: ${required}`);
+  if (report?.schema_version !== PHASE2_MUTATION_CANDIDATE_SCHEMA_VERSION)
+    errors.push("candidate schema_version mismatch");
+  if (report?.evidence_eligible !== false)
+    errors.push("candidate can never be Evidence-eligible");
+  if (report?.phase !== 2) errors.push("candidate phase must be 2");
+  if (report?.target !== "phase2") errors.push("candidate target must be phase2");
+  if (!Array.isArray(report?.results)) errors.push("candidate results must be an array");
+  if (!Array.isArray(report?.errors) || !report.errors.every((value) => typeof value === 'string'))
+    errors.push("candidate errors must be an array of strings");
+  if (!/^commit:\/\/[a-f0-9]{40}\/$/u.test(report?.source_root ?? ""))
+    errors.push("candidate source_root mismatch");
+  if (!/^bundle:\/\/[a-f0-9]{64}\/$/u.test(report?.artifact_root ?? ""))
+    errors.push("candidate artifact_root mismatch");
+  for (const result of Array.isArray(report?.results) ? report.results : []) {
+    errors.push(...exactFieldErrors(result, RESULT_FIELDS, `${String(result?.requirement_id)} result`));
+    if (result?.evidence_eligible !== false || result?.synthetic_fixture !== false ||
+        result?.execution_provenance !== "isolated_candidate" || result?.isolation_mechanism !== "bubblewrap" ||
+        !UUID_V4.test(result?.candidate_run_id ?? "") || result?.snapshot_sha256 !== report?.execution_receipt?.source_snapshot_sha256 ||
+        result?.batch_sha256 !== report?.batch_sha256 || result?.commit_sha !== report?.commit_sha || result?.tree_sha !== report?.tree_sha)
+      errors.push(`${String(result?.requirement_id)} candidate execution identity mismatch`);
+    for (const chunk of Array.isArray(result?.chunks) ? result.chunks : []) {
+      errors.push(...exactFieldErrors(chunk, CANDIDATE_CHUNK_FIELDS, `${String(chunk?.chunk_id)} chunk`));
+      if (chunk?.raw_report_uri !== `bundle://${report?.batch_sha256}/raw/${result?.requirement_id}/${chunk?.chunk_id}/mutation.json` ||
+          chunk?.config_uri !== `bundle://${report?.batch_sha256}/raw/${result?.requirement_id}/${chunk?.chunk_id}/stryker.config.json`)
+        errors.push(`${String(chunk?.chunk_id)} candidate bundle URI mismatch`);
+    }
+  }
+  const receipt = report?.execution_receipt;
+  errors.push(...exactFieldErrors(receipt, EXECUTION_RECEIPT_FIELDS, "execution receipt"));
+  errors.push(...exactFieldErrors(receipt?.toolchain, TOOLCHAIN_FIELDS, "execution toolchain"));
+  if (receipt?.toolchain?.node_version !== "v20.18.1" || !HASH_64.test(receipt?.toolchain?.node_sha256 ?? "") ||
+      receipt?.toolchain?.npm_version !== "10.8.2" || !HASH_64.test(receipt?.toolchain?.npm_sha256 ?? "") ||
+      receipt?.toolchain?.registry !== "https://registry.npmjs.org/" ||
+      receipt?.toolchain?.bubblewrap_version !== "bubblewrap 0.6.1" ||
+      !HASH_64.test(receipt?.toolchain?.bubblewrap_sha256 ?? "") || !HASH_64.test(receipt?.toolchain?.prlimit_sha256 ?? ""))
+    errors.push("execution toolchain authority mismatch");
+  return errors;
 };
 
 const readManifest = (repositoryRoot) =>
@@ -391,10 +524,18 @@ const validCounts = (counts) => {
 const reportErrors = (
   report,
   authority,
-  { ignoreReportedStatus = false } = {},
+  { ignoreReportedStatus = false, final = false } = {},
 ) => {
-  const errors = [...authority.errors];
-  if (report.schema_version !== PHASE2_MUTATION_SCHEMA_VERSION) {
+  const errors = [
+    ...authority.errors,
+    ...(final
+      ? validatePhase2MutationCandidateSchema(report)
+      : validatePhase2MutationDraftSchema(report)),
+  ];
+  const expectedSchema = final
+    ? PHASE2_MUTATION_FINAL_SCHEMA_VERSION
+    : PHASE2_MUTATION_DRAFT_SCHEMA_VERSION;
+  if (report.schema_version !== expectedSchema) {
     errors.push("Phase 2 mutation report schema mismatch");
   }
   if (!SHA_40.test(report.commit_sha ?? ""))
@@ -420,8 +561,7 @@ const reportErrors = (
   ) {
     errors.push("report mutation thresholds mismatch");
   }
-  const expectedEvidenceEligibility =
-    report.target === "phase2" && report.status === "PASS";
+  const expectedEvidenceEligibility = false;
   if (
     !ignoreReportedStatus &&
     report.evidence_eligible !== expectedEvidenceEligibility
@@ -429,6 +569,31 @@ const reportErrors = (
     errors.push("report Evidence eligibility does not match its scope");
   }
   const results = Array.isArray(report.results) ? report.results : [];
+  if (report.evidence_eligible === true) {
+    if (
+      report.execution_provenance !== "formal_isolated" ||
+      !["seatbelt", "bubblewrap"].includes(report.isolation_mechanism) ||
+      !UUID_V4.test(report.formal_run_id ?? "") ||
+      !HASH_64.test(report.snapshot_sha256 ?? "") ||
+      !HASH_64.test(report.batch_sha256 ?? "")
+    ) {
+      errors.push("final Evidence lacks a valid formal isolated run identity");
+    }
+    for (const result of results) {
+      if (
+        result?.execution_provenance !== "formal_isolated" ||
+        result?.isolation_mechanism !== report.isolation_mechanism ||
+        result?.formal_run_id !== report.formal_run_id ||
+        result?.snapshot_sha256 !== report.snapshot_sha256 ||
+        result?.batch_sha256 !== report.batch_sha256 ||
+        result?.synthetic_fixture !== false
+      ) {
+        errors.push(
+          `${String(result?.requirement_id)} formal run identity mismatch`,
+        );
+      }
+    }
+  }
   const syntheticResults = results.filter(
     (result) => result?.synthetic_fixture !== false,
   );
@@ -670,6 +835,38 @@ export function validatePhase2MutationReport(report, authority) {
   return reportErrors(report, authority);
 }
 
+export function validateFinalPhase2MutationReport(report, authority) {
+  const errors = reportErrors(report, authority, { final: true });
+  if (report?.target !== "phase2")
+    errors.push("final Phase 2 mutation report target must be phase2");
+  if (report?.status !== "PASS" || report?.completed !== 64)
+    errors.push("final Phase 2 mutation report must be a complete PASS");
+  if (!/^commit:\/\/[a-f0-9]{40}\/$/u.test(report?.source_root ?? ""))
+    errors.push("final Phase 2 mutation source_root must be a commit URI");
+  if (!/^bundle:\/\/[a-f0-9]{64}\/$/u.test(report?.artifact_root ?? ""))
+    errors.push("final Phase 2 mutation artifact_root must be a bundle URI");
+  if (
+    !report?.execution_receipt ||
+    report.execution_receipt.schema_version !==
+      "phase2-mutation-execution-receipt/v1" ||
+    report.execution_receipt.child_exit_status !== 0 ||
+    !HASH_64.test(report.execution_receipt.runner_sha256 ?? "") ||
+    report.execution_receipt.configuration_sha256 !==
+      report.configuration_hash ||
+    !HASH_64.test(report.execution_receipt.source_snapshot_sha256 ?? "") ||
+    !HASH_64.test(report.execution_receipt.dependency_snapshot_sha256 ?? "") ||
+    !HASH_64.test(report.execution_receipt.dependency_manifest_sha256 ?? "") ||
+    !HASH_64.test(report.execution_receipt.authority_closure_sha256 ?? "") ||
+    !HASH_64.test(report.execution_receipt.mutant_completeness_sha256 ?? "") ||
+    report.execution_receipt.isolation_mechanism !== "bubblewrap"
+  )
+    errors.push("final Phase 2 mutation execution receipt is invalid");
+  return [...new Set(errors)];
+}
+
+export const validatePhase2MutationCandidateReport =
+  validateFinalPhase2MutationReport;
+
 export function buildPhase2MutationReport({
   authority,
   target,
@@ -702,7 +899,7 @@ export function buildPhase2MutationReport({
     required: target === "phase2" ? 64 : 1,
     aggregate,
     aggregate_score: scoreFromCounts(aggregate),
-    results,
+    results: globalThis.structuredClone(results),
     status: "PASS",
     errors: [],
   };
@@ -710,10 +907,6 @@ export function buildPhase2MutationReport({
     ignoreReportedStatus: true,
   });
   report.status = errors.length === 0 ? "PASS" : "FAIL";
-  report.evidence_eligible = target === "phase2" && report.status === "PASS";
-  for (const result of results) {
-    result.evidence_eligible = report.evidence_eligible;
-  }
   report.errors = reportErrors(report, authority);
   return report;
 }

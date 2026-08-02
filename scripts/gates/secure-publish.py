@@ -19,6 +19,9 @@ import uuid
 
 DECIMAL = re.compile(r"^[0-9]+$")
 TESTING = os.environ.get("PHASE2_SECURE_PUBLISH_TESTING") == "1"
+JOURNAL_STATES = ("PREPARED", "RENAMED", "COMMITTED")
+JOURNAL_PREFIX = ".phase2-publication-journal-"
+TEST_PAUSE_STATES = ("PREPARED", "IDENTITY", "RENAMED", "COMMITTED")
 
 
 def fail(message: str) -> None:
@@ -129,6 +132,26 @@ def write_new_file(parent_fd: int, name: str, payload: bytes) -> None:
         os.close(descriptor)
 
 
+def write_journal(parent_fd: int, name: str, value: dict) -> None:
+    temporary = f".{name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    payload = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    write_new_file(parent_fd, temporary, payload)
+    os.rename(temporary, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+    os.fsync(parent_fd)
+
+
+def remove_journal(parent_fd: int, name: str) -> None:
+    os.unlink(name, dir_fd=parent_fd)
+    os.fsync(parent_fd)
+
+
+def test_pause(request: dict, state: str) -> None:
+    if request.get("testPauseState") == state:
+        sys.stderr.write(f"SECURE_PUBLISH_STATE={state}\n")
+        sys.stderr.flush()
+        time.sleep(30)
+
+
 def remove_contents(directory_fd: int) -> None:
     for name in os.listdir(directory_fd):
         try:
@@ -232,7 +255,7 @@ def validate_request(raw: object) -> dict:
         request["pathParts"] = components(request["path"])
         request["payload"] = decode_base64(request["contentBase64"])
     elif operation == "publish_tree":
-        optional = {"testFailAfterRenameFsync", "testFailCleanup", "testIdentity"} | test_pause
+        optional = {"testFailAfterRenameFsync", "testFailCleanup", "testIdentity", "testPauseState"} | test_pause
         request = exact_object(raw, {"operation", root_key, "temporary", "final", "files"}, optional)
         request["temporaryParts"] = components(request["temporary"])
         request["finalParts"] = components(request["final"])
@@ -260,11 +283,18 @@ def validate_request(raw: object) -> dict:
     elif operation == "read_tree":
         request = exact_object(raw, {"operation", root_key, "path"}, test_pause)
         request["pathParts"] = components(request["path"])
+    elif operation == "recover_publications":
+        request = exact_object(raw, {"operation", root_key, "path"}, test_pause)
+        request["pathParts"] = components(request["path"])
     else:
         fail(f"unsupported secure publication operation: {operation!r}")
     for key in ("testFailAfterRenameFsync", "testFailCleanup"):
         if key in request and (not TESTING or request[key] is not True):
             fail(f"{key} is forbidden outside secure publication tests")
+    if "testPauseState" in request and (
+        not TESTING or request["testPauseState"] not in TEST_PAUSE_STATES
+    ):
+        fail("testPauseState is forbidden outside secure publication tests")
     pause = request.get("testPauseAfterRootOpenMs", 0)
     if pause and (not TESTING or not isinstance(pause, int) or isinstance(pause, bool) or not 1 <= pause <= 5_000):
         fail("invalid secure publication test pause")
@@ -317,13 +347,26 @@ def publish_tree(root_fd: int, request: dict) -> dict:
     created = False
     renamed = False
     owned_identity: dict[str, str] | None = None
+    journal_name = f"{JOURNAL_PREFIX}{final_parts[-1]}.json"
+    journal = {
+        "schema_version": "phase2-publication-journal/v1",
+        "state": "PREPARED",
+        "temporary": "/".join(temporary_parts),
+        "final": "/".join(final_parts),
+        "identity": None,
+    }
     try:
+        write_journal(final_parent, journal_name, journal)
+        test_pause(request, "PREPARED")
         os.mkdir(temporary_parts[-1], 0o700, dir_fd=temporary_parent)
         created = True
         os.fsync(temporary_parent)
         temporary_fd = os.open(temporary_parts[-1], directory_flags(), dir_fd=temporary_parent)
         identity = os.fstat(temporary_fd)
         owned_identity = {"dev": str(identity.st_dev), "ino": str(identity.st_ino)}
+        journal["identity"] = owned_identity
+        write_journal(final_parent, journal_name, journal)
+        test_pause(request, "IDENTITY")
         for logical, payload in request["decodedFiles"]:
             parent = open_directory(temporary_fd, logical[:-1], True)
             try:
@@ -337,10 +380,17 @@ def publish_tree(root_fd: int, request: dict) -> dict:
         rename_noreplace(temporary_parent, temporary_parts[-1], final_parent, final_parts[-1])
         renamed = True
         created = False
+        journal["state"] = "RENAMED"
+        write_journal(final_parent, journal_name, journal)
+        test_pause(request, "RENAMED")
         os.fsync(temporary_parent)
         if request.get("testFailAfterRenameFsync"):
             fail("injected post-rename fsync failure")
         os.fsync(final_parent)
+        journal["state"] = "COMMITTED"
+        write_journal(final_parent, journal_name, journal)
+        test_pause(request, "COMMITTED")
+        remove_journal(final_parent, journal_name)
         receipt = request.get("testIdentity", owned_identity)
         return {"ok": True, **receipt, "files": len(request["decodedFiles"])}
     except BaseException as original:
@@ -360,6 +410,10 @@ def publish_tree(root_fd: int, request: dict) -> dict:
         if cleanup_errors:
             detail = "; ".join(f"{type(error).__name__}: {error}" for error in cleanup_errors)
             fail(f"{type(original).__name__}: {original}; cleanup failed: {detail}")
+        try:
+            remove_journal(final_parent, journal_name)
+        except FileNotFoundError:
+            pass
         raise
     finally:
         if temporary_fd >= 0:
@@ -412,6 +466,7 @@ def collect_tree(directory_fd: int, prefix: str = "") -> list[dict]:
 def read_tree(root_fd: int, request: dict) -> dict:
     directory = open_directory(root_fd, request["pathParts"], False)
     try:
+        identity = os.fstat(directory)
         files = collect_tree(directory)
     finally:
         os.close(directory)
@@ -421,7 +476,70 @@ def read_tree(root_fd: int, request: dict) -> dict:
         set_hash.update(b"\0")
         set_hash.update(base64.b64decode(entry["contentBase64"]))
         set_hash.update(b"\0")
-    return {"ok": True, "count": len(files), "setSha256": set_hash.hexdigest(), "files": files}
+    return {
+        "ok": True,
+        "count": len(files),
+        "setSha256": set_hash.hexdigest(),
+        "dev": str(identity.st_dev),
+        "ino": str(identity.st_ino),
+        "files": files,
+    }
+
+
+def recover_publications(root_fd: int, request: dict) -> dict:
+    parent = open_directory(root_fd, request["pathParts"], True)
+    recovered = 0
+    try:
+        for name in sorted(os.listdir(parent)):
+            if not name.startswith(JOURNAL_PREFIX) or not name.endswith(".json"):
+                continue
+            raw = read_file_bytes(parent, name)
+            journal = exact_object(
+                json.loads(raw),
+                {"schema_version", "state", "temporary", "final", "identity"},
+            )
+            if journal["schema_version"] != "phase2-publication-journal/v1" or journal["state"] not in JOURNAL_STATES:
+                fail("publication journal schema/state mismatch")
+            temporary = components(journal["temporary"])
+            final = components(journal["final"])
+            if final[:-1] != request["pathParts"] or name != f"{JOURNAL_PREFIX}{final[-1]}.json":
+                fail("publication journal path binding mismatch")
+            identity = journal["identity"]
+            if journal["state"] == "PREPARED" and identity is not None:
+                expected = validate_expected(identity)
+                try:
+                    remove_relative_tree(root_fd, temporary, expected)
+                except FileNotFoundError:
+                    # renameat2 completed but the RENAMED journal update did not.
+                    # The inode identity follows the directory across the rename,
+                    # so only the exact owned final tree is recoverable here.
+                    remove_relative_tree(root_fd, final, expected)
+            elif journal["state"] == "RENAMED":
+                remove_relative_tree(root_fd, final, validate_expected(identity))
+            elif journal["state"] == "PREPARED" and identity is None:
+                try:
+                    unowned = open_directory(root_fd, temporary, False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    try:
+                        # This is the narrow crash window after mkdir and before
+                        # the durable identity update. Publication writes cannot
+                        # have started yet. Only an empty directory is recoverable;
+                        # substitution or partial content remains fail-closed.
+                        if os.listdir(unowned):
+                            fail("unowned PREPARED publication requires manual reconciliation")
+                        current = os.fstat(unowned)
+                        recovered_identity = {"dev": str(current.st_dev), "ino": str(current.st_ino)}
+                    finally:
+                        os.close(unowned)
+                    remove_relative_tree(root_fd, temporary, recovered_identity)
+            # COMMITTED means the complete tree and its parent fsync finished.
+            remove_journal(parent, name)
+            recovered += 1
+        return {"ok": True, "recovered": recovered}
+    finally:
+        os.close(parent)
 
 
 def execute(raw: object) -> dict:
@@ -445,6 +563,8 @@ def execute(raw: object) -> dict:
             return {"ok": True}
         if operation == "read_tree":
             return read_tree(root_fd, request)
+        if operation == "recover_publications":
+            return recover_publications(root_fd, request)
         fail(f"unsupported secure publication operation: {operation!r}")
     finally:
         os.close(root_fd)

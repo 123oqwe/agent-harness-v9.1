@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import {
   existsSync,
+  cpSync,
   lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -26,7 +29,7 @@ import {
   validatePhase2MutationReport,
 } from "./gates/phase2-mutation.mjs";
 import { runProcessTree } from "./run-process-tree.mjs";
-import { readTrustedGitBlob, runTrustedGit } from "./trusted-git.mjs";
+import { addTrustedDetachedWorktree, readTrustedGitBlob, removeTrustedOwnedWorktree, runTrustedGit } from "./gates/trusted-git.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const scriptDirectory = dirname(scriptPath);
@@ -39,6 +42,18 @@ const SHA_40 = /^[0-9a-f]{40}$/u;
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const REGULAR_BLOB_MODES = new Set(["100644", "100755"]);
+const EXACT_STRYKER_BASE = Object.freeze({
+  testRunner: "vitest",
+  coverageAnalysis: "perTest",
+  reporters: ["clear-text", "progress", "html", "json"],
+  timeoutMS: 30_000,
+  concurrency: 4,
+  vitest: { configFile: "vitest.mutation.config.ts" },
+  ignorePatterns: ["/reports", ".stryker-tmp"],
+  thresholds: { high: 80, low: 70, break: 70 },
+  symlinkNodeModules: true,
+  cleanTempDir: "always",
+});
 export const PHASE2_EXPECTED_PHASE1_SHA =
   "2d59a526fcf7cd067fbe9d44981537a42d441360";
 export const PHASE2_MUTATION_AUTHORITY_PATHS = Object.freeze([
@@ -46,10 +61,27 @@ export const PHASE2_MUTATION_AUTHORITY_PATHS = Object.freeze([
   "mutation/modules.mjs",
   "mutation/stryker.base.mjs",
   "verification/gates/phase2-gate.json",
+  "verification/gates/phase2-mutation-workflow-contract.json",
+  "verification/schemas/phase2-mutation-publication-receipt.schema.json",
+  "verification/schemas/phase2-mutation-draft.schema.json",
+  "verification/schemas/phase2-mutation-candidate.schema.json",
+  "verification/schemas/phase2-mutation-execution-receipt.schema.json",
+  "verification/schemas/phase2-mutation-attestation-receipt.schema.json",
+  "tests/phase-2/fixtures/native-clean-install/package.json",
+  "tests/phase-2/fixtures/native-clean-install/package-lock.json",
+  ".github/workflows/phase2-mutation.yml",
   "scripts/gates/phase2-mutation.mjs",
+  "scripts/gates/json-schema.mjs",
+  "scripts/gates/workflow-contract.mjs",
+  "scripts/gates/secure-publish.mjs",
+  "scripts/gates/secure-publish.py",
+  "scripts/gates/verify-phase2-mutation-bundle.mjs",
+  "scripts/gates/verify-phase2-mutant-completeness.mjs",
+  "scripts/run-phase2-mutation-launcher.mjs",
+  "scripts/run-phase2-mutation-bootstrap.mjs",
   "scripts/run-phase2-mutation.mjs",
   "scripts/run-process-tree.mjs",
-  "scripts/trusted-git.mjs",
+  "scripts/gates/trusted-git.mjs",
   "package.json",
   "package-lock.json",
   "patches/@stryker-mutator+core+9.6.1.patch",
@@ -155,6 +187,11 @@ const parseCommittedStrykerBase = (source) => {
   if (value === null || Array.isArray(value) || typeof value !== "object") {
     throw new Error("committed Stryker base must be an object literal");
   }
+  if (canonicalJson(value) !== canonicalJson(EXACT_STRYKER_BASE)) {
+    throw new Error(
+      "committed Stryker base contains unknown keys, invalid types, or security-critical value drift",
+    );
+  }
   return value;
 };
 
@@ -176,7 +213,7 @@ export const collectPhase2MutationSnapshotPaths = ({
   return [...paths].sort();
 };
 
-const atomicWriteJson = (path, value) => {
+const writeJsonAtomically = (path, value) => {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
@@ -330,6 +367,13 @@ const assertMutantInChunk = (mutant, chunk) => {
   }
 };
 
+const reporterPath = (cwd, absolute) => {
+  const candidate = relative(cwd, absolute).replaceAll("\\", "/");
+  return candidate === ".." || candidate.startsWith("../")
+    ? absolute
+    : candidate;
+};
+
 const phase2ChunkConfig = ({
   strykerBase,
   requirement,
@@ -364,6 +408,7 @@ const runChunk = async ({
   vitestConfigPath,
   timeoutMs,
   strykerBase,
+  candidateContext,
 }) => {
   const chunkRoot = join(runRoot, requirement.id, "chunks", chunk.chunk_id);
   const rawReportPath = join(chunkRoot, "mutation.json");
@@ -372,11 +417,11 @@ const runChunk = async ({
     strykerBase,
     requirement,
     chunk,
-    reportPath: rawReportPath,
+    reportPath: reporterPath(repositoryRoot, rawReportPath),
     tempDirName: `.stryker-tmp/phase2/${runId}/${chunk.chunk_id}`,
     vitestConfigPath,
   });
-  atomicWriteJson(configPath, config);
+  writeJsonAtomically(configPath, config);
   const result = await runProcessTree(strykerExecutable, ["run", configPath], {
     cwd: repositoryRoot,
     env: { ...process.env, STRYKER: "true" },
@@ -390,9 +435,24 @@ const runChunk = async ({
   if (!existsSync(rawReportPath)) {
     throw new Error(`Stryker did not produce ${rawReportPath}`);
   }
+  const rawRelativePath = relative(reportRoot, rawReportPath).replaceAll(
+    "\\",
+    "/",
+  );
+  const configRelativePath = relative(reportRoot, configPath).replaceAll(
+    "\\",
+    "/",
+  );
+  assertNoSymlinkAncestors(reportRoot, rawRelativePath, {
+    requireFile: true,
+  });
+  assertNoSymlinkAncestors(reportRoot, configRelativePath, {
+    requireFile: true,
+  });
   const rawText = readFileSync(rawReportPath, "utf8");
   const raw = JSON.parse(rawText);
-  const entries = Object.entries(raw?.files ?? {}).map(([path, file]) => [
+  const rawEntries = Object.entries(raw?.files ?? {});
+  const entries = rawEntries.map(([path, file]) => [
     normalizeSourcePath(repositoryRoot, path),
     file,
   ]);
@@ -417,20 +477,29 @@ const runChunk = async ({
     chunk: {
       ...chunk,
       complete: true,
-      raw_report_path: relative(reportRoot, rawReportPath).replaceAll(
-        "\\",
-        "/",
-      ),
-      config_path: relative(reportRoot, configPath).replaceAll("\\", "/"),
+      raw_report_path: rawRelativePath,
+      config_path: configRelativePath,
+      raw_report_uri:
+        candidateContext === null
+          ? null
+          : `bundle://${candidateContext.batchSha256}/raw/${requirement.id}/${chunk.chunk_id}/mutation.json`,
+      config_uri:
+        candidateContext === null
+          ? null
+          : `bundle://${candidateContext.batchSha256}/raw/${requirement.id}/${chunk.chunk_id}/stryker.config.json`,
       raw_report_sha256: sha256(rawText),
       config_sha256: sha256(readFileSync(configPath)),
+      raw_source_path_sha256: sha256(
+        canonicalJson(rawEntries.map(([path]) => path).sort()),
+      ),
+      normalized_source_file: chunk.source_file,
       mutant_identity_sha256: sha256(canonicalJson(identities.sort())),
     },
     mutants,
   };
 };
 
-export async function runPhase2RequirementDiagnostic({
+async function executePhase2RequirementMutation({
   repositoryRoot,
   requirement,
   commitSha,
@@ -443,6 +512,7 @@ export async function runPhase2RequirementDiagnostic({
   vitestConfigPath,
   reportRoot = join(repositoryRoot, "reports/mutation/phase2-diagnostic"),
   timeoutMs = 15 * 60 * 1000,
+  candidateContext = null,
 }) {
   if (!SHA_40.test(commitSha ?? ""))
     throw new Error("diagnostic requires exact commit SHA");
@@ -473,6 +543,7 @@ export async function runPhase2RequirementDiagnostic({
   ) {
     throw new Error(`diagnostic requirement ${requirement.id} is not ready`);
   }
+  reportRoot = prepareSafeReportRoot(repositoryRoot, reportRoot);
   for (const path of [
     ...requirement.sources,
     ...(requirement.integrationSources ?? []),
@@ -498,6 +569,10 @@ export async function runPhase2RequirementDiagnostic({
   );
   if (chunks.length === 0)
     throw new Error("diagnostic mutation chunk set is empty");
+  const isolated = candidateContext
+    ? { executionRoot: repositoryRoot, cleanup() {} }
+    : createIsolatedExecutionRoot(repositoryRoot, commitSha);
+  const executionRoot = isolated.executionRoot;
   const perFileMutants = new Map(
     requirement.sources.map((source) => [source, []]),
   );
@@ -506,7 +581,7 @@ export async function runPhase2RequirementDiagnostic({
   try {
     for (const chunk of chunks) {
       const executed = await runChunk({
-        repositoryRoot,
+        repositoryRoot: executionRoot,
         requirement,
         chunk,
         runId,
@@ -516,6 +591,7 @@ export async function runPhase2RequirementDiagnostic({
         vitestConfigPath,
         timeoutMs,
         strykerBase,
+        candidateContext,
       });
       for (const mutant of executed.mutants) {
         const identity = mutantIdentity(chunk.source_file, mutant);
@@ -555,7 +631,13 @@ export async function runPhase2RequirementDiagnostic({
           ? "PASS"
           : "FAIL",
       evidence_eligible: false,
-      synthetic_fixture: true,
+      synthetic_fixture: candidateContext === null,
+      execution_provenance:
+        candidateContext === null ? "diagnostic" : "isolated_candidate",
+      isolation_mechanism: candidateContext?.isolationMechanism ?? null,
+      candidate_run_id: candidateContext?.candidateRunId ?? null,
+      snapshot_sha256: candidateContext?.snapshotSha256 ?? null,
+      batch_sha256: candidateContext?.batchSha256 ?? null,
       commit_sha: commitSha,
       tree_sha: treeSha,
       registry_sha256: registrySha256,
@@ -580,11 +662,19 @@ export async function runPhase2RequirementDiagnostic({
       mutant_identity_sha256: sha256(canonicalJson([...identities].sort())),
     };
   } finally {
-    rmSync(join(repositoryRoot, ".stryker-tmp", "phase2", runId), {
-      recursive: true,
-      force: true,
-    });
+    try {
+      rmSync(join(executionRoot, ".stryker-tmp", "phase2", runId), {
+        recursive: true,
+        force: true,
+      });
+    } finally {
+      isolated.cleanup();
+    }
   }
+}
+
+export async function runPhase2RequirementDiagnostic(options) {
+  return executePhase2RequirementMutation({ ...options, candidateContext: null });
 }
 
 const resolveArtifactPath = (reportRoot, path) => {
@@ -615,6 +705,123 @@ const assertSafeRepositoryPath = (path) => {
     path.split("/").some((part) => !part || part === "." || part === "..")
   ) {
     throw new Error(`unsafe mutation repository path: ${String(path)}`);
+  }
+};
+
+const assertNoSymlinkAncestors = (
+  root,
+  relativePath,
+  { requireFile = false } = {},
+) => {
+  assertSafeRepositoryPath(relativePath);
+  const resolvedRoot = resolve(root);
+  const rootMetadata = lstatSync(resolvedRoot);
+  if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) {
+    throw new Error("mutation repository root must be a real directory");
+  }
+  const parts = relativePath.split("/");
+  let cursor = resolvedRoot;
+  for (const [index, part] of parts.entries()) {
+    cursor = join(cursor, part);
+    const metadata = lstatSync(cursor);
+    const displayPath = parts.slice(0, index + 1).join("/");
+    if (metadata.isSymbolicLink()) {
+      throw new Error(`mutation path ancestor is a symlink: ${displayPath}`);
+    }
+    const leaf = index === parts.length - 1;
+    if (!leaf && !metadata.isDirectory()) {
+      throw new Error(`mutation path ancestor is not a directory: ${displayPath}`);
+    }
+    if (leaf && requireFile && !metadata.isFile()) {
+      throw new Error(`mutation path is not a regular file: ${relativePath}`);
+    }
+  }
+};
+
+const prepareSafeReportRoot = (repositoryRoot, reportRoot) => {
+  const root = resolve(repositoryRoot);
+  const absolute = resolve(reportRoot);
+  const relativeRoot = relative(root, absolute).replaceAll("\\", "/");
+  if (
+    relativeRoot === "" ||
+    relativeRoot === ".." ||
+    relativeRoot.startsWith("../")
+  ) {
+    throw new Error("mutation report root must remain inside the repository");
+  }
+  assertSafeRepositoryPath(relativeRoot);
+  const parts = relativeRoot.split("/");
+  let cursor = root;
+  for (const [index, part] of parts.entries()) {
+    cursor = join(cursor, part);
+    const displayPath = parts.slice(0, index + 1).join("/");
+    try {
+      const metadata = lstatSync(cursor);
+      if (metadata.isSymbolicLink()) {
+        throw new Error(`mutation report ancestor is a symlink: ${displayPath}`);
+      }
+      if (!metadata.isDirectory()) {
+        throw new Error(
+          `mutation report ancestor is not a directory: ${displayPath}`,
+        );
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        mkdirSync(cursor, { mode: 0o700 });
+        const created = lstatSync(cursor);
+        if (created.isSymbolicLink() || !created.isDirectory()) {
+          throw new Error(
+            `mutation report directory creation was replaced: ${displayPath}`,
+            { cause: error },
+          );
+        }
+        continue;
+      }
+      throw error;
+    }
+  }
+  return absolute;
+};
+
+const createIsolatedExecutionRoot = (repositoryRoot, commitSha) => {
+  const parent = resolve(
+    dirname(repositoryRoot),
+    `.phase2-mutation-isolated-${randomUUID()}`,
+  );
+  const executionRoot = join(parent, "repository");
+  mkdirSync(parent, { mode: 0o700 });
+  try {
+    addTrustedDetachedWorktree(repositoryRoot, executionRoot, commitSha);
+    const dependencyRoot = join(repositoryRoot, "node_modules");
+    if (existsSync(dependencyRoot)) {
+      const resolvedDependencies = realpathSync(dependencyRoot);
+      const dependencyMetadata = lstatSync(resolvedDependencies);
+      if (!dependencyMetadata.isDirectory()) {
+        throw new Error("mutation dependency boundary is not a directory");
+      }
+      cpSync(resolvedDependencies, join(executionRoot, "node_modules"), {
+        recursive: true,
+        dereference: true,
+        force: false,
+      });
+    }
+    return {
+      executionRoot,
+      cleanup() {
+        try {
+          removeTrustedOwnedWorktree(repositoryRoot, executionRoot);
+        } finally {
+          rmSync(parent, { recursive: true, force: true });
+        }
+      },
+    };
+  } catch (error) {
+    rmSync(parent, { recursive: true, force: true });
+    throw error;
   }
 };
 
@@ -656,6 +863,9 @@ const verifyCommittedWorkingRegularBlob = (
   commitSha,
   relativePath,
 ) => {
+  assertNoSymlinkAncestors(repositoryRoot, relativePath, {
+    requireFile: true,
+  });
   const committed = readCommittedRegularBlob(
     repositoryRoot,
     commitSha,
@@ -735,6 +945,9 @@ export async function validatePhase2MutationArtifacts({
   repositoryRoot,
   reportRoot,
   result,
+  artifactReader = null,
+  canonicalReportRoot = reportRoot,
+  sourcePathRoot = repositoryRoot,
 }) {
   if (!SHA_40.test(result?.commit_sha ?? "")) {
     throw new Error(
@@ -851,18 +1064,34 @@ export async function validatePhase2MutationArtifacts({
     ].join("/");
     const expectedRawPath = `${expectedChunkRoot}/mutation.json`;
     const expectedConfigPath = `${expectedChunkRoot}/stryker.config.json`;
-    if (
+    if (artifactReader === null && (
       chunk.raw_report_path !== expectedRawPath ||
       chunk.config_path !== expectedConfigPath
-    ) {
+    )) {
       throw new Error(
         `deterministic mutation artifact path mismatch for ${chunk.chunk_id}`,
       );
     }
-    const rawPath = resolveArtifactPath(reportRoot, chunk.raw_report_path);
-    const configPath = resolveArtifactPath(reportRoot, chunk.config_path);
-    const rawText = readFileSync(rawPath, "utf8");
-    const configText = readFileSync(configPath, "utf8");
+    const rawPath = artifactReader === null ? resolveArtifactPath(reportRoot, chunk.raw_report_path) : null;
+    const configPath = artifactReader === null ? resolveArtifactPath(reportRoot, chunk.config_path) : null;
+    if (artifactReader === null) {
+      assertNoSymlinkAncestors(reportRoot, chunk.raw_report_path, {
+        requireFile: true,
+      });
+      assertNoSymlinkAncestors(reportRoot, chunk.config_path, {
+        requireFile: true,
+      });
+    }
+    const rawValue =
+      artifactReader === null
+        ? readFileSync(rawPath)
+        : await artifactReader({ kind: "raw", result, chunk });
+    const configValue =
+      artifactReader === null
+        ? readFileSync(configPath)
+        : await artifactReader({ kind: "config", result, chunk });
+    const rawText = Buffer.from(rawValue).toString("utf8");
+    const configText = Buffer.from(configValue).toString("utf8");
     if (sha256(rawText) !== chunk.raw_report_sha256) {
       throw new Error(`raw report hash mismatch for ${chunk.chunk_id}`);
     }
@@ -877,7 +1106,13 @@ export async function validatePhase2MutationArtifacts({
         threshold: result.threshold,
       },
       chunk,
-      reportPath: resolve(reportRoot, expectedRawPath),
+      reportPath:
+        result.execution_provenance === "isolated_candidate"
+          ? reporterPath(
+              sourcePathRoot,
+              resolve(canonicalReportRoot, expectedRawPath),
+            )
+          : resolve(canonicalReportRoot, expectedRawPath),
       tempDirName: `.stryker-tmp/phase2/${result.run_id}/${chunk.chunk_id}`,
       vitestConfigPath: result.vitest_config_path,
     });
@@ -887,8 +1122,16 @@ export async function validatePhase2MutationArtifacts({
       );
     }
     const raw = JSON.parse(rawText);
-    const entries = Object.entries(raw?.files ?? {}).map(([path, file]) => [
-      normalizeSourcePath(repositoryRoot, path),
+    const rawEntries = Object.entries(raw?.files ?? {});
+    if (
+      chunk.raw_source_path_sha256 !==
+      sha256(canonicalJson(rawEntries.map(([path]) => path).sort())) ||
+      chunk.normalized_source_file !== chunk.source_file
+    ) {
+      throw new Error(`raw source path provenance mismatch for ${chunk.chunk_id}`);
+    }
+    const entries = rawEntries.map(([path, file]) => [
+      normalizeSourcePath(sourcePathRoot, path),
       file,
     ]);
     if (
@@ -1060,7 +1303,7 @@ export async function runPhase2Mutation({
     report.readiness = readiness;
     report.blockers = readiness.blockers;
     report.status = "FAIL";
-    atomicWriteJson(join(reportRoot, "mutation.json"), report);
+    writeJsonAtomically(join(reportRoot, "draft-report.json"), report);
     return report;
   }
 
@@ -1076,8 +1319,27 @@ export async function runPhase2Mutation({
     commitSha: identity.commitSha,
     requiredPaths: snapshotPaths,
   });
+  const candidateRunId = randomUUID();
+  const candidateContext = {
+    candidateRunId,
+    snapshotSha256: initialSnapshot.snapshotSha256,
+    isolationMechanism: "candidate_unattested",
+    batchSha256: sha256(
+      canonicalJson({
+        candidate_run_id: candidateRunId,
+        commit_sha: identity.commitSha,
+        tree_sha: identity.treeSha,
+        snapshot_sha256: initialSnapshot.snapshotSha256,
+        isolation_mechanism: "candidate_unattested",
+        configuration_hash: configurationHash,
+        registry_sha256: authority.registrySha256,
+        manifest_sha256: authority.manifestSha256,
+        requirement_ids: selected.map((requirement) => requirement.id),
+      }),
+    ),
+  };
   for (const requirement of selected) {
-    const result = await runPhase2RequirementDiagnostic({
+    const result = await executePhase2RequirementMutation({
       repositoryRoot: root,
       requirement,
       commitSha: identity.commitSha,
@@ -1089,14 +1351,13 @@ export async function runPhase2Mutation({
       strykerExecutable: join(root, "node_modules/.bin/stryker"),
       vitestConfigPath: "vitest.mutation.config.ts",
       reportRoot,
+      candidateContext: target === "phase2" ? candidateContext : null,
     });
     await validatePhase2MutationArtifacts({
       repositoryRoot: root,
       reportRoot,
       result,
     });
-    result.synthetic_fixture = false;
-    result.evidence_eligible = false;
     results.push(result);
   }
   if (target === "phase2") {
@@ -1131,8 +1392,10 @@ export async function runPhase2Mutation({
     for (const result of results) result.evidence_eligible = false;
     report.errors = validatePhase2MutationReport(report, authority);
   }
-  atomicWriteJson(
-    join(reportRoot, target === "phase2" ? "mutation.json" : `${target}.json`),
+  const reportName =
+    target === "phase2" ? "candidate-report.json" : `${target}.json`;
+  writeJsonAtomically(
+    join(reportRoot, reportName),
     report,
   );
   return report;
@@ -1140,7 +1403,8 @@ export async function runPhase2Mutation({
 
 const isMain =
   process.argv[1] !== undefined &&
-  resolve(process.argv[1]) === resolve(scriptPath);
+  existsSync(resolve(process.argv[1])) &&
+  realpathSync(resolve(process.argv[1])) === realpathSync(resolve(scriptPath));
 if (isMain) {
   const target = process.argv[2];
   if (!target) {
@@ -1151,7 +1415,14 @@ if (isMain) {
   } else {
     try {
       const report = await runPhase2Mutation({ target });
-      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      const path =
+        target === "phase2"
+          ? (report.readiness ? "draft-report.json" : "candidate-report.json")
+          : `${target}.json`;
+      const bytes = readFileSync(join(DEFAULT_REPORT_ROOT, path));
+      process.stdout.write(
+        `${JSON.stringify({ batch_sha256: null, report_sha256: sha256(bytes), path, status: report.status })}\n`,
+      );
       process.exitCode = report.status === "PASS" ? 0 : 1;
     } catch (error) {
       process.stderr.write(

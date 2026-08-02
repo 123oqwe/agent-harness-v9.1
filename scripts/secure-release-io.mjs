@@ -11,7 +11,7 @@ import {
   readTrustedGitBlob,
   trustedPythonExecutable,
   runTrustedGit,
-} from './trusted-git.mjs';
+} from './gates/trusted-git.mjs';
 
 const helperPath = 'scripts/secure-release-io.py';
 

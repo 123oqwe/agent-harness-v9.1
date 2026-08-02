@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-harness.local/verification/schemas/phase2-mutation-draft/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "phase", "target", "status", "evidence_eligible", "commit_sha", "tree_sha", "results", "errors"],
+  "properties": {
+    "schema_version": { "const": "phase2-mutation-draft/v1" },
+    "phase": { "const": 2 },
+    "target": { "type": "string" },
+    "status": { "enum": ["PASS", "FAIL"] },
+    "evidence_eligible": { "const": false },
+    "commit_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "tree_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "registry_sha256": { "type": "string" },
+    "manifest_sha256": { "type": "string" },
+    "phase1_mutation_registry_sha256": { "type": "string" },
+    "configuration_hash": { "type": "string" },
+    "thresholds": { "type": "object", "additionalProperties": false, "required": ["critical", "core"], "properties": { "critical": { "type": "number" }, "core": { "type": "number" } } },
+    "completed": { "type": "integer" },
+    "required": { "type": "integer" },
+    "aggregate": { "$ref": "#/$defs/counts" },
+    "aggregate_score": { "type": "number" },
+    "results": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/result" } },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "readiness": { "type": "object" },
+    "blockers": { "type": "array" }
+  },
+  "$defs": {
+    "counts": { "type": "object", "additionalProperties": false, "required": ["total", "killed", "timeout", "survived", "noCoverage", "ignored"], "properties": { "total": { "type": "integer" }, "killed": { "type": "integer" }, "timeout": { "type": "integer" }, "survived": { "type": "integer" }, "noCoverage": { "type": "integer" }, "ignored": { "type": "integer" } } },
+    "chunk": { "type": "object", "additionalProperties": false, "required": ["chunk_id", "source_file", "start_line", "end_line", "complete", "raw_report_sha256", "config_sha256", "mutant_identity_sha256"], "properties": { "chunk_id": { "type": "string" }, "source_file": { "type": "string" }, "start_line": { "type": "integer" }, "end_line": { "type": "integer" }, "mutate_pattern": { "type": "string" }, "complete": { "const": true }, "raw_report_path": { "type": "string" }, "config_path": { "type": "string" }, "raw_report_uri": { "type": ["string", "null"] }, "config_uri": { "type": ["string", "null"] }, "raw_report_sha256": { "type": "string" }, "config_sha256": { "type": "string" }, "raw_source_path_sha256": { "type": "string" }, "normalized_source_file": { "type": "string" }, "mutant_identity_sha256": { "type": "string" } } },
+    "result": { "type": "object", "additionalProperties": false, "required": ["requirement_id", "mutation_class", "threshold", "status", "evidence_eligible", "synthetic_fixture", "commit_sha", "tree_sha", "registry_sha256", "manifest_sha256", "phase1_mutation_registry_sha256", "configuration_hash", "run_id", "vitest_config_path", "sources", "integration_sources", "integration_source_modules", "tests", "counts", "score", "per_file", "expected_chunk_count", "chunks"], "properties": { "requirement_id": { "type": "string" }, "mutation_class": { "type": "string" }, "threshold": { "type": "number" }, "status": { "enum": ["PASS", "FAIL"] }, "evidence_eligible": { "const": false }, "synthetic_fixture": { "type": "boolean" }, "execution_provenance": { "type": "string" }, "isolation_mechanism": { "type": ["string", "null"] }, "candidate_run_id": { "type": ["string", "null"] }, "snapshot_sha256": { "type": ["string", "null"] }, "batch_sha256": { "type": ["string", "null"] }, "commit_sha": { "type": "string" }, "tree_sha": { "type": "string" }, "registry_sha256": { "type": "string" }, "manifest_sha256": { "type": "string" }, "phase1_mutation_registry_sha256": { "type": "string" }, "configuration_hash": { "type": "string" }, "run_id": { "type": "string" }, "vitest_config_path": { "type": "string" }, "sources": { "type": "array", "minItems": 1, "items": { "type": "string" } }, "integration_sources": { "type": "array", "items": { "type": "string" } }, "integration_source_modules": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }, "tests": { "type": "array", "minItems": 1, "items": { "type": "string" } }, "counts": { "$ref": "#/$defs/counts" }, "score": { "type": "number" }, "per_file": { "type": "object", "additionalProperties": { "type": "object" } }, "expected_chunk_count": { "type": "integer", "minimum": 1 }, "chunks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/chunk" } }, "mutant_identity_sha256": { "type": "string" } } }
+  }
+}

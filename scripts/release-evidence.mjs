@@ -13,7 +13,7 @@ import {
   runTrustedGit,
   spawnTrustedGitSync,
   validateProtectedExecutable,
-} from './trusted-git.mjs';
+} from './gates/trusted-git.mjs';
 import { secureReleaseIo } from './secure-release-io.mjs';
 
 const isolatedReleaseTrees = new Map();

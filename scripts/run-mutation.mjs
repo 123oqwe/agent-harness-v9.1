@@ -43,7 +43,7 @@ export const mutationAuthorityFiles = [
   'scripts/run-process-tree.mjs',
   'scripts/check-mutation-thresholds.mjs',
   'scripts/repository-paths.mjs',
-  'scripts/trusted-git.mjs',
+  'scripts/gates/trusted-git.mjs',
   'scripts/secure-release-io.mjs',
   'scripts/secure-release-io.py',
   'benchmarks/phase1/final-evidence.schema.json',

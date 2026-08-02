@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -19,10 +21,13 @@ import {
 } from "../../../mutation/phase2-modules.mjs";
 import {
   buildPhase2MutationReport,
+  PHASE2_MUTATION_DRAFT_SCHEMA_VERSION,
+  PHASE2_MUTATION_FINAL_SCHEMA_VERSION,
   inspectPhase2MutationReadiness,
   loadPhase2MutationAuthority,
   resolvePhase2MutationTarget,
   validatePhase2MutationReport,
+  validateFinalPhase2MutationReport,
   // @ts-expect-error The mutation gate intentionally ships as plain Node ESM.
 } from "../../../scripts/gates/phase2-mutation.mjs";
 
@@ -348,71 +353,83 @@ describe("Phase 2 mutation authority", () => {
   });
 
   it(
-    "wires the package command to the real runner and reports 0/64 as mutation_incomplete",
+    "wires the package command to the candidate launcher and keeps stdout bounded",
     { timeout: 30_000 },
     () => {
       const packageJson = JSON.parse(
         readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
       );
       expect(packageJson.scripts["test:mutation:phase2"]).toBe(
-        "node scripts/run-phase2-mutation.mjs phase2",
+        "node scripts/run-phase2-mutation-launcher.mjs phase2",
       );
-      const parent = mkdtempSync(resolve(tmpdir(), "phase2-runner-command-"));
-      const root = resolve(parent, "repository");
-      try {
-        git(parent, "clone", "--shared", repositoryRoot, root);
-        for (const path of [
-          "scripts/gates/phase2-mutation.mjs",
-          "scripts/run-phase2-mutation.mjs",
-        ]) {
-          copyFileSync(resolve(repositoryRoot, path), resolve(root, path));
-        }
-        git(root, "add", "scripts/gates/phase2-mutation.mjs");
-        git(root, "add", "scripts/run-phase2-mutation.mjs");
-        git(
-          root,
-          "-c",
-          "user.name=Phase2 Mutation Test",
-          "-c",
-          "user.email=phase2-mutation@example.invalid",
-          "commit",
-          "-m",
-          "test committed mutation runner",
-        );
-        symlinkSync(
-          resolve(repositoryRoot, "node_modules"),
-          resolve(root, "node_modules"),
-          "dir",
-        );
-        const run = spawnSync(
-          "npm",
-          ["run", "test:mutation:phase2", "--silent"],
-          {
-            cwd: root,
-            encoding: "utf8",
-            shell: false,
-            timeout: 30_000,
-          },
-        );
-        expect(run.status, run.stderr).toBe(1);
-        expect(JSON.parse(run.stdout)).toMatchObject({
-          target: "phase2",
-          status: "FAIL",
-          completed: 0,
-          required: 64,
-          blockers: [
-            { code: "mutation_incomplete", completed: 0, required: 64 },
-          ],
-        });
-      } finally {
-        rmSync(parent, { recursive: true, force: true });
-      }
+      const bootstrap = readFileSync(resolve(repositoryRoot, "scripts/run-phase2-mutation-bootstrap.mjs"), "utf8");
+      expect(bootstrap).toMatch(/batch_sha256.*report_sha256.*path.*status/su);
+      expect(bootstrap).toMatch(/explicitReady\s*!==\s*64/u);
+      expect(bootstrap).not.toContain("mutation-bundles");
     },
   );
 });
 
 describe("Phase 2 mutation report integrity", () => {
-  it("accepts only a complete threshold-passing 64-requirement report", () => {
+  it("keeps draft and candidate report schemas explicit without a local formal schema", () => {
+    expect(PHASE2_MUTATION_DRAFT_SCHEMA_VERSION).toBe(
+      "phase2-mutation-draft/v1",
+    );
+    expect(PHASE2_MUTATION_FINAL_SCHEMA_VERSION).toBe(
+      "phase2-mutation-candidate/v1",
+    );
+    expect(typeof validateFinalPhase2MutationReport).toBe("function");
+  });
+  it("keeps a complete threshold-passing pure report draft Evidence-ineligible", () => {
+    const authority = readyAuthority();
+    const results = passingResults(authority);
+    const originalResults = structuredClone(results);
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results,
+    });
+
+    expect(report.status).toBe("PASS");
+    expect(report.evidence_eligible).toBe(false);
+    expect(report.phase1_mutation_registry_sha256).toBe(
+      authority.phase1MutationSha256,
+    );
+    expect(report.tree_sha).toBe("f".repeat(40));
+    expect(report.completed).toBe(64);
+    expect(results).toEqual(originalResults);
+    expect(validatePhase2MutationReport(report, authority)).toEqual([]);
+  });
+
+  it("does not launder 64 independent diagnostics into full Evidence", () => {
+    const authority = readyAuthority();
+    const diagnostics = passingResults(authority).map(
+      (result: ReturnType<typeof passingResults>[number]) => ({
+        ...result,
+        evidence_eligible: false,
+        synthetic_fixture: false,
+        execution_provenance: "diagnostic",
+        formal_run_id: null,
+      }),
+    );
+    const original = structuredClone(diagnostics);
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: diagnostics,
+    });
+
+    expect(report.evidence_eligible).toBe(false);
+    expect(report.results).toEqual(original);
+  });
+
+  it("does not grant Evidence to a pure report built with invented Git identities", () => {
     const authority = readyAuthority();
     const report = buildPhase2MutationReport({
       authority,
@@ -424,20 +441,66 @@ describe("Phase 2 mutation report integrity", () => {
     });
 
     expect(report.status).toBe("PASS");
-    expect(report.evidence_eligible).toBe(true);
-    expect(report.phase1_mutation_registry_sha256).toBe(
-      authority.phase1MutationSha256,
+    expect(report.evidence_eligible).toBe(false);
+  });
+
+  it("rejects a forged local attempt to upgrade a candidate into formal Evidence", () => {
+    const authority = readyAuthority();
+    const formalRunId = "00000000-0000-4000-8000-000000000000";
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: passingResults(authority),
+    });
+    Object.assign(report, {
+      evidence_eligible: true,
+      execution_provenance: "formal_isolated",
+      isolation_mechanism: "seatbelt",
+      formal_run_id: formalRunId,
+      snapshot_sha256: "1".repeat(64),
+      batch_sha256: "2".repeat(64),
+    });
+    for (const result of report.results) {
+      Object.assign(result, {
+        evidence_eligible: true,
+        synthetic_fixture: false,
+        execution_provenance: "formal_isolated",
+        isolation_mechanism: "seatbelt",
+        formal_run_id: formalRunId,
+        snapshot_sha256: "1".repeat(64),
+        batch_sha256: "2".repeat(64),
+      });
+    }
+
+    expect(validatePhase2MutationReport(report, authority).join("\n")).toMatch(/Evidence eligibility/u);
+    Object.assign(report, {
+      schema_version: PHASE2_MUTATION_FINAL_SCHEMA_VERSION,
+      source_root: `commit://${"a".repeat(40)}/`,
+      artifact_root: `bundle://${"2".repeat(64)}/`,
+      execution_receipt: {
+        child_exit_status: 0,
+        runner_sha256: "4".repeat(64),
+        configuration_sha256: "b".repeat(64),
+        source_snapshot_sha256: "1".repeat(64),
+        dependency_snapshot_sha256: "5".repeat(64),
+        dependency_manifest_sha256: "6".repeat(64),
+        authority_closure_sha256: "7".repeat(64),
+        toolchain: {
+          node_version: "v20.18.1",
+          node_sha256: "8".repeat(64),
+          npm_version: "10.8.2",
+          npm_sha256: "9".repeat(64),
+          registry: "https://registry.npmjs.org/",
+        },
+        isolation_mechanism: "seatbelt",
+      },
+    });
+    expect(validateFinalPhase2MutationReport(report, authority).join("\n")).toMatch(
+      /candidate can never be Evidence-eligible|unknown field|execution receipt/u,
     );
-    expect(report.tree_sha).toBe("f".repeat(40));
-    expect(report.completed).toBe(64);
-    expect(
-      report.results.every(
-        (result: { evidence_eligible: boolean; synthetic_fixture: boolean }) =>
-          result.evidence_eligible === true &&
-          result.synthetic_fixture === false,
-      ),
-    ).toBe(true);
-    expect(validatePhase2MutationReport(report, authority)).toEqual([]);
   });
 
   it("rejects a forged 64-result full report made entirely from synthetic diagnostics", () => {

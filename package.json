@@ -78,7 +78,7 @@
     "test:phase2:security": "vitest run tests/phase-2/security",
     "test:phase2:e2e": "vitest run tests/phase-2/e2e",
     "test:phase2:architecture": "vitest run tests/phase-2/architecture",
-    "test:mutation:phase2": "node scripts/run-phase2-mutation.mjs phase2",
+    "test:mutation:phase2": "node scripts/run-phase2-mutation-launcher.mjs phase2",
     "test:phase2:evals": "node scripts/gates/run-phase2-evals.mjs --mode bootstrap",
     "test:phase2:data": "node scripts/gates/run-phase2-data.mjs --mode bootstrap",
     "test:phase2:package-smoke": "node scripts/gates/package-smoke.mjs",

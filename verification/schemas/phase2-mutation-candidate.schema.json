@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-harness.local/verification/schemas/phase2-mutation-candidate/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "evidence_eligible", "commit_sha", "tree_sha", "batch_sha256", "source_root", "artifact_root", "execution_receipt", "results"],
+  "properties": {
+    "schema_version": { "const": "phase2-mutation-candidate/v1" },
+    "status": { "enum": ["PASS", "FAIL"] },
+    "evidence_eligible": { "const": false },
+    "commit_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "tree_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "batch_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_root": { "type": "string", "pattern": "^commit://[a-f0-9]{40}/$" },
+    "artifact_root": { "type": "string", "pattern": "^bundle://[a-f0-9]{64}/$" },
+    "execution_receipt": { "$ref": "https://agent-harness.local/verification/schemas/phase2-mutation-execution-receipt/v1" },
+    "results": { "type": "array", "minItems": 64, "items": { "$ref": "https://agent-harness.local/verification/schemas/phase2-mutation-draft/v1#/$defs/result" } },
+    "phase": { "const": 2 },
+    "target": { "const": "phase2" },
+    "registry_sha256": { "type": "string" },
+    "manifest_sha256": { "type": "string" },
+    "phase1_mutation_registry_sha256": { "type": "string" },
+    "configuration_hash": { "type": "string" },
+    "thresholds": { "type": "object", "additionalProperties": false, "required": ["critical", "core"], "properties": { "critical": { "type": "number" }, "core": { "type": "number" } } },
+    "completed": { "type": "integer" },
+    "required": { "type": "integer" },
+    "aggregate": { "$ref": "https://agent-harness.local/verification/schemas/phase2-mutation-draft/v1#/$defs/counts" },
+    "aggregate_score": { "type": "number" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

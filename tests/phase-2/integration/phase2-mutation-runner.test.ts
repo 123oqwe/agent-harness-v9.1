@@ -370,7 +370,7 @@ describe("Phase 2 mutation runner", () => {
             reportRoot,
             result: sharedSymlink,
           }),
-        ).rejects.toThrow(/Git tree mode.*120000/u);
+        ).rejects.toThrow(/Git tree mode.*120000|ancestor is a symlink/u);
 
         const ownedSymlink = {
           ...structuredClone(sharedSymlink),
@@ -384,7 +384,7 @@ describe("Phase 2 mutation runner", () => {
             reportRoot,
             result: ownedSymlink,
           }),
-        ).rejects.toThrow(/Git tree mode.*120000/u);
+        ).rejects.toThrow(/Git tree mode.*120000|ancestor is a symlink/u);
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
