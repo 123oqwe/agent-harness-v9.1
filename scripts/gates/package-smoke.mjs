@@ -43,6 +43,7 @@ const REQUIRED_EXPORTS = [
   "SecretsBrokerApi",
   "HookRestrictionError",
   "SandboxedHookExecutionPort",
+  "SessionSteeringJournal",
 ];
 
 export const parseNpmJson = (stdout) => {

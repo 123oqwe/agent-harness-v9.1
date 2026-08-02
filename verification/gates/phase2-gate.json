@@ -557,10 +557,44 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-LOOP-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-runtime-steering-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-runtime-steering-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-loop.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-session-journal.test.ts",
+        "tests/phase-2/security/ah-runtime-steering-001-security.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-STEERING-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": ["packages/runtime-core/src/steering.ts"],
+      "test_files": [
+        "tests/phase-2/unit/ah-runtime-steering-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-loop.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-session-journal.test.ts",
+        "tests/phase-2/security/ah-runtime-steering-001-security.test.ts"
+      ],
+      "owned_sources": [
+        "packages/runtime-core/src/steering.ts",
+        "runtime/session-steering-journal.ts"
+      ],
+      "integration_sources": [
+        "harness.ts",
+        "runtime/loop.ts",
+        "runtime/steering-port.ts"
+      ],
+      "runtime_assets": [
+        "packages/runtime-core/src/index.ts",
+        "index.ts"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-runtime-steering-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-loop.test.ts",
+        "tests/phase-2/integration/ah-runtime-steering-001-session-journal.test.ts"
+      ],
+      "security_tests": [
+        "tests/phase-2/security/ah-runtime-steering-001-security.test.ts"
+      ],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-TOOL-BEHAVIOR-VERIFY-001",

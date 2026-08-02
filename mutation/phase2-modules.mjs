@@ -87,7 +87,18 @@ export const phase2MutationRequirements = Object.freeze([
       "session/sqlite-session-store.ts",
     ],
   }),
-  requirement("AH-RUNTIME-STEERING-001"),
+  requirement("AH-RUNTIME-STEERING-001", {
+    status: "ready",
+    sources: [
+      "packages/runtime-core/src/steering.ts",
+      "runtime/session-steering-journal.ts",
+    ],
+    integrationSources: [
+      "harness.ts",
+      "runtime/loop.ts",
+      "runtime/steering-port.ts",
+    ],
+  }),
   requirement("AH-TOOL-BEHAVIOR-VERIFY-001"),
   requirement("AH-TOOL-IMAGE-GEN-001"),
   requirement("AH-TOOL-SPEECH-GEN-001"),

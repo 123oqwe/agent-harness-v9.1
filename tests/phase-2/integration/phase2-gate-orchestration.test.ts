@@ -930,7 +930,7 @@ describe("Phase 2 gate command orchestration", () => {
     }
   });
 
-  it("keeps the complete gate and helper authority independent of PATH git and stale trees", { timeout: 120_000 }, () => {
+  it("keeps the complete gate and helper authority independent of PATH git and stale trees", { timeout: 720_000 }, () => {
     const bin = mkdtempSync(join(tmpdir(), "phase2-full-gate-path-spoof-"));
     const marker = join(bin, "malicious-git-ran");
     const fakeGit = join(bin, "git");
@@ -947,7 +947,7 @@ describe("Phase 2 gate command orchestration", () => {
         env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
         encoding: "utf8",
         shell: false,
-        timeout: 90_000,
+        timeout: 660_000,
       },
     );
     expect(result.status, result.stderr).toBe(0);

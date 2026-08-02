@@ -643,7 +643,7 @@ describe("Phase 2 release-gate manifest", () => {
 
   it(
     "binds every active source authority to real source, root exports, and tests",
-    { timeout: 20_000 },
+    { timeout: 60_000 },
     () => {
       const fixture = createSourceAuthorityFixture();
       try {

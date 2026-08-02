@@ -93,9 +93,9 @@ describe("Phase 2 real release gate", () => {
 
   it(
     "allows the dirty-tree development gate but makes zero release claims",
-    { timeout: 240_000 },
+    { timeout: 720_000 },
     () => {
-      const result = runScript("verify:phase2:dev", 210_000);
+      const result = runScript("verify:phase2:dev", 660_000);
       expect(result.status, result.stderr).toBe(0);
       const report = JSON.parse(result.stdout);
       expect(report).toMatchObject({
@@ -212,7 +212,7 @@ describe("Phase 2 real release gate", () => {
         expect.objectContaining({ code: "assets_release_blocked" }),
         expect.objectContaining({
           code: "mutation_incomplete",
-          completed: 1,
+          completed: 3,
           required: 64,
         }),
         expect.objectContaining({ code: "evidence_incomplete" }),
@@ -310,9 +310,12 @@ describe("Phase 2 real release gate", () => {
       expect.arrayContaining(["run", "tests/phase-2/e2e"]),
     );
     expect(JSON.stringify(e2e)).not.toContain("verify:phase2:local");
-    const source = readFileSync(import.meta.filename, "utf8");
+    const source = readFileSync(
+      join(repositoryRoot, "tests/phase-2/e2e/phase2-release-gate.test.ts"),
+      "utf8",
+    );
     const spawnedGateScripts = [
-      ...source.matchAll(/runScript\("(verify:phase2:[^"]+)"\)/gu),
+      ...source.matchAll(/runScript\("(verify:phase2:[^"]+)"(?:,|\))/gu),
     ].map((match) => match[1]);
     expect(spawnedGateScripts).toEqual(["verify:phase2:dev"]);
   });

@@ -16,6 +16,11 @@ import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
 import { HookRestrictionError } from './hook-port.js';
+import type {
+  RuntimeSteeringCommand,
+  RuntimeSteeringPort,
+  RuntimeSteeringQueue,
+} from './steering-port.js';
 
 export { LoopError } from './errors.js';
 
@@ -136,6 +141,7 @@ export interface LoopDeps {
     attempt: number,
     budget: ModelCallBudget,
     directive?: ModelCallDirective,
+    signal?: AbortSignal,
   ) => Promise<ModelTurn>;
   toolExecute?: (
     name: string,
@@ -145,6 +151,7 @@ export interface LoopDeps {
   /** Legacy stop hint only. It never grants verification success. */
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
   signal?: AbortSignal | undefined;
+  steering?: RuntimeSteeringPort;
   turnHooks?: {
     beforeTurn(input: {
       readonly iteration: number;
@@ -214,6 +221,8 @@ export class LoopEngine {
   private pendingHookTurn: LoopTurn | undefined;
   private lifecycle: 'idle' | 'running' | 'finished' = 'idle';
   private requestedStop: TerminationReason | null = null;
+  private activeModelAbort: AbortController | null = null;
+  private steeringInterruptedModel = false;
 
   constructor(
     private readonly config: LoopConfig,
@@ -229,12 +238,19 @@ export class LoopEngine {
     }
     this.deps.session.acquireWriter();
     this.lifecycle = 'running';
+    let unsubscribeSteering: (() => void) | undefined;
     try {
       const messages: unknown[] = [
         { role: 'user', content: this.config.goal },
       ];
+      unsubscribeSteering = this.deps.steering?.subscribe((command) =>
+        this.onSteering(command),
+      );
+      this.applySteering(messages, 'next_turn');
       const context = this.createContext();
-      if (this.config.strategy === 'direct') {
+      if (this.terminatedValue) {
+        // A replayed cancellation remains authoritative after restart.
+      } else if (this.config.strategy === 'direct') {
         await runDirect(context, messages);
       } else if (this.config.strategy === 'react') {
         await runReact(context, messages);
@@ -253,6 +269,7 @@ export class LoopEngine {
       });
       this.terminate(reason);
     } finally {
+      unsubscribeSteering?.();
       try {
         await this.flushPendingTurnHook();
       } catch (error) {
@@ -288,6 +305,7 @@ export class LoopEngine {
   stop(reason: TerminationReason): void {
     if (this.lifecycle === 'finished' || this.terminatedValue) return;
     this.requestedStop = reason;
+    this.activeModelAbort?.abort('loop_stop');
     if (this.lifecycle === 'running') this.terminate(reason);
   }
 
@@ -300,11 +318,52 @@ export class LoopEngine {
         ...this.deps,
         modelCall: async (messages, attempt, budget, directive) => {
           await self.flushPendingTurnHook();
+          if (self.turns.length > 0) self.applySteering(messages, 'follow_up');
+          self.applySteering(messages, 'steer');
           await self.deps.turnHooks?.beforeTurn({
             iteration: self.iterationsValue,
             messages,
           });
-          return self.deps.modelCall(messages, attempt, budget, directive);
+          if (self.terminatedValue) return { content: '', decision_summary: '' };
+          if (!self.deps.steering) {
+            return self.deps.signal === undefined
+              ? self.deps.modelCall(messages, attempt, budget, directive)
+              : self.deps.modelCall(
+                  messages,
+                  attempt,
+                  budget,
+                  directive,
+                  self.deps.signal,
+                );
+          }
+          for (;;) {
+            self.steeringInterruptedModel = false;
+            // Close the async beforeTurn/retry window before starting a provider.
+            self.applySteering(messages, 'steer');
+            if (self.terminatedValue) return { content: '', decision_summary: '' };
+            const controller = new AbortController();
+            self.activeModelAbort = controller;
+            const signal = self.deps.signal
+              ? AbortSignal.any([self.deps.signal, controller.signal])
+              : controller.signal;
+            try {
+              const turn = await self.deps.modelCall(
+                messages,
+                attempt,
+                budget,
+                directive,
+                signal,
+              );
+              if (self.terminatedValue) return { content: '', decision_summary: '' };
+              if (!self.steeringInterruptedModel) return turn;
+            } catch (error) {
+              if (self.terminatedValue) return { content: '', decision_summary: '' };
+              if (!self.steeringInterruptedModel) throw error;
+            } finally {
+              if (self.activeModelAbort === controller) self.activeModelAbort = null;
+            }
+            self.applySteering(messages, 'steer');
+          }
         },
       },
       turns: this.turns,
@@ -351,6 +410,36 @@ export class LoopEngine {
       return 'budget_exhausted';
     }
     return null;
+  }
+
+  private onSteering(command: RuntimeSteeringCommand): void {
+    if (command.priority === 'kill' || command.priority === 'human_cancel') {
+      this.stop('user_cancel');
+      return;
+    }
+    if (command.queue === 'steer') {
+      this.steeringInterruptedModel = true;
+      this.activeModelAbort?.abort('steering_interrupt');
+    }
+  }
+
+  private applySteering(messages: unknown[], queue: RuntimeSteeringQueue): void {
+    for (const command of this.deps.steering?.drain(queue) ?? []) {
+      if (command.priority === 'kill' || command.priority === 'human_cancel') {
+        this.stop('user_cancel');
+        continue;
+      }
+      messages.push({
+        role: 'user',
+        content: command.content,
+        metadata: {
+          source: 'steering',
+          trust: 'user',
+          command_id: command.command_id,
+          priority: command.priority,
+        },
+      });
+    }
   }
 
   private nextModelBudget(): ModelCallBudget {

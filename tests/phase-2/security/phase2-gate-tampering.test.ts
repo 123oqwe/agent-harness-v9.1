@@ -195,11 +195,13 @@ describe("Phase 2 gate tamper resistance", () => {
       .map((requirement) => requirement.id)
       .filter(
         (id) =>
-          id !== "AH-RUNTIME-SESSIONTREE-001" && id !== "AH-HOOK-001",
+          id !== "AH-RUNTIME-SESSIONTREE-001" &&
+          id !== "AH-HOOK-001" &&
+          id !== "AH-RUNTIME-STEERING-001",
       )
       .sort();
     expect(result.releaseReady).toBe(false);
-    expect(result.activeRequirementIds).toHaveLength(62);
+    expect(result.activeRequirementIds).toHaveLength(61);
     expect([...result.activeRequirementIds].sort()).toEqual(expectedActive);
     expect(result.claims).toEqual({
       requirementsVerified: 0,

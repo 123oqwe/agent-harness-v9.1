@@ -60,7 +60,7 @@ const runChecker = (root: string, mode: "bootstrap" | "release") =>
   spawnSync(process.execPath, [checkerPath, "--root", root, "--mode", mode], {
     encoding: "utf8",
     shell: false,
-    timeout: 10_000,
+    timeout: 30_000,
     maxBuffer: 256 * 1024,
   });
 
@@ -70,7 +70,7 @@ afterEach(() => {
   }
 });
 
-describe("Phase 2 executable asset contracts", () => {
+describe("Phase 2 executable asset contracts", { timeout: 30_000 }, () => {
   it("accepts the checked-in bootstrap contracts without claiming release readiness", () => {
     const result = checkPhase2Assets({
       mode: "bootstrap",

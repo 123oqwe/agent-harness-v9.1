@@ -103,6 +103,7 @@ export const mutationModules = {
       'runtime/harness-support.ts',
       'runtime/hook-port.ts',
       'runtime/loop.ts',
+      'runtime/steering-port.ts',
       'runtime/retry.ts',
       'runtime/notifications.ts',
     ],

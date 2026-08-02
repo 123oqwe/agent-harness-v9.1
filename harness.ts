@@ -79,6 +79,7 @@ import {
   isTerminalRun,
   openRunSession,
 } from './session/run-session.js';
+import type { RuntimeSteeringFactoryPort } from './runtime/steering-port.js';
 
 export {
   createDefaultExecutionContext,
@@ -140,6 +141,8 @@ export interface HarnessConfig {
   hooks?: HookRuntimePort;
   /** Aggregate boundary ceiling; individual Hook registrations may be lower. */
   hookTimeoutMs?: number;
+  /** Binds the single Runtime steering authority to the active session log. */
+  steering?: RuntimeSteeringFactoryPort;
 }
 
 export class Harness {
@@ -261,6 +264,14 @@ export class Harness {
       session,
       existingEvents,
     } = openedSession;
+    const steering = this.config.steering?.bind({
+      session,
+      scope: {
+        tenant_id: this.execCtx.tenant_id,
+        run_id: actualRunId,
+        session_id: actualRunId,
+      },
+    });
 
     try {
       await this.observationalHook(
@@ -501,11 +512,13 @@ export class Harness {
       },
       {
         session,
+        ...(steering === undefined ? {} : { steering }),
         modelCall: async (
           messages: unknown[],
           _attempt: number,
           modelBudget,
           directive?: ModelCallDirective,
+          modelSignal?: AbortSignal,
         ) => {
           const modelCallCount = (this._modelCallCount++) + 1;
           const plannedToolNames = new Set(
@@ -548,7 +561,12 @@ export class Harness {
         const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, effectiveRequest, {
           operation_id: opId,
           attempt_id: attId,
-          signal: this.config.signal,
+          signal:
+            this.config.signal &&
+            modelSignal &&
+            this.config.signal !== modelSignal
+              ? AbortSignal.any([this.config.signal, modelSignal])
+              : (modelSignal ?? this.config.signal),
         });
           await this.observationalHook(
             'after_response',

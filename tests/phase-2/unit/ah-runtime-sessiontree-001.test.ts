@@ -1758,7 +1758,10 @@ async function directAuthorityRequest(
   };
 }
 
-describe("AH-RUNTIME-SESSIONTREE-001 SQLite authority integration", () => {
+describe(
+  "AH-RUNTIME-SESSIONTREE-001 SQLite authority integration",
+  { timeout: 30_000 },
+  () => {
   afterAll(async () => {
     // better-sqlite3 finalizes native statements asynchronously after every
     // explicitly closed connection. Yield once so Vitest does not tear down

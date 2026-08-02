@@ -63,3 +63,22 @@ export {
   type DurableHookSystemOptions,
   type SqliteHookJournalOptions,
 } from "./sqlite-hook-journal.js";
+
+export {
+  STEERING_PRIORITIES,
+  STEERING_QUEUES,
+  SteeringController,
+  SteeringError,
+  type SteeringCommand,
+  type SteeringControllerOptions,
+  type SteeringDisposition,
+  type SteeringEffectState,
+  type SteeringEnqueueResult,
+  type SteeringEvent,
+  type SteeringJournalPort,
+  type SteeringListener,
+  type SteeringPriority,
+  type SteeringQueue,
+  type SteeringRequest,
+  type SteeringScope,
+} from "./steering.js";

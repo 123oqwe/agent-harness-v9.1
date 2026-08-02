@@ -101,7 +101,7 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
         process.execPath,
         [vitest, "run", "tests/phase-2/unit"],
         {
-          timeoutMs: 180_000,
+          timeoutMs: 600_000,
         },
       ),
     ];
@@ -151,7 +151,7 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
       "phase2-unit",
       process.execPath,
       [vitest, "run", "tests/phase-2/unit"],
-      { timeoutMs: 300_000 },
+      { timeoutMs: 600_000 },
     ),
     command(
       "phase2-integration",

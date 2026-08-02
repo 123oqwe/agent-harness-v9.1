@@ -60,6 +60,8 @@ describe("Phase 2 batch-zero release structure", () => {
       "export * from './session/session-state-root.js';\n",
       "export * from './runtime/hook-port.js';\n",
       "export * from './runtime/sandboxed-hook-execution-port.js';\n",
+      "export * from './runtime/steering-port.js';\n",
+      "export * from './runtime/session-steering-journal.js';\n",
     ];
     expect(
       additions.reduce((source, addition) => source.replace(addition, ""), current),
