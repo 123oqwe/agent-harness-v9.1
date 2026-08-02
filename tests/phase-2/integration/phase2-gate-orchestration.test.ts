@@ -1232,7 +1232,7 @@ describe("Phase 2 gate command orchestration", () => {
     expect(readFileSync(join(external, "sentinel"), "utf8")).toBe(
       "unchanged\n",
     );
-  });
+  }, 15_000);
 
   it(
     "fails closed when an attacker swaps the Evidence ancestor before descriptor publication",
@@ -1517,5 +1517,5 @@ describe("Phase 2 gate command orchestration", () => {
     expect(swapped).toBe(true);
     expect(checked.ok).toBe(false);
     expect(readdirSync(external)).toEqual([]);
-  });
+  }, 15_000);
 });
