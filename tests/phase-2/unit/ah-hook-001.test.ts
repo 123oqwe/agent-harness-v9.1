@@ -700,6 +700,84 @@ describe('AH-HOOK-001 HookSystem', () => {
     expect(release).toHaveBeenCalledWith('claim-1');
   });
 
+  it.each([
+    [undefined, 'hook_attenuation_policy_required'],
+    [
+      {
+        validate: () => {
+          throw new Error('policy unavailable');
+        },
+      },
+      'hook_attenuation_policy_failed',
+    ],
+  ] as const)(
+    'fails closed when attenuation policy resolves to %s',
+    async (attenuationPolicy, reasonCode) => {
+      const system = new HookSystem(
+        [
+          registration('policy-required', 'pre_tool_use', {
+            handle: async () => ({
+              action: 'attenuate',
+              payload: { path: '/workspace/reduced' },
+            }),
+          }),
+        ],
+        attenuationPolicy === undefined ? {} : { attenuationPolicy },
+      );
+      await expect(
+        system.dispatch(
+          request('pre_tool_use', `policy-${reasonCode}`, {
+            path: '/workspace/original',
+            extra: true,
+          }),
+        ),
+      ).resolves.toMatchObject({
+        action: 'deny',
+        reason_code: reasonCode,
+        payload: { path: '/workspace/original', extra: true },
+        replayed: false,
+      });
+    },
+  );
+
+  it.each([
+    ['pre_tool_use', 'deny'],
+    ['post_tool_use', 'continue'],
+  ] as const)(
+    'maps journal reconciliation for %s to %s without executing hooks',
+    async (event, action) => {
+      const handler = vi.fn(async () => ({ action: 'continue' as const }));
+      const journal: HookJournalPort = {
+        claim: vi.fn(async () => ({
+          status: 'reconciliation' as const,
+          reason_code: 'hook_claim_abandoned' as const,
+        })),
+        commit: vi.fn(async () => undefined),
+        release: vi.fn(async () => undefined),
+      };
+      const system = new HookSystem(
+        [registration('reconciliation', event, { handle: handler })],
+        { journal },
+      );
+      const outcome = await system.dispatch(
+        request(event, `reconciliation-${event}`, { unchanged: true }),
+      );
+      expect(outcome).toMatchObject({
+        event,
+        action,
+        payload: { unchanged: true },
+        follow_ups: [],
+        replayed: false,
+      });
+      if (event === 'pre_tool_use') {
+        expect(outcome.reason_code).toBe('hook_claim_abandoned');
+      } else {
+        expect(outcome).not.toHaveProperty('reason_code');
+      }
+      expect(handler).not.toHaveBeenCalled();
+    },
+  );
+
   it('uses atomic journal claims across HookSystem instances', async () => {
     const journal = new MemoryJournal();
     let release!: () => void;
