@@ -70,6 +70,7 @@ export const runPackedPackageSmoke = async ({ repositoryRoot = root } = {}) => {
         "pack",
         "--json",
         "--ignore-scripts",
+        "--silent",
         "--pack-destination",
         temporaryRoot,
       ],

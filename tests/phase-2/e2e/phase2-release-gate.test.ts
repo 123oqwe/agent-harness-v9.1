@@ -59,7 +59,7 @@ describe("Phase 2 real release gate", () => {
     () => {
       const packed = spawnSync(
         "npm",
-        ["pack", "--dry-run", "--json", "--ignore-scripts"],
+        ["pack", "--dry-run", "--json", "--ignore-scripts", "--silent"],
         {
           cwd: repositoryRoot,
           encoding: "utf8",
