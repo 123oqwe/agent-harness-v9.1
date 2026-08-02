@@ -30,14 +30,16 @@ export class SessionSteeringJournal {
   }
 
   read(): readonly RuntimeSteeringEvent[] {
-    return this.session
-      .getEvents()
-      .filter((event) => event.type === "steer")
-      .map((event) => event.data)
-      .filter(
-        (data): data is RuntimeSteeringEvent =>
-          isRecord(data) && data.schema_version === "steering-event/v1",
-      );
+    const events: RuntimeSteeringEvent[] = [];
+    for (const event of this.session.getEvents()) {
+      if (event.type !== "steer") continue;
+      const data = event.data;
+      if (!isRecord(data) || data.schema_version !== "steering-event/v1") {
+        throw new Error("invalid steering session event");
+      }
+      events.push(data as unknown as RuntimeSteeringEvent);
+    }
+    return events;
   }
 
   append(event: RuntimeSteeringEvent): void {
