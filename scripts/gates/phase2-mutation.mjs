@@ -24,7 +24,9 @@ const productionSchema = (suffix) => productionSchemas.find((schema) => schema.$
 export const DEFAULT_PHASE2_MUTATION_ROOT = resolve(scriptDirectory, "../..");
 export const PHASE2_MUTATION_MANIFEST = "verification/gates/phase2-gate.json";
 export const PHASE2_MUTATION_REGISTRY = "mutation/phase2-modules.mjs";
-export const PHASE2_MUTATION_CHUNK_LINES = 150;
+// Keep each exact-source chunk below the runner's hard execution deadline.
+// This changes only scheduling granularity; every source line remains covered.
+export const PHASE2_MUTATION_CHUNK_LINES = 75;
 export const PHASE2_MUTATION_DRAFT_SCHEMA_VERSION =
   "phase2-mutation-draft/v1";
 export const PHASE2_MUTATION_FINAL_SCHEMA_VERSION =

@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  planPhase2MutationChunks,
   runPhase2RequirementDiagnostic,
   validatePhase2MutationArtifacts,
   // @ts-expect-error The mutation runner intentionally ships as plain Node ESM.
@@ -51,6 +52,51 @@ const git = (root: string, ...args: string[]) => {
 };
 
 describe("Phase 2 mutation runner", () => {
+  it("plans complete bounded chunks without dropping source lines", () => {
+    const root = mkdtempSync(join(tmpdir(), "phase2-chunk-plan-"));
+    try {
+      write(
+        root,
+        "src/large.ts",
+        Array.from({ length: 160 }, (_, index) => `// source line ${index + 1}`).join(
+          "\n",
+        ),
+      );
+      write(root, ".gitignore", "reports/\n.stryker-tmp/\nnode_modules\n");
+      git(root, "init");
+      git(root, "add", ".");
+      git(
+        root,
+        "-c",
+        "user.name=Phase2 Mutation Test",
+        "-c",
+        "user.email=phase2-mutation@example.invalid",
+        "commit",
+        "-m",
+        "chunk plan fixture",
+      );
+      const commitSha = git(root, "rev-parse", "HEAD");
+      expect(
+        planPhase2MutationChunks(
+          { id: "AH-CHUNK-PLAN-001", sources: ["src/large.ts"] },
+          root,
+          commitSha,
+        ).map(
+          ({ start_line, end_line }: { start_line: number; end_line: number }) => [
+            start_line,
+            end_line,
+          ],
+        ),
+      ).toEqual([
+        [1, 75],
+        [76, 150],
+        [151, 160],
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it(
     "runs real Stryker mutants for a synthetic diagnostic without producing product Evidence",
     { timeout: 120_000 },

@@ -578,6 +578,8 @@ async function executePhase2RequirementMutation({
   );
   const identities = new Set();
   const chunkResults = [];
+  let executionError;
+  let executionResult;
   try {
     for (const chunk of chunks) {
       const executed = await runChunk({
@@ -622,7 +624,7 @@ async function executePhase2RequirementMutation({
     const allFilesPass = Object.values(perFile).every(
       (metrics) => metrics.total > 0 && metrics.score >= requirement.threshold,
     );
-    return {
+    executionResult = {
       requirement_id: requirement.id,
       mutation_class: requirement.mutationClass,
       threshold: requirement.threshold,
@@ -661,16 +663,46 @@ async function executePhase2RequirementMutation({
       chunks: chunkResults,
       mutant_identity_sha256: sha256(canonicalJson([...identities].sort())),
     };
-  } finally {
-    try {
-      rmSync(join(executionRoot, ".stryker-tmp", "phase2", runId), {
-        recursive: true,
-        force: true,
-      });
-    } finally {
-      isolated.cleanup();
-    }
+  } catch (error) {
+    executionError = error;
   }
+  const cleanupErrors = [];
+  try {
+    rmSync(join(executionRoot, ".stryker-tmp", "phase2", runId), {
+      recursive: true,
+      force: true,
+    });
+  } catch (error) {
+    cleanupErrors.push(error);
+  }
+  try {
+    isolated.cleanup();
+  } catch (error) {
+    cleanupErrors.push(error);
+  }
+  if (cleanupErrors.length > 0) {
+    const cleanupMessage = cleanupErrors
+      .map((error) => (error instanceof Error ? error.message : String(error)))
+      .join("; ");
+    if (executionError !== undefined) {
+      const primaryMessage =
+        executionError instanceof Error
+          ? executionError.message
+          : String(executionError);
+      throw new AggregateError(
+        [executionError, ...cleanupErrors],
+        `${primaryMessage}; mutation cleanup failed: ${cleanupMessage}`,
+      );
+    }
+    throw new AggregateError(
+      cleanupErrors,
+      `mutation cleanup failed: ${cleanupMessage}`,
+    );
+  }
+  if (executionError !== undefined) throw executionError;
+  if (executionResult === undefined)
+    throw new Error("mutation execution completed without a result");
+  return executionResult;
 }
 
 export async function runPhase2RequirementDiagnostic(options) {
@@ -812,10 +844,37 @@ const createIsolatedExecutionRoot = (repositoryRoot, commitSha) => {
     return {
       executionRoot,
       cleanup() {
+        const cleanupErrors = [];
+        try {
+          // node_modules is an untracked dependency snapshot, not Git
+          // authority. Remove this exact owned path before asking Git to
+          // detach the worktree so cleanup is bounded by tracked content.
+          rmSync(join(executionRoot, "node_modules"), {
+            recursive: true,
+            force: true,
+          });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
         try {
           removeTrustedOwnedWorktree(repositoryRoot, executionRoot);
-        } finally {
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+        try {
           rmSync(parent, { recursive: true, force: true });
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+        if (cleanupErrors.length > 0) {
+          throw new AggregateError(
+            cleanupErrors,
+            `isolated mutation cleanup failed: ${cleanupErrors
+              .map((error) =>
+                error instanceof Error ? error.message : String(error),
+              )
+              .join("; ")}`,
+          );
         }
       },
     };
