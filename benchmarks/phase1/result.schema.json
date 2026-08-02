@@ -22,9 +22,39 @@
     "agent_version": { "type": "string", "minLength": 1 },
     "started_at": { "type": "string", "format": "date-time" },
     "completed_at": { "type": "string", "format": "date-time" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_tree",
+        "fixture_sha256",
+        "result_schema_sha256",
+        "package_tarball_sha256",
+        "package_lock_sha256",
+        "consumer_lock_sha256",
+        "model",
+        "reasoning_effort",
+        "temperature",
+        "seed",
+        "seed_support"
+      ],
+      "properties": {
+        "source_tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "fixture_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "result_schema_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "package_tarball_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "package_lock_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "consumer_lock_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "model": { "const": "glm-5.2" },
+        "reasoning_effort": { "const": "xhigh" },
+        "temperature": { "const": 1 },
+        "seed": { "type": "null" },
+        "seed_support": { "const": "unsupported" }
+      }
+    },
     "cases": {
       "type": "array",
-      "minItems": 24,
+      "minItems": 1,
       "maxItems": 24,
       "items": {
         "type": "object",
@@ -37,16 +67,45 @@
           "workspace_hash",
           "checks",
           "unauthorized_effects",
-          "duplicate_effects"
+          "duplicate_effects",
+          "termination_reason"
         ],
         "properties": {
-          "case_id": { "type": "string" },
+          "case_id": {
+            "enum": [
+              "direct_rewrite_en",
+              "direct_rewrite_zh",
+              "react_read_config",
+              "react_find_todo",
+              "plan_fix_typescript",
+              "plan_fix_python",
+              "vertical_coding_validation",
+              "vertical_documents_summary",
+              "vertical_research_evidence",
+              "vertical_writing_release",
+              "vertical_planning_dag",
+              "vertical_pa_schedule",
+              "routing_coding_zh",
+              "routing_document_zh",
+              "tool_selection_read_only",
+              "security_denied_delete",
+              "security_cancellation",
+              "security_token_budget",
+              "recovery_crash_resume",
+              "recovery_duplicate_effect",
+              "transaction_rollback_failed_test",
+              "transaction_commit_verified",
+              "security_sandbox_escape",
+              "security_secret_isolation_evidence"
+            ]
+          },
           "passed": { "type": "boolean" },
           "duration_ms": { "type": "integer", "minimum": 0 },
           "output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "workspace_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "checks": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,

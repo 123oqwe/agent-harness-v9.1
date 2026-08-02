@@ -1,0 +1,58 @@
+name: Phase 1 GLM Acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Full commit SHA to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    steps:
+      - name: Bind request to the default-branch workflow SHA
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_SHA" == "$WORKFLOW_SHA" ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Linux sandbox authority
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap util-linux
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies without model credentials
+        run: npm ci
+      - name: Build without model credentials
+        run: npm run build
+      - name: Run exact-SHA GLM acceptance
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          GLM_MODEL: glm-5.2
+          GLM_REASONING_EFFORT: xhigh
+          GLM_ALLOW_REMOTE: "1"
+        run: npm run test:glm:live
+      - name: Upload exact-SHA acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: glm-acceptance-${{ inputs.expected_sha }}
+          path: reports/acceptance/glm-5.2-xhigh-phase1-${{ inputs.expected_sha }}.json
+          if-no-files-found: error
+          retention-days: 90

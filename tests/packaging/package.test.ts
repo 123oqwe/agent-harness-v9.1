@@ -69,6 +69,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
       scripts: Record<string, string>;
       exports: Record<string, unknown>;
       files: string[];
+      homepage: string;
     };
     const required = [
       'typecheck',
@@ -95,6 +96,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
     }
     expect(pkg.exports).toHaveProperty('.');
     expect(pkg.files).toEqual(['dist']);
+    expect(pkg.homepage).toBe('https://github.com/123oqwe/agentharness91');
     expect(pkg.scripts.postinstall).toBeUndefined();
     expect(pkg.scripts.prepare).toBe('patch-package');
     expect(pkg.scripts.lint).toContain('benchmarks');
