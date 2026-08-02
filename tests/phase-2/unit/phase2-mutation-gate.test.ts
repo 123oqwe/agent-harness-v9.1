@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import {
+  copyFileSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -26,6 +27,15 @@ import {
 } from "../../../scripts/gates/phase2-mutation.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
+const git = (root: string, ...args: string[]) => {
+  const result = spawnSync("/usr/bin/git", args, {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim();
+};
 const manifest = JSON.parse(
   readFileSync(
     resolve(repositoryRoot, "verification/gates/phase2-gate.json"),
@@ -74,12 +84,16 @@ const passingResults = (authority: ReturnType<typeof readyAuthority>) =>
         mutation_class: requirement.mutationClass,
         threshold: requirement.threshold,
         status: "PASS",
+        evidence_eligible: false,
+        synthetic_fixture: false,
         commit_sha: "a".repeat(40),
         tree_sha: "f".repeat(40),
         registry_sha256: authority.registrySha256,
         manifest_sha256: authority.manifestSha256,
         phase1_mutation_registry_sha256: authority.phase1MutationSha256,
         configuration_hash: "b".repeat(64),
+        run_id: `${requirement.id.toLowerCase()}-00000000-0000-4000-8000-000000000000`,
+        vitest_config_path: "vitest.mutation.config.ts",
         sources: requirement.sources,
         integration_sources: requirement.integrationSources,
         integration_source_modules: requirement.integrationSourceModules,
@@ -343,24 +357,56 @@ describe("Phase 2 mutation authority", () => {
       expect(packageJson.scripts["test:mutation:phase2"]).toBe(
         "node scripts/run-phase2-mutation.mjs phase2",
       );
-      const run = spawnSync(
-        "npm",
-        ["run", "test:mutation:phase2", "--silent"],
-        {
-          cwd: repositoryRoot,
-          encoding: "utf8",
-          shell: false,
-          timeout: 30_000,
-        },
-      );
-      expect(run.status, run.stderr).toBe(1);
-      expect(JSON.parse(run.stdout)).toMatchObject({
-        target: "phase2",
-        status: "FAIL",
-        completed: 0,
-        required: 64,
-        blockers: [{ code: "mutation_incomplete", completed: 0, required: 64 }],
-      });
+      const parent = mkdtempSync(resolve(tmpdir(), "phase2-runner-command-"));
+      const root = resolve(parent, "repository");
+      try {
+        git(parent, "clone", "--shared", repositoryRoot, root);
+        for (const path of [
+          "scripts/gates/phase2-mutation.mjs",
+          "scripts/run-phase2-mutation.mjs",
+        ]) {
+          copyFileSync(resolve(repositoryRoot, path), resolve(root, path));
+        }
+        git(root, "add", "scripts/gates/phase2-mutation.mjs");
+        git(root, "add", "scripts/run-phase2-mutation.mjs");
+        git(
+          root,
+          "-c",
+          "user.name=Phase2 Mutation Test",
+          "-c",
+          "user.email=phase2-mutation@example.invalid",
+          "commit",
+          "-m",
+          "test committed mutation runner",
+        );
+        symlinkSync(
+          resolve(repositoryRoot, "node_modules"),
+          resolve(root, "node_modules"),
+          "dir",
+        );
+        const run = spawnSync(
+          "npm",
+          ["run", "test:mutation:phase2", "--silent"],
+          {
+            cwd: root,
+            encoding: "utf8",
+            shell: false,
+            timeout: 30_000,
+          },
+        );
+        expect(run.status, run.stderr).toBe(1);
+        expect(JSON.parse(run.stdout)).toMatchObject({
+          target: "phase2",
+          status: "FAIL",
+          completed: 0,
+          required: 64,
+          blockers: [
+            { code: "mutation_incomplete", completed: 0, required: 64 },
+          ],
+        });
+      } finally {
+        rmSync(parent, { recursive: true, force: true });
+      }
     },
   );
 });
@@ -384,7 +430,66 @@ describe("Phase 2 mutation report integrity", () => {
     );
     expect(report.tree_sha).toBe("f".repeat(40));
     expect(report.completed).toBe(64);
+    expect(
+      report.results.every(
+        (result: { evidence_eligible: boolean; synthetic_fixture: boolean }) =>
+          result.evidence_eligible === true &&
+          result.synthetic_fixture === false,
+      ),
+    ).toBe(true);
     expect(validatePhase2MutationReport(report, authority)).toEqual([]);
+  });
+
+  it("rejects a forged 64-result full report made entirely from synthetic diagnostics", () => {
+    const authority = readyAuthority();
+    const results = passingResults(authority).map(
+      (result: ReturnType<typeof passingResults>[number]) => ({
+        ...result,
+        evidence_eligible: true,
+        synthetic_fixture: true,
+      }),
+    );
+    const report = buildPhase2MutationReport({
+      authority,
+      target: "phase2",
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results,
+    });
+
+    expect(report.status).toBe("FAIL");
+    expect(report.evidence_eligible).toBe(false);
+    expect(report.errors.join("\n")).toMatch(
+      /synthetic.*Evidence|Evidence.*synthetic/u,
+    );
+  });
+
+  it("keeps a diagnostic or synthetic result permanently ineligible for Evidence", () => {
+    const authority = readyAuthority();
+    const result = {
+      ...passingResults(authority)[0],
+      evidence_eligible: false,
+      synthetic_fixture: true,
+    };
+    const report = buildPhase2MutationReport({
+      authority,
+      target: result.requirement_id,
+      commitSha: "a".repeat(40),
+      treeSha: "f".repeat(40),
+      configurationHash: "b".repeat(64),
+      results: [result],
+    });
+
+    expect(report.status).toBe("PASS");
+    expect(report.evidence_eligible).toBe(false);
+    expect(report.results[0].evidence_eligible).toBe(false);
+
+    report.evidence_eligible = true;
+    report.results[0].evidence_eligible = true;
+    expect(validatePhase2MutationReport(report, authority).join("\n")).toMatch(
+      /diagnostic.*Evidence|Evidence.*diagnostic|synthetic.*Evidence|Evidence.*synthetic/u,
+    );
   });
 
   it.each([

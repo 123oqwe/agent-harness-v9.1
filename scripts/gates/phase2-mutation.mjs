@@ -20,6 +20,8 @@ export const PHASE2_MUTATION_SCHEMA_VERSION = "phase2-mutation-report/v1";
 const STATUSES = new Set(["not_started", "ready"]);
 const HASH_64 = /^[0-9a-f]{64}$/u;
 const SHA_40 = /^[0-9a-f]{40}$/u;
+const UUID_V4 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -427,6 +429,37 @@ const reportErrors = (
     errors.push("report Evidence eligibility does not match its scope");
   }
   const results = Array.isArray(report.results) ? report.results : [];
+  const syntheticResults = results.filter(
+    (result) => result?.synthetic_fixture !== false,
+  );
+  if (report.target === "phase2" && syntheticResults.length > 0) {
+    errors.push(
+      "full Phase 2 Evidence cannot contain synthetic mutation results",
+    );
+  }
+  if (
+    (report.evidence_eligible === true ||
+      results.some((result) => result?.evidence_eligible === true)) &&
+    syntheticResults.length > 0
+  ) {
+    errors.push("Evidence-eligible mutation results must be non-synthetic");
+  }
+  if (
+    report.target !== "phase2" &&
+    (report.evidence_eligible === true ||
+      results.some((result) => result?.evidence_eligible === true))
+  ) {
+    errors.push("diagnostic mutation results are never Evidence-eligible");
+  }
+  if (!ignoreReportedStatus) {
+    for (const result of results) {
+      if (result?.evidence_eligible !== expectedEvidenceEligibility) {
+        errors.push(
+          `${String(result?.requirement_id)} result Evidence eligibility does not match its scope`,
+        );
+      }
+    }
+  }
   const ids = results.map((result) => result?.requirement_id);
   for (const id of duplicateValues(ids))
     errors.push(`duplicate mutation result: ${String(id)}`);
@@ -473,6 +506,20 @@ const reportErrors = (
     }
     if (result.tree_sha !== report.tree_sha) {
       errors.push(`mixed tree SHA for ${requirement.id}`);
+    }
+    const runPrefix = `${requirement.id.toLowerCase()}-`;
+    if (
+      typeof result.run_id !== "string" ||
+      !result.run_id.startsWith(runPrefix) ||
+      !UUID_V4.test(result.run_id.slice(runPrefix.length))
+    ) {
+      errors.push(`${requirement.id} run ID is invalid`);
+    }
+    if (
+      report.target === "phase2" &&
+      result.vitest_config_path !== "vitest.mutation.config.ts"
+    ) {
+      errors.push(`${requirement.id} Vitest mutation config mismatch`);
     }
     for (const [field, expected] of [
       ["registry_sha256", authority.registrySha256],
@@ -664,6 +711,9 @@ export function buildPhase2MutationReport({
   });
   report.status = errors.length === 0 ? "PASS" : "FAIL";
   report.evidence_eligible = target === "phase2" && report.status === "PASS";
-  report.errors = errors;
+  for (const result of results) {
+    result.evidence_eligible = report.evidence_eligible;
+  }
+  report.errors = reportErrors(report, authority);
   return report;
 }

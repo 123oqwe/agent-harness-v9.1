@@ -3,18 +3,19 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Instrumenter } from "@stryker-mutator/instrumenter";
+import ts from "typescript";
 
-import { strykerBase } from "../mutation/stryker.base.mjs";
 import {
   buildPhase2MutationReport,
   DEFAULT_PHASE2_MUTATION_ROOT,
@@ -35,8 +36,12 @@ const DEFAULT_REPORT_ROOT = resolve(
 );
 const HASH_64 = /^[0-9a-f]{64}$/u;
 const SHA_40 = /^[0-9a-f]{40}$/u;
+const UUID_V4 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const REGULAR_BLOB_MODES = new Set(["100644", "100755"]);
-const PHASE2_MUTATION_AUTHORITY_FILES = Object.freeze([
+export const PHASE2_EXPECTED_PHASE1_SHA =
+  "2d59a526fcf7cd067fbe9d44981537a42d441360";
+export const PHASE2_MUTATION_AUTHORITY_PATHS = Object.freeze([
   "mutation/phase2-modules.mjs",
   "mutation/modules.mjs",
   "mutation/stryker.base.mjs",
@@ -44,10 +49,12 @@ const PHASE2_MUTATION_AUTHORITY_FILES = Object.freeze([
   "scripts/gates/phase2-mutation.mjs",
   "scripts/run-phase2-mutation.mjs",
   "scripts/run-process-tree.mjs",
+  "scripts/trusted-git.mjs",
   "package.json",
   "package-lock.json",
   "patches/@stryker-mutator+core+9.6.1.patch",
   "patches/@stryker-mutator+vitest-runner+9.6.1.patch",
+  "vitest.mutation.config.ts",
 ]);
 const silentInstrumenterLogger = Object.freeze({
   debug() {},
@@ -77,6 +84,98 @@ const canonicalJson = (value) => {
   return JSON.stringify(value);
 };
 
+const literalPropertyName = (name) => {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  throw new Error("Stryker base contains a non-literal property name");
+};
+
+const literalValue = (node) => {
+  if (ts.isStringLiteral(node)) return node.text;
+  if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (node.kind === ts.SyntaxKind.NullKeyword) return null;
+  if (ts.isArrayLiteralExpression(node)) {
+    return node.elements.map((entry) => literalValue(entry));
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    const entries = [];
+    const names = new Set();
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) {
+        throw new Error("Stryker base must contain only property assignments");
+      }
+      const name = literalPropertyName(property.name);
+      if (
+        names.has(name) ||
+        ["__proto__", "constructor", "prototype"].includes(name)
+      ) {
+        throw new Error(`Stryker base contains an unsafe property: ${name}`);
+      }
+      names.add(name);
+      entries.push([name, literalValue(property.initializer)]);
+    }
+    return Object.fromEntries(entries);
+  }
+  throw new Error("Stryker base contains a non-literal value");
+};
+
+const parseCommittedStrykerBase = (source) => {
+  const parsed = ts.createSourceFile(
+    "mutation/stryker.base.mjs",
+    source,
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.JS,
+  );
+  if (parsed.parseDiagnostics.length > 0 || parsed.statements.length !== 1) {
+    throw new Error("committed Stryker base must contain one valid statement");
+  }
+  const statement = parsed.statements[0];
+  const exported = statement.modifiers?.some(
+    (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+  );
+  if (
+    !exported ||
+    !ts.isVariableStatement(statement) ||
+    (statement.declarationList.flags & ts.NodeFlags.Const) === 0 ||
+    statement.declarationList.declarations.length !== 1
+  ) {
+    throw new Error("committed Stryker base must export one const declaration");
+  }
+  const declaration = statement.declarationList.declarations[0];
+  if (
+    !ts.isIdentifier(declaration.name) ||
+    declaration.name.text !== "strykerBase" ||
+    declaration.initializer === undefined
+  ) {
+    throw new Error("committed Stryker base export is invalid");
+  }
+  const value = literalValue(declaration.initializer);
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
+    throw new Error("committed Stryker base must be an object literal");
+  }
+  return value;
+};
+
+export const collectPhase2MutationSnapshotPaths = ({
+  requirements,
+  vitestConfigPath,
+}) => {
+  const paths = new Set(PHASE2_MUTATION_AUTHORITY_PATHS);
+  paths.add(vitestConfigPath);
+  for (const requirement of requirements) {
+    for (const path of [
+      ...(requirement.sources ?? []),
+      ...(requirement.integrationSources ?? []),
+      ...(requirement.tests ?? []),
+    ]) {
+      paths.add(path);
+    }
+  }
+  return [...paths].sort();
+};
+
 const atomicWriteJson = (path, value) => {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
@@ -101,10 +200,18 @@ const chunkId = (requirementId, sourceFile, startLine, endLine) => {
   return `${slug}-${startLine}-${endLine}`;
 };
 
-export function planPhase2MutationChunks(requirement, repositoryRoot) {
+export function planPhase2MutationChunks(
+  requirement,
+  repositoryRoot,
+  commitSha,
+) {
   const chunks = [];
   for (const sourceFile of [...requirement.sources].sort()) {
-    const source = readFileSync(join(repositoryRoot, sourceFile), "utf8");
+    const source = readCommittedRegularBlob(
+      repositoryRoot,
+      commitSha,
+      sourceFile,
+    ).toString("utf8");
     const lines = sourceLineCount(source);
     for (
       let startLine = 1;
@@ -224,6 +331,7 @@ const assertMutantInChunk = (mutant, chunk) => {
 };
 
 const phase2ChunkConfig = ({
+  strykerBase,
   requirement,
   chunk,
   reportPath,
@@ -255,11 +363,13 @@ const runChunk = async ({
   strykerExecutable,
   vitestConfigPath,
   timeoutMs,
+  strykerBase,
 }) => {
   const chunkRoot = join(runRoot, requirement.id, "chunks", chunk.chunk_id);
   const rawReportPath = join(chunkRoot, "mutation.json");
   const configPath = join(chunkRoot, "stryker.config.json");
   const config = phase2ChunkConfig({
+    strykerBase,
     requirement,
     chunk,
     reportPath: rawReportPath,
@@ -338,6 +448,13 @@ export async function runPhase2RequirementDiagnostic({
     throw new Error("diagnostic requires exact commit SHA");
   if (!SHA_40.test(treeSha ?? ""))
     throw new Error("diagnostic requires exact tree SHA");
+  const committedTreeSha = runTrustedGit(repositoryRoot, [
+    "rev-parse",
+    `${commitSha}^{tree}`,
+  ]).trim();
+  if (treeSha !== committedTreeSha) {
+    throw new Error("diagnostic tree SHA does not match its commit");
+  }
   for (const [label, value] of [
     ["registry", registrySha256],
     ["manifest", manifestSha256],
@@ -361,14 +478,24 @@ export async function runPhase2RequirementDiagnostic({
     ...(requirement.integrationSources ?? []),
     ...requirement.tests,
     vitestConfigPath,
+    "mutation/stryker.base.mjs",
   ]) {
-    if (!existsSync(join(repositoryRoot, path))) {
-      throw new Error(`diagnostic input is missing: ${path}`);
-    }
+    verifyCommittedWorkingRegularBlob(repositoryRoot, commitSha, path);
   }
+  const strykerBase = parseCommittedStrykerBase(
+    readCommittedRegularBlob(
+      repositoryRoot,
+      commitSha,
+      "mutation/stryker.base.mjs",
+    ).toString("utf8"),
+  );
   const runId = `${requirement.id.toLowerCase()}-${randomUUID()}`;
   const runRoot = join(reportRoot, "runs", runId);
-  const chunks = planPhase2MutationChunks(requirement, repositoryRoot);
+  const chunks = planPhase2MutationChunks(
+    requirement,
+    repositoryRoot,
+    commitSha,
+  );
   if (chunks.length === 0)
     throw new Error("diagnostic mutation chunk set is empty");
   const perFileMutants = new Map(
@@ -388,6 +515,7 @@ export async function runPhase2RequirementDiagnostic({
         strykerExecutable,
         vitestConfigPath,
         timeoutMs,
+        strykerBase,
       });
       for (const mutant of executed.mutants) {
         const identity = mutantIdentity(chunk.source_file, mutant);
@@ -434,6 +562,8 @@ export async function runPhase2RequirementDiagnostic({
       manifest_sha256: manifestSha256,
       phase1_mutation_registry_sha256: phase1MutationSha256,
       configuration_hash: configurationHash,
+      run_id: runId,
+      vitest_config_path: vitestConfigPath,
       sources: [...requirement.sources],
       integration_sources: [...(requirement.integrationSources ?? [])],
       integration_source_modules: Object.fromEntries(
@@ -473,7 +603,23 @@ const resolveArtifactPath = (reportRoot, path) => {
   return absolute;
 };
 
+const assertSafeRepositoryPath = (path) => {
+  if (
+    typeof path !== "string" ||
+    path.length === 0 ||
+    isAbsolute(path) ||
+    path.includes("\\") ||
+    path.includes(":") ||
+    path.includes("\0") ||
+    /[*?[\]{}]/u.test(path) ||
+    path.split("/").some((part) => !part || part === "." || part === "..")
+  ) {
+    throw new Error(`unsafe mutation repository path: ${String(path)}`);
+  }
+};
+
 const readCommittedRegularBlob = (repositoryRoot, commitSha, relativePath) => {
+  assertSafeRepositoryPath(relativePath);
   const rawEntry = runTrustedGit(
     repositoryRoot,
     ["ls-tree", "--full-tree", "-z", commitSha, "--", relativePath],
@@ -505,6 +651,86 @@ const readCommittedRegularBlob = (repositoryRoot, commitSha, relativePath) => {
   return readTrustedGitBlob(repositoryRoot, commitSha, relativePath);
 };
 
+const verifyCommittedWorkingRegularBlob = (
+  repositoryRoot,
+  commitSha,
+  relativePath,
+) => {
+  const committed = readCommittedRegularBlob(
+    repositoryRoot,
+    commitSha,
+    relativePath,
+  );
+  const absolute = resolve(repositoryRoot, relativePath);
+  const metadata = lstatSync(absolute);
+  if (metadata.isSymbolicLink() || !metadata.isFile()) {
+    throw new Error(
+      `working tree input is not a regular file: ${relativePath}`,
+    );
+  }
+  const working = readFileSync(absolute);
+  if (!working.equals(committed)) {
+    throw new Error(
+      `working tree bytes differ from commit for ${relativePath}`,
+    );
+  }
+  return committed;
+};
+
+export async function validatePhase2RepositorySnapshot({
+  repositoryRoot,
+  commitSha,
+  requiredPaths,
+}) {
+  if (!SHA_40.test(commitSha ?? "")) {
+    throw new Error("Phase 2 snapshot requires an exact commit SHA");
+  }
+  const resolvedCommit = runTrustedGit(repositoryRoot, [
+    "rev-parse",
+    "--verify",
+    `${commitSha}^{commit}`,
+  ]).trim();
+  if (resolvedCommit !== commitSha) {
+    throw new Error("Phase 2 snapshot commit resolution mismatch");
+  }
+  try {
+    runTrustedGit(repositoryRoot, [
+      "merge-base",
+      "--is-ancestor",
+      PHASE2_EXPECTED_PHASE1_SHA,
+      commitSha,
+    ]);
+  } catch {
+    throw new Error(
+      `Phase 2 mutation commit is not a descendant of ${PHASE2_EXPECTED_PHASE1_SHA}`,
+    );
+  }
+  const treeSha = runTrustedGit(repositoryRoot, [
+    "rev-parse",
+    `${commitSha}^{tree}`,
+  ]).trim();
+  const paths = [...new Set(requiredPaths)].sort();
+  const hash = createHash("sha256");
+  for (const path of paths) {
+    const bytes = verifyCommittedWorkingRegularBlob(
+      repositoryRoot,
+      commitSha,
+      path,
+    );
+    hash.update(path);
+    hash.update("\0");
+    hash.update(bytes);
+    hash.update("\0");
+  }
+  return {
+    commitSha,
+    treeSha,
+    baselineSha: PHASE2_EXPECTED_PHASE1_SHA,
+    paths,
+    snapshotSha256: hash.digest("hex"),
+  };
+}
+
 export async function validatePhase2MutationArtifacts({
   repositoryRoot,
   reportRoot,
@@ -522,23 +748,53 @@ export async function validatePhase2MutationArtifacts({
   if (result.tree_sha !== expectedTreeSha) {
     throw new Error("mutation artifact tree SHA mismatch");
   }
+  if (
+    typeof result.requirement_id !== "string" ||
+    typeof result.run_id !== "string" ||
+    !result.run_id.startsWith(`${result.requirement_id.toLowerCase()}-`) ||
+    !UUID_V4.test(
+      result.run_id.slice(`${result.requirement_id.toLowerCase()}-`.length),
+    )
+  ) {
+    throw new Error("mutation artifact run ID is not deterministic");
+  }
+  if (
+    !Array.isArray(result.sources) ||
+    !Array.isArray(result.integration_sources) ||
+    !Array.isArray(result.tests)
+  ) {
+    throw new Error("mutation artifact input paths are invalid");
+  }
+  for (const inputPath of [
+    ...result.sources,
+    ...result.integration_sources,
+    ...result.tests,
+    result.vitest_config_path,
+    "mutation/stryker.base.mjs",
+  ]) {
+    verifyCommittedWorkingRegularBlob(
+      repositoryRoot,
+      result.commit_sha,
+      inputPath,
+    );
+  }
+  const committedStrykerBase = parseCommittedStrykerBase(
+    readCommittedRegularBlob(
+      repositoryRoot,
+      result.commit_sha,
+      "mutation/stryker.base.mjs",
+    ).toString("utf8"),
+  );
   const sourceBytes = new Map(
     result.sources.map((sourceFile) => [
       sourceFile,
-      readCommittedRegularBlob(
+      verifyCommittedWorkingRegularBlob(
         repositoryRoot,
         result.commit_sha,
         sourceFile,
       ).toString("utf8"),
     ]),
   );
-  for (const integrationSource of result.integration_sources ?? []) {
-    readCommittedRegularBlob(
-      repositoryRoot,
-      result.commit_sha,
-      integrationSource,
-    );
-  }
   const expectedChunks = [];
   for (const sourceFile of [...result.sources].sort()) {
     const lineCount = sourceLineCount(sourceBytes.get(sourceFile));
@@ -586,6 +842,23 @@ export async function validatePhase2MutationArtifacts({
   const identities = new Set();
   const instrumenter = new Instrumenter(silentInstrumenterLogger);
   for (const chunk of result.chunks) {
+    const expectedChunkRoot = [
+      "runs",
+      result.run_id,
+      result.requirement_id,
+      "chunks",
+      chunk.chunk_id,
+    ].join("/");
+    const expectedRawPath = `${expectedChunkRoot}/mutation.json`;
+    const expectedConfigPath = `${expectedChunkRoot}/stryker.config.json`;
+    if (
+      chunk.raw_report_path !== expectedRawPath ||
+      chunk.config_path !== expectedConfigPath
+    ) {
+      throw new Error(
+        `deterministic mutation artifact path mismatch for ${chunk.chunk_id}`,
+      );
+    }
     const rawPath = resolveArtifactPath(reportRoot, chunk.raw_report_path);
     const configPath = resolveArtifactPath(reportRoot, chunk.config_path);
     const rawText = readFileSync(rawPath, "utf8");
@@ -597,17 +870,20 @@ export async function validatePhase2MutationArtifacts({
       throw new Error(`Stryker config hash mismatch for ${chunk.chunk_id}`);
     }
     const config = JSON.parse(configText);
-    if (
-      canonicalJson(config.mutate) !==
-        canonicalJson([
-          `${chunk.source_file}:${chunk.start_line}-${chunk.end_line}`,
-        ]) ||
-      canonicalJson(config.testFiles) !== canonicalJson(result.tests) ||
-      config.thresholds?.high !== result.threshold ||
-      config.thresholds?.break !== null
-    ) {
+    const expectedConfig = phase2ChunkConfig({
+      strykerBase: committedStrykerBase,
+      requirement: {
+        tests: result.tests,
+        threshold: result.threshold,
+      },
+      chunk,
+      reportPath: resolve(reportRoot, expectedRawPath),
+      tempDirName: `.stryker-tmp/phase2/${result.run_id}/${chunk.chunk_id}`,
+      vitestConfigPath: result.vitest_config_path,
+    });
+    if (canonicalJson(config) !== canonicalJson(expectedConfig)) {
       throw new Error(
-        `Stryker config authority mismatch for ${chunk.chunk_id}`,
+        `canonical Stryker config mismatch for ${chunk.chunk_id}`,
       );
     }
     const raw = JSON.parse(rawText);
@@ -718,15 +994,13 @@ export async function validatePhase2MutationArtifacts({
 
 export function computePhase2MutationConfigurationHash(
   repositoryRoot = DEFAULT_PHASE2_MUTATION_ROOT,
+  commitSha = runTrustedGit(repositoryRoot, ["rev-parse", "HEAD"]).trim(),
 ) {
   const hash = createHash("sha256");
-  for (const path of PHASE2_MUTATION_AUTHORITY_FILES) {
-    const absolute = join(repositoryRoot, path);
-    if (!existsSync(absolute))
-      throw new Error(`mutation authority missing: ${path}`);
+  for (const path of PHASE2_MUTATION_AUTHORITY_PATHS) {
     hash.update(path);
     hash.update("\0");
-    hash.update(readFileSync(absolute));
+    hash.update(readCommittedRegularBlob(repositoryRoot, commitSha, path));
     hash.update("\0");
   }
   return hash.digest("hex");
@@ -757,17 +1031,22 @@ export async function runPhase2Mutation({
   reportRoot = DEFAULT_REPORT_ROOT,
 } = {}) {
   const root = resolve(repositoryRoot);
+  const identity = repositoryIdentity(root, false);
+  await validatePhase2RepositorySnapshot({
+    repositoryRoot: root,
+    commitSha: identity.commitSha,
+    requiredPaths: PHASE2_MUTATION_AUTHORITY_PATHS,
+  });
   const authority = loadPhase2MutationAuthority({ repositoryRoot: root });
   const resolvedTarget = resolvePhase2MutationTarget(target, authority);
   const readiness = inspectPhase2MutationReadiness({
     authority,
     repositoryRoot: root,
   });
-  const identity = repositoryIdentity(
+  const configurationHash = computePhase2MutationConfigurationHash(
     root,
-    target === "phase2" && readiness.ok,
+    identity.commitSha,
   );
-  const configurationHash = computePhase2MutationConfigurationHash(root);
   const results = [];
   if (target === "phase2" && !readiness.ok) {
     const report = buildPhase2MutationReport({
@@ -787,6 +1066,16 @@ export async function runPhase2Mutation({
 
   const selected =
     target === "phase2" ? authority.requirements : [resolvedTarget];
+  if (target === "phase2") repositoryIdentity(root, true);
+  const snapshotPaths = collectPhase2MutationSnapshotPaths({
+    requirements: selected,
+    vitestConfigPath: "vitest.mutation.config.ts",
+  });
+  const initialSnapshot = await validatePhase2RepositorySnapshot({
+    repositoryRoot: root,
+    commitSha: identity.commitSha,
+    requiredPaths: snapshotPaths,
+  });
   for (const requirement of selected) {
     const result = await runPhase2RequirementDiagnostic({
       repositoryRoot: root,
@@ -818,6 +1107,14 @@ export async function runPhase2Mutation({
     if (finalIdentity.treeSha !== identity.treeSha) {
       throw new Error("repository tree changed during Phase 2 mutation run");
     }
+    const finalSnapshot = await validatePhase2RepositorySnapshot({
+      repositoryRoot: root,
+      commitSha: finalIdentity.commitSha,
+      requiredPaths: snapshotPaths,
+    });
+    if (finalSnapshot.snapshotSha256 !== initialSnapshot.snapshotSha256) {
+      throw new Error("Phase 2 mutation inputs changed during the run");
+    }
   }
   const report = buildPhase2MutationReport({
     authority,
@@ -831,10 +1128,8 @@ export async function runPhase2Mutation({
   if (errors.length > 0) {
     report.status = "FAIL";
     report.evidence_eligible = false;
-    report.errors = errors;
-  }
-  for (const result of results) {
-    result.evidence_eligible = report.evidence_eligible;
+    for (const result of results) result.evidence_eligible = false;
+    report.errors = validatePhase2MutationReport(report, authority);
   }
   atomicWriteJson(
     join(reportRoot, target === "phase2" ? "mutation.json" : `${target}.json`),

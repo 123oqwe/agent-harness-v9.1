@@ -95,6 +95,11 @@ describe("Phase 2 mutation runner", () => {
         );
         write(
           root,
+          "mutation/stryker.base.mjs",
+          readFileSync(join(harnessRoot, "mutation/stryker.base.mjs"), "utf8"),
+        );
+        write(
+          root,
           "package.json",
           '{"name":"phase2-mutant-fixture","type":"module"}\n',
         );
@@ -233,8 +238,77 @@ describe("Phase 2 mutation runner", () => {
             reportRoot,
             result: wrongTests,
           }),
-        ).rejects.toThrow(/config authority mismatch/u);
+        ).rejects.toThrow(/canonical Stryker config mismatch/u);
         writeFileSync(configPath, configText);
+
+        const baseConfig = JSON.parse(configText);
+        const canonicalConfigDrifts = [
+          { ...baseConfig, testRunner: "command" },
+          { ...baseConfig, coverageAnalysis: "all" },
+          { ...baseConfig, reporters: ["json", "progress"] },
+          { ...baseConfig, concurrency: 2 },
+          { ...baseConfig, timeoutMS: 1 },
+          { ...baseConfig, symlinkNodeModules: false },
+          { ...baseConfig, cleanTempDir: "never" },
+          {
+            ...baseConfig,
+            vitest: {
+              ...baseConfig.vitest,
+              configFile: "vitest.config.ts",
+            },
+          },
+          {
+            ...baseConfig,
+            tempDirName: ".stryker-tmp/phase2/forged/chunk",
+          },
+          {
+            ...baseConfig,
+            jsonReporter: {
+              fileName: join(reportRoot, "forged/mutation.json"),
+            },
+          },
+          { ...baseConfig, forged_extra_key: true },
+        ];
+        for (const driftedConfig of canonicalConfigDrifts) {
+          const driftedConfigText = `${JSON.stringify(driftedConfig)}\n`;
+          const drifted = structuredClone(result);
+          drifted.chunks[0].config_sha256 = sha256(driftedConfigText);
+          writeFileSync(configPath, driftedConfigText);
+          await expect(
+            validatePhase2MutationArtifacts({
+              repositoryRoot: root,
+              reportRoot,
+              result: drifted,
+            }),
+          ).rejects.toThrow(/canonical Stryker config mismatch/u);
+        }
+        writeFileSync(configPath, configText);
+
+        const relocatedRawPath =
+          "runs/forged/AH-SYNTHETIC-MUTATION-001/chunks/forged/mutation.json";
+        const relocatedConfigPath =
+          "runs/forged/AH-SYNTHETIC-MUTATION-001/chunks/forged/stryker.config.json";
+        write(reportRoot, relocatedRawPath, rawText);
+        const relocatedConfig = {
+          ...baseConfig,
+          tempDirName: ".stryker-tmp/phase2/forged/forged",
+          jsonReporter: {
+            fileName: join(reportRoot, relocatedRawPath),
+          },
+        };
+        const relocatedConfigText = `${JSON.stringify(relocatedConfig)}\n`;
+        write(reportRoot, relocatedConfigPath, relocatedConfigText);
+        const relocated = structuredClone(result);
+        relocated.chunks[0].raw_report_path = relocatedRawPath;
+        relocated.chunks[0].config_path = relocatedConfigPath;
+        relocated.chunks[0].config_sha256 = sha256(relocatedConfigText);
+        await expect(
+          validatePhase2MutationArtifacts({
+            repositoryRoot: root,
+            reportRoot,
+            result: relocated,
+          }),
+        ).rejects.toThrow(/deterministic mutation artifact path/u);
 
         const forged = structuredClone(result);
         const forgedRaw = JSON.parse(rawText);
