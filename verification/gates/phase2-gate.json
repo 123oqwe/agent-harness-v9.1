@@ -3,7 +3,7 @@
   "phase": 2,
   "baseline": {
     "repository": "https://github.com/123oqwe/agentharness91.git",
-    "sha": "2d59a526fcf7cd067fbe9d44981537a42d441360"
+    "sha": "8dca581e11b8043aed257cb07c5161237633c40e"
   },
   "evidence_root": "artifacts/phase-2",
   "mutation_thresholds": {

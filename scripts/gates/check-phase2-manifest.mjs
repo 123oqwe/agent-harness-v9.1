@@ -12,15 +12,15 @@ import { spawnTrustedGitSync } from "./trusted-git.mjs";
 const EXPECTED_SCHEMA_VERSION = "1.0.0";
 const EXPECTED_PHASE = 2;
 const EXPECTED_REPOSITORY = "https://github.com/123oqwe/agentharness91.git";
-const EXPECTED_SHA = "2d59a526fcf7cd067fbe9d44981537a42d441360";
+const EXPECTED_SHA = "8dca581e11b8043aed257cb07c5161237633c40e";
 const EXPECTED_EVIDENCE_ROOT = "artifacts/phase-2";
 const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
 const EXPECTED_REQUIREMENT_COUNT = 64;
 const SUPERSEDED_PHASE1_SHA = "bf5eac648527205603de7d26278276ad78819850";
 export const AUTHORITY_CANONICAL_SHA256 =
-  "8dcbc3e0116a8f5f7a17cc2e39e29d540ec5a20552ea23f0a1337960f37bc267";
+  "f0ee8953eea22b141a7b56dd3ecf4602ff616e6f760699997f8cdd20f8883df9";
 export const PHASE1_HARDENING_BINDING_SHA256 =
-  "c7e5d55a1e03eab9ccb58d6bb5e87c020c6987f456d1ec8ad6ba4a171ccb4a19";
+  "13623818373a47cc0bc240b259d759fb96aa28b9c81bbe07e08fdbd0b904ab78";
 
 export const PHASE1_HARDENING_BINDING = Object.freeze(
   [
@@ -38,7 +38,7 @@ export const PHASE1_HARDENING_BINDING = Object.freeze(
       "000000",
       "100644",
       "0000000000000000000000000000000000000000",
-      "78dbee2dec886d6be8598effaf33575a994af03a",
+      "13fd4c7e9536c57e6e55a87c89ec86079d48f925",
     ],
     [
       ".github/workflows/mutation.yml",
@@ -198,7 +198,7 @@ export const PHASE1_HARDENING_BINDING = Object.freeze(
       "000000",
       "100644",
       "0000000000000000000000000000000000000000",
-      "acbfef47569ee255cabb510f9d646f0455ab3b6a",
+      "120747a5885f1ab1e1293f42705a43f0008751af",
     ],
     [
       "tests/mutation/fixtures/process-tree-grandchild.mjs",

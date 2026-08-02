@@ -1170,7 +1170,7 @@ describe("Phase 2 release-gate manifest", () => {
     const wrongSha = loadFixture("valid", "phase2-gate.json");
     wrongSha.baseline.sha = "deadbeef";
     expect(validatePhase2Manifest(wrongSha)).toContain(
-      'manifest.baseline.sha must be "2d59a526fcf7cd067fbe9d44981537a42d441360"; received "deadbeef"',
+      'manifest.baseline.sha must be "8dca581e11b8043aed257cb07c5161237633c40e"; received "deadbeef"',
     );
 
     const wrongRepository = loadFixture("valid", "phase2-gate.json");

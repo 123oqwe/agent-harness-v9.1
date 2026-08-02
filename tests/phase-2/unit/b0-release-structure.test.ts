@@ -23,7 +23,7 @@ const snapshotPath = join(
   repositoryRoot,
   "fixtures/phase-2/valid/phase2-gate.json",
 );
-const acceptedPhase1Sha = "2d59a526fcf7cd067fbe9d44981537a42d441360";
+const acceptedPhase1Sha = "8dca581e11b8043aed257cb07c5161237633c40e";
 const supersededPhase1Sha = "bf5eac648527205603de7d26278276ad78819850";
 
 type Manifest = {
