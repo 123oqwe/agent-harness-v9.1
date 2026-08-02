@@ -172,12 +172,12 @@ export interface HookAuditPort {
 }
 
 export interface HookSystemOptions {
-  readonly journal?: HookJournalPort;
-  readonly audit?: HookAuditPort;
-  readonly attenuationPolicy?: HookAttenuationPolicy;
-  readonly executionPort?: HookExecutionPort;
-  readonly now?: () => string;
-  readonly monotonicNow?: () => number;
+  readonly journal?: HookJournalPort | undefined;
+  readonly audit?: HookAuditPort | undefined;
+  readonly attenuationPolicy?: HookAttenuationPolicy | undefined;
+  readonly executionPort?: HookExecutionPort | undefined;
+  readonly now?: (() => string) | undefined;
+  readonly monotonicNow?: (() => number) | undefined;
 }
 
 const DECISION_EVENTS = new Set<HookEvent>([

@@ -79,7 +79,7 @@ export interface SqliteHookJournalOptions {
   readonly masterKey: Uint8Array;
   readonly ownerId: string;
   readonly leaseMs: number;
-  readonly nowMs?: () => number;
+  readonly nowMs?: (() => number) | undefined;
 }
 
 function requiredId(label: string, value: unknown): asserts value is string {
@@ -529,7 +529,7 @@ export interface DurableHookSystemOptions extends Omit<
   readonly masterKey: Uint8Array;
   readonly ownerId: string;
   readonly leaseMs: number;
-  readonly nowMs?: () => number;
+  readonly nowMs?: (() => number) | undefined;
   readonly registrations: readonly HookRegistration[];
 }
 
@@ -538,21 +538,15 @@ export function createDurableHookSystem(options: DurableHookSystemOptions) {
     masterKey: options.masterKey,
     ownerId: options.ownerId,
     leaseMs: options.leaseMs,
-    ...(options.nowMs === undefined ? {} : { nowMs: options.nowMs }),
+    nowMs: options.nowMs,
   });
   const hooks = new HookSystem(options.registrations, {
     journal,
-    ...(options.audit === undefined ? {} : { audit: options.audit }),
-    ...(options.attenuationPolicy === undefined
-      ? {}
-      : { attenuationPolicy: options.attenuationPolicy }),
-    ...(options.executionPort === undefined
-      ? {}
-      : { executionPort: options.executionPort }),
-    ...(options.now === undefined ? {} : { now: options.now }),
-    ...(options.monotonicNow === undefined
-      ? {}
-      : { monotonicNow: options.monotonicNow }),
+    audit: options.audit,
+    attenuationPolicy: options.attenuationPolicy,
+    executionPort: options.executionPort,
+    now: options.now,
+    monotonicNow: options.monotonicNow,
   });
   return Object.freeze({
     hooks,
