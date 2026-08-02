@@ -52,7 +52,7 @@ const externalFixture = () => {
   const scriptPath = join(root, 'hook.mjs');
   writeFileSync(
     scriptPath,
-    `import { readFileSync, writeFileSync } from 'node:fs';
+    `import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 
 const chunks = [];
@@ -60,8 +60,11 @@ for await (const chunk of process.stdin) chunks.push(chunk);
 const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
 const mode = input.payload.mode;
 let follow_up;
+let emitted = false;
 if (mode === 'env') {
   follow_up = { leaked: process.env.HOOK_HOST_SECRET ?? null };
+} else if (mode === 'source-mode') {
+  follow_up = { mode: statSync(new URL(import.meta.url)).mode & 0o777 };
 } else if (mode === 'fs') {
   try { follow_up = { read: readFileSync(input.payload.path, 'utf8') }; }
   catch { follow_up = { read: null }; }
@@ -84,10 +87,13 @@ if (mode === 'env') {
 } else if (mode === 'large-output') {
   process.stdout.write('x'.repeat(300_000));
   process.exit(0);
+} else if (mode === 'max-output') {
+  await new Promise((resolve) => process.stdout.write(JSON.stringify('x'.repeat(262_142)), resolve));
+  emitted = true;
 } else if (mode === 'nonzero-exit') {
   process.exit(7);
 }
-process.stdout.write(JSON.stringify({ action: 'observe', follow_up }));
+if (!emitted) process.stdout.write(JSON.stringify({ action: 'observe', follow_up }));
 `,
     { mode: 0o700 },
   );
@@ -168,8 +174,13 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
       durationMs: 1,
       ...override,
     };
+    const limitExceeded =
+      'limitExceeded' in result ? result.limitExceeded : undefined;
     expect(() => assertTrustedHookExecutionResult('seatbelt', result)).toThrow(
-      'external Hook sandbox execution failed closed',
+      `external Hook sandbox execution failed closed ` +
+        `(mechanism=seatbelt, exit=${String(result.exitCode)}, ` +
+        `timeout=${String(result.timedOut)}, canceled=${String(result.canceled)}, ` +
+        `truncated=${String(result.truncated)}, limit=${limitExceeded ?? 'none'})`,
     );
   });
 
@@ -274,6 +285,20 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         new AbortController().signal,
       ),
     ).resolves.toEqual({ action: 'observe', follow_up: { leaked: null } });
+    await expect(
+      executionPort.execute(
+        registration,
+        {
+          hook_id: registration.id,
+          event: 'post_tool_use',
+          trust: registration.trust,
+          invocation_id: 'staged-source-mode-check',
+          scope,
+          payload: { mode: 'source-mode' },
+        },
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ action: 'observe', follow_up: { mode: 0o400 } });
     const system = new HookSystem(
       [registration],
       { executionPort },
@@ -330,12 +355,56 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     expect(() => readFileSync(marker, 'utf8')).toThrow();
   });
 
+  it('enforces the registration timeout at the sandbox execution boundary', async () => {
+    const fixture = externalFixture();
+    const marker = join(fixture.root, 'direct-late-effect.txt');
+    const registration = externalRegistration(
+      fixture.scriptPath,
+      fixture.contentHash,
+      20,
+    );
+    await expect(
+      new SandboxedHookExecutionPort().execute(
+        registration,
+        {
+          hook_id: registration.id,
+          event: registration.event,
+          trust: registration.trust,
+          invocation_id: 'direct-timeout-boundary',
+          scope,
+          payload: { mode: 'late-effect', path: marker },
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('external Hook sandbox execution failed closed');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(() => readFileSync(marker, 'utf8')).toThrow();
+  });
+
   it('rejects a row whose reviewed source bytes no longer match content_hash', async () => {
     const fixture = externalFixture();
     const executionPort = new SandboxedHookExecutionPort();
     writeFileSync(fixture.scriptPath, 'process.stdout.write("{}")');
+    const registration = externalRegistration(
+      fixture.scriptPath,
+      fixture.contentHash,
+    );
+    await expect(
+      executionPort.execute(
+        registration,
+        {
+          hook_id: registration.id,
+          event: registration.event,
+          trust: registration.trust,
+          invocation_id: 'direct-content-hash-mismatch',
+          scope,
+          payload: { mode: 'env' },
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('external Hook content hash mismatch');
     const system = new HookSystem(
-      [externalRegistration(fixture.scriptPath, fixture.contentHash)],
+      [registration],
       { executionPort },
     );
 
@@ -345,6 +414,27 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
       action: 'deny',
       reason_code: 'hook_error',
     });
+  });
+
+  it('executes a user-trust descriptor without inventing a reviewed hash', async () => {
+    const fixture = externalFixture();
+    const reviewed = externalRegistration(fixture.scriptPath, fixture.contentHash);
+    const { content_hash: _reviewedHash, ...descriptor } = reviewed;
+    const registration = { ...descriptor, trust: 'user' as const };
+    await expect(
+      new SandboxedHookExecutionPort().execute(
+        registration,
+        {
+          hook_id: registration.id,
+          event: registration.event,
+          trust: registration.trust,
+          invocation_id: 'user-trust-no-reviewed-hash',
+          scope,
+          payload: { mode: 'env' },
+        },
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ action: 'observe', follow_up: { leaked: null } });
   });
 
   it('rejects every untrusted executable and source path shape directly', async () => {
@@ -452,5 +542,40 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         new AbortController().signal,
       ),
     ).rejects.toThrow('external Hook input exceeds JSON limit');
+  }, 30_000);
+
+  it('accepts input and output envelopes exactly at the JSON byte limit', async () => {
+    const fixture = externalFixture();
+    const registration = externalRegistration(
+      fixture.scriptPath,
+      fixture.contentHash,
+      10_000,
+    );
+    const input = {
+      hook_id: registration.id,
+      event: registration.event,
+      trust: registration.trust,
+      invocation_id: 'exact-input-limit',
+      scope,
+      payload: { mode: 'env', padding: '' },
+    };
+    const encodedBase = Buffer.byteLength(JSON.stringify(input));
+    input.payload.padding = 'x'.repeat(256 * 1024 - encodedBase);
+    expect(Buffer.byteLength(JSON.stringify(input))).toBe(256 * 1024);
+    const port = new SandboxedHookExecutionPort();
+    await expect(
+      port.execute(
+        registration,
+        input,
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ action: 'observe', follow_up: { leaked: null } });
+    await expect(
+      port.execute(
+        registration,
+        { ...input, invocation_id: 'exact-output-limit', payload: { mode: 'max-output' } },
+        new AbortController().signal,
+      ),
+    ).resolves.toHaveLength(262_142);
   }, 30_000);
 });

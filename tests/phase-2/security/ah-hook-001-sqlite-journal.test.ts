@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, hkdfSync } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -263,6 +263,40 @@ describe('AH-HOOK-001 encrypted SQLite HookJournal', () => {
     raw.close();
   });
 
+  it('binds persisted key metadata to the canonical derivation contexts', () => {
+    const path = fixture();
+    new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'derivation-reference',
+      leaseMs: 1_000,
+    }).close();
+    const raw = new Database(path, { readonly: true });
+    const metadata = Object.fromEntries(
+      (
+        raw
+          .prepare('SELECT key, value FROM hook_journal_metadata ORDER BY key')
+          .all() as Array<{ key: string; value: string }>
+      ).map(({ key, value }) => [key, value]),
+    );
+    raw.close();
+    const salt = Buffer.from(metadata.encryption_salt!, 'base64');
+    const recordKey = Buffer.from(
+      hkdfSync(
+        'sha256',
+        masterKey,
+        salt,
+        'agent-harness/hook-journal/v1',
+        32,
+      ),
+    );
+    const expectedKeyCheck = createHmac('sha256', recordKey)
+      .update('agent-harness/hook-journal/key-check/v1')
+      .digest('hex');
+    expect(metadata.encryption_key_check).toBe(expectedKeyCheck);
+    recordKey.fill(0);
+    salt.fill(0);
+  });
+
   it('isolates identical idempotency keys across tenants', async () => {
     const path = fixture();
     const journal = new SqliteHookJournal(path, {
@@ -300,7 +334,7 @@ describe('AH-HOOK-001 encrypted SQLite HookJournal', () => {
       status: 'reconciliation',
       reason_code: 'hook_claim_in_flight',
     });
-    now = 2_001;
+    now = 2_000;
     await expect(second.claim(input)).resolves.toMatchObject({
       status: 'reconciliation',
       reason_code: 'hook_claim_abandoned',
@@ -523,10 +557,35 @@ db.close();`,
     after.close();
   });
 
+  it('rejects a key-check digest with trailing attacker-controlled hex', () => {
+    const path = fixture();
+    new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'key-check-anchor-writer',
+      leaseMs: 1_000,
+    }).close();
+    const raw = new Database(path);
+    raw
+      .prepare(
+        "UPDATE hook_journal_metadata SET value = value || 'a' WHERE key = 'encryption_key_check'",
+      )
+      .run();
+    raw.close();
+    expect(
+      () =>
+        new SqliteHookJournal(path, {
+          masterKey,
+          ownerId: 'key-check-anchor-reader',
+          leaseMs: 1_000,
+        }),
+    ).toThrow('Hook journal master key rejected');
+  });
+
   it('validates constructor identity, key length and lease before use', () => {
     for (const [options, message] of [
       [undefined, 'ownerId is required'],
       [{ masterKey, ownerId: '', leaseMs: 1_000 }, 'ownerId is required'],
+      [{ masterKey, ownerId: '   ', leaseMs: 1_000 }, 'ownerId is required'],
       [
         { masterKey: Buffer.alloc(31), ownerId: 'owner', leaseMs: 1_000 },
         '32-byte Hook journal masterKey is required',
@@ -573,6 +632,7 @@ db.close();`,
     const invalid: Array<[unknown, string]> = [
       [{ ...valid, scope: null }, 'tenant_id is required'],
       [{ ...valid, scope: { ...scope(), tenant_id: '' } }, 'tenant_id is required'],
+      [{ ...valid, scope: { ...scope(), tenant_id: '   ' } }, 'tenant_id is required'],
       [{ ...valid, scope: { ...scope(), run_id: '' } }, 'run_id is required'],
       [{ ...valid, scope: { ...scope(), session_id: '' } }, 'session_id is required'],
       [{ ...valid, scope: { ...scope(), operation_id: '' } }, 'operation_id is required'],
@@ -582,6 +642,14 @@ db.close();`,
       [{ ...valid, input_hash: '' }, 'Hook journal input_hash must be SHA-256'],
       [
         { ...valid, input_hash: `g${'0'.repeat(63)}` },
+        'Hook journal input_hash must be SHA-256',
+      ],
+      [
+        { ...valid, input_hash: `${'a'.repeat(64)}a` },
+        'Hook journal input_hash must be SHA-256',
+      ],
+      [
+        { ...valid, input_hash: `a${'b'.repeat(64)}` },
         'Hook journal input_hash must be SHA-256',
       ],
     ];
