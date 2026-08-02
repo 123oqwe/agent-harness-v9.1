@@ -76,7 +76,11 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: phase1-mutation-${{ github.sha }}
-          path: reports/mutation/
+          # HTML is a human-readable duplicate of the authoritative JSON and
+          # can exceed the bounded descriptor-relative verifier transport.
+          path: |
+            reports/mutation/
+            !reports/mutation/**/*.html
           if-no-files-found: error
           retention-days: 90
 

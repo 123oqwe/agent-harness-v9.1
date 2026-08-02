@@ -37,6 +37,7 @@ describe('manual Phase 1 GLM acceptance workflow', () => {
     expect(workflow).toContain(
       'MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}',
     );
+    expect(workflow).toContain('!reports/mutation/**/*.html');
     expect(workflow).toContain('EXPECTED_SHA: ${{ inputs.expected_sha }}');
     expect(workflow.match(/secrets\.GLM_API_KEY/gu)).toHaveLength(1);
     expect(workflow).toContain('run: npm run build');
