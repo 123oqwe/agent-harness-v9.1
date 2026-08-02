@@ -7,8 +7,8 @@
  * checked. A filesystem lock prevents two Stryker processes from sharing
  * temporary or report state.
  */
-import { createHash, randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { createHash, randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -17,46 +17,46 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-} from "node:fs";
-import { hostname } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
-import { mutationModules, phase1Minimum } from "../mutation/modules.mjs";
-import { strykerBase } from "../mutation/stryker.base.mjs";
-import { resolveSpecRoot } from "./repository-paths.mjs";
-import { runProcessTree } from "./run-process-tree.mjs";
+} from 'node:fs';
+import { hostname } from 'node:os';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { mutationModules, phase1Minimum } from '../mutation/modules.mjs';
+import { strykerBase } from '../mutation/stryker.base.mjs';
+import { resolveSpecRoot } from './repository-paths.mjs';
+import { runProcessTree } from './run-process-tree.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
-const harnessRoot = resolve(dirname(scriptPath), "..");
-const reportsDir = join(harnessRoot, "reports", "mutation");
+const harnessRoot = resolve(dirname(scriptPath), '..');
+const reportsDir = join(harnessRoot, 'reports', 'mutation');
 export const mutationAuthorityFiles = [
-  "mutation/modules.mjs",
-  "mutation/thresholds.json",
-  "mutation/stryker.base.mjs",
-  "mutation/equivalent-mutants.json",
-  "package.json",
-  "package-lock.json",
-  "patches/@stryker-mutator+core+9.6.1.patch",
-  "patches/@stryker-mutator+vitest-runner+9.6.1.patch",
-  "vitest.mutation.config.ts",
-  "scripts/run-mutation.mjs",
-  "scripts/run-process-tree.mjs",
-  "scripts/check-mutation-thresholds.mjs",
-  "scripts/repository-paths.mjs",
-  "scripts/trusted-git.mjs",
-  "scripts/secure-release-io.mjs",
-  "scripts/secure-release-io.py",
-  "benchmarks/phase1/final-evidence.schema.json",
+  'mutation/modules.mjs',
+  'mutation/thresholds.json',
+  'mutation/stryker.base.mjs',
+  'mutation/equivalent-mutants.json',
+  'package.json',
+  'package-lock.json',
+  'patches/@stryker-mutator+core+9.6.1.patch',
+  'patches/@stryker-mutator+vitest-runner+9.6.1.patch',
+  'vitest.mutation.config.ts',
+  'scripts/run-mutation.mjs',
+  'scripts/run-process-tree.mjs',
+  'scripts/check-mutation-thresholds.mjs',
+  'scripts/repository-paths.mjs',
+  'scripts/trusted-git.mjs',
+  'scripts/secure-release-io.mjs',
+  'scripts/secure-release-io.py',
+  'benchmarks/phase1/final-evidence.schema.json',
 ];
 const securityCriticalModules = new Set([
-  "router",
-  "toolsRegistry",
-  "actionControl",
-  "identitySecrets",
-  "vfs",
-  "sandbox",
-  "session",
-  "runtime",
+  'router',
+  'toolsRegistry',
+  'actionControl',
+  'identitySecrets',
+  'vfs',
+  'sandbox',
+  'session',
+  'runtime',
 ]);
 const defaultChunkTimeoutMs = 15 * 60 * 1000;
 
@@ -74,27 +74,27 @@ export function resolveChunkTimeoutMs(moduleName) {
 
 export function resolveMutationTarget(target) {
   if (!target) {
-    throw new Error("usage: node scripts/run-mutation.mjs <module|phase1>");
+    throw new Error('usage: node scripts/run-mutation.mjs <module|phase1>');
   }
-  if (target !== "phase1" && !Object.hasOwn(mutationModules, target)) {
+  if (target !== 'phase1' && !Object.hasOwn(mutationModules, target)) {
     throw new Error(`unknown mutation target: ${target}`);
   }
   return target;
 }
 
 function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash('sha256').update(value).digest('hex');
 }
 
 function canonicalJson(value) {
   if (Array.isArray(value)) {
-    return `[${value.map(canonicalJson).join(",")}]`;
+    return `[${value.map(canonicalJson).join(',')}]`;
   }
-  if (value !== null && typeof value === "object") {
+  if (value !== null && typeof value === 'object') {
     return `{${Object.keys(value)
       .sort()
       .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
-      .join(",")}}`;
+      .join(',')}}`;
   }
   return JSON.stringify(value);
 }
@@ -103,14 +103,14 @@ function atomicWriteJson(path, value) {
   mkdirSync(dirname(path), { recursive: true });
   const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
-    encoding: "utf8",
+    encoding: 'utf8',
     mode: 0o600,
   });
   renameSync(temporaryPath, path);
 }
 
 function normalizedAuthorityContent(path, content) {
-  if (!path.endsWith("equivalent-mutants.json")) return content;
+  if (!path.endsWith('equivalent-mutants.json')) return content;
   let parsed;
   try {
     parsed = JSON.parse(content);
@@ -122,7 +122,7 @@ function normalizedAuthorityContent(path, content) {
     parsed.map((value) =>
       Object.fromEntries(
         Object.entries(value).filter(
-          ([key]) => key !== "commitSha" && key !== "configurationHash",
+          ([key]) => key !== 'commitSha' && key !== 'configurationHash',
         ),
       ),
     ),
@@ -130,7 +130,7 @@ function normalizedAuthorityContent(path, content) {
 }
 
 export function computeMutationConfigurationHash(root = harnessRoot) {
-  const hash = createHash("sha256");
+  const hash = createHash('sha256');
   for (const relativePath of mutationAuthorityFiles) {
     const absolutePath = join(root, relativePath);
     if (!existsSync(absolutePath)) {
@@ -138,19 +138,19 @@ export function computeMutationConfigurationHash(root = harnessRoot) {
     }
     const content = normalizedAuthorityContent(
       relativePath,
-      readFileSync(absolutePath, "utf8"),
+      readFileSync(absolutePath, 'utf8'),
     );
     hash.update(relativePath);
-    hash.update("\0");
+    hash.update('\0');
     hash.update(content);
-    hash.update("\0");
+    hash.update('\0');
   }
-  return hash.digest("hex");
+  return hash.digest('hex');
 }
 
 function readLockMetadata(lockPath) {
   try {
-    return JSON.parse(readFileSync(join(lockPath, "owner.json"), "utf8"));
+    return JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8'));
   } catch {
     return null;
   }
@@ -162,7 +162,7 @@ function processIsAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error?.code !== "ESRCH";
+    return error?.code !== 'ESRCH';
   }
 }
 
@@ -173,7 +173,7 @@ export function acquireRunLock(lockPath, owner) {
       mkdirSync(lockPath, { mode: 0o700 });
       break;
     } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
+      if (error?.code !== 'EEXIST') throw error;
       const existing = readLockMetadata(lockPath);
       const stale =
         existing?.hostname === hostname() && !processIsAlive(existing.pid);
@@ -184,21 +184,21 @@ export function acquireRunLock(lockPath, owner) {
           rmSync(stalePath, { force: true, recursive: true });
           continue;
         } catch (recoveryError) {
-          throw new Error("failed to recover stale mutation lock", {
+          throw new Error('failed to recover stale mutation lock', {
             cause: recoveryError,
           });
         }
       }
       const detail = existing
         ? `run_id=${existing.run_id} pid=${existing.pid}`
-        : "owner metadata unavailable";
+        : 'owner metadata unavailable';
       throw new Error(`mutation runner already running (${detail})`, {
         cause: error,
       });
     }
   }
   try {
-    atomicWriteJson(join(lockPath, "owner.json"), {
+    atomicWriteJson(join(lockPath, 'owner.json'), {
       ...owner,
       hostname: owner.hostname ?? hostname(),
     });
@@ -218,15 +218,15 @@ export function releaseRunLock(lockPath, runId) {
 
 function validSha(value, length) {
   return (
-    typeof value === "string" &&
-    new RegExp(`^[0-9a-f]{${length}}$`, "u").test(value)
+    typeof value === 'string' &&
+    new RegExp(`^[0-9a-f]{${length}}$`, 'u').test(value)
   );
 }
 
 export function loadEquivalentMutants(path, commitSha, configurationHash) {
   let entries;
   try {
-    entries = JSON.parse(readFileSync(path, "utf8"));
+    entries = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
     throw new Error(
       `equivalent-mutants.json must be valid JSON: ${error.message}`,
@@ -234,30 +234,30 @@ export function loadEquivalentMutants(path, commitSha, configurationHash) {
     );
   }
   if (!Array.isArray(entries)) {
-    throw new Error("equivalent-mutants.json must be an array");
+    throw new Error('equivalent-mutants.json must be an array');
   }
   return parseEquivalentMutants(entries, commitSha, configurationHash);
 }
 
 export function parseEquivalentMutants(entries, commitSha, configurationHash) {
   if (!Array.isArray(entries)) {
-    throw new Error("equivalent-mutants.json must be an array");
+    throw new Error('equivalent-mutants.json must be an array');
   }
   const keys = new Set();
   for (const [index, entry] of entries.entries()) {
     const prefix = `equivalent mutant waiver ${index}`;
     if (
       !entry ||
-      typeof entry !== "object" ||
-      typeof entry.strykerMutantId !== "string" ||
-      entry.strykerMutantId.trim() === "" ||
-      typeof entry.module !== "string" ||
-      typeof entry.sourceFile !== "string" ||
-      typeof entry.reason !== "string" ||
+      typeof entry !== 'object' ||
+      typeof entry.strykerMutantId !== 'string' ||
+      entry.strykerMutantId.trim() === '' ||
+      typeof entry.module !== 'string' ||
+      typeof entry.sourceFile !== 'string' ||
+      typeof entry.reason !== 'string' ||
       entry.reason.trim().length < 20 ||
-      typeof entry.reviewedBy !== "string" ||
-      entry.reviewedBy.trim() === "" ||
-      typeof entry.reviewedAt !== "string" ||
+      typeof entry.reviewedBy !== 'string' ||
+      entry.reviewedBy.trim() === '' ||
+      typeof entry.reviewedAt !== 'string' ||
       Number.isNaN(Date.parse(entry.reviewedAt)) ||
       !validSha(entry.commitSha, 40) ||
       !validSha(entry.configurationHash, 64)
@@ -295,8 +295,8 @@ export function parseEquivalentMutants(entries, commitSha, configurationHash) {
 function resolveMutationFiles(patterns, root = harnessRoot) {
   const files = new Set();
   for (const pattern of patterns) {
-    if (typeof pattern !== "string" || pattern.length === 0) {
-      throw new Error("mutation source path must be a non-empty string");
+    if (typeof pattern !== 'string' || pattern.length === 0) {
+      throw new Error('mutation source path must be a non-empty string');
     }
     if (/[*?[\]{}]/u.test(pattern)) {
       throw new Error(
@@ -304,11 +304,11 @@ function resolveMutationFiles(patterns, root = harnessRoot) {
       );
     }
     const absolutePath = resolve(root, pattern);
-    const match = relative(root, absolutePath).split(sep).join("/");
+    const match = relative(root, absolutePath).split(sep).join('/');
     if (
-      match === "" ||
-      match === ".." ||
-      match.startsWith("../") ||
+      match === '' ||
+      match === '..' ||
+      match.startsWith('../') ||
       isAbsolute(match)
     ) {
       throw new Error(
@@ -319,14 +319,14 @@ function resolveMutationFiles(patterns, root = harnessRoot) {
       throw new Error(`mutation source file is missing: ${match}`);
     }
     if (
-      match.endsWith("index.ts") ||
-      match.endsWith(".d.ts") ||
-      match.endsWith(".test.ts") ||
-      match.endsWith(".spec.ts") ||
-      match.startsWith("contracts/") ||
-      match.startsWith("tests/") ||
-      match.startsWith("dist/") ||
-      match.startsWith("node_modules/")
+      match.endsWith('index.ts') ||
+      match.endsWith('.d.ts') ||
+      match.endsWith('.test.ts') ||
+      match.endsWith('.spec.ts') ||
+      match.startsWith('contracts/') ||
+      match.startsWith('tests/') ||
+      match.startsWith('dist/') ||
+      match.startsWith('node_modules/')
     ) {
       continue;
     }
@@ -337,14 +337,14 @@ function resolveMutationFiles(patterns, root = harnessRoot) {
 
 function sourceLineCount(source) {
   if (source.length === 0) return 1;
-  const lines = source.split("\n");
-  return lines.at(-1) === "" ? Math.max(1, lines.length - 1) : lines.length;
+  const lines = source.split('\n');
+  return lines.at(-1) === '' ? Math.max(1, lines.length - 1) : lines.length;
 }
 
 function chunkId(sourceFile, startLine, endLine) {
   const slug = sourceFile
-    .replaceAll(/[^a-zA-Z0-9]+/gu, "-")
-    .replaceAll(/^-|-$/gu, "")
+    .replaceAll(/[^a-zA-Z0-9]+/gu, '-')
+    .replaceAll(/^-|-$/gu, '')
     .toLowerCase();
   return `${slug}-${startLine}-${endLine}`;
 }
@@ -355,7 +355,7 @@ export function planMutationChunks(
   linesPerChunk = 250,
 ) {
   if (!Number.isSafeInteger(linesPerChunk) || linesPerChunk <= 0) {
-    throw new Error("linesPerChunk must be a positive safe integer");
+    throw new Error('linesPerChunk must be a positive safe integer');
   }
   const chunks = [];
   for (const sourceFile of [...sourceFiles].sort()) {
@@ -363,7 +363,7 @@ export function planMutationChunks(
     if (!existsSync(absolutePath)) {
       throw new Error(`mutation source missing: ${sourceFile}`);
     }
-    const lineCount = sourceLineCount(readFileSync(absolutePath, "utf8"));
+    const lineCount = sourceLineCount(readFileSync(absolutePath, 'utf8'));
     for (
       let startLine = 1;
       startLine <= lineCount;
@@ -392,7 +392,7 @@ export function buildMutationChunkConfig(moduleName, chunk, runId) {
     tempDirName: `.stryker-tmp/${runId}/${moduleName}/${chunk.chunk_id}`,
     jsonReporter: { fileName: `${chunkRoot}/mutation.json` },
     htmlReporter: { fileName: `${chunkRoot}/mutation.html` },
-    ...(moduleName === "sandbox" ? { concurrency: 1, timeoutMS: 60_000 } : {}),
+    ...(moduleName === 'sandbox' ? { concurrency: 1, timeoutMS: 60_000 } : {}),
     thresholds: {
       high: module.minimum,
       low: Math.max(0, module.minimum - 5),
@@ -412,7 +412,7 @@ function mutantIdentity(sourceFile, mutant) {
 
 export function mergeChunkReports(chunks, reports, sourceRoot = harnessRoot) {
   if (chunks.length === 0 || chunks.length !== reports.length) {
-    throw new Error("chunk/report cardinality mismatch");
+    throw new Error('chunk/report cardinality mismatch');
   }
   const merged = {
     ...reports[0],
@@ -423,7 +423,7 @@ export function mergeChunkReports(chunks, reports, sourceRoot = harnessRoot) {
   const identities = new Set();
   for (const [index, report] of reports.entries()) {
     const chunk = chunks[index];
-    if (!report?.files || typeof report.files !== "object") {
+    if (!report?.files || typeof report.files !== 'object') {
       throw new Error(`chunk ${chunk.chunk_id} has no files object`);
     }
     const entries = Object.entries(report.files);
@@ -461,22 +461,22 @@ export function mergeChunkReports(chunks, reports, sourceRoot = harnessRoot) {
       throw new Error(`all-empty chunk source missing: ${sourceFile}`);
     }
     merged.files[sourceFile] = {
-      language: "typescript",
-      source: readFileSync(sourcePath, "utf8"),
+      language: 'typescript',
+      source: readFileSync(sourcePath, 'utf8'),
       mutants: [],
     };
   }
   exactSet(
     Object.keys(merged.files),
     [...new Set(chunks.map((chunk) => chunk.source_file))],
-    "merged chunk source files",
+    'merged chunk source files',
   );
   return merged;
 }
 
 function reportFiles(report) {
-  if (!report?.files || typeof report.files !== "object") {
-    throw new Error("Stryker report has no files object");
+  if (!report?.files || typeof report.files !== 'object') {
+    throw new Error('Stryker report has no files object');
   }
   return Object.entries(report.files)
     .map(([sourceFile, value]) => ({
@@ -520,19 +520,19 @@ function countMutants(files, moduleName, waiverKeys) {
         continue;
       }
       switch (mutant.status) {
-        case "Killed":
+        case 'Killed':
           counts.killed += 1;
           break;
-        case "Timeout":
+        case 'Timeout':
           counts.timeout += 1;
           break;
-        case "Survived":
+        case 'Survived':
           counts.survived += 1;
           break;
-        case "NoCoverage":
+        case 'NoCoverage':
           counts.noCoverage += 1;
           break;
-        case "Ignored":
+        case 'Ignored':
           throw new Error(
             `unreviewed ignored mutant ${mutant.id} in ${file.sourceFile}`,
           );
@@ -551,8 +551,8 @@ function exactSet(actual, expected, label) {
   const right = [...expected].sort();
   if (JSON.stringify(left) !== JSON.stringify(right)) {
     throw new Error(
-      `${label} mismatch: actual=[${left.join(", ")}] ` +
-        `expected=[${right.join(", ")}]`,
+      `${label} mismatch: actual=[${left.join(', ')}] ` +
+        `expected=[${right.join(', ')}]`,
     );
   }
 }
@@ -581,8 +581,8 @@ function moduleResultFromReport(
     const fileCounts = countMutants([file], moduleName, context.waiverKeys);
     const fileScore = scoreFromCounts(fileCounts);
     const minimum = module.perFileMinimum ?? 0;
-    const status = fileScore >= minimum ? "PASS" : "FAIL";
-    if (status === "FAIL") perFilePassed = false;
+    const status = fileScore >= minimum ? 'PASS' : 'FAIL';
+    if (status === 'FAIL') perFilePassed = false;
     perFile[file.sourceFile] = {
       ...fileCounts,
       score: fileScore,
@@ -600,7 +600,7 @@ function moduleResultFromReport(
     source_files: expectedFiles,
     minimum: module.minimum,
     score,
-    status: passed ? "PASS" : "FAIL",
+    status: passed ? 'PASS' : 'FAIL',
     counts,
     per_file: perFile,
     chunks: chunks.map((chunk) => {
@@ -624,7 +624,7 @@ function failedModuleResult(moduleName, context, error) {
     source_files: [...mutationModules[moduleName].mutate].sort(),
     minimum: mutationModules[moduleName].minimum,
     score: 0,
-    status: "FAIL",
+    status: 'FAIL',
     counts: emptyCounts(),
     per_file: {},
     chunks: [],
@@ -645,9 +645,9 @@ export function buildPhase1Report(context, results) {
     new Set(actualNames).size === expectedNames.length &&
     expectedNames.every((name) => actualNames.includes(name));
   const allModulesPass =
-    moduleSetComplete && results.every((result) => result.status === "PASS");
+    moduleSetComplete && results.every((result) => result.status === 'PASS');
   const status =
-    allModulesPass && aggregateScore >= phase1Minimum ? "PASS" : "FAIL";
+    allModulesPass && aggregateScore >= phase1Minimum ? 'PASS' : 'FAIL';
   return {
     schema_version: 1,
     run_id: context.runId,
@@ -672,19 +672,19 @@ export function validatePhase1Report(report, expected) {
     report.schema_version !== 1 ||
     report.run_id !== expected.runId
   ) {
-    throw new Error("Phase 1 report run identity mismatch");
+    throw new Error('Phase 1 report run identity mismatch');
   }
   if (report.commit_sha !== expected.commitSha) {
-    throw new Error("Phase 1 report commit mismatch");
+    throw new Error('Phase 1 report commit mismatch');
   }
   if (report.configuration_hash !== expected.configurationHash) {
-    throw new Error("Phase 1 report configuration mismatch");
+    throw new Error('Phase 1 report configuration mismatch');
   }
   const expectedNames = Object.keys(mutationModules);
   const actualNames = (report.modules ?? []).map((module) => module.module);
-  exactSet(actualNames, expectedNames, "Phase 1 module set");
+  exactSet(actualNames, expectedNames, 'Phase 1 module set');
   if (new Set(actualNames).size !== actualNames.length) {
-    throw new Error("Phase 1 module set contains duplicates");
+    throw new Error('Phase 1 module set contains duplicates');
   }
   const aggregateCounts = emptyCounts();
   for (const result of report.modules) {
@@ -728,10 +728,10 @@ export function validatePhase1Report(report, expected) {
     }
     const perFilePassed = Object.values(result.per_file).every(
       (file) =>
-        file.status === "PASS" && file.score >= (module.perFileMinimum ?? 0),
+        file.status === 'PASS' && file.score >= (module.perFileMinimum ?? 0),
     );
     if (
-      result.status !== "PASS" ||
+      result.status !== 'PASS' ||
       result.score < module.minimum ||
       !perFilePassed
     ) {
@@ -752,41 +752,41 @@ export function validatePhase1Report(report, expected) {
       }) ||
     report.aggregate.score !== aggregateScore ||
     report.aggregate.required !== phase1Minimum ||
-    report.aggregate.status !== "PASS" ||
+    report.aggregate.status !== 'PASS' ||
     aggregateScore < phase1Minimum
   ) {
-    throw new Error("Phase 1 aggregate is not passing or is inconsistent");
+    throw new Error('Phase 1 aggregate is not passing or is inconsistent');
   }
   return true;
 }
 
 function git(args) {
-  const result = spawnSync("git", args, {
+  const result = spawnSync('git', args, {
     cwd: harnessRoot,
-    encoding: "utf8",
+    encoding: 'utf8',
     shell: false,
   });
   if (result.status !== 0) {
     throw new Error(
-      `git ${args.join(" ")} failed: ${(result.stderr || "").trim()}`,
+      `git ${args.join(' ')} failed: ${(result.stderr || '').trim()}`,
     );
   }
   return result.stdout.trim();
 }
 
 function repositoryContext(requireClean) {
-  const commitSha = git(["rev-parse", "HEAD"]);
+  const commitSha = git(['rev-parse', 'HEAD']);
   const status = git([
-    "status",
-    "--porcelain=v1",
-    "--untracked-files=all",
-    "--",
-    ".",
+    'status',
+    '--porcelain=v1',
+    '--untracked-files=all',
+    '--',
+    '.',
   ]);
-  if (requireClean && status !== "") {
+  if (requireClean && status !== '') {
     throw new Error(
-      "Phase 1 mutation requires a clean Harness worktree; commit source " +
-        "and test changes first",
+      'Phase 1 mutation requires a clean Harness worktree; commit source ' +
+        'and test changes first',
     );
   }
   return {
@@ -845,21 +845,21 @@ export async function runMutationChunkCommand({
   } catch (error) {
     throw new Error(
       `Stryker ${error.message} for ${moduleName}/${chunkId}; ` +
-        "no report is accepted",
+        'no report is accepted',
       { cause: error },
     );
   }
   if (run.status !== 0) {
     throw new Error(
       `Stryker exited ${run.status} for ${moduleName}/${chunkId}; ` +
-        "no report is accepted",
+        'no report is accepted',
     );
   }
   if (!existsSync(reportPath)) {
     throw new Error(`Stryker did not produce ${reportPath}`);
   }
   try {
-    return JSON.parse(readFileSync(reportPath, "utf8"));
+    return JSON.parse(readFileSync(reportPath, 'utf8'));
   } catch (error) {
     throw new Error(
       `invalid Stryker report for ${moduleName}/${chunkId}: ${error.message}`,
@@ -873,7 +873,7 @@ async function runModule(moduleName, context) {
   if (!module) {
     throw new Error(
       `unknown module ${moduleName}; available: ` +
-        `${Object.keys(mutationModules).join(", ")}`,
+        `${Object.keys(mutationModules).join(', ')}`,
     );
   }
   const sourceFiles = resolveMutationFiles(module.mutate);
@@ -881,31 +881,31 @@ async function runModule(moduleName, context) {
 
   const moduleRoot = join(context.runRoot, moduleName);
   mkdirSync(moduleRoot, { recursive: true });
-  const rawReportPath = join(moduleRoot, "mutation.json");
+  const rawReportPath = join(moduleRoot, 'mutation.json');
   const chunks = planMutationChunks(sourceFiles, harnessRoot, 150);
   const chunkTimeoutMs = resolveChunkTimeoutMs(moduleName);
 
   console.log(`\n=== Mutation: ${moduleName} ===`);
   console.log(`Run: ${context.runId}`);
-  console.log(`Files: ${sourceFiles.join(", ")}`);
+  console.log(`Files: ${sourceFiles.join(', ')}`);
   console.log(`Chunks: ${chunks.length} (complete 150-line ranges)`);
   console.log(`Chunk timeout: ${chunkTimeoutMs}ms`);
-  const stryker = join(harnessRoot, "node_modules", ".bin", "stryker");
+  const stryker = join(harnessRoot, 'node_modules', '.bin', 'stryker');
   const chunkReports = [];
   for (const [index, chunk] of chunks.entries()) {
-    const chunkRoot = join(moduleRoot, "chunks", chunk.chunk_id);
-    const chunkReportPath = join(chunkRoot, "mutation.json");
-    const configPath = join(chunkRoot, "stryker.config.json");
+    const chunkRoot = join(moduleRoot, 'chunks', chunk.chunk_id);
+    const chunkReportPath = join(chunkRoot, 'mutation.json');
+    const configPath = join(chunkRoot, 'stryker.config.json');
     const config = buildMutationChunkConfig(moduleName, chunk, context.runId);
     atomicWriteJson(configPath, config);
     console.log(`\n[${index + 1}/${chunks.length}] ${chunk.mutate_pattern}`);
     const chunkReport = await runMutationChunkCommand({
       executable: stryker,
-      args: ["run", configPath],
+      args: ['run', configPath],
       cwd: harnessRoot,
       env: {
         ...process.env,
-        STRYKER: "true",
+        STRYKER: 'true',
         HARNESS_SPEC_ROOT: resolveSpecRoot(),
       },
       timeoutMs: chunkTimeoutMs,
@@ -916,11 +916,11 @@ async function runModule(moduleName, context) {
     chunkReports.push(chunkReport);
   }
   const chunkEvidence = chunks.map((chunk, index) => {
-    const chunkRoot = join(moduleRoot, "chunks", chunk.chunk_id);
-    const rawText = readFileSync(join(chunkRoot, "mutation.json"), "utf8");
+    const chunkRoot = join(moduleRoot, 'chunks', chunk.chunk_id);
+    const rawText = readFileSync(join(chunkRoot, 'mutation.json'), 'utf8');
     const configText = readFileSync(
-      join(chunkRoot, "stryker.config.json"),
-      "utf8",
+      join(chunkRoot, 'stryker.config.json'),
+      'utf8',
     );
     const raw = chunkReports[index];
     const mutantCount = Object.values(raw?.files ?? {}).reduce(
@@ -937,7 +937,7 @@ async function runModule(moduleName, context) {
   });
   const rawReport = mergeChunkReports(chunks, chunkReports);
   atomicWriteJson(rawReportPath, rawReport);
-  const rawReportText = readFileSync(rawReportPath, "utf8");
+  const rawReportText = readFileSync(rawReportPath, 'utf8');
   const result = moduleResultFromReport(
     moduleName,
     rawReport,
@@ -948,7 +948,7 @@ async function runModule(moduleName, context) {
     rawReportText,
     chunkEvidence,
   );
-  atomicWriteJson(join(moduleRoot, "result.json"), result);
+  atomicWriteJson(join(moduleRoot, 'result.json'), result);
   printModuleResult(result);
   return result;
 }
@@ -956,11 +956,11 @@ async function runModule(moduleName, context) {
 function createRunContext(requireClean) {
   const repository = repositoryContext(requireClean);
   const configurationHash = computeMutationConfigurationHash(harnessRoot);
-  const runId = `${new Date().toISOString().replaceAll(/[:.]/gu, "-")}-${randomUUID()}`;
-  const runRoot = join(reportsDir, "runs", runId);
+  const runId = `${new Date().toISOString().replaceAll(/[:.]/gu, '-')}-${randomUUID()}`;
+  const runRoot = join(reportsDir, 'runs', runId);
   mkdirSync(runRoot, { recursive: true, mode: 0o700 });
   const waiverKeys = loadEquivalentMutants(
-    join(harnessRoot, "mutation", "equivalent-mutants.json"),
+    join(harnessRoot, 'mutation', 'equivalent-mutants.json'),
     repository.commitSha,
     configurationHash,
   );
@@ -976,7 +976,7 @@ function createRunContext(requireClean) {
 }
 
 function publishJson(source, destination) {
-  const parsed = JSON.parse(readFileSync(source, "utf8"));
+  const parsed = JSON.parse(readFileSync(source, 'utf8'));
   atomicWriteJson(destination, parsed);
 }
 
@@ -988,10 +988,10 @@ async function runOne(moduleName, context) {
   const result = await runModule(moduleName, moduleContext);
   const currentRoot = join(reportsDir, moduleName);
   publishJson(
-    join(context.runRoot, moduleName, "mutation.json"),
-    join(currentRoot, "mutation.json"),
+    join(context.runRoot, moduleName, 'mutation.json'),
+    join(currentRoot, 'mutation.json'),
   );
-  atomicWriteJson(join(currentRoot, "result.json"), result);
+  atomicWriteJson(join(currentRoot, 'result.json'), result);
   return result;
 }
 
@@ -1007,18 +1007,18 @@ async function runPhase1(context) {
     } catch (error) {
       const failed = failedModuleResult(moduleName, moduleContext, error);
       results.push(failed);
-      atomicWriteJson(join(context.runRoot, moduleName, "result.json"), failed);
+      atomicWriteJson(join(context.runRoot, moduleName, 'result.json'), failed);
       console.error(`\nFAIL ${moduleName}: ${failed.error}`);
     }
   }
   const report = buildPhase1Report(context, results);
-  atomicWriteJson(join(context.runRoot, "phase1.json"), report);
-  if (report.aggregate.status === "PASS") {
+  atomicWriteJson(join(context.runRoot, 'phase1.json'), report);
+  if (report.aggregate.status === 'PASS') {
     validatePhase1Report(report, context);
-    atomicWriteJson(join(reportsDir, "phase1", "mutation.json"), report);
+    atomicWriteJson(join(reportsDir, 'phase1', 'mutation.json'), report);
   }
 
-  console.log("\n=== Phase 1 mutation aggregate ===");
+  console.log('\n=== Phase 1 mutation aggregate ===');
   console.log(
     `${report.aggregate.score}% / ${phase1Minimum}% ` +
       `[${report.aggregate.status}]`,
@@ -1026,7 +1026,7 @@ async function runPhase1(context) {
   for (const result of results) {
     console.log(
       `  ${result.module}: ${result.score}% / ${result.minimum}% ` +
-        `[${result.status}]${result.error ? ` (${result.error})` : ""}`,
+        `[${result.status}]${result.error ? ` (${result.error})` : ''}`,
     );
   }
   return report;
@@ -1034,8 +1034,8 @@ async function runPhase1(context) {
 
 async function main() {
   const target = resolveMutationTarget(process.argv[2]);
-  const context = createRunContext(target === "phase1");
-  const lockPath = join(reportsDir, ".phase1.lock");
+  const context = createRunContext(target === 'phase1');
+  const lockPath = join(reportsDir, '.phase1.lock');
   acquireRunLock(lockPath, {
     run_id: context.runId,
     pid: process.pid,
@@ -1044,12 +1044,12 @@ async function main() {
     started_at: context.startedAt,
   });
   try {
-    if (target === "phase1") {
+    if (target === 'phase1') {
       const report = await runPhase1(context);
-      process.exitCode = report.aggregate.status === "PASS" ? 0 : 1;
+      process.exitCode = report.aggregate.status === 'PASS' ? 0 : 1;
     } else {
       const result = await runOne(target, context);
-      process.exitCode = result.status === "PASS" ? 0 : 1;
+      process.exitCode = result.status === 'PASS' ? 0 : 1;
     }
   } finally {
     releaseRunLock(lockPath, context.runId);
