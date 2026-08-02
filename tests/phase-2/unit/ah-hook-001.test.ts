@@ -1055,6 +1055,23 @@ describe('AH-HOOK-001 HookSystem', () => {
     ).toBe(true);
   });
 
+  it.each([null, 0, 'primitive', true] as const)(
+    'accepts and preserves JSON primitive payload %j',
+    async (payload) => {
+      const outcome = await new HookSystem([]).dispatch(
+        request('pre_tool_use', `primitive-${String(payload)}`, payload),
+      );
+      expect(outcome).toMatchObject({
+        event: 'pre_tool_use',
+        action: 'continue',
+        payload,
+        follow_ups: [],
+        replayed: false,
+      });
+      expect(Object.isFrozen(outcome)).toBe(true);
+    },
+  );
+
   it('fails closed for malformed decision results and ignores malformed observations', async () => {
     const malformed = [
       null,

@@ -554,4 +554,123 @@ db.close();`,
     );
     await expect(journal.release(token)).rejects.toThrow('Hook journal is closed');
   });
+
+  it('binds commit to the live token, record identity and outcome event', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'commit-owner',
+      leaseMs: 1_000,
+    });
+    const input = claimInput('commit-identity');
+    const token = claimedToken(await journal.claim(input));
+    const valid = record(input, 'commit-secret');
+    for (const [candidate, message] of [
+      [{ ...valid, idempotency_key: 'other' }, 'Hook journal record identity conflict'],
+      [
+        { ...valid, scope: { ...valid.scope, operation_id: 'other' } },
+        'Hook journal idempotency key collision',
+      ],
+      [
+        { ...valid, scope: { ...valid.scope, attempt_id: 'other' } },
+        'Hook journal idempotency key collision',
+      ],
+      [
+        { ...valid, input_hash: 'a'.repeat(64) },
+        'Hook journal idempotency key collision',
+      ],
+      [
+        { ...valid, outcome: null },
+        'Hook journal outcome event mismatch',
+      ],
+      [
+        { ...valid, outcome: { ...valid.outcome, event: 'post_tool_use' } },
+        'Hook journal outcome event mismatch',
+      ],
+    ] as const) {
+      await expect(journal.commit(token, candidate as never)).rejects.toThrow(
+        message,
+      );
+    }
+    await expect(journal.commit('unknown-token', valid)).rejects.toThrow(
+      'invalid Hook journal claim',
+    );
+    await journal.commit(token, valid);
+    await expect(journal.commit(token, valid)).rejects.toThrow(
+      'invalid Hook journal claim',
+    );
+    journal.close();
+  });
+
+  it('moves an expired commit to reconciliation without writing an outcome', async () => {
+    let now = 100;
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'expiry-owner',
+      leaseMs: 10,
+      nowMs: () => now,
+    });
+    const input = claimInput('expired-commit');
+    const token = claimedToken(await journal.claim(input));
+    now = 110;
+    await expect(journal.commit(token, record(input, 'must-not-write'))).rejects.toThrow(
+      'Hook journal claim expired and requires reconciliation',
+    );
+    await expect(journal.claim(input)).resolves.toEqual({
+      status: 'reconciliation',
+      reason_code: 'hook_claim_abandoned',
+    });
+    const raw = new Database(path, { readonly: true });
+    expect(
+      raw
+        .prepare('SELECT state, outcome_ciphertext FROM hook_journal WHERE idempotency_key = ?')
+        .get(input.idempotency_key),
+    ).toEqual({ state: 'RECONCILIATION', outcome_ciphertext: null });
+    raw.close();
+    journal.close();
+  });
+
+  it.each([
+    ['bad-prefix', (parts: string[]) => { parts[0] = 'bad'; }],
+    ['missing-part', (parts: string[]) => { parts.pop(); }],
+    ['bad-nonce', (parts: string[]) => { parts[2] = Buffer.alloc(11).toString('base64'); }],
+    ['bad-tag', (parts: string[]) => { parts[3] = Buffer.alloc(15).toString('base64'); }],
+    ['bad-ciphertext', (parts: string[]) => { parts[4] = Buffer.from('tampered').toString('base64'); }],
+  ] as const)(
+    'rejects authenticated envelope variant %s',
+    async (_case, mutate) => {
+      const path = fixture();
+      const input = claimInput(`envelope-${_case}`);
+      const journal = new SqliteHookJournal(path, {
+        masterKey,
+        ownerId: 'envelope-writer',
+        leaseMs: 1_000,
+      });
+      await journal.commit(
+        claimedToken(await journal.claim(input)),
+        record(input, 'envelope-secret'),
+      );
+      journal.close();
+      const raw = new Database(path);
+      const row = raw
+        .prepare('SELECT outcome_ciphertext FROM hook_journal WHERE idempotency_key = ?')
+        .get(input.idempotency_key) as { outcome_ciphertext: string };
+      const parts = row.outcome_ciphertext.split(':');
+      mutate(parts);
+      raw
+        .prepare('UPDATE hook_journal SET outcome_ciphertext = ? WHERE idempotency_key = ?')
+        .run(parts.join(':'), input.idempotency_key);
+      raw.close();
+      const reopened = new SqliteHookJournal(path, {
+        masterKey,
+        ownerId: 'envelope-reader',
+        leaseMs: 1_000,
+      });
+      await expect(reopened.claim(input)).rejects.toThrow(
+        'hook journal authentication failed',
+      );
+      reopened.close();
+    },
+  );
 });

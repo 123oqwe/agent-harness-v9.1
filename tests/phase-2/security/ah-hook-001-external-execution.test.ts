@@ -74,6 +74,16 @@ if (mode === 'env') {
   process.on('SIGTERM', () => undefined);
   setTimeout(() => writeFileSync(input.payload.path, 'late'), 80);
   await new Promise((resolve) => setTimeout(resolve, 5_000));
+} else if (mode === 'empty-output') {
+  process.exit(0);
+} else if (mode === 'invalid-json') {
+  process.stdout.write('not-json');
+  process.exit(0);
+} else if (mode === 'large-output') {
+  process.stdout.write('x'.repeat(300_000));
+  process.exit(0);
+} else if (mode === 'nonzero-exit') {
+  process.exit(7);
 }
 process.stdout.write(JSON.stringify({ action: 'observe', follow_up }));
 `,
@@ -279,4 +289,111 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
       reason_code: 'hook_error',
     });
   });
+
+  it('rejects every untrusted executable and source path shape directly', async () => {
+    const fixture = externalFixture();
+    const port = new SandboxedHookExecutionPort();
+    const base = externalRegistration(fixture.scriptPath, fixture.contentHash);
+    const input = {
+      hook_id: base.id,
+      event: base.event,
+      trust: base.trust,
+      invocation_id: 'invalid-path-shape',
+      scope,
+      payload: { mode: 'env' },
+    } as const;
+    for (const [execution, message] of [
+      [
+        { ...base.execution, executable_path: 'node' },
+        'external hook executable must be absolute',
+      ],
+      [
+        { ...base.execution, source_path: 'hook.mjs' },
+        'external hook source must be absolute',
+      ],
+      [
+        { ...base.execution, source_path: fixture.root },
+        'external hook source must be a regular file',
+      ],
+      [
+        { ...base.execution, executable_path: '/usr/bin/true' },
+        'external Hook execution must use the trusted Node runtime',
+      ],
+      [
+        { ...base.execution, argv: [] },
+        'external Hook execution must use the trusted Node runtime',
+      ],
+      [
+        { ...base.execution, argv: ['relative-hook.mjs'] },
+        'external Hook execution must use the trusted Node runtime',
+      ],
+      [
+        { ...base.execution, argv: [process.execPath] },
+        'external Hook execution must use the trusted Node runtime',
+      ],
+    ] as const) {
+      await expect(
+        port.execute(
+          { ...base, execution } as never,
+          input,
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow(message);
+    }
+  }, 30_000);
+
+  it.each([
+    ['empty-output', 'external Hook returned an invalid JSON envelope size'],
+    ['invalid-json', 'external Hook stdout must contain exactly one JSON value'],
+    ['large-output', 'external Hook stdout must contain exactly one JSON value'],
+    ['nonzero-exit', 'external Hook sandbox execution failed closed'],
+  ] as const)(
+    'fails closed on external result mode %s',
+    async (mode, message) => {
+      const fixture = externalFixture();
+      const registration = externalRegistration(
+        fixture.scriptPath,
+        fixture.contentHash,
+        10_000,
+      );
+      await expect(
+        new SandboxedHookExecutionPort().execute(
+          registration,
+          {
+            hook_id: registration.id,
+            event: registration.event,
+            trust: registration.trust,
+            invocation_id: `invalid-result-${mode}`,
+            scope,
+            payload: { mode },
+          },
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow(message);
+    },
+    30_000,
+  );
+
+  it('rejects oversized input before external execution', async () => {
+    const fixture = externalFixture();
+    const registration = externalRegistration(
+      fixture.scriptPath,
+      fixture.contentHash,
+      10_000,
+    );
+    await expect(
+      new SandboxedHookExecutionPort().execute(
+        registration,
+        {
+          hook_id: registration.id,
+          event: registration.event,
+          trust: registration.trust,
+          invocation_id: 'oversized-input',
+          scope,
+          payload: { value: 'x'.repeat(300_000) },
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('external Hook input exceeds JSON limit');
+  }, 30_000);
 });
