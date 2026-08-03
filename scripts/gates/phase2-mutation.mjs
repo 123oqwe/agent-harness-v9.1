@@ -26,7 +26,9 @@ export const PHASE2_MUTATION_MANIFEST = "verification/gates/phase2-gate.json";
 export const PHASE2_MUTATION_REGISTRY = "mutation/phase2-modules.mjs";
 // Keep each exact-source chunk below the runner's hard execution deadline.
 // This changes only scheduling granularity; every source line remains covered.
-export const PHASE2_MUTATION_CHUNK_LINES = 75;
+// Keep each diagnostic mutation process bounded when the requirement owns
+// integration and security suites with expensive crash/restart fixtures.
+export const PHASE2_MUTATION_CHUNK_LINES = 20;
 export const PHASE2_MUTATION_DRAFT_SCHEMA_VERSION =
   "phase2-mutation-draft/v1";
 export const PHASE2_MUTATION_FINAL_SCHEMA_VERSION =
