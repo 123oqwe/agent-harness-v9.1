@@ -133,7 +133,9 @@ export class PauseResumeController {
     try {
       resolution = await this.#readBack.query(operation);
     } catch {
-      resolution = { status: "indeterminate" };
+      const unknown = this.#transition(operation, "EFFECT_UNKNOWN");
+      const reconciling = this.#transition(unknown, "RECONCILING");
+      return this.#reconcile(reconciling);
     }
     if (resolution.status === "confirmed") {
       this.#confirmed(operation, resolution.stored_outcome_json);
@@ -155,7 +157,8 @@ export class PauseResumeController {
     try {
       resolution = await this.#reconciliation.reconcile(operation);
     } catch {
-      resolution = { status: "indeterminate" };
+      this.#transition(operation, "AWAITING_HUMAN");
+      return this.#awaitHuman(operation);
     }
     if (resolution.status === "confirmed") {
       this.#confirmed(operation, resolution.stored_outcome_json);

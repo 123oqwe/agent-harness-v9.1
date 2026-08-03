@@ -43,6 +43,83 @@ const request = {
 } as const;
 
 describe("AH-PAUSE-RESUME-001 effect-state-aware resume", () => {
+  it.each([
+    [undefined, "pause/resume journal is required"],
+    [{}, "pause/resume journal is required"],
+    [
+      { journal: { getOperation: null, recordOperation: vi.fn() } },
+      "pause/resume journal is required",
+    ],
+    [
+      { journal: { getOperation: vi.fn(), recordOperation: null } },
+      "pause/resume journal is required",
+    ],
+    [
+      { journal: new MemoryJournal("PRE_DISPATCH") },
+      "pause/resume read-back port is required",
+    ],
+    [
+      {
+        journal: new MemoryJournal("PRE_DISPATCH"),
+        readBack: { query: null },
+      },
+      "pause/resume read-back port is required",
+    ],
+    [
+      {
+        journal: new MemoryJournal("PRE_DISPATCH"),
+        readBack: { query: vi.fn() },
+      },
+      "pause/resume reconciliation port is required",
+    ],
+    [
+      {
+        journal: new MemoryJournal("PRE_DISPATCH"),
+        readBack: { query: vi.fn() },
+        reconciliation: { reconcile: null },
+      },
+      "pause/resume reconciliation port is required",
+    ],
+  ])("rejects an incomplete composition port", (options, message) => {
+    expect(() => new PauseResumeController(options as never)).toThrow(message);
+  });
+
+  it.each([
+    [undefined, "run_id is required"],
+    [null, "run_id is required"],
+    [42, "run_id is required"],
+    ["", "run_id is required"],
+    ["   ", "run_id is required"],
+  ])("rejects an invalid run identity", async (run_id, message) => {
+    const controller = new PauseResumeController({
+      journal: new MemoryJournal("PRE_DISPATCH"),
+      readBack: { query: vi.fn() },
+      reconciliation: { reconcile: vi.fn() },
+    });
+
+    await expect(
+      controller.resume({ ...request, run_id } as never),
+    ).rejects.toThrow(message);
+  });
+
+  it.each([
+    [undefined, "operation_id is required"],
+    [null, "operation_id is required"],
+    [42, "operation_id is required"],
+    ["", "operation_id is required"],
+    ["   ", "operation_id is required"],
+  ])("rejects an invalid operation identity", async (operation_id, message) => {
+    const controller = new PauseResumeController({
+      journal: new MemoryJournal("PRE_DISPATCH"),
+      readBack: { query: vi.fn() },
+      reconciliation: { reconcile: vi.fn() },
+    });
+
+    await expect(
+      controller.resume({ ...request, operation_id } as never),
+    ).rejects.toThrow(message);
+  });
+
   it("turns PRE_DISPATCH into a new attempt through the full action pipeline", async () => {
     const journal = new MemoryJournal("PRE_DISPATCH");
     const readBack = vi.fn();
@@ -233,6 +310,13 @@ describe("AH-PAUSE-RESUME-001 effect-state-aware resume", () => {
         reason: "effect_state_indeterminate",
       });
       expect(journal.record.effect_state).toBe("AWAITING_HUMAN");
+      if (state === "IN_FLIGHT") {
+        expect(journal.transitions.map((entry) => entry.effect_state)).toEqual([
+          "EFFECT_UNKNOWN",
+          "RECONCILING",
+          "AWAITING_HUMAN",
+        ]);
+      }
     }
   });
 
@@ -254,6 +338,28 @@ describe("AH-PAUSE-RESUME-001 effect-state-aware resume", () => {
     );
     expect(journal.record.effect_state).toBe("IN_FLIGHT");
   });
+
+  it.each(["", "   "])(
+    "does not persist an empty confirmed outcome",
+    async (stored_outcome_json) => {
+      const journal = new MemoryJournal("IN_FLIGHT");
+      const controller = new PauseResumeController({
+        journal,
+        readBack: {
+          query: vi.fn().mockResolvedValue({
+            status: "confirmed",
+            stored_outcome_json,
+          }),
+        },
+        reconciliation: { reconcile: vi.fn() },
+      });
+
+      await expect(controller.resume(request)).rejects.toThrow(
+        "stored_outcome_json is required",
+      );
+      expect(journal.record.effect_state).toBe("IN_FLIGHT");
+    },
+  );
 
   it("rejects a corrupted persisted effect state instead of returning undefined", async () => {
     const journal = new MemoryJournal("PRE_DISPATCH");
