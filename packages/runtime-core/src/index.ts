@@ -82,3 +82,21 @@ export {
   type SteeringRequest,
   type SteeringScope,
 } from "./steering.js";
+
+export {
+  BudgetLedger,
+  type BudgetAuthorization,
+  type BudgetCeiling,
+  type BudgetDegradationRule,
+  type BudgetEvent,
+  type BudgetJournalPort,
+  type BudgetLedgerOptions,
+  type BudgetPricing,
+  type BudgetProjection,
+  type BudgetRecordResult,
+  type BudgetScope,
+  type BudgetSnapshot,
+  type ModelCallBudgetProjection,
+} from "./budget-ledger.js";
+
+export { SqliteBudgetJournal } from "./sqlite-budget-journal.js";

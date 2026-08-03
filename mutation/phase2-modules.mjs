@@ -68,7 +68,15 @@ export const phase2MutationRequirements = Object.freeze([
   requirement("AH-RAG-META-001"),
   requirement("AH-RAG-QUERY-001"),
   requirement("AH-RAG-RERANK-001"),
-  requirement("AH-RUNTIME-BUDGET-002"),
+  requirement("AH-RUNTIME-BUDGET-002", {
+    status: "ready",
+    sources: [
+      "packages/runtime-core/src/budget-ledger.ts",
+      "packages/runtime-core/src/sqlite-budget-journal.ts",
+      "runtime/budget-port.ts",
+    ],
+    integrationSources: ["harness.ts", "runtime/loop.ts"],
+  }),
   requirement("AH-RUNTIME-COMPACTION-001"),
   requirement("AH-RUNTIME-MODELFALLBACK-001"),
   requirement("AH-RUNTIME-SESSIONTREE-001", {

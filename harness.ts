@@ -83,6 +83,7 @@ import {
   openRunSession,
 } from './session/run-session.js';
 import type { RuntimeSteeringFactoryPort } from './runtime/steering-port.js';
+import type { RuntimeBudgetFactoryPort } from './runtime/budget-port.js';
 
 export {
   createDefaultExecutionContext,
@@ -146,6 +147,8 @@ export interface HarnessConfig {
   hookTimeoutMs?: number;
   /** Binds the single Runtime steering authority to the active session log. */
   steering?: RuntimeSteeringFactoryPort;
+  /** Binds the single runtime-core BudgetLedger authority to the routed run. */
+  budget?: RuntimeBudgetFactoryPort;
 }
 
 export class Harness {
@@ -281,7 +284,6 @@ export class Harness {
         session_id: actualRunId,
       },
     });
-
     try {
       await this.observationalHook(
         'session_start',
@@ -420,6 +422,13 @@ export class Harness {
     if (runPlan === undefined) {
       throw new Error('Router returned route without a RunPlan');
     }
+    const budgetGuard = this.config.budget?.bind({
+      scope: {
+        tenant_id: this.execCtx.tenant_id,
+        run_id: actualRunId,
+        session_id: actualRunId,
+      },
+    });
     this.currentWorkspace = TransactionalWorkspace.open({
       runId: actualRunId,
       baseVfs: this.config.vfs,
@@ -522,6 +531,7 @@ export class Harness {
       {
         session,
         ...(steering === undefined ? {} : { steering }),
+        ...(budgetGuard === undefined ? {} : { budgetGuard }),
         modelCall: async (
           messages: unknown[],
           _attempt: number,

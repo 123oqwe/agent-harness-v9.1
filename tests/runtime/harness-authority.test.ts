@@ -32,6 +32,14 @@ import type {
   VerificationReport,
 } from '../../verification/verification-engine.js';
 import { canonicalHash } from '../../runtime/harness-support.js';
+import {
+  BudgetLedgerRuntimeAdapter,
+  type RuntimeBudgetFactoryPort,
+} from '../../runtime/budget-port.js';
+import {
+  BudgetLedger,
+  type BudgetEvent,
+} from '../../packages/runtime-core/src/index.js';
 import { SqliteSessionStore } from '../../session/sqlite-session-store.js';
 import { createTrustedSessionStateRoot } from '../../session/session-state-root.js';
 import { TransactionalWorkspace } from '../../vfs/transactional-workspace.js';
@@ -96,6 +104,7 @@ interface FixtureOptions {
   signal?: AbortSignal;
   credentialedRead?: boolean;
   credentialBroker?: HarnessSecurityDeps['credentialBroker'];
+  budget?: RuntimeBudgetFactoryPort;
 }
 
 function fixture(options: FixtureOptions = {}): {
@@ -164,7 +173,7 @@ function fixture(options: FixtureOptions = {}): {
           get(target, property) {
             if (property === 'resolve') {
               return (request: unknown) => {
-                options.onResolve!(request);
+                options.onResolve?.(request);
                 return target.resolve(request as never);
               };
             }
@@ -224,6 +233,7 @@ function fixture(options: FixtureOptions = {}): {
       ? {}
       : { maxSkillRiskTier: options.maxSkillRiskTier }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.budget === undefined ? {} : { budget: options.budget }),
   };
   return { harness: new Harness(config), config, workspace, vfs };
 }
@@ -237,6 +247,72 @@ function spec(name: string): ToolSpec {
 }
 
 describe('Harness composition-root authority', () => {
+  it('binds the Runtime Budget authority to the routed run before Gateway dispatch', async () => {
+    const events: BudgetEvent[] = [];
+    const bind = vi.fn(({ scope }) =>
+      new BudgetLedgerRuntimeAdapter({
+        ledger: new BudgetLedger({
+          scope,
+          ceiling: { usd_micros: 0 },
+          journal: {
+            read: () => events,
+            append: (event) => events.push(event),
+          },
+        }),
+        pricing: {
+          cached_input_micros_per_million: 1,
+          uncached_input_micros_per_million: 1,
+          output_micros_per_million: 1,
+        },
+      }),
+    );
+    const gatewayDispatch = vi.fn();
+    const setup = fixture({
+      budget: { bind },
+      onGatewayDispatch: gatewayDispatch,
+    });
+
+    const result = await setup.harness.run(
+      task('Provide a concise answer to this well-defined question', [
+        { type: 'privacy', value: 'local_only' },
+      ]),
+      'run-budget-harness',
+    );
+
+    expect(result.routing.outcome).toBe('route');
+    expect(bind).toHaveBeenCalledWith({
+      scope: {
+        tenant_id: 'default-tenant',
+        run_id: 'run-budget-harness',
+        session_id: 'run-budget-harness',
+      },
+    });
+    expect(result.loop_result.termination_reason).toBe('budget_exhausted');
+    expect(gatewayDispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not bind a Budget authority when routing abstains', async () => {
+    const bind = vi.fn(() => ({
+      beforeModelCall: () => ({
+        allowed: true as const,
+        reason: 'within_budget' as const,
+        max_output_tokens: 1,
+      }),
+      afterModelCall: () => undefined,
+    }));
+    const setup = fixture({
+      budget: { bind },
+      onResolve: () => {
+        throw new Error('provider unavailable');
+      },
+    });
+
+    const result = await setup.harness.run(task(), 'run-budget-abstain');
+
+    expect(result.routing.outcome).toBe('abstain');
+    expect(bind).not.toHaveBeenCalled();
+  });
+
   it('creates an exact deterministic test execution context', () => {
     expect(createDefaultExecutionContext('run-1', () => CLOCK)).toEqual({
       tenant_id: 'default-tenant',

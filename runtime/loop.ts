@@ -21,6 +21,7 @@ import type {
   RuntimeSteeringPort,
   RuntimeSteeringQueue,
 } from './steering-port.js';
+import type { RuntimeBudgetPort } from './budget-port.js';
 
 export { LoopError } from './errors.js';
 
@@ -152,6 +153,7 @@ export interface LoopDeps {
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
   signal?: AbortSignal | undefined;
   steering?: RuntimeSteeringPort;
+  budgetGuard?: RuntimeBudgetPort;
   turnHooks?: {
     beforeTurn(input: {
       readonly iteration: number;
@@ -325,16 +327,61 @@ export class LoopEngine {
             messages,
           });
           if (self.terminatedValue) return { content: '', decision_summary: '' };
+          const budgetDecision = self.deps.budgetGuard?.beforeModelCall({
+            run_id: self.config.run_id,
+            iteration: self.iterationsValue,
+            attempt,
+            remaining_tokens: budget.remaining_tokens,
+            requested_max_output_tokens: budget.max_output_tokens,
+            estimated_input_tokens: Math.min(
+              100_000,
+              stableJson([messages, directive]).length,
+            ),
+          });
+          if (budgetDecision && !budgetDecision.allowed) {
+            self.terminate('budget_exhausted');
+            return { content: '', decision_summary: '' };
+          }
+          const approvedBudget = budgetDecision
+            ? {
+                remaining_tokens: budget.remaining_tokens,
+                max_output_tokens: Math.min(
+                  budget.max_output_tokens,
+                  budgetDecision.max_output_tokens,
+                ),
+              }
+            : budget;
+          const callProvider = async (signal?: AbortSignal) => {
+            const turn =
+              signal === undefined
+                ? await self.deps.modelCall(
+                    messages,
+                    attempt,
+                    approvedBudget,
+                    directive,
+                  )
+                : await self.deps.modelCall(
+                    messages,
+                    attempt,
+                    approvedBudget,
+                    directive,
+                    signal,
+                  );
+            if (turn.usage) {
+              self.deps.budgetGuard?.afterModelCall({
+                run_id: self.config.run_id,
+                iteration: self.iterationsValue,
+                attempt,
+                input_tokens: turn.usage.input_tokens,
+                output_tokens: turn.usage.output_tokens,
+              });
+            }
+            return turn;
+          };
           if (!self.deps.steering) {
             return self.deps.signal === undefined
-              ? self.deps.modelCall(messages, attempt, budget, directive)
-              : self.deps.modelCall(
-                  messages,
-                  attempt,
-                  budget,
-                  directive,
-                  self.deps.signal,
-                );
+              ? callProvider()
+              : callProvider(self.deps.signal);
           }
           for (;;) {
             self.steeringInterruptedModel = false;
@@ -347,13 +394,7 @@ export class LoopEngine {
               ? AbortSignal.any([self.deps.signal, controller.signal])
               : controller.signal;
             try {
-              const turn = await self.deps.modelCall(
-                messages,
-                attempt,
-                budget,
-                directive,
-                signal,
-              );
+              const turn = await callProvider(signal);
               if (self.terminatedValue) return { content: '', decision_summary: '' };
               if (!self.steeringInterruptedModel) return turn;
             } catch (error) {
