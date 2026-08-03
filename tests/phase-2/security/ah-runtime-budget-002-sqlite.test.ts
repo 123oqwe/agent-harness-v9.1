@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { createHmac, hkdfSync } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -23,6 +24,7 @@ const pricing = {
   uncached_input_micros_per_million: 10_000,
   output_micros_per_million: 20_000,
 } as const;
+const MASTER_KEY = Buffer.alloc(32, 0x6b);
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -57,10 +59,47 @@ function eventFor(
   return events[0]!;
 }
 
+function storedHmac(
+  database: Database.Database,
+  eventScope: BudgetScope,
+  sequence: number,
+  callId: string,
+  eventJson: string,
+): string {
+  const row = database
+    .prepare("SELECT value FROM budget_journal_metadata WHERE key = 'hmac_salt'")
+    .get() as { readonly value: string };
+  const key = Buffer.from(
+    hkdfSync(
+      "sha256",
+      MASTER_KEY,
+      Buffer.from(row.value, "base64"),
+      "agent-harness/budget-journal/v1",
+      32,
+    ),
+  );
+  try {
+    return createHmac("sha256", key)
+      .update(
+        JSON.stringify([
+          eventScope.tenant_id,
+          eventScope.run_id,
+          eventScope.session_id,
+          sequence,
+          callId,
+          eventJson,
+        ]),
+      )
+      .digest("hex");
+  } finally {
+    key.fill(0);
+  }
+}
+
 describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
   it("rebuilds exact spend after close and restart", () => {
     const path = fixture();
-    const firstJournal = new SqliteBudgetJournal(path, scope);
+    const firstJournal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const first = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -75,7 +114,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     });
     firstJournal.close();
 
-    const restartedJournal = new SqliteBudgetJournal(path, scope);
+    const restartedJournal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const restarted = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -88,10 +127,70 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     restartedJournal.close();
   });
 
+  it("requires the exact journal key before trusting or changing persisted usage", () => {
+    const path = fixture();
+    expect(
+      () => new SqliteBudgetJournal(path, scope, Buffer.alloc(0)),
+    ).toThrow("32-byte Budget journal masterKey is required");
+    const first = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    const ledger = new BudgetLedger({
+      scope,
+      ceiling: { usd_micros: 100 },
+      journal: first,
+    });
+    ledger.recordModelCall({
+      call_id: "call-1",
+      cached_input_tokens: 0,
+      uncached_input_tokens: 1,
+      output_tokens: 0,
+      pricing,
+    });
+    first.close();
+
+    expect(
+      () =>
+        new SqliteBudgetJournal(path, scope, Buffer.alloc(32, 0x6c)),
+    ).toThrow("Budget journal master key rejected");
+    const database = new Database(path, { readonly: true });
+    expect(
+      database.prepare("SELECT COUNT(*) AS count FROM budget_journal").get(),
+    ).toEqual({ count: 1 });
+    database.close();
+  });
+
+  it("authenticates event bytes before JSON parsing", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    const ledger = new BudgetLedger({
+      scope,
+      ceiling: { usd_micros: 100 },
+      journal,
+    });
+    ledger.recordModelCall({
+      call_id: "call-1",
+      cached_input_tokens: 0,
+      uncached_input_tokens: 1,
+      output_tokens: 0,
+      pricing,
+    });
+    journal.close();
+
+    const database = new Database(path);
+    database
+      .prepare("UPDATE budget_journal SET event_hmac = ?")
+      .run("0".repeat(64));
+    database.close();
+    const reopened = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    expect(() => reopened.read()).toThrow(
+      "budget journal event authentication failed",
+    );
+    reopened.close();
+  });
+
   it("fails one stale concurrent writer instead of losing or double counting usage", () => {
     const path = fixture();
-    const journalA = new SqliteBudgetJournal(path, scope);
-    const journalB = new SqliteBudgetJournal(path, scope);
+    const journalA = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    const journalB = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const ledgerA = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -114,7 +213,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     journalA.close();
     journalB.close();
 
-    const reopenedJournal = new SqliteBudgetJournal(path, scope);
+    const reopenedJournal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const reopened = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -126,7 +225,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
 
   it("detects out-of-band event tampering on restart", () => {
     const path = fixture();
-    const journal = new SqliteBudgetJournal(path, scope);
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const ledger = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -147,7 +246,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     );
     database.close();
 
-    const reopened = new SqliteBudgetJournal(path, scope);
+    const reopened = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     expect(
       () =>
         new BudgetLedger({
@@ -160,7 +259,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
   });
 
   it("rejects every invalid database path and scope field", () => {
-    expect(() => new SqliteBudgetJournal("", scope)).toThrow(
+    expect(() => new SqliteBudgetJournal("", scope, MASTER_KEY)).toThrow(
       "databasePath is required",
     );
     for (const [patch, message] of [
@@ -170,14 +269,15 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     ] as const) {
       expect(
         () =>
-          new SqliteBudgetJournal(fixture(), {
-            ...scope,
-            ...patch,
-          } as never),
+          new SqliteBudgetJournal(
+            fixture(),
+            { ...scope, ...patch } as never,
+            MASTER_KEY,
+          ),
       ).toThrow(message);
     }
     const path = fixture();
-    const journal = new SqliteBudgetJournal(path, scope);
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     expect(statSync(path).mode & 0o777).toBe(0o600);
     journal.close();
   });
@@ -190,18 +290,25 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
       ["[]", "budget journal contains an invalid event"],
     ] as const) {
       const path = fixture();
-      const initialized = new SqliteBudgetJournal(path, scope);
+      const initialized = new SqliteBudgetJournal(path, scope, MASTER_KEY);
       initialized.close();
       const database = new Database(path);
       database
         .prepare(
           `INSERT INTO budget_journal
-            (tenant_id, run_id, session_id, sequence, call_id, event_json)
-           VALUES (?, ?, ?, 0, 'malformed', ?)`,
+            (tenant_id, run_id, session_id, sequence, call_id, event_json,
+             event_hmac)
+           VALUES (?, ?, ?, 0, 'malformed', ?, ?)`,
         )
-        .run(scope.tenant_id, scope.run_id, scope.session_id, stored);
+        .run(
+          scope.tenant_id,
+          scope.run_id,
+          scope.session_id,
+          stored,
+          storedHmac(database, scope, 0, "malformed", stored),
+        );
       database.close();
-      const reopened = new SqliteBudgetJournal(path, scope);
+      const reopened = new SqliteBudgetJournal(path, scope, MASTER_KEY);
       expect(() => reopened.read()).toThrow(message);
       reopened.close();
     }
@@ -209,7 +316,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
 
   it("rejects each append identity violation without writing a row", () => {
     const path = fixture();
-    const journal = new SqliteBudgetJournal(path, scope);
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const valid = eventFor();
     for (const field of ["tenant_id", "run_id", "session_id"] as const) {
       expect(() =>
@@ -228,7 +335,7 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
 
   it("distinguishes stale sequence, corrupt prior JSON, and stale hash", () => {
     const path = fixture();
-    const journal = new SqliteBudgetJournal(path, scope);
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const ledger = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },
@@ -267,12 +374,12 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
         call_id: "corrupt-prior",
         previous_hash: first.event_hash,
       }),
-    ).toThrow("budget journal contains invalid JSON");
+    ).toThrow("budget journal event authentication failed");
     journal.close();
   });
 
   it("is idempotently closeable and fails closed after close", () => {
-    const journal = new SqliteBudgetJournal(fixture(), scope);
+    const journal = new SqliteBudgetJournal(fixture(), scope, MASTER_KEY);
     journal.close();
     expect(() => journal.close()).not.toThrow();
     expect(() => journal.read()).toThrow("budget journal is closed");
@@ -288,8 +395,8 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
       run_id: "run-b",
       session_id: "session-b",
     } as const;
-    const journalA = new SqliteBudgetJournal(path, scope);
-    const journalB = new SqliteBudgetJournal(path, scopeB);
+    const journalA = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    const journalB = new SqliteBudgetJournal(path, scopeB, MASTER_KEY);
     const ledgerA = new BudgetLedger({
       scope,
       ceiling: { usd_micros: 100 },

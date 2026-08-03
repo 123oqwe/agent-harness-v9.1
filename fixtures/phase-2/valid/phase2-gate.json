@@ -485,7 +485,8 @@
       "integration_sources": ["harness.ts", "runtime/loop.ts"],
       "runtime_assets": [
         "packages/runtime-core/src/index.ts",
-        "packages/runtime-core/package.json"
+        "packages/runtime-core/package.json",
+        "scripts/check-workspace-boundaries.mjs"
       ],
       "behavioral_tests": [
         "tests/phase-2/unit/ah-runtime-budget-002.test.ts",

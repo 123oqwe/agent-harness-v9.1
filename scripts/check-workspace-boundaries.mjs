@@ -178,6 +178,10 @@ const PHASE1_AUTHORITY_WORKSPACES = new Set([
   "packages/tools",
 ]);
 const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
+const RUNTIME_CORE_DURABLE_JOURNALS = new Set([
+  "packages/runtime-core/src/sqlite-hook-journal.ts",
+  "packages/runtime-core/src/sqlite-budget-journal.ts",
+]);
 const FORBIDDEN_IMPORTS = new Map([
   ["filesystem", new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])],
   ["CLI", new Set(["child_process", "node:child_process"])],
@@ -1349,11 +1353,11 @@ export const checkWorkspaceBoundaries = ({
       }
       for (const specifier of accesses.specifiers) {
         for (const [category, forbidden] of FORBIDDEN_IMPORTS) {
-          const hookJournalFilesystem =
-            label === "packages/runtime-core/src/sqlite-hook-journal.ts" &&
+          const durableJournalFilesystem =
+            RUNTIME_CORE_DURABLE_JOURNALS.has(label) &&
             category === "filesystem" &&
             ["node:fs", "node:fs/promises"].includes(specifier);
-          if (forbidden.has(specifier) && !hookJournalFilesystem)
+          if (forbidden.has(specifier) && !durableJournalFilesystem)
             errors.push(`${label}: direct ${category} access is forbidden`);
         }
         if (
@@ -1412,13 +1416,13 @@ export const checkWorkspaceBoundaries = ({
           specifier.startsWith("node:") ||
           NODE_BUILTINS.has(specifier)
         ) {
-          const hookJournalBuiltin =
-            label === "packages/runtime-core/src/sqlite-hook-journal.ts" &&
+          const durableJournalBuiltin =
+            RUNTIME_CORE_DURABLE_JOURNALS.has(label) &&
             ["node:fs", "node:path"].includes(specifier);
           if (
             !NODE_BUILTINS.has(specifier) ||
             (!expected.safeBuiltins.includes(specifier) &&
-              !hookJournalBuiltin)
+              !durableJournalBuiltin)
           ) {
             errors.push(
               `${label}: builtin import ${specifier} is not approved for ${expected.path}`,
