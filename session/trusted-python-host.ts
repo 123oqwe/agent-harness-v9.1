@@ -31,7 +31,7 @@ const DEFAULT_PYTHON = "/usr/bin/python3";
 const MAX_HOST_BYTES = 1024 * 1024;
 const MAX_INLINE_HOST_BYTES = 128 * 1024;
 const SUPERVISOR = new URL("./trusted-python-supervisor.py", import.meta.url);
-const SUPERVISOR_SHA256 = "8b87523f66c96b22f160a1d48deef61d0ce9bf6a101ade660693e7cb7ce4ffc8";
+const SUPERVISOR_SHA256 = "1a94d2f57a9431842bf43dafba9cc41d8e3188df7940441c52ccaefd50b9ddb5";
 const ASSETS: Readonly<Record<TrustedPythonAsset, Readonly<{ url: URL; sha256: string }>>> = {
   checkpoint: Object.freeze({
     url: new URL("./secure-checkpoint-host.py", import.meta.url),
@@ -200,6 +200,9 @@ function launchVerifiedBytes(
   try {
     response = JSON.parse(stdout);
   } catch {
+    if (result.status !== 0 && stdout.trim().length === 0) {
+      throw new Error("trusted host execution failed: supervisor produced no response");
+    }
     throw new Error("trusted host response is malformed");
   }
   validateJson(response);

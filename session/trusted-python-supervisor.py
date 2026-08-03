@@ -21,7 +21,7 @@ def process_tree(root_pid):
         output = subprocess.check_output(
             ["/bin/ps", "-axo", "pid=,ppid="],
             text=True,
-            timeout=0.2,
+            timeout=1.0,
             env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
         )
     except Exception:
@@ -45,23 +45,7 @@ def process_tree(root_pid):
 
 
 def kill_recorded(process, recorded):
-    targets = set(recorded)
-    targets.add(process.pid)
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    for pid in sorted(targets, reverse=True):
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-    time.sleep(0.2)
-    for pid in sorted(targets, reverse=True):
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+    kill_pid_tree(process.pid, recorded)
     try:
         process.wait(timeout=0.2)
     except subprocess.TimeoutExpired:
