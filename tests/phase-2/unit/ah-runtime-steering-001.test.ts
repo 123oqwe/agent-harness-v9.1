@@ -502,6 +502,22 @@ describe("AH-RUNTIME-STEERING-001 steering authority", () => {
           }),
       ).toThrow(SteeringError);
     }
+
+    const foreignJournal = new MemorySteeringJournal();
+    new SteeringController({ scope: scope("session-b"), journal: foreignJournal })
+      .enqueue({
+        ...request("valid-foreign-command", "steer", "user"),
+        scope: scope("session-b"),
+      });
+    const wrappedForeignCommand = structuredClone(foreignJournal.events[0]!);
+    (wrappedForeignCommand as { scope: SteeringScope }).scope = scope();
+    expect(
+      () =>
+        new SteeringController({
+          scope: scope(),
+          journal: new MemorySteeringJournal([wrappedForeignCommand]),
+        }),
+    ).toThrow("steering journal scope mismatch");
   });
 
   it("rejects unknown, duplicate and out-of-order consumed journal events", () => {
