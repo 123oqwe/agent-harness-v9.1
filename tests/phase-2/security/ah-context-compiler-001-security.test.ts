@@ -137,6 +137,87 @@ describe("AH-CONTEXT-COMPILER-001 fail-closed security boundaries", () => {
     });
 
     await expect(compiler.compile(input())).rejects.toThrow("policy_denied");
+
+    const unspecified = new ContextCompiler({
+      compactor: {
+        compact: vi.fn(async () => ({
+          action: "cancelled" as const,
+          state,
+          stable_prefix: [], recent_conversation: [], offloaded: [], omitted_ids: [],
+          cache_breakpoint: 1, pressure_after_offload: 0.7,
+        })),
+      },
+    });
+    await expect(unspecified.compile(input())).rejects
+      .toThrow("context preparation cancelled: unspecified");
+  });
+
+  it("fails closed on missing pressure state or an invalid compactor result", async () => {
+    await expect(new ContextCompiler().compile(input())).rejects
+      .toThrow("context pressure requires the existing compactor authority");
+
+    const missingState = input();
+    delete (missingState as any).compaction_state;
+    await expect(new ContextCompiler({ compactor: { compact: vi.fn() } }).compile(missingState))
+      .rejects.toThrow("compaction_state is required at context pressure boundary");
+
+    const none = new ContextCompiler({
+      compactor: {
+        compact: vi.fn(async () => ({
+          action: "none" as const,
+          state,
+          stable_prefix: [], recent_conversation: [], offloaded: [], omitted_ids: [],
+          cache_breakpoint: 1, pressure_after_offload: 0.7,
+        })),
+      },
+    });
+    await expect(none.compile(input())).rejects
+      .toThrow("compactor returned none at context pressure boundary");
+
+    const resetWithoutSession = new ContextCompiler({
+      compactor: {
+        compact: vi.fn(async () => ({
+          action: "context_reset" as const,
+          state,
+          stable_prefix: [], recent_conversation: [], offloaded: [], omitted_ids: [],
+          cache_breakpoint: 1, pressure_after_offload: 0.85,
+        })),
+      },
+    });
+    await expect(resetWithoutSession.compile(input())).rejects
+      .toThrow("context reset did not return a fresh session");
+  });
+
+  it("rejects a compactor result that still exceeds capacity", async () => {
+    const value = input();
+    value.layers.recent_conversation = [
+      { ...item("discardable", "recent_conversation", 2_000), key_fact: false },
+    ];
+    const compiler = new ContextCompiler({
+      compactor: {
+        compact: vi.fn(async (requested) => ({
+          action: "offload" as const,
+          state,
+          stable_prefix: requested.stable_prefix,
+          recent_conversation: requested.recent_conversation,
+          offloaded: [], omitted_ids: [], cache_breakpoint: 1,
+          pressure_after_offload: 2,
+        })),
+      },
+    });
+    await expect(compiler.compile(value)).rejects
+      .toThrow("compiled context exceeds context capacity");
+  });
+
+  it("rejects non-serializable context before invoking the compactor", async () => {
+    const compact = vi.fn();
+    const compiler = new ContextCompiler({ compactor: { compact } });
+    const value = input();
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    value.layers.task[0]!.content = cycle;
+    await expect(compiler.compile(value)).rejects.toThrow();
+    expect(compact).not.toHaveBeenCalled();
   });
 
   it("requires exact RAG disclosure and never promotes untrusted layers", async () => {
