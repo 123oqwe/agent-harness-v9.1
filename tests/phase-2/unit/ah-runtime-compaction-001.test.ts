@@ -73,6 +73,7 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
       expect(() => new ContextCompactor({ ...good, [key]: undefined } as never))
         .toThrow(key === "vfs" ? "compaction VFS port is required" : key === "beforeCompact" ? "compaction Hook port is required" : "fresh Session port is required");
     }
+    expect(() => new ContextCompactor(undefined as never)).toThrow("compaction VFS port is required");
   });
 
   it("does nothing below 40% context pressure", async () => {
@@ -149,8 +150,9 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
   it("uses the hook action as the fail-closed reason when no reason is supplied", async () => {
     const value = fixture();
     value.hook.mockResolvedValueOnce({ action: "deny" });
-    await expect(value.compactor.compact({ ...input(70_000), offload_items: [] }))
-      .resolves.toMatchObject({ action: "cancelled", reason_code: "hook_deny" });
+    const result = await value.compactor.compact({ ...input(70_000), offload_items: [] });
+    expect(result).toMatchObject({ action: "cancelled", reason_code: "hook_deny" });
+    expect(Object.hasOwn(result, "reason_code")).toBe(true);
   });
 
   it("lets session_before_compact cancel without discarding state", async () => {
@@ -192,18 +194,23 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
   });
 
   it.each([
-    ["context_generation", -1],
-    ["context_generation", 1.5],
-    ["context_capacity_tokens", 0],
-    ["context_capacity_tokens", -1],
-    ["used_tokens", -1],
-    ["cache_breakpoint", -1],
-  ] as const)("rejects invalid %s before side effects", async (field, invalid) => {
+    ["context_generation", -1, "context_generation must be a non-negative safe integer"],
+    ["context_generation", 1.5, "context_generation must be a non-negative safe integer"],
+    ["context_capacity_tokens", 0, "context_capacity_tokens must be positive"],
+    ["context_capacity_tokens", -1, "context_capacity_tokens must be a non-negative safe integer"],
+    ["used_tokens", -1, "used_tokens must be a non-negative safe integer"],
+    ["cache_breakpoint", -1, "cache_breakpoint must be a non-negative safe integer"],
+  ] as const)("rejects invalid %s before side effects", async (field, invalid, message) => {
     const value = fixture();
     await expect(value.compactor.compact({ ...input(39_999), [field]: invalid }))
-      .rejects.toThrow();
+      .rejects.toThrow(message);
     expect(value.writes).toEqual([]);
     expect(value.hook).not.toHaveBeenCalled();
+  });
+
+  it("rejects an absent input with the first exact scope error", async () => {
+    const value = fixture();
+    await expect(value.compactor.compact(undefined as never)).rejects.toThrow("tenant_id is invalid");
   });
 
   it("rejects a cache breakpoint beyond the stable prefix", async () => {
@@ -213,13 +220,13 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
   });
 
   it.each([
-    { stable_prefix: [{ id: "../escape", token_count: 1, content: "x", key_fact: true }] },
-    { recent_conversation: [{ id: "item", token_count: -1, content: "x", key_fact: true }] },
-    { offload_items: [{ id: "item", token_count: 1.5, content: "x" }] },
-  ])("validates every context item before side effects", async (override) => {
+    [{ stable_prefix: [{ id: "../escape", token_count: 1, content: "x", key_fact: true }] }, "context item id is invalid"],
+    [{ recent_conversation: [{ id: "item", token_count: -1, content: "x", key_fact: true }] }, "context item token_count must be a non-negative safe integer"],
+    [{ offload_items: [{ id: "item", token_count: 1.5, content: "x" }] }, "context item token_count must be a non-negative safe integer"],
+  ])("validates every context item before side effects", async (override, message) => {
     const value = fixture();
     await expect(value.compactor.compact({ ...input(39_999), ...override } as CompactionInput))
-      .rejects.toThrow();
+      .rejects.toThrow(message);
     expect(value.writes).toEqual([]);
   });
 
@@ -235,6 +242,23 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
       } as never)).rejects.toThrow(`security.${field} must be an array`);
     },
   );
+
+  it("rejects a state whose JSON representation disappears", async () => {
+    const value = fixture();
+    const base = input(39_999);
+    const state = { ...base.state, toJSON: () => undefined };
+    await expect(value.compactor.compact({ ...base, state }))
+      .rejects.toThrow("compaction state must be JSON-serializable");
+  });
+
+  it("deep-freezes preserved nested state while leaving primitives intact", async () => {
+    const value = fixture();
+    const result = await value.compactor.compact({ ...input(70_000), offload_items: [] });
+    expect(result.state.goal).toBe("ship safely");
+    expect(Object.isFrozen(result.state)).toBe(true);
+    expect(Object.isFrozen(result.state.active_plan)).toBe(true);
+    expect(Object.isFrozen(result.state.active_plan[0]!)).toBe(true);
+  });
 
   it("does not commit a fresh SessionTree branch when handoff persistence fails", async () => {
     const commit = vi.fn();

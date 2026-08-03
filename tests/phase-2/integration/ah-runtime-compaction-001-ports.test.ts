@@ -72,6 +72,23 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
       session_id: "session-1", action: "compact", pressure: 0.7,
     })).resolves.toEqual({ action: "continue" });
     expect(dispatch.mock.calls[0]![0].signal).toBeInstanceOf(AbortSignal);
+    const result = await adapter.dispatch({
+      event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
+      session_id: "session-1", action: "compact", pressure: 0.7,
+    });
+    expect(Object.hasOwn(result, "reason_code")).toBe(false);
+  });
+
+  it("honors an already-aborted caller signal", async () => {
+    const dispatch = vi.fn();
+    const controller = new AbortController();
+    controller.abort(new Error("caller stopped"));
+    const adapter = new CompactionHookRuntimeAdapter({ hooks: { dispatch }, signal: controller.signal });
+    await expect(adapter.dispatch({
+      event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
+      session_id: "session-1", action: "compact", pressure: 0.7,
+    })).resolves.toMatchObject({ action: "deny" });
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("fails closed when the managed Hook throws", async () => {
@@ -166,5 +183,18 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
     expect(() => adapter.prepare({
       tenant_id: "tenant-1", run_id: "run-1", previous_session_id: "session-1", context_generation,
     })).toThrow("context_generation must be a non-negative safe integer");
+  });
+
+  it("accepts generation zero and binds it into a distinct branch identity", () => {
+    const adapter = new ContextResetSessionAdapter({
+      tenant_id: "tenant-1", root_session_id: "run-1", tree: { branch: vi.fn() },
+    });
+    const zero = adapter.prepare({
+      tenant_id: "tenant-1", run_id: "run-1", previous_session_id: "session-1", context_generation: 0,
+    });
+    const one = adapter.prepare({
+      tenant_id: "tenant-1", run_id: "run-1", previous_session_id: "session-1", context_generation: 1,
+    });
+    expect(zero.session_id).not.toBe(one.session_id);
   });
 });
