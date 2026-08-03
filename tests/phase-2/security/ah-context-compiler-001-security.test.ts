@@ -9,6 +9,14 @@ import {
   type ContextContentLayer,
 } from "../../../packages/runtime-core/src/context-compiler.js";
 
+type Mutable<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly (infer Item)[]
+    ? Mutable<Item>[]
+    : T extends object
+      ? { -readonly [Key in keyof T]: Mutable<T[Key]> }
+      : T;
+
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 const item = (
@@ -16,7 +24,7 @@ const item = (
   layer: ContextContentLayer,
   token_count: number,
   trust: ContextCompilerItem["trust"] = "trusted",
-): ContextCompilerItem => ({
+): Mutable<ContextCompilerItem> => ({
   id,
   layer,
   token_count,
@@ -52,7 +60,7 @@ const state = {
   tracked_file_changes: [],
 };
 
-const input = (): ContextCompilerInput => ({
+const input = (): Mutable<ContextCompilerInput> => ({
   tenant_id: "tenant-a",
   principal_id: "principal-a",
   run_id: "run-a",

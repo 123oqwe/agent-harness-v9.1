@@ -10,6 +10,14 @@ import {
   type ContextCompilerItem,
 } from "../../../packages/runtime-core/src/context-compiler.js";
 
+type Mutable<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly (infer Item)[]
+    ? Mutable<Item>[]
+    : T extends object
+      ? { -readonly [Key in keyof T]: Mutable<T[Key]> }
+      : T;
+
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const canonical = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -24,7 +32,7 @@ const item = (
   layer: ContextCompilerItem["layer"],
   token_count: number,
   trust: ContextCompilerItem["trust"] = "trusted",
-): ContextCompilerItem => ({
+): Mutable<ContextCompilerItem> => ({
   id, layer, token_count, trust, tenant_id: "tenant-1",
   acl: { tenant_id: "tenant-1", principal_ids: ["principal-1"] },
   content: layer === "active_plan" ? {
@@ -44,7 +52,7 @@ const item = (
   key_fact: true,
 });
 
-const input = (): ContextCompilerInput => ({
+const input = (): Mutable<ContextCompilerInput> => ({
   tenant_id: "tenant-1",
   principal_id: "principal-1",
   run_id: "run-1",
