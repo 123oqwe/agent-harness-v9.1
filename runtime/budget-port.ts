@@ -1,8 +1,3 @@
-import type {
-  BudgetLedger,
-  BudgetPricing,
-} from "../packages/runtime-core/src/index.js";
-
 export interface RuntimeBudgetPreflight {
   readonly run_id: string;
   readonly iteration: number;
@@ -51,9 +46,37 @@ export interface RuntimeBudgetEstimatorPort {
   estimate(input: RuntimeBudgetPreflight): RuntimeBudgetEstimate;
 }
 
+export interface RuntimeBudgetPricing {
+  readonly cached_input_micros_per_million: number;
+  readonly uncached_input_micros_per_million: number;
+  readonly output_micros_per_million: number;
+}
+
+/** Narrow integration port; the sole implementation authority is runtime-core. */
+export interface RuntimeBudgetLedgerPort {
+  authorizeModelCall(input: {
+    readonly cached_input_tokens: number;
+    readonly uncached_input_tokens: number;
+    readonly output_tokens: number;
+    readonly pricing: RuntimeBudgetPricing;
+    readonly requested_max_output_tokens: number;
+    readonly dag_node_count: number;
+  }): {
+    readonly allowed: boolean;
+    readonly max_output_tokens?: number;
+  };
+  recordModelCall(input: {
+    readonly call_id: string;
+    readonly cached_input_tokens: number;
+    readonly uncached_input_tokens: number;
+    readonly output_tokens: number;
+    readonly pricing: RuntimeBudgetPricing;
+  }): unknown;
+}
+
 export interface BudgetLedgerRuntimeAdapterOptions {
-  readonly ledger: BudgetLedger;
-  readonly pricing: BudgetPricing;
+  readonly ledger: RuntimeBudgetLedgerPort;
+  readonly pricing: RuntimeBudgetPricing;
   readonly estimator?: RuntimeBudgetEstimatorPort;
 }
 
@@ -63,8 +86,8 @@ export interface BudgetLedgerRuntimeAdapterOptions {
  * contract carries an independently measured cache-hit count.
  */
 export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
-  readonly #ledger: BudgetLedger;
-  readonly #pricing: BudgetPricing;
+  readonly #ledger: RuntimeBudgetLedgerPort;
+  readonly #pricing: RuntimeBudgetPricing;
   readonly #estimator: RuntimeBudgetEstimatorPort | undefined;
   readonly #pending = new Set<string>();
 
