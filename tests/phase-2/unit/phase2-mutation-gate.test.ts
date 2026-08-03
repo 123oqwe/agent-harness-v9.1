@@ -309,7 +309,7 @@ describe("Phase 2 mutation authority", () => {
 
     expect(readiness).toMatchObject({
       ok: false,
-      completed: 6,
+      completed: 7,
       required: 64,
     });
     expect(readiness.blockers).toEqual(

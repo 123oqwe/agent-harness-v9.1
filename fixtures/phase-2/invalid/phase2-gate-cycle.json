@@ -568,11 +568,36 @@
       "dependencies": ["AH-RUNTIME-LOOP-001"],
       "owner": "packages/runtime-core",
       "test_suites": [
-        "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts"
+        "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts",
+        "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-MODELFALLBACK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": ["packages/runtime-core/src/model-fallback.ts"],
+      "test_files": [
+        "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts",
+        "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
+      ],
+      "owned_sources": [
+        "packages/runtime-core/src/model-fallback.ts",
+        "runtime/model-fallback-port.ts"
+      ],
+      "integration_sources": ["gateway/model-gateway.ts"],
+      "runtime_assets": [
+        "packages/runtime-core/src/index.ts",
+        "packages/runtime-core/package.json"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts"
+      ],
+      "security_tests": [
+        "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
+      ],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-RUNTIME-SESSIONTREE-001",

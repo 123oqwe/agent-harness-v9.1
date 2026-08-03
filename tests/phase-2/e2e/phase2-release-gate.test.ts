@@ -212,7 +212,7 @@ describe("Phase 2 real release gate", () => {
         expect.objectContaining({ code: "assets_release_blocked" }),
         expect.objectContaining({
           code: "mutation_incomplete",
-          completed: 6,
+          completed: 7,
           required: 64,
         }),
         expect.objectContaining({ code: "evidence_incomplete" }),

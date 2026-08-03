@@ -92,7 +92,14 @@ export const phase2MutationRequirements = Object.freeze([
     ],
     integrationSources: ["runtime/hook-port.ts"],
   }),
-  requirement("AH-RUNTIME-MODELFALLBACK-001"),
+  requirement("AH-RUNTIME-MODELFALLBACK-001", {
+    status: "ready",
+    sources: [
+      "packages/runtime-core/src/model-fallback.ts",
+      "runtime/model-fallback-port.ts",
+    ],
+    integrationSources: ["gateway/model-gateway.ts"],
+  }),
   requirement("AH-RUNTIME-SESSIONTREE-001", {
     status: "ready",
     sources: [
