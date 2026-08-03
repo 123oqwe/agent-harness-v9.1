@@ -5,22 +5,28 @@ import {
   type ProviderSelectionRequest,
   type ResolvedProvider,
 } from "../gateway/model-gateway.js";
-import type {
-  FallbackDispatchContext,
-  FallbackFailureClassification,
-  FallbackResolvedProvider,
-  ModelFallbackGatewayPort,
-} from "../packages/runtime-core/src/model-fallback.js";
+
+type FallbackProviderBinding = Pick<
+  ResolvedProvider,
+  | "provider_id"
+  | "registry_snapshot_hash"
+  | "provider_metadata_hash"
+  | "selection_request_hash"
+>;
+
+interface RuntimeFallbackDispatchContext {
+  readonly operation_id: string;
+  readonly attempt_id?: string;
+  readonly signal?: AbortSignal;
+  readonly deadline_at?: string;
+}
 
 /**
  * Thin runtime adapter over the existing ModelGateway authority. Selection,
  * Policy, egress, credential exchange, health and provider dispatch remain in
  * ModelGateway; this adapter only exposes its exact-hop surface.
  */
-export class ModelFallbackGatewayAdapter implements ModelFallbackGatewayPort<
-  ProviderSelectionRequest,
-  GatewayDispatchResult
-> {
+export class ModelFallbackGatewayAdapter {
   readonly #gateway: ModelGateway;
 
   constructor(gateway: ModelGateway) {
@@ -31,7 +37,7 @@ export class ModelFallbackGatewayAdapter implements ModelFallbackGatewayPort<
   }
 
   switchProvider(
-    previous: FallbackResolvedProvider,
+    previous: FallbackProviderBinding,
     selection: ProviderSelectionRequest,
     visitedProviderIds: readonly string[],
   ): ResolvedProvider {
@@ -43,9 +49,9 @@ export class ModelFallbackGatewayAdapter implements ModelFallbackGatewayPort<
   }
 
   dispatchExact(
-    resolved: FallbackResolvedProvider,
+    resolved: FallbackProviderBinding,
     selection: ProviderSelectionRequest,
-    context: FallbackDispatchContext & {
+    context: RuntimeFallbackDispatchContext & {
       readonly context_generation: number;
       readonly context_manifest_hash: string;
     },
@@ -58,7 +64,10 @@ export class ModelFallbackGatewayAdapter implements ModelFallbackGatewayPort<
     });
   }
 
-  classifyFailure(error: unknown): FallbackFailureClassification {
+  classifyFailure(error: unknown): {
+    readonly fallback_allowed: boolean;
+    readonly reason_code: string;
+  } {
     if (!(error instanceof ProviderDispatchError)) {
       return Object.freeze({ fallback_allowed: false, reason_code: "unclassified_failure" });
     }
