@@ -1018,6 +1018,32 @@ db.close();`,
         }),
     ).toThrow('Hook journal encryption salt invalid');
 
+    const missingSaltPath = fixture();
+    new SqliteHookJournal(missingSaltPath, {
+      masterKey,
+      ownerId: 'missing-salt-initializer',
+      leaseMs: 1_000,
+    }).close();
+    const missingSalt = new Database(missingSaltPath);
+    missingSalt.exec(`
+      DELETE FROM hook_journal_metadata WHERE key = 'encryption_salt';
+      CREATE TRIGGER ignore_encryption_salt_recreation
+      BEFORE INSERT ON hook_journal_metadata
+      WHEN NEW.key = 'encryption_salt'
+      BEGIN
+        SELECT RAISE(IGNORE);
+      END;
+    `);
+    missingSalt.close();
+    expect(
+      () =>
+        new SqliteHookJournal(missingSaltPath, {
+          masterKey,
+          ownerId: 'missing-salt-reader',
+          leaseMs: 1_000,
+        }),
+    ).toThrow('Hook journal encryption salt invalid');
+
     const legacyPath = fixture();
     new SqliteHookJournal(legacyPath, {
       masterKey,
