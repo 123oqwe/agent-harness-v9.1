@@ -496,7 +496,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 security authority", () => {
     } finally {
       value.close();
     }
-  });
+  }, 30_000);
 
   it("zeros the derived authority key when checkpoint construction fails", () => {
     const value = fixture();

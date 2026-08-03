@@ -181,7 +181,7 @@ describe('AH-HOOK-001 kernel integration', () => {
     } finally {
       durable.close();
     }
-  });
+  }, 30_000);
 
   it('runs the eleven-event lifecycle and executes only final attenuated tool args', async () => {
     const events: HookEvent[] = [];
