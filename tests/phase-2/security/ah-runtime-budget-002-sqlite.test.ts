@@ -132,6 +132,9 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     expect(
       () => new SqliteBudgetJournal(path, scope, Buffer.alloc(0)),
     ).toThrow("32-byte Budget journal masterKey is required");
+    expect(
+      () => new SqliteBudgetJournal(path, scope, undefined as never),
+    ).toThrow("32-byte Budget journal masterKey is required");
     const first = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     const ledger = new BudgetLedger({
       scope,
@@ -158,6 +161,80 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     database.close();
   });
 
+  it("binds the persisted key check to the documented journal context", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    journal.close();
+    const database = new Database(path);
+    const metadata = database
+      .prepare("SELECT key, value FROM budget_journal_metadata")
+      .all() as Array<{ readonly key: string; readonly value: string }>;
+    const values = new Map(metadata.map((row) => [row.key, row.value]));
+    const derived = Buffer.from(
+      hkdfSync(
+        "sha256",
+        MASTER_KEY,
+        Buffer.from(values.get("hmac_salt")!, "base64"),
+        "agent-harness/budget-journal/v1",
+        32,
+      ),
+    );
+    try {
+      expect(values.get("hmac_key_check")).toBe(
+        createHmac("sha256", derived)
+          .update("agent-harness/budget-journal/key-check/v1")
+          .digest("hex"),
+      );
+    } finally {
+      derived.fill(0);
+      database.close();
+    }
+  });
+
+  it("rejects a missing salt and a non-empty journal without key-check metadata", () => {
+    const missingSaltPath = fixture();
+    const bootstrap = new Database(missingSaltPath);
+    bootstrap.exec(`
+      CREATE TABLE budget_journal_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TRIGGER ignore_budget_metadata
+      BEFORE INSERT ON budget_journal_metadata
+      BEGIN
+        SELECT RAISE(IGNORE);
+      END;
+    `);
+    bootstrap.close();
+    expect(
+      () => new SqliteBudgetJournal(missingSaltPath, scope, MASTER_KEY),
+    ).toThrow("Budget journal HMAC salt invalid");
+
+    const legacyPath = fixture();
+    const journal = new SqliteBudgetJournal(legacyPath, scope, MASTER_KEY);
+    const ledger = new BudgetLedger({
+      scope,
+      ceiling: { usd_micros: 100 },
+      journal,
+    });
+    ledger.recordModelCall({
+      call_id: "legacy-call",
+      cached_input_tokens: 0,
+      uncached_input_tokens: 1,
+      output_tokens: 0,
+      pricing,
+    });
+    journal.close();
+    const legacy = new Database(legacyPath);
+    legacy
+      .prepare("DELETE FROM budget_journal_metadata WHERE key = 'hmac_key_check'")
+      .run();
+    legacy.close();
+    expect(
+      () => new SqliteBudgetJournal(legacyPath, scope, MASTER_KEY),
+    ).toThrow("Budget journal key-check migration requires an empty journal");
+  });
+
   it("authenticates event bytes before JSON parsing", () => {
     const path = fixture();
     const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
@@ -179,6 +256,21 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
     database
       .prepare("UPDATE budget_journal SET event_hmac = ?")
       .run("0".repeat(64));
+    database.close();
+    const reopened = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    expect(() => reopened.read()).toThrow(
+      "budget journal event authentication failed",
+    );
+    reopened.close();
+  });
+
+  it("rejects malformed authentication encodings with a controlled error", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    journal.append(eventFor());
+    journal.close();
+    const database = new Database(path);
+    database.prepare("UPDATE budget_journal SET event_hmac = '0'").run();
     database.close();
     const reopened = new SqliteBudgetJournal(path, scope, MASTER_KEY);
     expect(() => reopened.read()).toThrow(
@@ -375,6 +467,25 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
         previous_hash: first.event_hash,
       }),
     ).toThrow("budget journal event authentication failed");
+    journal.close();
+  });
+
+  it("rejects authenticated invalid prior JSON before following its hash", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope, MASTER_KEY);
+    journal.append(eventFor());
+    const database = new Database(path);
+    database
+      .prepare("UPDATE budget_journal SET event_json = ?, event_hmac = ?")
+      .run("{", storedHmac(database, scope, 0, "call-1", "{"));
+    database.close();
+    expect(() =>
+      journal.append({
+        ...eventFor(scope, "call-2"),
+        sequence: 1,
+        previous_hash: "f".repeat(64),
+      }),
+    ).toThrow("budget journal contains invalid JSON");
     journal.close();
   });
 
