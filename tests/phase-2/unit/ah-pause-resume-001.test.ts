@@ -188,6 +188,28 @@ describe("AH-PAUSE-RESUME-001 effect-state-aware resume", () => {
     });
   });
 
+  it("reconciles an indeterminate IN_FLIGHT read-back before awaiting a human", async () => {
+    const journal = new MemoryJournal("IN_FLIGHT");
+    const reconcile = vi.fn().mockResolvedValue({ status: "indeterminate" });
+    const controller = new PauseResumeController({
+      journal,
+      readBack: { query: vi.fn().mockResolvedValue({ status: "indeterminate" }) },
+      reconciliation: { reconcile },
+    });
+
+    await expect(controller.resume(request)).resolves.toEqual({
+      action: "await_human",
+      operation_id: "operation-1",
+      reason: "effect_state_indeterminate",
+    });
+    expect(journal.transitions.map((entry) => entry.effect_state)).toEqual([
+      "EFFECT_UNKNOWN",
+      "RECONCILING",
+      "AWAITING_HUMAN",
+    ]);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+  });
+
   it("moves unknown effects through RECONCILING before confirmation", async () => {
     const journal = new MemoryJournal("EFFECT_UNKNOWN");
     const reconcile = vi.fn().mockResolvedValue({

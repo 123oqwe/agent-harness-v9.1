@@ -893,6 +893,38 @@ db.close();`,
     journal.close();
   });
 
+  it('fails closed when SQLite reports a lost commit update', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'commit-conflict-owner',
+      leaseMs: 1_000,
+    });
+    const input = claimInput('commit-conflict');
+    const token = claimedToken(await journal.claim(input));
+    const raw = new Database(path);
+    raw.exec(`
+      CREATE TRIGGER force_hook_commit_conflict
+      BEFORE UPDATE ON hook_journal
+      WHEN OLD.state = 'CLAIMED' AND NEW.state = 'COMMITTED'
+      BEGIN
+        SELECT RAISE(IGNORE);
+      END;
+    `);
+    raw.close();
+
+    await expect(journal.commit(token, record(input, 'must-not-commit')))
+      .rejects.toThrow('Hook journal commit conflict');
+    const persisted = new Database(path, { readonly: true });
+    expect(
+      persisted
+        .prepare('SELECT state, outcome_ciphertext FROM hook_journal WHERE idempotency_key = ?')
+        .get(input.idempotency_key),
+    ).toEqual({ state: 'CLAIMED', outcome_ciphertext: null });
+    persisted.close();
+    journal.close();
+  });
+
   it('moves an expired commit to reconciliation without writing an outcome', async () => {
     let now = 100;
     const path = fixture();
