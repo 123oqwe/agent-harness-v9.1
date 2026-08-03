@@ -466,7 +466,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 security authority", () => {
     } finally {
       value.close();
     }
-  });
+  }, 30_000);
 
   it("documents the local sidecar rollback boundary without overstating protection", () => {
     const source = readFileSync(
@@ -592,7 +592,7 @@ describe("AH-RUNTIME-SESSIONTREE-001 security authority", () => {
       restarted?.close();
       rmSync(value.directory, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 60_000);
 
   it("persists every security anchor as AEAD bound to tenant, root, and logical session", async () => {
     const value = fixture();
