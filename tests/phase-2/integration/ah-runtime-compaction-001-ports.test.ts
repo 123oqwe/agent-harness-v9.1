@@ -79,6 +79,17 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
     expect(Object.hasOwn(result, "reason_code")).toBe(false);
   });
 
+  it("enforces the configured Hook timeout at the existing boundary", async () => {
+    const adapter = new CompactionHookRuntimeAdapter({
+      hooks: { dispatch: vi.fn(() => new Promise(() => undefined)) },
+      timeout_ms: 5,
+    });
+    await expect(adapter.dispatch({
+      event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
+      session_id: "session-1", action: "compact", pressure: 0.7,
+    })).resolves.toEqual({ action: "deny", reason_code: "hook_timeout" });
+  });
+
   it("honors an already-aborted caller signal", async () => {
     const dispatch = vi.fn();
     const controller = new AbortController();
