@@ -460,10 +460,42 @@
       "priority": "P0",
       "dependencies": ["AH-POLICY-ENGINE-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-runtime-budget-002.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-runtime-budget-002.test.ts",
+        "tests/phase-2/integration/ah-runtime-budget-002-loop.test.ts",
+        "tests/phase-2/security/ah-runtime-budget-002-sqlite.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-BUDGET-002.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": [
+        "packages/runtime-core/src/budget-ledger.ts",
+        "packages/runtime-core/src/sqlite-budget-journal.ts"
+      ],
+      "test_files": [
+        "tests/phase-2/unit/ah-runtime-budget-002.test.ts",
+        "tests/phase-2/integration/ah-runtime-budget-002-loop.test.ts",
+        "tests/phase-2/security/ah-runtime-budget-002-sqlite.test.ts"
+      ],
+      "owned_sources": [
+        "packages/runtime-core/src/budget-ledger.ts",
+        "packages/runtime-core/src/sqlite-budget-journal.ts",
+        "runtime/budget-port.ts"
+      ],
+      "integration_sources": ["harness.ts", "runtime/loop.ts"],
+      "runtime_assets": [
+        "packages/runtime-core/src/index.ts",
+        "packages/runtime-core/package.json",
+        "scripts/check-workspace-boundaries.mjs"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-runtime-budget-002.test.ts",
+        "tests/phase-2/integration/ah-runtime-budget-002-loop.test.ts"
+      ],
+      "security_tests": [
+        "tests/phase-2/security/ah-runtime-budget-002-sqlite.test.ts"
+      ],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-RUNTIME-COMPACTION-001",
