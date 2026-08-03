@@ -656,6 +656,31 @@ describe('AH-GATEWAY-PROVIDER-001: deterministic Phase 1 resolution', () => {
     );
   });
 
+  it('dispatchExact never performs a hidden provider fallback', async () => {
+    const primary = makeRuntime();
+    primary.runtime.resolve = vi.fn(() => {
+      throw new ProviderHttpError(429, 'primary unavailable');
+    });
+    const fallback = makeRuntime();
+    const registry = new FrozenProviderRegistry([
+      makeRegistration('provider-a', {}, primary.runtime),
+      makeRegistration('provider-b', {}, fallback.runtime),
+    ]);
+    const gateway = new ModelGateway(registry, makePorts());
+    const request = makeSelection(registry.snapshot.hash);
+
+    await expect(gateway.dispatchExact(
+      gateway.resolve(request),
+      request,
+      { operation_id: 'exact-operation' },
+    )).rejects.toMatchObject({
+      code: 'provider_failure',
+      provider_error: { kind: 'rate_limited', retryable: true },
+    });
+    expect(primary.runtime.resolve).toHaveBeenCalledTimes(3);
+    expect(fallback.provider.callCount).toBe(0);
+  });
+
   it.each(['tool serialization', 'adapter data policy'] as const)(
     'revalidates %s when switching providers',
     (validation) => {

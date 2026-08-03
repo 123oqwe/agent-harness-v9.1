@@ -128,3 +128,18 @@ export {
   type FreshSessionPort,
   type OffloadedContextHandle,
 } from "./compaction.js";
+
+export {
+  ModelFallbackController,
+  ModelFallbackError,
+  type FallbackDispatchContext,
+  type FallbackFailureClassification,
+  type FallbackResolvedProvider,
+  type ModelFallbackCachePort,
+  type ModelFallbackContextPort,
+  type ModelFallbackErrorCode,
+  type ModelFallbackGatewayPort,
+  type ModelFallbackInput,
+  type ModelFallbackOptions,
+  type ModelFallbackResult,
+} from "./model-fallback.js";

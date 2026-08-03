@@ -914,6 +914,48 @@ export class ModelGateway {
     }
   }
 
+  /**
+   * Dispatches only the resolved provider. Runtime fallback orchestration uses
+   * this entrypoint so cache invalidation and context recompilation occur
+   * between provider hops instead of being bypassed by an internal switch.
+   */
+  async dispatchExact(
+    resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    context: {
+      readonly operation_id: string;
+      readonly attempt_id?: string;
+      readonly signal?: AbortSignal | undefined;
+      readonly deadline_at?: string;
+    },
+  ): Promise<GatewayDispatchResult> {
+    if (
+      resolved.registry_snapshot_hash !== this.registry.snapshot.hash ||
+      resolved.selection_request_hash !== selectionHash(request)
+    ) {
+      throw new ProviderDispatchError('provider_no_longer_compatible');
+    }
+    const operationId = nonEmptyString(context.operation_id, 'dispatchExact.operation_id');
+    const deadline =
+      context.deadline_at === undefined ? undefined : Date.parse(context.deadline_at);
+    if (deadline !== undefined && !Number.isFinite(deadline)) {
+      throw new ProviderConfigurationError('dispatchExact.deadline_at must be an ISO timestamp');
+    }
+    const abort = this.createDispatchAbort(context.signal, deadline);
+    try {
+      return await this.dispatchToProvider(
+        resolved,
+        request,
+        context,
+        operationId,
+        abort.signal,
+        abort.code,
+      );
+    } finally {
+      abort.cleanup();
+    }
+  }
+
   private async dispatchToProvider(
     resolved: ResolvedProvider,
     request: ProviderSelectionRequest,
