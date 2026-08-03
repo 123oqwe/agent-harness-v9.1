@@ -569,6 +569,7 @@
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/unit/ah-runtime-modelfallback-001-adapter.test.ts",
         "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts",
         "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
       ],
@@ -578,6 +579,7 @@
       "source_files": ["packages/runtime-core/src/model-fallback.ts"],
       "test_files": [
         "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/unit/ah-runtime-modelfallback-001-adapter.test.ts",
         "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts",
         "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
       ],
@@ -592,6 +594,7 @@
       ],
       "behavioral_tests": [
         "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
+        "tests/phase-2/unit/ah-runtime-modelfallback-001-adapter.test.ts",
         "tests/phase-2/integration/ah-runtime-modelfallback-001-gateway.test.ts"
       ],
       "security_tests": [
