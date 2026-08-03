@@ -295,4 +295,23 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     ).rejects.toThrow("context reset requires a fresh session");
     expect(writes).not.toHaveBeenCalled();
   });
+
+  it("rejects an unsafe fresh session identity with the exact field label", async () => {
+    const compactor = new ContextCompactor({
+      vfs: { write: vi.fn() },
+      beforeCompact: { dispatch: vi.fn().mockResolvedValue({ action: "continue" }) },
+      freshSession: { prepare: vi.fn(() => ({ session_id: "../escape", commit: vi.fn() })) },
+    });
+    await expect(compactor.compact({ ...input(85_000), offload_items: [] }))
+      .rejects.toThrow("fresh session_id is invalid");
+  });
+
+  it.each([
+    ["run_id", "run/escape", "run_id is invalid"],
+    ["session_id", "session/escape", "session_id is invalid"],
+  ] as const)("labels invalid %s exactly", async (field, invalid, message) => {
+    const value = fixture();
+    await expect(value.compactor.compact({ ...input(39_999), [field]: invalid }))
+      .rejects.toThrow(message);
+  });
 });
