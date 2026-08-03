@@ -488,6 +488,27 @@ db.close();`,
     journal.close();
   });
 
+  it('makes reconciliation terminal for an uncertain claim', async () => {
+    const path = fixture();
+    const journal = new SqliteHookJournal(path, {
+      masterKey,
+      ownerId: 'reconciliation-owner',
+      leaseMs: 1_000,
+    });
+    const input = claimInput('reconciliation-key');
+    const token = claimedToken(await journal.claim(input));
+
+    await journal.reconcile(token);
+    await expect(journal.claim(input)).resolves.toMatchObject({
+      status: 'reconciliation',
+      reason_code: 'hook_claim_abandoned',
+    });
+    await expect(journal.reconcile(token)).rejects.toThrow(
+      'invalid Hook journal claim',
+    );
+    journal.close();
+  });
+
   it('authenticates ciphertext against its exact tenant/run/session row', async () => {
     const path = fixture();
     const journal = new SqliteHookJournal(path, {
@@ -810,6 +831,10 @@ db.close();`,
     await expect(journal.release('unknown-token')).rejects.toThrow(
       'invalid Hook journal claim',
     );
+    await expect(journal.reconcile('')).rejects.toThrow('claimToken is required');
+    await expect(journal.reconcile('unknown-token')).rejects.toThrow(
+      'invalid Hook journal claim',
+    );
     await journal.release(token);
     journal.close();
     journal.close();
@@ -818,6 +843,7 @@ db.close();`,
       'Hook journal is closed',
     );
     await expect(journal.release(token)).rejects.toThrow('Hook journal is closed');
+    await expect(journal.reconcile(token)).rejects.toThrow('Hook journal is closed');
   });
 
   it('binds commit to the live token, record identity and outcome event', async () => {
