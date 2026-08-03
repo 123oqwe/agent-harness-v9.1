@@ -80,14 +80,21 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
   });
 
   it("enforces the configured Hook timeout at the existing boundary", async () => {
+    vi.useFakeTimers();
     const adapter = new CompactionHookRuntimeAdapter({
       hooks: { dispatch: vi.fn(() => new Promise(() => undefined)) },
       timeout_ms: 5,
     });
-    await expect(adapter.dispatch({
-      event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
-      session_id: "session-1", action: "compact", pressure: 0.7,
-    })).resolves.toEqual({ action: "deny", reason_code: "hook_timeout" });
+    try {
+      const result = adapter.dispatch({
+        event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
+        session_id: "session-1", action: "compact", pressure: 0.7,
+      });
+      await vi.advanceTimersByTimeAsync(5);
+      await expect(result).resolves.toEqual({ action: "deny", reason_code: "hook_timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("honors an already-aborted caller signal", async () => {
