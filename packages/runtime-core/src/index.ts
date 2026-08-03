@@ -100,3 +100,15 @@ export {
 } from "./budget-ledger.js";
 
 export { SqliteBudgetJournal } from "./sqlite-budget-journal.js";
+
+export {
+  PauseResumeController,
+  type EffectReadBackPort,
+  type EffectReconciliationPort,
+  type EffectResolution,
+  type PauseResumeAction,
+  type PauseResumeControllerOptions,
+  type PauseResumeEffectRecord,
+  type PauseResumeEffectState,
+  type PauseResumeJournalPort,
+} from "./pause-resume.js";

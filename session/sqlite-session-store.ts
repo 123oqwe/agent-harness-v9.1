@@ -39,7 +39,14 @@ export interface OperationRecord {
   attempt_id: string;
   tool_name: string;
   idempotency_key: string;
-  effect_state: 'PRE_DISPATCH' | 'IN_FLIGHT' | 'EFFECT_UNKNOWN' | 'EFFECT_CONFIRMED' | 'DEFINITELY_FAILED_NO_EFFECT';
+  effect_state:
+    | 'PRE_DISPATCH'
+    | 'IN_FLIGHT'
+    | 'EFFECT_UNKNOWN'
+    | 'RECONCILING'
+    | 'EFFECT_CONFIRMED'
+    | 'DEFINITELY_FAILED_NO_EFFECT'
+    | 'AWAITING_HUMAN';
   receipt_json: string | null;
   created_at: string;
   updated_at: string;
@@ -681,9 +688,15 @@ export class SqliteSessionStore {
      const allowed: Record<OperationRecord['effect_state'], readonly OperationRecord['effect_state'][]> = {
        PRE_DISPATCH: ['IN_FLIGHT', 'DEFINITELY_FAILED_NO_EFFECT'],
        IN_FLIGHT: ['EFFECT_CONFIRMED', 'EFFECT_UNKNOWN', 'DEFINITELY_FAILED_NO_EFFECT'],
-       EFFECT_UNKNOWN: [],
+       EFFECT_UNKNOWN: ['RECONCILING'],
+       RECONCILING: [
+         'EFFECT_CONFIRMED',
+         'DEFINITELY_FAILED_NO_EFFECT',
+         'AWAITING_HUMAN',
+       ],
        EFFECT_CONFIRMED: [],
        DEFINITELY_FAILED_NO_EFFECT: ['PRE_DISPATCH'],
+       AWAITING_HUMAN: [],
      };
      if (
        existing.effect_state !== op.effect_state &&

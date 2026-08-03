@@ -325,10 +325,33 @@
       "priority": "P0",
       "dependencies": ["AH-STATE-EXTERNAL-001", "AH-RUNTIME-SESSION-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-pause-resume-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-pause-resume-001.test.ts",
+        "tests/phase-2/integration/ah-pause-resume-001-store.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-PAUSE-RESUME-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
+      "eval_suites": ["evals/personal-assistant/phase-2.yaml"],
+      "source_files": ["packages/runtime-core/src/pause-resume.ts"],
+      "test_files": [
+        "tests/phase-2/unit/ah-pause-resume-001.test.ts",
+        "tests/phase-2/integration/ah-pause-resume-001-store.test.ts"
+      ],
+      "owned_sources": ["packages/runtime-core/src/pause-resume.ts"],
+      "integration_sources": [
+        "session/sqlite-session-store.ts",
+        "tools/tool-executor.ts"
+      ],
+      "runtime_assets": [
+        "packages/runtime-core/src/index.ts",
+        "packages/runtime-core/package.json"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-pause-resume-001.test.ts",
+        "tests/phase-2/integration/ah-pause-resume-001-store.test.ts"
+      ],
+      "security_tests": ["tests/tools/tool-executor-effects.test.ts"],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-SANDBOX-OCI-001",

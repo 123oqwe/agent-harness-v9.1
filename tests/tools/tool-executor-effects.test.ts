@@ -507,7 +507,12 @@ describe('ToolExecutor durable effect contracts', () => {
     ).rejects.toThrowError(/^stored effect outcome is invalid:/);
   });
 
-  it.each(['IN_FLIGHT', 'EFFECT_UNKNOWN'] as const)(
+  it.each([
+    'IN_FLIGHT',
+    'EFFECT_UNKNOWN',
+    'RECONCILING',
+    'AWAITING_HUMAN',
+  ] as const)(
     'requires reconciliation for %s',
     async (effectState) => {
       const journal = new Journal({

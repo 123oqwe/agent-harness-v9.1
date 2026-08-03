@@ -81,8 +81,10 @@ export type EffectState =
   | 'PRE_DISPATCH'
   | 'IN_FLIGHT'
   | 'EFFECT_UNKNOWN'
+  | 'RECONCILING'
   | 'EFFECT_CONFIRMED'
-  | 'DEFINITELY_FAILED_NO_EFFECT';
+  | 'DEFINITELY_FAILED_NO_EFFECT'
+  | 'AWAITING_HUMAN';
 
 export interface EffectJournalRecord {
   readonly operation_id: string;
@@ -397,7 +399,9 @@ export class ToolExecutor {
       }
       if (
         existingEffect?.effect_state === 'IN_FLIGHT' ||
-        existingEffect?.effect_state === 'EFFECT_UNKNOWN'
+        existingEffect?.effect_state === 'EFFECT_UNKNOWN' ||
+        existingEffect?.effect_state === 'RECONCILING' ||
+        existingEffect?.effect_state === 'AWAITING_HUMAN'
       ) {
         throw new ToolExecutorError(
           `effect requires reconciliation: ${existingEffect.effect_state}`,

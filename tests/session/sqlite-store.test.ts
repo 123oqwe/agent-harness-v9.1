@@ -660,7 +660,7 @@ describe('SQLite Session Store', () => {
     ).toThrow('invalid effect transition');
   });
 
-  it('enforces terminal effect transitions and exact idempotent replay', () => {
+  it('requires reconciliation before resolving an unknown effect', () => {
     store.createRun('run-terminal', 'test');
     const base = {
       operation_id: 'op-terminal',
@@ -690,10 +690,20 @@ describe('SQLite Session Store', () => {
     expect(() =>
       store.recordOperation({ ...base, effect_state: 'EFFECT_UNKNOWN' }),
     ).not.toThrow();
+    store.recordOperation({ ...base, effect_state: 'RECONCILING' });
+    store.recordOperation({
+      ...base,
+      effect_state: 'EFFECT_CONFIRMED',
+      receipt_json: '{"receipt":{"success":true}}',
+    });
+    expect(store.getOperation('op-terminal')).toMatchObject({
+      effect_state: 'EFFECT_CONFIRMED',
+      receipt_json: '{"receipt":{"success":true}}',
+    });
   });
 
   it('rejects unknown target states from terminal operations', () => {
-    for (const terminal of ['EFFECT_UNKNOWN', 'EFFECT_CONFIRMED'] as const) {
+    for (const terminal of ['AWAITING_HUMAN', 'EFFECT_CONFIRMED'] as const) {
       const suffix = terminal.toLowerCase();
       const base = {
         operation_id: `op-${suffix}`,
@@ -707,7 +717,13 @@ describe('SQLite Session Store', () => {
       store.createRun(base.run_id, 'test');
       store.recordOperation({ ...base, effect_state: 'PRE_DISPATCH' });
       store.recordOperation({ ...base, effect_state: 'IN_FLIGHT' });
-      store.recordOperation({ ...base, effect_state: terminal });
+      if (terminal === 'AWAITING_HUMAN') {
+        store.recordOperation({ ...base, effect_state: 'EFFECT_UNKNOWN' });
+        store.recordOperation({ ...base, effect_state: 'RECONCILING' });
+        store.recordOperation({ ...base, effect_state: terminal });
+      } else {
+        store.recordOperation({ ...base, effect_state: terminal });
+      }
       expect(() =>
         store.recordOperation({
           ...base,

@@ -55,7 +55,14 @@ export const phase2MutationRequirements = Object.freeze([
   requirement("AH-MM-IMAGE-GEN-001"),
   requirement("AH-MM-IMAGE-IN-001"),
   requirement("AH-MM-VISION-VERIFY-001"),
-  requirement("AH-PAUSE-RESUME-001"),
+  requirement("AH-PAUSE-RESUME-001", {
+    status: "ready",
+    sources: ["packages/runtime-core/src/pause-resume.ts"],
+    integrationSources: [
+      "session/sqlite-session-store.ts",
+      "tools/tool-executor.ts",
+    ],
+  }),
   requirement("AH-SANDBOX-OCI-001"),
   requirement("AH-RAG-CHUNK-001"),
   requirement("AH-RAG-CITE-001"),
