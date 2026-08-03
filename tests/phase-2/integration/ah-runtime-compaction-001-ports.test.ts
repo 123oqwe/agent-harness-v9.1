@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,6 +46,32 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
         payload: { action: "compact", pressure: 0.7 },
       }),
     );
+    const hookRequest = dispatch.mock.calls[0]![0];
+    const identity = createHash("sha256").update(JSON.stringify({
+      event: "session_before_compact",
+      tenant_id: "tenant-1",
+      run_id: "run-1",
+      session_id: "session-1",
+      action: "compact",
+      pressure: 0.7,
+    })).digest("hex");
+    expect(hookRequest.invocation_id).toBe(`hook-${identity}`);
+    expect(hookRequest.idempotency_key).toBe(`hook-idempotency-${identity}`);
+  });
+
+  it("omits optional Hook fields and reason codes when absent", async () => {
+    const dispatch = vi.fn(async (request) => ({
+      event: request.event,
+      action: "continue" as const,
+      payload: request.payload,
+      follow_ups: [], replayed: false,
+    }));
+    const adapter = new CompactionHookRuntimeAdapter({ hooks: { dispatch } });
+    await expect(adapter.dispatch({
+      event: "session_before_compact", tenant_id: "tenant-1", run_id: "run-1",
+      session_id: "session-1", action: "compact", pressure: 0.7,
+    })).resolves.toEqual({ action: "continue" });
+    expect(dispatch.mock.calls[0]![0].signal).toBeInstanceOf(AbortSignal);
   });
 
   it("fails closed when the managed Hook throws", async () => {
@@ -96,6 +124,9 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
       source_session_id: "session-1",
       child_session_id: first.session_id,
     });
+    const expected = createHash("sha256").update(JSON.stringify(request)).digest("hex").slice(0, 32);
+    expect(first.session_id).toBe(`context-reset-${expected}`);
+    expect(branch.mock.calls[0]![0].command_id).toBe(`context-reset-command-${expected}`);
   });
 
   it("rejects a cross-scope context reset before touching SessionTree", async () => {
@@ -115,5 +146,25 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
       })),
     ).rejects.toThrow("context reset SessionTree scope mismatch");
     expect(branch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a wrong run scope independently of tenant scope", () => {
+    const branch = vi.fn();
+    const adapter = new ContextResetSessionAdapter({
+      tenant_id: "tenant-1", root_session_id: "run-1", tree: { branch },
+    });
+    expect(() => adapter.prepare({
+      tenant_id: "tenant-1", run_id: "run-2", previous_session_id: "session-1", context_generation: 2,
+    })).toThrow("context reset SessionTree scope mismatch");
+    expect(branch).not.toHaveBeenCalled();
+  });
+
+  it.each([-1, 1.5, Number.NaN])("rejects invalid context generation %s", (context_generation) => {
+    const adapter = new ContextResetSessionAdapter({
+      tenant_id: "tenant-1", root_session_id: "run-1", tree: { branch: vi.fn() },
+    });
+    expect(() => adapter.prepare({
+      tenant_id: "tenant-1", run_id: "run-1", previous_session_id: "session-1", context_generation,
+    })).toThrow("context_generation must be a non-negative safe integer");
   });
 });

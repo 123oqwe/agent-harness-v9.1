@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -61,6 +63,18 @@ const fixture = (hookAction: "continue" | "skip" = "continue") => {
 };
 
 describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
+  it("requires each existing authority port", () => {
+    const good = {
+      vfs: { write: vi.fn() },
+      beforeCompact: { dispatch: vi.fn() },
+      freshSession: { prepare: vi.fn() },
+    };
+    for (const key of ["vfs", "beforeCompact", "freshSession"] as const) {
+      expect(() => new ContextCompactor({ ...good, [key]: undefined } as never))
+        .toThrow(key === "vfs" ? "compaction VFS port is required" : key === "beforeCompact" ? "compaction Hook port is required" : "fresh Session port is required");
+    }
+  });
+
   it("does nothing below 40% context pressure", async () => {
     const value = fixture();
     const result = await value.compactor.compact(input(39_999));
@@ -82,6 +96,15 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     });
     expect(value.writes).toHaveLength(1);
     expect(value.writes[0]!.path).toMatch(/^\/scratch\/context\/tenant-1\/run-1\/session-1\/[0-9a-f]{64}\.json$/u);
+    const payload = value.writes[0]!.bytes;
+    expect(payload).toBe('{"content":{"result":"large"},"run_id":"run-1","schema_version":"context-offload/v1","session_id":"session-1","source_id":"tool-large","tenant_id":"tenant-1","token_count":15000}');
+    const hash = createHash("sha256").update(payload).digest("hex");
+    expect(result.offloaded[0]).toEqual({
+      source_id: "tool-large",
+      token_count: 15_000,
+      path: `/scratch/context/tenant-1/run-1/session-1/${hash}.json`,
+      sha256: hash,
+    });
     expect(value.hook).not.toHaveBeenCalled();
   });
 
@@ -103,6 +126,14 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
 
     expect(result.action).toBe("compact");
     expect(value.hook).toHaveBeenCalledTimes(1);
+    expect(value.hook).toHaveBeenCalledWith({
+      event: "session_before_compact",
+      tenant_id: "tenant-1",
+      run_id: "run-1",
+      session_id: "session-1",
+      action: "compact",
+      pressure: 0.7,
+    });
     expect(result.state.security).toEqual(security);
     expect(result.state.security).not.toBe(original.state.security);
     expect(result.state.constraints).toEqual(["no external writes"]);
@@ -113,6 +144,13 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     expect(result.recent_conversation.map((entry) => entry.id)).toEqual(["fact-1"]);
     expect(result.omitted_ids).toEqual(["old-chatter"]);
     expect(result.cache_breakpoint).toBe(1);
+  });
+
+  it("uses the hook action as the fail-closed reason when no reason is supplied", async () => {
+    const value = fixture();
+    value.hook.mockResolvedValueOnce({ action: "deny" });
+    await expect(value.compactor.compact({ ...input(70_000), offload_items: [] }))
+      .resolves.toMatchObject({ action: "cancelled", reason_code: "hook_deny" });
   });
 
   it("lets session_before_compact cancel without discarding state", async () => {
@@ -148,7 +186,55 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
       state: { security },
     });
     expect(handoff.state).toEqual(result.state);
+    expect(result.handoff!.sha256).toBe(
+      createHash("sha256").update(value.writes.at(-1)!.bytes).digest("hex"),
+    );
   });
+
+  it.each([
+    ["context_generation", -1],
+    ["context_generation", 1.5],
+    ["context_capacity_tokens", 0],
+    ["context_capacity_tokens", -1],
+    ["used_tokens", -1],
+    ["cache_breakpoint", -1],
+  ] as const)("rejects invalid %s before side effects", async (field, invalid) => {
+    const value = fixture();
+    await expect(value.compactor.compact({ ...input(39_999), [field]: invalid }))
+      .rejects.toThrow();
+    expect(value.writes).toEqual([]);
+    expect(value.hook).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cache breakpoint beyond the stable prefix", async () => {
+    const value = fixture();
+    await expect(value.compactor.compact({ ...input(39_999), cache_breakpoint: 2 }))
+      .rejects.toThrow("cache_breakpoint exceeds stable prefix");
+  });
+
+  it.each([
+    { stable_prefix: [{ id: "../escape", token_count: 1, content: "x", key_fact: true }] },
+    { recent_conversation: [{ id: "item", token_count: -1, content: "x", key_fact: true }] },
+    { offload_items: [{ id: "item", token_count: 1.5, content: "x" }] },
+  ])("validates every context item before side effects", async (override) => {
+    const value = fixture();
+    await expect(value.compactor.compact({ ...input(39_999), ...override } as CompactionInput))
+      .rejects.toThrow();
+    expect(value.writes).toEqual([]);
+  });
+
+  it.each(["approvals", "grants", "denials", "current_revocations", "effects", "receipts", "idempotency_ids"] as const)(
+    "requires structured security.%s",
+    async (field) => {
+      const value = fixture();
+      const base = input(39_999);
+      const securityState = { ...base.state.security, [field]: null };
+      await expect(value.compactor.compact({
+        ...base,
+        state: { ...base.state, security: securityState },
+      } as never)).rejects.toThrow(`security.${field} must be an array`);
+    },
+  );
 
   it("does not commit a fresh SessionTree branch when handoff persistence fails", async () => {
     const commit = vi.fn();
