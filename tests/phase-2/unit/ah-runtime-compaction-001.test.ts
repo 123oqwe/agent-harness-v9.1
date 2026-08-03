@@ -133,6 +133,24 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
 
     expect(result.action).toBe("offload");
     expect(result.pressure_after_offload).toBe(0.6);
+    const payload = value.writes[0]!.bytes;
+    expect(payload).toBe(
+      '{"content":{"result":"large"},"retained_token_count":5000,"run_id":"run-1","schema_version":"context-offload/v1","session_id":"session-1","source_id":"tool-large","tenant_id":"tenant-1","token_count":15000}',
+    );
+    expect(result.offloaded[0]!.sha256).toBe(
+      createHash("sha256").update(payload).digest("hex"),
+    );
+
+    const boundary = fixture();
+    const boundaryBase = input(40_000);
+    const boundaryResult = await boundary.compactor.compact({
+      ...boundaryBase,
+      offload_items: [{
+        ...boundaryBase.offload_items[0]!,
+        retained_token_count: boundaryBase.offload_items[0]!.token_count,
+      }],
+    });
+    expect(boundaryResult.pressure_after_offload).toBe(0.4);
   });
 
   it("compacts at 70% while preserving security and key facts exactly", async () => {
@@ -238,6 +256,8 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     [{ stable_prefix: [{ id: "../escape", token_count: 1, content: "x", key_fact: true }] }, "context item id is invalid"],
     [{ recent_conversation: [{ id: "item", token_count: -1, content: "x", key_fact: true }] }, "context item token_count must be a non-negative safe integer"],
     [{ offload_items: [{ id: "item", token_count: 1.5, content: "x" }] }, "context item token_count must be a non-negative safe integer"],
+    [{ offload_items: [{ id: "item", token_count: 2, retained_token_count: -1, content: "x" }] }, "context item retained_token_count must be a non-negative safe integer"],
+    [{ offload_items: [{ id: "item", token_count: 2, retained_token_count: 1.5, content: "x" }] }, "context item retained_token_count must be a non-negative safe integer"],
     [{ offload_items: [{ id: "item", token_count: 1, retained_token_count: 2, content: "x" }] }, "context item retained_token_count exceeds token_count"],
   ])("validates every context item before side effects", async (override, message) => {
     const value = fixture();
