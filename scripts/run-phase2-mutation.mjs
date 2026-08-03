@@ -47,6 +47,7 @@ const EXACT_STRYKER_BASE = Object.freeze({
   coverageAnalysis: "perTest",
   reporters: ["clear-text", "progress", "html", "json"],
   timeoutMS: 30_000,
+  dryRunTimeoutMinutes: 10,
   concurrency: 4,
   vitest: { configFile: "vitest.mutation.config.ts" },
   ignorePatterns: ["/reports", ".stryker-tmp"],
