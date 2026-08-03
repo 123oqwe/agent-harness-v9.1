@@ -17,7 +17,11 @@ const requirement = (
   });
 
 export const phase2MutationRequirements = Object.freeze([
-  requirement("AH-CONTEXT-COMPILER-001"),
+  requirement("AH-CONTEXT-COMPILER-001", {
+    status: "ready",
+    sources: ["packages/runtime-core/src/context-compiler.ts"],
+    integrationSources: ["vfs/virtual-filesystem.ts"],
+  }),
   requirement("AH-DOC-INGEST-DOCX-001"),
   requirement("AH-DOC-INGEST-ENC-001"),
   requirement("AH-DOC-INGEST-IMG-001"),

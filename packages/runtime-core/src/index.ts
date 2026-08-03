@@ -143,3 +143,23 @@ export {
   type ModelFallbackOptions,
   type ModelFallbackResult,
 } from "./model-fallback.js";
+
+export {
+  CONTEXT_LAYERS,
+  ContextCompiler,
+  type ActivePlanContent,
+  type CompiledContextMessage,
+  type ContextCompilerInput,
+  type ContextCompilerItem,
+  type ContextCompilerLayers,
+  type ContextCompilerOptions,
+  type ContextCompilerResult,
+  type ContextCompactionPort,
+  type ContextContentLayer,
+  type ContextLayer,
+  type ContextManifest,
+  type ContextManifestItem,
+  type ContextManifestLayer,
+  type ContextSelectionDisclosure,
+  type ContextTrust,
+} from "./context-compiler.js";

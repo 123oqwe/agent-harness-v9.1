@@ -231,7 +231,9 @@ describe("Phase 2 mutation authority", () => {
     );
 
     expect(authority.errors).toEqual([]);
-    expect(requirement.sources).toEqual([]);
+    expect(requirement.sources).toEqual([
+      "packages/runtime-core/src/context-compiler.ts",
+    ]);
     expect(requirement.integrationSources).toEqual(["harness.ts"]);
     expect(requirement.integrationSourceModules).toEqual({
       "harness.ts": ["runtime"],
@@ -309,7 +311,7 @@ describe("Phase 2 mutation authority", () => {
 
     expect(readiness).toMatchObject({
       ok: false,
-      completed: 7,
+      completed: 8,
       required: 64,
     });
     expect(readiness.blockers).toEqual(

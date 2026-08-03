@@ -120,6 +120,21 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     expect(value.hook).not.toHaveBeenCalled();
   });
 
+  it("counts the retained preview when deciding whether offload recovered pressure", async () => {
+    const value = fixture();
+    const base = input(70_000);
+    const result = await value.compactor.compact({
+      ...base,
+      offload_items: [{
+        ...base.offload_items[0]!,
+        retained_token_count: 5_000,
+      }],
+    });
+
+    expect(result.action).toBe("offload");
+    expect(result.pressure_after_offload).toBe(0.6);
+  });
+
   it("compacts at 70% while preserving security and key facts exactly", async () => {
     const value = fixture();
     const original = { ...input(70_000), offload_items: [] };
@@ -223,6 +238,7 @@ describe("AH-RUNTIME-COMPACTION-001 deterministic compaction", () => {
     [{ stable_prefix: [{ id: "../escape", token_count: 1, content: "x", key_fact: true }] }, "context item id is invalid"],
     [{ recent_conversation: [{ id: "item", token_count: -1, content: "x", key_fact: true }] }, "context item token_count must be a non-negative safe integer"],
     [{ offload_items: [{ id: "item", token_count: 1.5, content: "x" }] }, "context item token_count must be a non-negative safe integer"],
+    [{ offload_items: [{ id: "item", token_count: 1, retained_token_count: 2, content: "x" }] }, "context item retained_token_count exceeds token_count"],
   ])("validates every context item before side effects", async (override, message) => {
     const value = fixture();
     await expect(value.compactor.compact({ ...input(39_999), ...override } as CompactionInput))

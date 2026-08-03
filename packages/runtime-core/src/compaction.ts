@@ -31,6 +31,7 @@ export interface CompactionConversationItem {
 export interface CompactionOffloadItem {
   readonly id: string;
   readonly token_count: number;
+  readonly retained_token_count?: number;
   readonly content: unknown;
 }
 
@@ -193,6 +194,9 @@ export class ContextCompactor {
           session_id: input.session_id,
           source_id: item.id,
           token_count: item.token_count,
+          ...(item.retained_token_count === undefined
+            ? {}
+            : { retained_token_count: item.retained_token_count }),
           content: item.content,
         }));
         const hash = sha256(payload);
@@ -206,7 +210,10 @@ export class ContextCompactor {
             sha256: hash,
           }),
         );
-        projectedTokens = Math.max(0, projectedTokens - item.token_count);
+        projectedTokens = Math.max(
+          0,
+          projectedTokens - item.token_count + (item.retained_token_count ?? 0),
+        );
       }
     }
 
@@ -302,6 +309,14 @@ export class ContextCompactor {
     for (const item of [...input.stable_prefix, ...input.recent_conversation, ...input.offload_items]) {
       requiredId("context item id", item.id);
       nonNegativeInteger("context item token_count", item.token_count);
+    }
+    for (const item of input.offload_items) {
+      if (item.retained_token_count !== undefined) {
+        nonNegativeInteger("context item retained_token_count", item.retained_token_count);
+        if (item.retained_token_count > item.token_count) {
+          throw new TypeError("context item retained_token_count exceeds token_count");
+        }
+      }
     }
     for (const field of [
       "approvals",
