@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ModelFallbackController,
+  ModelFallbackError,
   type FallbackResolvedProvider,
 } from "../../../packages/runtime-core/src/model-fallback.js";
 
@@ -20,12 +21,24 @@ describe("AH-RUNTIME-MODELFALLBACK-001 model fallback", () => {
     };
     for (const mutate of [
       () => undefined,
+      () => ({ ...good, gateway: undefined }),
       () => ({ ...good, gateway: { ...good.gateway, switchProvider: undefined } }),
       () => ({ ...good, gateway: { ...good.gateway, dispatchExact: undefined } }),
       () => ({ ...good, gateway: { ...good.gateway, classifyFailure: undefined } }),
       () => ({ ...good, cache: { invalidate: undefined } }),
+      () => ({ ...good, cache: undefined }),
       () => ({ ...good, context: { recompile: undefined } }),
+      () => ({ ...good, context: undefined }),
     ]) expect(() => new ModelFallbackController(mutate() as never)).toThrow("ModelFallbackController ports are required");
+  });
+
+  it("exposes a stable typed fallback error", () => {
+    const error = new ModelFallbackError("fallback_forbidden", "auth");
+    expect(error.name).toBe("ModelFallbackError");
+    expect(error.message).toBe("Model fallback failed: fallback_forbidden");
+    expect(error.code).toBe("fallback_forbidden");
+    expect(error.reason_code).toBe("auth");
+    expect(new ModelFallbackError("fallback_loop").reason_code).toBeUndefined();
   });
 
   it("invalidates and fully recompiles context before exact dispatch on every hop", async () => {
@@ -160,25 +173,28 @@ describe("AH-RUNTIME-MODELFALLBACK-001 model fallback", () => {
   });
 
   it.each([
-    ["provider id", { current_provider: provider("../primary") }],
-    ["operation id", { dispatch_context: { operation_id: "../operation" } }],
-    ["negative generation", { context_generation: -1 }],
-    ["fractional generation", { context_generation: 1.5 }],
-    ["visited shape", { visited_provider_ids: null }],
-    ["unsafe visited id", { visited_provider_ids: ["primary", "../bad"] }],
-    ["missing current visit", { visited_provider_ids: ["other"] }],
-  ])("rejects invalid %s before fallback selection", async (_label, override) => {
+    ["absent input", undefined, "current_provider.provider_id"],
+    ["provider id", { current_provider: provider("primary/escape") }, "current_provider.provider_id"],
+    ["operation id", { dispatch_context: { operation_id: "operation/escape" } }, "dispatch_context.operation_id"],
+    ["negative generation", { context_generation: -1 }, "context_generation"],
+    ["fractional generation", { context_generation: 1.5 }, "context_generation"],
+    ["visited shape", { visited_provider_ids: null }, "visited_provider_ids"],
+    ["unsafe visited id", { visited_provider_ids: ["primary", "valid/escape"] }, "visited_provider_ids"],
+    ["missing current visit", { visited_provider_ids: ["other"] }, "current_provider_not_visited"],
+  ])("rejects invalid %s before fallback selection", async (_label, override, reason_code) => {
     const switchProvider = vi.fn();
     const controller = new ModelFallbackController({
       gateway: { switchProvider, dispatchExact: vi.fn(), classifyFailure: vi.fn(() => ({ fallback_allowed: true, reason_code: "transient" })) },
       cache: { invalidate: vi.fn() }, context: { recompile: vi.fn() },
     });
-    await expect(controller.execute({
+    const valid = {
       current_provider: provider("primary"), selection_request: {},
       dispatch_context: { operation_id: "operation-1" }, context_generation: 1,
       visited_provider_ids: ["primary"], initial_failure: new Error("failed"),
-      ...override,
-    } as never)).rejects.toMatchObject({ code: "invalid_fallback_state" });
+      ...(override ?? {}),
+    };
+    await expect(controller.execute((override === undefined && _label === "absent input" ? undefined : valid) as never))
+      .rejects.toMatchObject({ code: "invalid_fallback_state", reason_code });
     expect(switchProvider).not.toHaveBeenCalled();
   });
 
@@ -186,6 +202,8 @@ describe("AH-RUNTIME-MODELFALLBACK-001 model fallback", () => {
     ["registry_snapshot_hash", "x".repeat(64)],
     ["provider_metadata_hash", "A".repeat(64)],
     ["selection_request_hash", "short"],
+    ["registry_snapshot_hash", `x${"a".repeat(64)}`],
+    ["selection_request_hash", `${"c".repeat(64)}x`],
   ] as const)("rejects malformed current %s", async (field, value) => {
     const controller = new ModelFallbackController({
       gateway: { switchProvider: vi.fn(), dispatchExact: vi.fn(), classifyFailure: vi.fn() },
@@ -199,9 +217,28 @@ describe("AH-RUNTIME-MODELFALLBACK-001 model fallback", () => {
   });
 
   it.each([
+    ["registry", { registry_snapshot_hash: "d".repeat(64) }],
+    ["selection", { selection_request_hash: "e".repeat(64) }],
+  ])("rejects candidate %s binding drift independently", async (_label, candidateOverride) => {
+    const controller = new ModelFallbackController({
+      gateway: {
+        switchProvider: () => ({ ...provider("secondary"), ...candidateOverride }), dispatchExact: vi.fn(),
+        classifyFailure: () => ({ fallback_allowed: true, reason_code: "transient" }),
+      },
+      cache: { invalidate: vi.fn() }, context: { recompile: vi.fn() },
+    });
+    await expect(controller.execute({
+      current_provider: provider("primary"), selection_request: {},
+      dispatch_context: { operation_id: "operation-1" }, context_generation: 1,
+      visited_provider_ids: ["primary"], initial_failure: new Error("failed"),
+    })).rejects.toMatchObject({ code: "invalid_fallback_state", reason_code: "candidate_binding" });
+  });
+
+  it.each([
     ["provider", { provider_id: "wrong", context_generation: 2, manifest_hash: "m" }],
     ["generation", { provider_id: "secondary", context_generation: 3, manifest_hash: "m" }],
     ["manifest", { provider_id: "secondary", context_generation: 2, manifest_hash: "../bad" }],
+    ["manifest suffix", { provider_id: "secondary", context_generation: 2, manifest_hash: "valid/escape" }],
   ])("rejects mismatched compiled %s before dispatch", async (_label, compiled) => {
     const dispatchExact = vi.fn();
     const controller = new ModelFallbackController({

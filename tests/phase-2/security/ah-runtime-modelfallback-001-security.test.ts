@@ -56,10 +56,10 @@ describe("AH-RUNTIME-MODELFALLBACK-001 security invariants", () => {
     };
     await expect(controller.execute({
       ...base, context_generation: 1, visited_provider_ids: ["primary", "primary"],
-    })).rejects.toMatchObject({ code: "invalid_fallback_state" });
+    })).rejects.toMatchObject({ code: "invalid_fallback_state", reason_code: "duplicate_visited_provider" });
     await expect(controller.execute({
       ...base, context_generation: Number.MAX_SAFE_INTEGER, visited_provider_ids: ["primary"],
-    })).rejects.toMatchObject({ code: "invalid_fallback_state" });
+    })).rejects.toMatchObject({ code: "invalid_fallback_state", reason_code: "context_generation" });
     expect(switchProvider).not.toHaveBeenCalled();
   });
 });
