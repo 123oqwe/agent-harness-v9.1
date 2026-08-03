@@ -1332,6 +1332,7 @@ export async function runPhase2Mutation({
   repositoryRoot = DEFAULT_PHASE2_MUTATION_ROOT,
   target = "phase2",
   reportRoot = DEFAULT_REPORT_ROOT,
+  timeoutMs = 15 * 60 * 1000,
 } = {}) {
   const root = resolve(repositoryRoot);
   const identity = repositoryIdentity(root, false);
@@ -1411,6 +1412,7 @@ export async function runPhase2Mutation({
       strykerExecutable: join(root, "node_modules/.bin/stryker"),
       vitestConfigPath: "vitest.mutation.config.ts",
       reportRoot,
+      timeoutMs,
       candidateContext: target === "phase2" ? candidateContext : null,
     });
     await validatePhase2MutationArtifacts({
