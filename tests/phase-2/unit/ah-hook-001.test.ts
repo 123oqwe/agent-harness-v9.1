@@ -14,6 +14,7 @@ import {
 
 class MemoryJournal implements HookJournalPort {
   readonly records = new Map<string, HookJournalRecord>();
+  readonly reconciliations = new Set<string>();
   readonly active = new Map<
     string,
     { token: string; done: Promise<void>; finish: () => void }
@@ -26,6 +27,12 @@ class MemoryJournal implements HookJournalPort {
     event: HookJournalRecord['event'];
     input_hash: string;
   }): Promise<HookJournalClaim> {
+    if (this.reconciliations.has(input.idempotency_key)) {
+      return {
+        status: 'reconciliation' as const,
+        reason_code: 'hook_claim_abandoned' as const,
+      };
+    }
     const record = this.records.get(input.idempotency_key);
     if (record) return { status: 'replay' as const, record };
     const active = this.active.get(input.idempotency_key);
@@ -56,6 +63,18 @@ class MemoryJournal implements HookJournalPort {
     for (const [key, active] of this.active) {
       if (active.token === claimToken) {
         this.active.delete(key);
+        active.finish();
+        return;
+      }
+    }
+    throw new Error('invalid journal claim');
+  }
+
+  async reconcile(claimToken: string): Promise<void> {
+    for (const [key, active] of this.active) {
+      if (active.token === claimToken) {
+        this.active.delete(key);
+        this.reconciliations.add(key);
         active.finish();
         return;
       }
@@ -656,13 +675,14 @@ describe('AH-HOOK-001 HookSystem', () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects invalid journal claims and releases a claim after commit failure', async () => {
+  it('rejects invalid journal claims and reconciles a claim after commit failure', async () => {
     const invalidClaimJournal: HookJournalPort = {
       claim: vi.fn(async () => ({
         status: 'claimed' as const,
         claim_token: '   ',
       })),
       commit: vi.fn(async () => undefined),
+      reconcile: vi.fn(async () => undefined),
       release: vi.fn(async () => undefined),
     };
     const handler = vi.fn(async () => ({ action: 'continue' as const }));
@@ -677,6 +697,7 @@ describe('AH-HOOK-001 HookSystem', () => {
     ).rejects.toThrow('hook journal returned an invalid claim token');
     expect(handler).not.toHaveBeenCalled();
 
+    const reconcile = vi.fn(async () => undefined);
     const release = vi.fn(async () => undefined);
     const failingCommitJournal: HookJournalPort = {
       claim: vi.fn(async () => ({
@@ -686,6 +707,7 @@ describe('AH-HOOK-001 HookSystem', () => {
       commit: vi.fn(async () => {
         throw new Error('commit failed');
       }),
+      reconcile,
       release,
     };
     const failingCommitSystem = new HookSystem(
@@ -697,7 +719,8 @@ describe('AH-HOOK-001 HookSystem', () => {
         request('pre_tool_use', 'commit-failure-key', {}),
       ),
     ).rejects.toThrow('commit failed');
-    expect(release).toHaveBeenCalledWith('claim-1');
+    expect(reconcile).toHaveBeenCalledWith('claim-1');
+    expect(release).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -753,6 +776,7 @@ describe('AH-HOOK-001 HookSystem', () => {
           reason_code: 'hook_claim_abandoned' as const,
         })),
         commit: vi.fn(async () => undefined),
+        reconcile: vi.fn(async () => undefined),
         release: vi.fn(async () => undefined),
       };
       const system = new HookSystem(

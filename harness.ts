@@ -15,7 +15,11 @@
  */
 import type { TaskContract } from './contracts/index.js';
 import type { RunPlan } from './router/static-router.js';
-import { StaticRouter, type RoutingResult } from './router/static-router.js';
+import {
+  deriveRunId,
+  StaticRouter,
+  type RoutingResult,
+} from './router/static-router.js';
 import type { ToolRegistry, RegistrySnapshot } from './tools/tool-registry.js';
 import type { SkillRegistry, SkillRegistrySnapshot } from './skills/skill-registry.js';
 import type { PolicyEngine } from './security/policy-engine.js';
@@ -55,7 +59,6 @@ import {
   buildEvidence,
   buildProviderSelectionRequest,
   canonicalHash,
-  deterministicRunId,
   extractToolReceipts,
   gatewayResultToModelTurn,
   normalizeWorkspaceToolInput,
@@ -203,7 +206,14 @@ export class Harness {
     }
     this.activeRun = true;
     try {
-      const requestedRunId = runId ?? deterministicRunId(task);
+      const requestedRunId =
+        runId ??
+        deriveRunId(
+          task,
+          this.toolSnapshot.snapshot_id,
+          this.skillSnapshot.snapshot_id,
+          this.config.gateway.registrySnapshotHash,
+        );
       const prompt = await this.dispatchHook(
         'user_prompt_submit',
         task,
@@ -215,12 +225,12 @@ export class Harness {
         },
       );
       if (prompt.action !== 'continue') {
-        return await this.runOnce(task, runId, prompt);
+        return await this.runOnce(task, requestedRunId, prompt);
       }
       if (!this.isTaskContract(prompt.payload)) {
         throw new Error('UserPromptSubmit hook returned an invalid TaskContract');
       }
-      return await this.runOnce(prompt.payload, runId);
+      return await this.runOnce(prompt.payload, requestedRunId);
     } finally {
       this.activeRun = false;
     }
@@ -228,7 +238,7 @@ export class Harness {
 
   private async runOnce(
     task: TaskContract,
-    runId?: string,
+    runId: string,
     promptRestriction?: RuntimeHookOutcome,
   ): Promise<HarnessOutcome> {
     this._modelCallCount = 0;
@@ -242,8 +252,7 @@ export class Harness {
       gateway: this.config.gateway,
     });
     const routing = router.route(task, runId);
-    const actualRunId =
-      runId ?? routing.run_plan?.run_id ?? deterministicRunId(task);
+    const actualRunId = routing.run_plan?.run_id ?? runId;
     this.execCtx = {
       ...this.config.executionContext,
       session_id: actualRunId,

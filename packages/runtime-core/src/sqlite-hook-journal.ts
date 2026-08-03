@@ -400,6 +400,24 @@ export class SqliteHookJournal implements HookJournalPort {
     transaction.immediate();
   }
 
+  async reconcile(claimToken: string): Promise<void> {
+    this.#assertOpen();
+    requiredId("claimToken", claimToken);
+    const transaction = this.#database.transaction(() => {
+      const result = this.#database
+        .prepare(
+          `UPDATE hook_journal
+           SET state = 'RECONCILIATION', owner_id = NULL,
+               claim_token_hash = NULL, lease_expires_at_ms = NULL,
+               updated_at_ms = ?
+           WHERE claim_token_hash = ? AND state = 'CLAIMED'`,
+        )
+        .run(this.#now(), tokenHash(claimToken));
+      if (result.changes !== 1) throw new Error("invalid Hook journal claim");
+    });
+    transaction.immediate();
+  }
+
   close(): void {
     if (this.#closed) return;
     try {

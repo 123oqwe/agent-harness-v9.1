@@ -13,6 +13,7 @@ import {
   type HarnessConfig,
 } from '../../../harness.js';
 import {
+  createDurableHookSystem,
   HookSystem,
   type HookEvent,
   type HookHandler,
@@ -139,6 +140,49 @@ function fixture(
 }
 
 describe('AH-HOOK-001 kernel integration', () => {
+  it('binds prompt Hook scope and routing to one full-task run identity', async () => {
+    const scopes: Array<{ run_id: string; session_id: string }> = [];
+    const durable = createDurableHookSystem({
+      databasePath: join(temporaryRoot('hook-prompt-identity-'), 'hooks.sqlite'),
+      masterKey: Buffer.alloc(32, 0x45),
+      ownerId: 'prompt-identity',
+      leaseMs: 1_000,
+      registrations: [
+        hook('prompt-identity', 'user_prompt_submit', async (input) => {
+          scopes.push({
+            run_id: input.scope.run_id,
+            session_id: input.scope.session_id,
+          });
+          return { action: 'attenuate', payload: input.payload };
+        }),
+      ],
+      attenuationPolicy: createHarnessHookAttenuationPolicy(),
+    });
+    const setup = fixture(durable.hooks, [
+      { content: 'first', stop_reason: 'stop' },
+      { content: 'second', stop_reason: 'stop' },
+    ]);
+    const firstTask = task();
+    const secondTask: TaskContract = {
+      ...task(),
+      constraints: [{ type: 'budget', value: '1000' }],
+    };
+
+    try {
+      const first = await setup.harness.run(firstTask);
+      const second = await setup.harness.run(secondTask);
+
+      expect(first.run_plan?.run_id).toBe(scopes[0]?.run_id);
+      expect(scopes[0]?.session_id).toBe(scopes[0]?.run_id);
+      expect(second.run_plan?.run_id).toBe(scopes[1]?.run_id);
+      expect(scopes[1]?.session_id).toBe(scopes[1]?.run_id);
+      expect(second.run_plan?.run_id).not.toBe(first.run_plan?.run_id);
+      expect(scopes).toHaveLength(2);
+    } finally {
+      durable.close();
+    }
+  });
+
   it('runs the eleven-event lifecycle and executes only final attenuated tool args', async () => {
     const events: HookEvent[] = [];
     const registrations: HookRegistration[] = [];

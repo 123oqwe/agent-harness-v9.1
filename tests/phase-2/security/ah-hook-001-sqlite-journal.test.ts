@@ -416,6 +416,63 @@ db.close();`,
     restarted.close();
   });
 
+  it('durably reconciles instead of re-executing after post-handler audit failure', async () => {
+    const path = fixture();
+    let executions = 0;
+    const registration = {
+      id: 'post-handler-audit-failure',
+      event: 'pre_tool_use' as const,
+      trust: 'managed' as const,
+      priority: 1,
+      timeout_ms: 100,
+      handler: {
+        handle: async () => {
+          executions += 1;
+          return { action: 'continue' as const };
+        },
+      },
+    };
+    const input = {
+      event: 'pre_tool_use' as const,
+      invocation_id: 'audit-failure-invocation',
+      idempotency_key: 'audit-failure-idempotency',
+      scope: scope(),
+      payload: { value: 'must-run-once' },
+    };
+    const first = createDurableHookSystem({
+      databasePath: path,
+      masterKey,
+      ownerId: 'audit-failure-first',
+      leaseMs: 1_000,
+      registrations: [registration],
+      audit: {
+        record: async () => {
+          throw new Error('audit persistence failed');
+        },
+      },
+    });
+
+    await expect(first.hooks.dispatch(input)).rejects.toThrow(
+      'audit persistence failed',
+    );
+    first.close();
+
+    const restarted = createDurableHookSystem({
+      databasePath: path,
+      masterKey,
+      ownerId: 'audit-failure-restart',
+      leaseMs: 1_000,
+      registrations: [registration],
+    });
+    await expect(restarted.hooks.dispatch(input)).resolves.toMatchObject({
+      action: 'deny',
+      reason_code: 'hook_claim_abandoned',
+      replayed: false,
+    });
+    expect(executions).toBe(1);
+    restarted.close();
+  });
+
   it('allows a definitely-uncommitted released claim to be acquired again', async () => {
     const path = fixture();
     const journal = new SqliteHookJournal(path, {

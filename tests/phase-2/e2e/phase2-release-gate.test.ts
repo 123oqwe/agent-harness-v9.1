@@ -275,8 +275,11 @@ describe("Phase 2 real release gate", () => {
         mode: "workspace",
         workspaceReady: true,
         compositionBound: true,
+        runtimeCorePacked: true,
+        runtimeCoreRestartReplay: true,
         errors: [],
       });
+      expect(composition.runtimeCoreTarballSha256).toMatch(/^[a-f0-9]{64}$/u);
       expect(composition).not.toHaveProperty("releaseReady");
       expect(
         composition.workspaces.map(

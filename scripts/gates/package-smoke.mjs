@@ -217,6 +217,12 @@ export const runWorkspaceCompositionSmoke = async ({
   const errors = [];
   const workspaces = [];
   let compositionBound = false;
+  let runtimeCorePacked = false;
+  let runtimeCoreRestartReplay = false;
+  let runtimeCoreTarballSha256 = null;
+  const externalRoot = mkdtempSync(
+    join(tmpdir(), "phase2-runtime-core-consumer-"),
+  );
   try {
     const boundaries = checkWorkspaceBoundaries({ repositoryRoot });
     if (!boundaries.ok) {
@@ -260,14 +266,125 @@ export const runWorkspaceCompositionSmoke = async ({
     if (!compositionBound) {
       throw new Error("API composition did not bind built root authorities");
     }
+
+    const tarballs = {};
+    for (const workspacePath of [
+      "packages/contracts",
+      "packages/runtime-core",
+    ]) {
+      const packed = spawnSync(
+        "npm",
+        [
+          "pack",
+          "--json",
+          "--ignore-scripts",
+          "--silent",
+          "--pack-destination",
+          externalRoot,
+        ],
+        {
+          cwd: join(repositoryRoot, workspacePath),
+          env: createSafeCommandEnvironment(),
+          shell: false,
+          encoding: "utf8",
+          maxBuffer: 4 * 1024 * 1024,
+          timeout: 120_000,
+        },
+      );
+      if (packed.status !== 0) {
+        throw new Error(
+          `${workspacePath} npm pack failed with exit ${String(packed.status)}`,
+        );
+      }
+      const result = parseNpmJson(packed.stdout);
+      tarballs[workspacePath] = join(
+        externalRoot,
+        basename(result[0].filename),
+      );
+    }
+    runtimeCoreTarballSha256 = createHash("sha256")
+      .update(readFileSync(tarballs["packages/runtime-core"]))
+      .digest("hex");
+    writeFileSync(
+      join(externalRoot, "package.json"),
+      `${JSON.stringify({ name: "runtime-core-external-consumer", private: true, type: "module" })}\n`,
+    );
+    const install = spawnSync(
+      "npm",
+      [
+        "install",
+        "--no-audit",
+        "--no-fund",
+        "--package-lock=false",
+        "--prefer-offline",
+        tarballs["packages/contracts"],
+        tarballs["packages/runtime-core"],
+      ],
+      {
+        cwd: externalRoot,
+        env: createSafeCommandEnvironment(),
+        shell: false,
+        encoding: "utf8",
+        maxBuffer: 4 * 1024 * 1024,
+        timeout: 180_000,
+      },
+    );
+    if (install.status !== 0) {
+      throw new Error(
+        `runtime-core external install failed with exit ${String(install.status)}`,
+      );
+    }
+    const databasePath = join(externalRoot, "hook-restart.sqlite");
+    const smokeSource = [
+      `import {createDurableHookSystem} from "@agent-harness/runtime-core";`,
+      "let executions=0;",
+      "const registration={id:'packed-hook',event:'pre_tool_use',trust:'managed',priority:1,timeout_ms:100,handler:{handle:async()=>{executions+=1;return {action:'continue'}}}};",
+      "const input={event:'pre_tool_use',invocation_id:'packed-invocation',idempotency_key:'packed-idempotency',scope:{tenant_id:'packed-tenant',run_id:'packed-run',session_id:'packed-session'},payload:{value:'packed'}};",
+      `const options={databasePath:${JSON.stringify(databasePath)},masterKey:Buffer.alloc(32,0x46),leaseMs:1000,registrations:[registration]};`,
+      "const first=createDurableHookSystem({...options,ownerId:'packed-first'});",
+      "const initial=await first.hooks.dispatch(input);first.close();",
+      "const restarted=createDurableHookSystem({...options,ownerId:'packed-restart'});",
+      "const replay=await restarted.hooks.dispatch(input);restarted.close();",
+      "if(initial.replayed||!replay.replayed||executions!==1)throw new Error('runtime-core restart replay failed');",
+      "process.stdout.write(JSON.stringify({restartReplay:true,executions}));",
+    ].join("");
+    const smoke = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", smokeSource],
+      {
+        cwd: externalRoot,
+        env: createSafeCommandEnvironment(),
+        shell: false,
+        encoding: "utf8",
+        maxBuffer: 4 * 1024 * 1024,
+        timeout: 30_000,
+      },
+    );
+    if (smoke.status !== 0) {
+      const stderrSha256 = createHash("sha256")
+        .update(smoke.stderr)
+        .digest("hex");
+      throw new Error(
+        `runtime-core external restart smoke failed with exit ${String(smoke.status)} (stderr_sha256=${stderrSha256})`,
+      );
+    }
+    const smokeResult = JSON.parse(smoke.stdout);
+    runtimeCoreRestartReplay =
+      smokeResult.restartReplay === true && smokeResult.executions === 1;
+    runtimeCorePacked = runtimeCoreRestartReplay;
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
+  } finally {
+    rmSync(externalRoot, { recursive: true, force: true });
   }
   return {
     mode: "workspace",
     errors,
     workspaces,
     compositionBound,
+    runtimeCorePacked,
+    runtimeCoreRestartReplay,
+    runtimeCoreTarballSha256,
     workspaceReady: errors.length === 0,
   };
 };

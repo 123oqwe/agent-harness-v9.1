@@ -136,13 +136,6 @@ export function assertTimestamp(value: string, source: string): string {
   return value;
 }
 
-export function deterministicRunId(task: TaskContract): string {
-  return `run-${createHash('sha256')
-    .update(task.goal)
-    .digest('hex')
-    .slice(0, 12)}`;
-}
-
 export function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value !== null && typeof value === 'object') {

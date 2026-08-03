@@ -40,6 +40,7 @@ export const phase2MutationRequirements = Object.freeze([
     ],
     integrationSources: [
       "harness.ts",
+      "router/static-router.ts",
       "runtime/hook-port.ts",
       "runtime/loop.ts",
       "runtime/plan-execute.ts",

@@ -9,7 +9,6 @@ import {
   canonicalHash,
   canonicalize,
   createDefaultExecutionContext,
-  deterministicRunId,
   extractToolReceipts,
   gatewayResultToModelTurn,
   normalizeWorkspaceToolInput,
@@ -204,15 +203,6 @@ describe('Harness runtime support', () => {
     );
     expect(canonicalHash({ a: 1 }, 12)).toHaveLength(12);
     expect(canonicalHash({ a: 1 })).toHaveLength(64);
-  });
-
-  it('derives a stable goal-scoped fallback run id', () => {
-    const first = deterministicRunId(task());
-    expect(first).toMatch(/^run-[0-9a-f]{12}$/u);
-    expect(deterministicRunId(task())).toBe(first);
-    expect(
-      deterministicRunId({ ...task(), goal: 'different' }),
-    ).not.toBe(first);
   });
 
   it('returns a complete immutable terminal failure shape', () => {

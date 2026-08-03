@@ -146,7 +146,7 @@ export function selectStrategy(intent: IntentProfile): ReasoningStrategy {
 }
 
 /** Deterministic run_id: UUID v5-style (deterministic from task + snapshots, no Date.now()). */
-function deterministicRunId(task: TaskContract, toolSnapId: string, skillSnapId: string, providerSnapId: string): string {
+export function deriveRunId(task: TaskContract, toolSnapId: string, skillSnapId: string, providerSnapId: string): string {
   const hash = createHash('sha256').update(JSON.stringify(canonicalize(task)) + toolSnapId + skillSnapId + providerSnapId).digest('hex');
   // Format as UUID: 8-4-4-4-12 hex chars from the hash
   return `${hash.slice(0,8)}-${hash.slice(8,12)}-${hash.slice(12,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
@@ -418,7 +418,7 @@ export class StaticRouter {
   ): RunPlan {
     const run_id =
       runIdOverride ??
-      deterministicRunId(
+      deriveRunId(
         task,
         this.deps.toolSnapshot.snapshot_id,
         this.deps.skillSnapshot.snapshot_id,

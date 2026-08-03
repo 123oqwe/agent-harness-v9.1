@@ -145,6 +145,7 @@ export interface HookJournalPort {
     readonly input_hash: string;
   }): Promise<HookJournalClaim>;
   commit(claimToken: string, record: HookJournalRecord): Promise<void>;
+  reconcile(claimToken: string): Promise<void>;
   release(claimToken: string): Promise<void>;
 }
 
@@ -484,10 +485,11 @@ export class HookSystem {
     } catch (error) {
       if (this.#journal && claimToken) {
         try {
-          await this.#journal.release(claimToken);
+          await this.#journal.reconcile(claimToken);
         } catch {
-          // Preserve the original execution/commit failure. A failed release
-          // remains durable and must reconcile rather than being hidden.
+          // Preserve the original execution/commit failure. A claim that
+          // cannot be transitioned remains durable and must reconcile on
+          // lease expiry rather than being hidden or released for retry.
         }
       }
       throw error;

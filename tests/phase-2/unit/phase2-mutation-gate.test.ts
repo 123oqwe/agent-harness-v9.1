@@ -187,6 +187,9 @@ describe("Phase 2 mutation authority", () => {
 
   it("derives the integrated Hook and SessionTree suites from the gate", () => {
     const authority = loadPhase2MutationAuthority({ manifest });
+    const hook = authority.requirements.find(
+      (entry: { id: string }) => entry.id === "AH-HOOK-001",
+    );
     const testsFor = (id: string) =>
       authority.requirements.find((entry: { id: string }) => entry.id === id)
         ?.tests;
@@ -199,6 +202,7 @@ describe("Phase 2 mutation authority", () => {
       "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
       "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts",
     ]);
+    expect(hook.integrationSources).toContain("router/static-router.ts");
     expect(testsFor("AH-RUNTIME-SESSIONTREE-001")).toEqual([
       "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
       "tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts",
