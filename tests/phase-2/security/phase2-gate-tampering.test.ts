@@ -199,7 +199,8 @@ describe("Phase 2 gate tamper resistance", () => {
           id !== "AH-HOOK-001" &&
           id !== "AH-RUNTIME-STEERING-001" &&
           id !== "AH-RUNTIME-BUDGET-002" &&
-          id !== "AH-PAUSE-RESUME-001",
+          id !== "AH-PAUSE-RESUME-001" &&
+          id !== "AH-RUNTIME-COMPACTION-001",
       )
       .sort();
     expect(result.releaseReady).toBe(false);

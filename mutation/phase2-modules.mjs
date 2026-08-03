@@ -84,7 +84,14 @@ export const phase2MutationRequirements = Object.freeze([
     ],
     integrationSources: ["harness.ts", "runtime/loop.ts"],
   }),
-  requirement("AH-RUNTIME-COMPACTION-001"),
+  requirement("AH-RUNTIME-COMPACTION-001", {
+    status: "ready",
+    sources: [
+      "packages/runtime-core/src/compaction.ts",
+      "runtime/compaction-port.ts",
+    ],
+    integrationSources: ["runtime/hook-port.ts"],
+  }),
   requirement("AH-RUNTIME-MODELFALLBACK-001"),
   requirement("AH-RUNTIME-SESSIONTREE-001", {
     status: "ready",

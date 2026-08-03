@@ -112,3 +112,19 @@ export {
   type PauseResumeEffectState,
   type PauseResumeJournalPort,
 } from "./pause-resume.js";
+
+export {
+  ContextCompactor,
+  type BeforeCompactPort,
+  type CompactionConversationItem,
+  type CompactionInput,
+  type CompactionOffloadItem,
+  type CompactionResult,
+  type CompactionSecurityState,
+  type CompactionState,
+  type CompactionVfsPort,
+  type ContextCompactorOptions,
+  type ContextHandoffHandle,
+  type FreshSessionPort,
+  type OffloadedContextHandle,
+} from "./compaction.js";
