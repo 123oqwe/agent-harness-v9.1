@@ -155,9 +155,7 @@ const deepFreeze = <T>(value: T): T => {
 };
 
 const clone = <T>(value: T): T => {
-  const encoded = JSON.stringify(value);
-  if (encoded === undefined) throw new TypeError("context value must be JSON-serializable");
-  return JSON.parse(encoded) as T;
+  return JSON.parse(JSON.stringify(value)) as T;
 };
 
 const requiredId = (label: string, value: unknown): string => {
