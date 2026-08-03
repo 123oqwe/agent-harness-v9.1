@@ -53,10 +53,33 @@
       "priority": "P0",
       "dependencies": ["AH-RUNTIME-COMPACTION-001"],
       "owner": "packages/runtime-core",
-      "test_suites": ["tests/phase-2/unit/ah-context-compiler-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-context-compiler-001.test.ts",
+        "tests/phase-2/integration/ah-context-compiler-001-vfs.test.ts",
+        "tests/phase-2/security/ah-context-compiler-001-security.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-CONTEXT-COMPILER-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "source_files": ["packages/runtime-core/src/context-compiler.ts"],
+      "test_files": [
+        "tests/phase-2/unit/ah-context-compiler-001.test.ts",
+        "tests/phase-2/integration/ah-context-compiler-001-vfs.test.ts",
+        "tests/phase-2/security/ah-context-compiler-001-security.test.ts"
+      ],
+      "owned_sources": ["packages/runtime-core/src/context-compiler.ts"],
+      "integration_sources": ["vfs/virtual-filesystem.ts"],
+      "runtime_assets": [
+        "packages/runtime-core/src/index.ts",
+        "packages/runtime-core/package.json",
+        "packages/runtime-core/src/compaction.ts"
+      ],
+      "behavioral_tests": [
+        "tests/phase-2/unit/ah-context-compiler-001.test.ts",
+        "tests/phase-2/integration/ah-context-compiler-001-vfs.test.ts"
+      ],
+      "security_tests": ["tests/phase-2/security/ah-context-compiler-001-security.test.ts"],
+      "mutation_configs": ["vitest.mutation.config.ts"]
     },
     {
       "id": "AH-DOC-INGEST-DOCX-001",
