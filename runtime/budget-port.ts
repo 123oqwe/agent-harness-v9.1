@@ -57,10 +57,6 @@ export interface BudgetLedgerRuntimeAdapterOptions {
   readonly estimator?: RuntimeBudgetEstimatorPort;
 }
 
-interface PendingBudgetCall {
-  readonly call_id: string;
-}
-
 /**
  * Root integration adapter for the unique runtime-core BudgetLedger authority.
  * Actual usage is conservatively charged as uncached until the provider usage
@@ -70,7 +66,7 @@ export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
   readonly #ledger: BudgetLedger;
   readonly #pricing: BudgetPricing;
   readonly #estimator: RuntimeBudgetEstimatorPort | undefined;
-  readonly #pending = new Map<string, PendingBudgetCall>();
+  readonly #pending = new Set<string>();
 
   constructor(options: BudgetLedgerRuntimeAdapterOptions) {
     this.#ledger = options.ledger;
@@ -94,9 +90,7 @@ export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
       output_tokens: input.requested_max_output_tokens,
       pricing: this.#pricing,
       requested_max_output_tokens: input.requested_max_output_tokens,
-      ...(estimate.dag_node_count === undefined
-        ? {}
-        : { dag_node_count: estimate.dag_node_count }),
+      dag_node_count: estimate.dag_node_count ?? 1,
     });
     if (!authorization.allowed) {
       return {
@@ -105,7 +99,7 @@ export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
         max_output_tokens: 0,
       };
     }
-    this.#pending.set(callId, { call_id: callId });
+    this.#pending.add(callId);
     return {
       allowed: true,
       reason: "within_budget",
@@ -116,12 +110,11 @@ export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
 
   afterModelCall(input: RuntimeBudgetUsage): void {
     const callId = this.#callId(input);
-    const pending = this.#pending.get(callId);
-    if (pending === undefined) {
+    if (!this.#pending.has(callId)) {
       throw new Error("budget usage has no authorized pending call");
     }
     this.#ledger.recordModelCall({
-      call_id: pending.call_id,
+      call_id: callId,
       cached_input_tokens: 0,
       uncached_input_tokens: input.input_tokens,
       output_tokens: input.output_tokens,

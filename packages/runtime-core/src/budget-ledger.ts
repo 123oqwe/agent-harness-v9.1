@@ -114,12 +114,12 @@ export class BudgetLedger {
   #spent = 0;
 
   constructor(options: BudgetLedgerOptions) {
-    requiredId("tenant_id", options?.scope?.tenant_id);
-    requiredId("run_id", options?.scope?.run_id);
-    requiredId("session_id", options?.scope?.session_id);
-    nonNegativeSafeInteger("ceiling.usd_micros", options?.ceiling?.usd_micros);
+    requiredId("tenant_id", options.scope.tenant_id);
+    requiredId("run_id", options.scope.run_id);
+    requiredId("session_id", options.scope.session_id);
+    nonNegativeSafeInteger("ceiling.usd_micros", options.ceiling.usd_micros);
     if (
-      options?.journal === undefined ||
+      options.journal === undefined ||
       typeof options.journal.read !== "function" ||
       typeof options.journal.append !== "function"
     ) {

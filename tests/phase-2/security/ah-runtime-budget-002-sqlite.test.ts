@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   BudgetLedger,
   SqliteBudgetJournal,
+  type BudgetEvent,
+  type BudgetScope,
 } from "../../../packages/runtime-core/src/index.js";
 
 const roots: string[] = [];
@@ -30,6 +32,29 @@ function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "budget-journal-"));
   roots.push(root);
   return join(root, "budget.sqlite");
+}
+
+function eventFor(
+  eventScope: BudgetScope = scope,
+  callId = "call-1",
+): BudgetEvent {
+  const events: BudgetEvent[] = [];
+  const ledger = new BudgetLedger({
+    scope: eventScope,
+    ceiling: { usd_micros: 100 },
+    journal: {
+      read: () => events,
+      append: (event) => events.push(event),
+    },
+  });
+  ledger.recordModelCall({
+    call_id: callId,
+    cached_input_tokens: 0,
+    uncached_input_tokens: 1,
+    output_tokens: 0,
+    pricing,
+  });
+  return events[0]!;
 }
 
 describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
@@ -132,5 +157,168 @@ describe("AH-RUNTIME-BUDGET-002 SQLite journal", () => {
         }),
     ).toThrow();
     reopened.close();
+  });
+
+  it("rejects every invalid database path and scope field", () => {
+    expect(() => new SqliteBudgetJournal("", scope)).toThrow(
+      "databasePath is required",
+    );
+    for (const [patch, message] of [
+      [{ tenant_id: " " }, "tenant_id is required"],
+      [{ run_id: "" }, "run_id is required"],
+      [{ session_id: 1 }, "session_id is required"],
+    ] as const) {
+      expect(
+        () =>
+          new SqliteBudgetJournal(fixture(), {
+            ...scope,
+            ...patch,
+          } as never),
+      ).toThrow(message);
+    }
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    journal.close();
+  });
+
+  it("fails closed for malformed persisted JSON and event shapes", () => {
+    for (const [stored, message] of [
+      ["{", "budget journal contains invalid JSON"],
+      ["null", "budget journal contains an invalid event"],
+      ["1", "budget journal contains an invalid event"],
+      ["[]", "budget journal contains an invalid event"],
+    ] as const) {
+      const path = fixture();
+      const initialized = new SqliteBudgetJournal(path, scope);
+      initialized.close();
+      const database = new Database(path);
+      database
+        .prepare(
+          `INSERT INTO budget_journal
+            (tenant_id, run_id, session_id, sequence, call_id, event_json)
+           VALUES (?, ?, ?, 0, 'malformed', ?)`,
+        )
+        .run(scope.tenant_id, scope.run_id, scope.session_id, stored);
+      database.close();
+      const reopened = new SqliteBudgetJournal(path, scope);
+      expect(() => reopened.read()).toThrow(message);
+      reopened.close();
+    }
+  });
+
+  it("rejects each append identity violation without writing a row", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope);
+    const valid = eventFor();
+    for (const field of ["tenant_id", "run_id", "session_id"] as const) {
+      expect(() =>
+        journal.append({
+          ...valid,
+          scope: { ...valid.scope, [field]: `wrong-${field}` },
+        }),
+      ).toThrow("budget journal append scope mismatch");
+    }
+    expect(() => journal.append({ ...valid, call_id: " " })).toThrow(
+      "call_id is required",
+    );
+    expect(journal.read()).toEqual([]);
+    journal.close();
+  });
+
+  it("distinguishes stale sequence, corrupt prior JSON, and stale hash", () => {
+    const path = fixture();
+    const journal = new SqliteBudgetJournal(path, scope);
+    const ledger = new BudgetLedger({
+      scope,
+      ceiling: { usd_micros: 100 },
+      journal,
+    });
+    ledger.recordModelCall({
+      call_id: "call-1",
+      cached_input_tokens: 0,
+      uncached_input_tokens: 1,
+      output_tokens: 0,
+      pricing,
+    });
+    const first = journal.read()[0]!;
+    expect(() =>
+      journal.append({ ...first, call_id: "stale-sequence" }),
+    ).toThrow("budget journal stale append rejected");
+    expect(() =>
+      journal.append({
+        ...first,
+        sequence: 1,
+        call_id: "stale-hash",
+        previous_hash: "f".repeat(64),
+      }),
+    ).toThrow("budget journal stale hash append rejected");
+    expect(journal.read()).toHaveLength(1);
+
+    const database = new Database(path);
+    database
+      .prepare("UPDATE budget_journal SET event_json = ?")
+      .run("{");
+    database.close();
+    expect(() =>
+      journal.append({
+        ...first,
+        sequence: 1,
+        call_id: "corrupt-prior",
+        previous_hash: first.event_hash,
+      }),
+    ).toThrow("budget journal contains invalid JSON");
+    journal.close();
+  });
+
+  it("is idempotently closeable and fails closed after close", () => {
+    const journal = new SqliteBudgetJournal(fixture(), scope);
+    journal.close();
+    expect(() => journal.close()).not.toThrow();
+    expect(() => journal.read()).toThrow("budget journal is closed");
+    expect(() => journal.append(eventFor())).toThrow(
+      "budget journal is closed",
+    );
+  });
+
+  it("isolates scopes and returns each scope in append order", () => {
+    const path = fixture();
+    const scopeB = {
+      tenant_id: "tenant-b",
+      run_id: "run-b",
+      session_id: "session-b",
+    } as const;
+    const journalA = new SqliteBudgetJournal(path, scope);
+    const journalB = new SqliteBudgetJournal(path, scopeB);
+    const ledgerA = new BudgetLedger({
+      scope,
+      ceiling: { usd_micros: 100 },
+      journal: journalA,
+    });
+    const ledgerB = new BudgetLedger({
+      scope: scopeB,
+      ceiling: { usd_micros: 100 },
+      journal: journalB,
+    });
+    const record = (ledger: BudgetLedger, call_id: string) =>
+      ledger.recordModelCall({
+        call_id,
+        cached_input_tokens: 0,
+        uncached_input_tokens: 1,
+        output_tokens: 0,
+        pricing,
+      });
+    record(ledgerA, "a-1");
+    record(ledgerA, "a-2");
+    record(ledgerB, "b-1");
+
+    expect(journalA.read().map((event) => event.call_id)).toEqual([
+      "a-1",
+      "a-2",
+    ]);
+    expect(journalB.read().map((event) => event.call_id)).toEqual(["b-1"]);
+    expect(Object.isFrozen(journalA.read()[0])).toBe(true);
+    journalA.close();
+    journalB.close();
   });
 });

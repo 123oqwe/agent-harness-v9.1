@@ -240,4 +240,133 @@ describe("AH-RUNTIME-BUDGET-002 LoopEngine integration", () => {
     });
     expect(events.events).toHaveLength(1);
   });
+
+  it("fails closed across the adapter pending-call state machine", () => {
+    const events = journal();
+    const adapter = new BudgetLedgerRuntimeAdapter({
+      ledger: new BudgetLedger({
+        scope: {
+          tenant_id: "tenant-a",
+          run_id: "run-adapter-state",
+          session_id: "run-adapter-state",
+        },
+        ceiling: { usd_micros: 100 },
+        journal: events,
+      }),
+      pricing,
+    });
+    const preflight = {
+      run_id: "run-adapter-state",
+      iteration: 1,
+      attempt: 1,
+      remaining_tokens: 100,
+      requested_max_output_tokens: 2,
+      estimated_input_tokens: 3,
+    } as const;
+
+    expect(adapter.beforeModelCall(preflight)).toEqual({
+      allowed: true,
+      reason: "within_budget",
+      max_output_tokens: 2,
+    });
+    expect(() => adapter.beforeModelCall(preflight)).toThrow(
+      "budget call is already pending",
+    );
+    adapter.afterModelCall({
+      run_id: preflight.run_id,
+      iteration: 1,
+      attempt: 1,
+      input_tokens: 3,
+      output_tokens: 2,
+    });
+    expect(() =>
+      adapter.afterModelCall({
+        run_id: preflight.run_id,
+        iteration: 1,
+        attempt: 1,
+        input_tokens: 3,
+        output_tokens: 2,
+      }),
+    ).toThrow("budget usage has no authorized pending call");
+    expect(events.events[0]).toMatchObject({
+      call_id: "run-adapter-state:1:1",
+      cached_input_tokens: 0,
+      uncached_input_tokens: 3,
+      output_tokens: 2,
+      usd_micros: 5,
+    });
+  });
+
+  it("returns exact deny and degradation decisions without granting authority", () => {
+    const deny = new BudgetLedgerRuntimeAdapter({
+      ledger: new BudgetLedger({
+        scope: {
+          tenant_id: "tenant-a",
+          run_id: "run-adapter-deny",
+          session_id: "run-adapter-deny",
+        },
+        ceiling: { usd_micros: 0 },
+        journal: journal(),
+      }),
+      pricing,
+    });
+    const denied = {
+      run_id: "run-adapter-deny",
+      iteration: 1,
+      attempt: 1,
+      remaining_tokens: 100,
+      requested_max_output_tokens: 1,
+      estimated_input_tokens: 1,
+    } as const;
+    expect(deny.beforeModelCall(denied)).toEqual({
+      allowed: false,
+      reason: "budget_exhausted",
+      max_output_tokens: 0,
+    });
+    expect(deny.beforeModelCall(denied)).toEqual({
+      allowed: false,
+      reason: "budget_exhausted",
+      max_output_tokens: 0,
+    });
+
+    const attenuated = new BudgetLedgerRuntimeAdapter({
+      ledger: new BudgetLedger({
+        scope: {
+          tenant_id: "tenant-a",
+          run_id: "run-adapter-attenuate",
+          session_id: "run-adapter-attenuate",
+        },
+        ceiling: { usd_micros: 100 },
+        journal: journal(),
+        degradation_matrix: [
+          {
+            remaining_ratio_at_or_below: 1,
+            action: "reduce_output",
+            max_output_tokens: 2,
+          },
+        ],
+      }),
+      pricing,
+      estimator: {
+        estimate: () => ({
+          cached_input_tokens: 1,
+          uncached_input_tokens: 0,
+        }),
+      },
+    });
+    expect(
+      attenuated.beforeModelCall({
+        run_id: "run-adapter-attenuate",
+        iteration: 1,
+        attempt: 1,
+        remaining_tokens: 100,
+        requested_max_output_tokens: 5,
+        estimated_input_tokens: 99,
+      }),
+    ).toEqual({
+      allowed: true,
+      reason: "within_budget",
+      max_output_tokens: 2,
+    });
+  });
 });

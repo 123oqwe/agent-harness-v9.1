@@ -31,9 +31,9 @@ function requiredId(label: string, value: unknown): asserts value is string {
 }
 
 function validateScope(scope: BudgetScope): void {
-  requiredId("tenant_id", scope?.tenant_id);
-  requiredId("run_id", scope?.run_id);
-  requiredId("session_id", scope?.session_id);
+  requiredId("tenant_id", scope.tenant_id);
+  requiredId("run_id", scope.run_id);
+  requiredId("session_id", scope.session_id);
 }
 
 interface StoredBudgetRow {
