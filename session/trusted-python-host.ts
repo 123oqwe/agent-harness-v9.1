@@ -76,7 +76,7 @@ function assertSafeAncestors(path: string): void {
   let current = path;
   while (true) {
     const metadata = lstatSync(current);
-    if (!trustedOwner(metadata.uid) || metadata.mode & 0o022) {
+    if (!trustedOwner(metadata.uid) || ((metadata.mode & 0o022) && !(metadata.mode & 0o1000))) {
       throw new Error("trusted host ancestor metadata is unsafe");
     }
     const parent = dirname(current);
