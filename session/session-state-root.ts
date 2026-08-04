@@ -44,10 +44,13 @@ function trustedOwner(uid: number): boolean {
 }
 
 function assertSafeAncestors(path: string): void {
+  // Ancestors with group/other write are allowed only when the sticky bit
+  // (0o1000) is set, as on Linux /tmp (mode 1777): the sticky bit prevents
+  // other users from deleting or renaming entries they do not own.
   let current = path;
   while (true) {
     const value = lstatSync(current);
-    if (!value.isDirectory() || !trustedOwner(value.uid) || value.mode & 0o022) {
+    if (!value.isDirectory() || !trustedOwner(value.uid) || ((value.mode & 0o022) && !(value.mode & 0o1000))) {
       throw new SessionStateRootError(
         "STATE_ROOT_UNTRUSTED",
         "session state root ancestor metadata is unsafe",
