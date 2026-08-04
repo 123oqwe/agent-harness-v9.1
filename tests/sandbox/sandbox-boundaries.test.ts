@@ -717,7 +717,6 @@ describe('OS sandbox argv compiler', () => {
       'sandbox',
       '--',
       '/usr/bin/prlimit',
-      `--as=${64 * 1024 * 1024}`,
       '--nproc=7',
       '--',
       '/bin/echo',

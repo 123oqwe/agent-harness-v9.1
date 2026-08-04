@@ -406,8 +406,6 @@ export function buildSandboxArgv(
     return ['sandbox-exec', '-f', profileFile, '--', ...opts.argv];
   }
   if (mech === 'bubblewrap') {
-    const addressSpaceBytes =
-      (BigInt(limits.memoryMb) * 1024n * 1024n).toString();
     const args = [
       'bwrap',
       '--unshare-all',
@@ -424,7 +422,6 @@ export function buildSandboxArgv(
       '--hostname', 'sandbox',
       '--',
       '/usr/bin/prlimit',
-      `--as=${addressSpaceBytes}`,
       `--nproc=${limits.processLimit}`,
       '--',
       ...opts.argv,

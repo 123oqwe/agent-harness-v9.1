@@ -184,11 +184,11 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
         limits: {
           timeoutMs: registration.timeout_ms,
           outputBytes: MAX_JSON_BYTES,
-          // 512 MB RLIMIT_AS: Node.js 20 V8 maps large virtual regions for
-          // the isolate, code range, and pointer-compression cage. 256 MB
-          // causes SIGTRAP (exit 133) on GitHub Actions; 512 MB is the
-          // minimum that reliably allows V8 to initialise.
-          memoryMb: 512,
+          // Memory ceiling enforced by the RSS monitor (inspectProcessLimit),
+          // not RLIMIT_AS. V8's CodeRange reservation requires more virtual
+          // address space than any reasonable RLIMIT_AS allows, so prlimit
+          // --as is omitted and memory is bounded at runtime via ps sampling.
+          memoryMb: 256,
           processLimit: 8,
         },
         profile: {
@@ -200,9 +200,7 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
           // sandboxed Node process find sibling runtime files (e.g. on
           // GitHub Actions at /opt/hostedtoolcache/node/.../bin/).
           allowRead: [dirname(executable)],
-          // Constrain V8's old-generation heap so the process stays well
-          // within the RLIMIT_AS ceiling while still initialising cleanly.
-          environment: { NODE_OPTIONS: '--max-old-space-size=64' },
+          environment: {},
           egressAllowlist: [],
         },
         signal,
