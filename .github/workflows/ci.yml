@@ -34,6 +34,57 @@ jobs:
       - run: npm run check:cycles
       - run: npm run build
       - run: npm run lint
+      - name: Debug Hook sandbox ESM
+        run: |
+          node -e '
+          const { mkdtempSync, writeFileSync, rmSync, existsSync } = require("fs");
+          const { join, dirname } = require("path");
+          const { tmpdir } = require("os");
+          const { spawn } = require("child_process");
+          const root = mkdtempSync(join(tmpdir(), "ah-hook-debug-"));
+          const nodeBin = process.execPath;
+          const nodeDir = dirname(nodeBin);
+          const nodeRoot = dirname(nodeDir);
+          const sysRoots = ["/usr","/bin","/sbin","/lib","/lib64"].filter(existsSync).flatMap(p => ["--ro-bind",p,p]);
+          // Simple .mjs that does NOT read stdin
+          const script1 = join(root, "simple.mjs");
+          writeFileSync(script1, `process.stdout.write(JSON.stringify({ok:true,mode:"simple-mjs"}));`, { mode: 0o700 });
+          // .mjs that reads stdin
+          const script2 = join(root, "stdin.mjs");
+          writeFileSync(script2, `const c=[];for await(const chunk of process.stdin)c.push(chunk);process.stdout.write(JSON.stringify({ok:true,mode:"stdin-mjs",input:JSON.parse(Buffer.concat(c).toString()).event}));`, { mode: 0o700 });
+          // .js CommonJS that does NOT read stdin
+          const script3 = join(root, "simple.cjs");
+          writeFileSync(script3, `process.stdout.write(JSON.stringify({ok:true,mode:"simple-cjs"}));`, { mode: 0o700 });
+          function runTest(label, script, writeStdin) {
+            return new Promise((resolve) => {
+              const args = ["--unshare-all","--new-session","--proc","/proc","--dev","/dev","--tmpfs","/tmp",
+                ...sysRoots, "--ro-bind",nodeDir,nodeDir, "--ro-bind",nodeRoot,nodeRoot,
+                "--bind",root,root,
+                "--die-with-parent","--hostname","sandbox","--",
+                "/usr/bin/prlimit","--nproc=8","--",
+                nodeBin,"--preserve-symlinks-main",script];
+              const child = spawn("bwrap", args, {
+                cwd: root, env: { PATH: process.env.PATH, HOME: root, TMPDIR: root, LANG: "C.UTF-8" },
+                stdio: ["pipe","pipe","pipe"], detached: true
+              });
+              if (writeStdin) {
+                child.stdin.write(JSON.stringify({event:"pre_tool_use"}));
+              }
+              child.stdin.end();
+              let stdout = "", stderr = "";
+              child.stdout.on("data", d => stdout += d);
+              child.stderr.on("data", d => stderr += d);
+              const to = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} }, 10000);
+              child.on("close", code => { clearTimeout(to); console.log(label, "exit:", code, "stdout:", stdout.slice(0,200), "stderr:", stderr.slice(0,500)); resolve(); });
+            });
+          }
+          (async () => {
+            await runTest("simple.mjs(no stdin):", script1, false);
+            await runTest("stdin.mjs(reads stdin):", script2, true);
+            await runTest("simple.cjs(no stdin):", script3, false);
+            rmSync(root, { recursive: true, force: true });
+          })();
+          '
       - run: npm test -- --maxWorkers=1
       - run: npm run test:coverage -- --maxWorkers=1
       - run: npm audit --omit=dev --audit-level=high
