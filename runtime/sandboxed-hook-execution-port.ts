@@ -171,7 +171,7 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
     }
     const workspaceRoot = mkdtempSync(join(tmpdir(), 'ah-external-hook-'));
     try {
-      const stagedSource = join(workspaceRoot, 'reviewed-hook.mjs');
+      const stagedSource = join(workspaceRoot, 'reviewed-hook.cjs');
       writeFileSync(stagedSource, sourceBytes, { mode: 0o400 });
       const stdin = Buffer.from(JSON.stringify(input), 'utf8');
       if (stdin.byteLength > MAX_JSON_BYTES) {

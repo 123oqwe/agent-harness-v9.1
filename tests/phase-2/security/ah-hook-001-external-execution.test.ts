@@ -49,51 +49,53 @@ const request = (
 const externalFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'ah-hook-external-test-'));
   roots.push(root);
-  const scriptPath = join(root, 'hook.mjs');
+  const scriptPath = join(root, 'hook.cjs');
   writeFileSync(
     scriptPath,
-    `import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { connect } from 'node:net';
+    `const { readFileSync, statSync, writeFileSync } = require('node:fs');
+const { connect } = require('node:net');
 
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-const mode = input.payload.mode;
-let follow_up;
-let emitted = false;
-if (mode === 'env') {
-  follow_up = { leaked: process.env.HOOK_HOST_SECRET ?? null };
-} else if (mode === 'source-mode') {
-  follow_up = { mode: statSync(new URL(import.meta.url)).mode & 0o777 };
-} else if (mode === 'fs') {
-  try { follow_up = { read: readFileSync(input.payload.path, 'utf8') }; }
-  catch { follow_up = { read: null }; }
-} else if (mode === 'network') {
-  follow_up = await new Promise((resolve) => {
-    const socket = connect({ host: '127.0.0.1', port: input.payload.port });
-    socket.once('connect', () => { socket.destroy(); resolve({ connected: true }); });
-    socket.once('error', () => resolve({ connected: false }));
-    setTimeout(() => { socket.destroy(); resolve({ connected: false }); }, 100).unref();
-  });
-} else if (mode === 'late-effect') {
-  process.on('SIGTERM', () => undefined);
-  setTimeout(() => writeFileSync(input.payload.path, 'late'), 80);
-  await new Promise((resolve) => setTimeout(resolve, 5_000));
-} else if (mode === 'empty-output') {
-  process.exit(0);
-} else if (mode === 'invalid-json') {
-  process.stdout.write('not-json');
-  process.exit(0);
-} else if (mode === 'large-output') {
-  process.stdout.write('x'.repeat(300_000));
-  process.exit(0);
-} else if (mode === 'max-output') {
-  await new Promise((resolve) => process.stdout.write(JSON.stringify('x'.repeat(262_142)), resolve));
-  emitted = true;
-} else if (mode === 'nonzero-exit') {
-  process.exit(7);
-}
-if (!emitted) process.stdout.write(JSON.stringify({ action: 'observe', follow_up }));
+(async () => {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  const mode = input.payload.mode;
+  let follow_up;
+  let emitted = false;
+  if (mode === 'env') {
+    follow_up = { leaked: process.env.HOOK_HOST_SECRET ?? null };
+  } else if (mode === 'source-mode') {
+    follow_up = { mode: statSync(__filename).mode & 0o777 };
+  } else if (mode === 'fs') {
+    try { follow_up = { read: readFileSync(input.payload.path, 'utf8') }; }
+    catch { follow_up = { read: null }; }
+  } else if (mode === 'network') {
+    follow_up = await new Promise((resolve) => {
+      const socket = connect({ host: '127.0.0.1', port: input.payload.port });
+      socket.once('connect', () => { socket.destroy(); resolve({ connected: true }); });
+      socket.once('error', () => resolve({ connected: false }));
+      setTimeout(() => { socket.destroy(); resolve({ connected: false }); }, 100).unref();
+    });
+  } else if (mode === 'late-effect') {
+    process.on('SIGTERM', () => undefined);
+    setTimeout(() => writeFileSync(input.payload.path, 'late'), 80);
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+  } else if (mode === 'empty-output') {
+    process.exit(0);
+  } else if (mode === 'invalid-json') {
+    process.stdout.write('not-json');
+    process.exit(0);
+  } else if (mode === 'large-output') {
+    process.stdout.write('x'.repeat(300_000));
+    process.exit(0);
+  } else if (mode === 'max-output') {
+    await new Promise((resolve) => process.stdout.write(JSON.stringify('x'.repeat(262_142)), resolve));
+    emitted = true;
+  } else if (mode === 'nonzero-exit') {
+    process.exit(7);
+  }
+  if (!emitted) process.stdout.write(JSON.stringify({ action: 'observe', follow_up }));
+})();
 `,
     { mode: 0o700 },
   );
