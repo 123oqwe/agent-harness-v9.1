@@ -34,38 +34,55 @@ jobs:
       - run: npm run check:cycles
       - run: npm run build
       - run: npm run lint
-      - name: Debug bwrap+node sandbox (no RLIMIT_AS)
+      - name: Debug Hook sandbox execution
         run: |
-          NODE_BIN=$(which node)
-          NODE_DIR=$(dirname "$NODE_BIN")
-          echo "node: $NODE_BIN"
-          echo "dir: $NODE_DIR"
-          ls -la "$NODE_DIR"
-          echo "=== Test 1: bwrap unshare-all, no --as, node -e ==="
-          timeout 30 bwrap \
-            --unshare-all --new-session \
-            --proc /proc --dev /dev --tmpfs /tmp \
-            --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /sbin /sbin \
-            --ro-bind /lib /lib $(test -d /lib64 && echo "--ro-bind /lib64 /lib64") \
-            --ro-bind "$NODE_DIR" "$NODE_DIR" \
-            --tmpfs /tmp/hook-test \
-            --die-with-parent --hostname sandbox \
-            -- /usr/bin/prlimit --nproc=8 -- \
-            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT: $?"
-          echo "=== Test 2: bwrap ro-bind /, no --as, node -e ==="
-          timeout 30 bwrap \
-            --ro-bind / / \
-            -- /usr/bin/prlimit --nproc=8 -- \
-            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT: $?"
-          echo "=== Test 3: bwrap unshare-all, no prlimit at all, node -e ==="
-          timeout 30 bwrap \
-            --unshare-all --new-session \
-            --proc /proc --dev /dev --tmpfs /tmp \
-            --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /sbin /sbin \
-            --ro-bind /lib /lib $(test -d /lib64 && echo "--ro-bind /lib64 /lib64") \
-            --ro-bind "$NODE_DIR" "$NODE_DIR" \
-            --die-with-parent --hostname sandbox \
-            -- "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true}))' 2>&1 || echo "EXIT: $?"
+          node -e '
+          const { mkdtempSync, writeFileSync, rmSync } = require("fs");
+          const { join, dirname } = require("path");
+          const { tmpdir } = require("os");
+          const { spawn } = require("child_process");
+          const root = mkdtempSync(join(tmpdir(), "ah-hook-debug-"));
+          const script = join(root, "hook.mjs");
+          writeFileSync(script, [
+            "const chunks = [];",
+            "for await (const c of process.stdin) chunks.push(c);",
+            "const input = JSON.parse(Buffer.concat(chunks).toString());",
+            "process.stdout.write(JSON.stringify({ action: \"observe\", follow_up: { leaked: process.env.HOOK_HOST_SECRET ?? null } }));",
+          ].join("\n"), { mode: 0o400 });
+          const nodeBin = process.execPath;
+          const nodeDir = dirname(nodeBin);
+          const args = [
+            "--unshare-all","--new-session","--proc","/proc","--dev","/dev","--tmpfs","/tmp",
+            "--ro-bind","/usr","/usr","--ro-bind","/bin","/bin","--ro-bind","/sbin","/sbin",
+            "--ro-bind","/lib","/lib",
+            "--ro-bind",nodeDir,nodeDir,
+            "--bind",root,root,
+            "--die-with-parent","--hostname","sandbox","--",
+            "/usr/bin/prlimit","--nproc=8","--",
+            nodeBin,"--preserve-symlinks-main",script
+          ];
+          console.log("bwrap:", "bwrap", args.join(" "));
+          const child = spawn("bwrap", args, {
+            cwd: root,
+            env: { PATH: process.env.PATH, HOME: root, TMPDIR: root, LANG: "C.UTF-8" },
+            stdio: ["pipe","pipe","pipe"],
+            detached: true
+          });
+          const stdin = Buffer.from(JSON.stringify({event:"pre_tool_use",invocation_id:"t",scope:{tenant_id:"t",run_id:"r",session_id:"s",operation_id:"o",attempt_id:"a"},payload:{mode:"env"}}));
+          child.stdin.write(stdin);
+          child.stdin.end();
+          let stdout = "", stderr = "";
+          child.stdout.on("data", (d) => stdout += d);
+          child.stderr.on("data", (d) => stderr += d);
+          const to = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} }, 10000);
+          child.on("close", (code) => {
+            clearTimeout(to);
+            console.log("exit:", code);
+            console.log("stdout:", stdout);
+            console.log("stderr:", stderr);
+            rmSync(root, { recursive: true, force: true });
+          });
+          '
       - run: npm test -- --maxWorkers=1
       - run: npm run test:coverage -- --maxWorkers=1
       - run: npm audit --omit=dev --audit-level=high
