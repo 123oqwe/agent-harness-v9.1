@@ -103,7 +103,11 @@ function cloneJson<T>(value: T, label: string): T {
   }
   if (encoded === undefined)
     throw new SteeringError(`${label} must be JSON-serializable`);
-  return JSON.parse(encoded) as T;
+  try {
+    return JSON.parse(encoded) as T;
+  } catch {
+    throw new SteeringError(`${label} must be JSON-serializable`);
+  }
 }
 function canonicalJson(value: unknown): string {
   const normalize = (input: unknown): unknown =>

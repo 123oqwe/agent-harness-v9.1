@@ -155,7 +155,8 @@ const deepFreeze = <T>(value: T): T => {
 };
 
 const clone = <T>(value: T): T => {
-  return JSON.parse(JSON.stringify(value)) as T;
+  const encoded = JSON.stringify(value);
+  return JSON.parse(encoded) as T;
 };
 
 const requiredId = (label: string, value: unknown): string => {

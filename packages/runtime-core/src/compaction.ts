@@ -137,7 +137,11 @@ const cloneJson = <T>(value: T): T => {
     throw new TypeError("compaction state must be JSON-serializable", { cause });
   }
   if (encoded === undefined) throw new TypeError("compaction state must be JSON-serializable");
-  return JSON.parse(encoded) as T;
+  try {
+    return JSON.parse(encoded) as T;
+  } catch (cause) {
+    throw new TypeError("compaction state must be JSON-serializable", { cause });
+  }
 };
 
 const deepFreeze = <T>(value: T): T => {
