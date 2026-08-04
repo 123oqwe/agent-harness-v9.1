@@ -23,6 +23,7 @@ import {
 } from "../../../scripts/gates/verify-phase2-local.mjs";
 import {
   prepareExactSourceCheckout,
+  parseNpmJson,
   runPackedPackageSmoke,
   runWorkspaceCompositionSmoke,
   // @ts-expect-error The production gate intentionally ships as plain Node ESM.
@@ -53,6 +54,17 @@ const runScript = (script: string) =>
   });
 
 describe("Phase 2 real release gate", () => {
+  it("parses npm 10 lifecycle output without trusting a non-JSON tail", () => {
+    expect(
+      parseNpmJson(
+        'patch-package 8.0.1\nApplying patches...\n[{"filename":"agent-harness.tgz"}]\n',
+      ),
+    ).toEqual([{ filename: "agent-harness.tgz" }]);
+    expect(() => parseNpmJson("patch-package only")).toThrow(
+      "npm output did not contain a trailing JSON document",
+    );
+  });
+
   it(
     "never includes Python bytecode caches in the packed Harness",
     { timeout: 30_000 },
@@ -69,7 +81,7 @@ describe("Phase 2 real release gate", () => {
         },
       );
       expect(packed.status, packed.stderr).toBe(0);
-      const paths = JSON.parse(packed.stdout)[0].files.map(
+      const paths = parseNpmJson(packed.stdout)[0].files.map(
         (entry: { path: string }) => entry.path,
       );
       expect(paths.some((path: string) => path.includes("__pycache__"))).toBe(

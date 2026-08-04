@@ -43,6 +43,23 @@ const REQUIRED_EXPORTS = [
   "SecretsBrokerApi",
 ];
 
+export const parseNpmJson = (stdout) => {
+  const starts = [
+    0,
+    ...[...stdout.matchAll(/\n/gu)].map((match) => match.index + 1),
+  ].reverse();
+  for (const start of starts) {
+    const candidate = stdout.slice(start).trim();
+    if (!candidate.startsWith("[") && !candidate.startsWith("{")) continue;
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // npm 10 can emit lifecycle output before the final --json document.
+    }
+  }
+  throw new SyntaxError("npm output did not contain a trailing JSON document");
+};
+
 export const runPackedPackageSmoke = async ({ repositoryRoot = root } = {}) => {
   const packageJson = JSON.parse(
     readFileSync(join(repositoryRoot, "package.json"), "utf8"),
@@ -85,7 +102,7 @@ export const runPackedPackageSmoke = async ({ repositoryRoot = root } = {}) => {
     );
     if (packed.status !== 0)
       throw new Error(`npm pack failed with exit ${String(packed.status)}`);
-    const packResult = JSON.parse(packed.stdout);
+    const packResult = parseNpmJson(packed.stdout);
     packedFiles = packResult[0].files.map(({ path }) => path);
     const leakedWorkspaceFiles = packedFiles.filter((path) =>
       /^(?:packages|apps)\//u.test(path),
