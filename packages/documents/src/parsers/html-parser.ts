@@ -75,10 +75,15 @@ export class HtmlParser implements DocumentParser {
       }
       if (rows.length > 0) tables.push({ rows });
     }
-    const images: ImageReference[] = [];
-    const imgRe = /<img\s+[^>]*src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*\/?>/gi;
+   const images: ImageReference[] = [];
+    const imgRe = /<img\s+[^>]*>/gi;
     while ((m = imgRe.exec(html)) !== null) {
-      images.push({ ref: m[1]!, alt: m[2] ?? '', source_path: m[1] });
+      const imgTag = m[0]!;
+      const srcMatch = /src=["']([^"']+)["']/i.exec(imgTag);
+      const altMatch = /alt=["']([^"']*)["']/i.exec(imgTag);
+      if (srcMatch) {
+        images.push({ ref: srcMatch[1]!, alt: altMatch?.[1] ?? '', source_path: srcMatch[1] });
+      }
     }
     const text = stripTags(html);
     const provenance: SourceProvenance = {
