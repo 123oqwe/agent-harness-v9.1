@@ -7,12 +7,15 @@
  * path for execute_command tools — there is no unsandboxed fallback on the
  * active path.
  *
- * Enforced limits: timeout, memory (RLIMIT_AS), output size, process count.
- * Linux applies memory/process limits through prlimit before exec; the runtime
- * monitor independently observes the complete process tree. stdin hang is
- * prevented by closing stdin when not provided. Cancellation uses AbortSignal.
- * Shell injection is blocked by argv (no shell) for the wrapped command. Path
- * traversal/symlink escape is blocked by VFS before reaching here.
+ * Enforced limits: timeout, memory (RSS monitor), output size, process count.
+ * Linux applies process limits through prlimit before exec (nproc only;
+ * RLIMIT_AS is omitted because V8's CodeRange reservation requires more
+ * virtual address space than any reasonable RLIMIT_AS allows). Memory is
+ * bounded at runtime via the RSS monitor. The runtime monitor independently
+ * observes the complete process tree. stdin hang is prevented by closing stdin
+ * when not provided. Cancellation uses AbortSignal. Shell injection is blocked
+ * by argv (no shell) for the wrapped command. Path traversal/symlink escape
+ * is blocked by VFS before reaching here.
  */
 import { spawn, execFileSync } from 'node:child_process';
 import {
