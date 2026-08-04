@@ -196,10 +196,13 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
           allowNetwork: false,
           allowUnixSockets: false,
           // The executable is already realpathSync-resolved by
-          // assertExecutable; binding its parent directory read-only lets the
-          // sandboxed Node process find sibling runtime files (e.g. on
-          // GitHub Actions at /opt/hostedtoolcache/node/.../bin/).
-          allowRead: [dirname(executable)],
+          // assertExecutable; binding its parent directories read-only lets
+          // the sandboxed Node process find sibling runtime files and the
+          // lib/ tree (e.g. on GitHub Actions at
+          // /opt/hostedtoolcache/node/.../{bin,lib}/). Without the lib
+          // directory, Node.js ESM loader crashes with SIGABRT (exit 134)
+          // when loading a .mjs file inside the sandbox.
+          allowRead: [dirname(executable), dirname(dirname(executable))],
           environment: {},
           egressAllowlist: [],
         },
