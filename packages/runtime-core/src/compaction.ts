@@ -121,7 +121,7 @@ const canonicalJson = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   const entries = Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
     .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`);
   return `{${entries.join(",")}}`;
 };
@@ -130,7 +130,12 @@ const sha256 = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
 
 const cloneJson = <T>(value: T): T => {
-  const encoded = JSON.stringify(value);
+  let encoded: string;
+  try {
+    encoded = JSON.stringify(value);
+  } catch (error) {
+    throw new TypeError("compaction state must be JSON-serializable");
+  }
   if (encoded === undefined) throw new TypeError("compaction state must be JSON-serializable");
   return JSON.parse(encoded) as T;
 };

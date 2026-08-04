@@ -341,7 +341,7 @@ export class HookSystem {
               (left, right) =>
                 left.priority - right.priority ||
                 left.ordinal - right.ordinal ||
-                left.id.localeCompare(right.id),
+                (left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
             )
             .map(({ ordinal: _ordinal, ...entry }) => Object.freeze(entry)),
         ),

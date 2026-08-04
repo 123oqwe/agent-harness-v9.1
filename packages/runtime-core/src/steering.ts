@@ -112,7 +112,7 @@ function canonicalJson(value: unknown): string {
       : isRecord(input)
         ? Object.fromEntries(
             Object.entries(input)
-              .sort(([a], [b]) => a.localeCompare(b))
+              .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
               .map(([key, child]) => [key, normalize(child)]),
           )
         : input;
