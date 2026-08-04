@@ -105,7 +105,7 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "@agent-harness/documents",
     ["@agent-harness/contracts"],
     "package",
-    ["node:buffer", "node:crypto"],
+    ["node:buffer", "node:crypto", "node:zlib"],
   ),
   workspace(
     "packages/rag",
