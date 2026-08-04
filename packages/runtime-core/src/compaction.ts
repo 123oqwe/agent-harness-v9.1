@@ -133,8 +133,8 @@ const cloneJson = <T>(value: T): T => {
   let encoded: string;
   try {
     encoded = JSON.stringify(value);
-  } catch (error) {
-    throw new TypeError("compaction state must be JSON-serializable");
+  } catch (cause) {
+    throw new TypeError("compaction state must be JSON-serializable", { cause });
   }
   if (encoded === undefined) throw new TypeError("compaction state must be JSON-serializable");
   return JSON.parse(encoded) as T;
