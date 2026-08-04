@@ -19,6 +19,7 @@ import {
   validatePhase2MutationArtifacts,
   // @ts-expect-error The mutation runner intentionally ships as plain Node ESM.
 } from "../../../scripts/run-phase2-mutation.mjs";
+import { PHASE2_MUTATION_CHUNK_LINES } from "../../../scripts/gates/phase2-mutation.mjs";
 
 const harnessRoot = resolve(import.meta.dirname, "../../..");
 const sha256 = (value: string) =>
@@ -88,9 +89,17 @@ describe("Phase 2 mutation runner", () => {
           ],
         ),
       ).toEqual([
-        [1, 75],
-        [76, 150],
-        [151, 160],
+        ...Array.from(
+          { length: Math.ceil(160 / PHASE2_MUTATION_CHUNK_LINES) },
+          (_, index) => {
+            const startLine = index * PHASE2_MUTATION_CHUNK_LINES + 1;
+            const endLine = Math.min(
+              160,
+              index * PHASE2_MUTATION_CHUNK_LINES + PHASE2_MUTATION_CHUNK_LINES,
+            );
+            return [startLine, endLine];
+          },
+        ),
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

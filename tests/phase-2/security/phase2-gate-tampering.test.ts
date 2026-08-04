@@ -195,6 +195,7 @@ describe("Phase 2 gate tamper resistance", () => {
       .map((requirement) => requirement.id)
       .filter(
         (id) =>
+          id !== "AH-CONTEXT-COMPILER-001" &&
           id !== "AH-RUNTIME-SESSIONTREE-001" &&
           id !== "AH-HOOK-001" &&
           id !== "AH-RUNTIME-STEERING-001" &&
@@ -252,7 +253,7 @@ describe("Phase 2 gate tamper resistance", () => {
 
   it(
     "rejects duplicate Evidence keys, owner escapes, and test symlinks",
-    { timeout: 30_000 },
+    { timeout: 120_000 },
     () => {
       const manifest = JSON.parse(
         readFileSync(

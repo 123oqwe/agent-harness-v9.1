@@ -282,7 +282,7 @@ export function preflightExistingSessionDatabase(
       'ok', 'parent_identity', 'main_identity', 'created',
       'schema', 'salt', 'sentinel', 'legacy',
     ],
-    timeoutMs: 15_000,
+    timeoutMs: 5_000,
     maxOutputBytes: 4 * 1024 * 1024,
   }) as unknown as ExistingSessionPreflight & { ok: true };
   validateSessionStoreSchemaObjects(value.schema);
