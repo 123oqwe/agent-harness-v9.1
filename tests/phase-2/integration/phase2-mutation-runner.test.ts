@@ -19,6 +19,7 @@ import {
   validatePhase2MutationArtifacts,
   // @ts-expect-error The mutation runner intentionally ships as plain Node ESM.
 } from "../../../scripts/run-phase2-mutation.mjs";
+// @ts-expect-error The mutation gate intentionally ships as plain Node ESM.
 import { PHASE2_MUTATION_CHUNK_LINES } from "../../../scripts/gates/phase2-mutation.mjs";
 
 const harnessRoot = resolve(import.meta.dirname, "../../..");

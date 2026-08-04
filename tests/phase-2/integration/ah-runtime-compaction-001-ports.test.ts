@@ -6,6 +6,7 @@ import {
   CompactionHookRuntimeAdapter,
   ContextResetSessionAdapter,
 } from "../../../runtime/compaction-port.js";
+import type { RuntimeHookOutcome } from "../../../runtime/hook-port.js";
 
 describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
   it("dispatches session_before_compact through the managed Hook boundary", async () => {
@@ -82,7 +83,7 @@ describe("AH-RUNTIME-COMPACTION-001 existing authority adapters", () => {
   it("enforces the configured Hook timeout at the existing boundary", async () => {
     vi.useFakeTimers();
     const adapter = new CompactionHookRuntimeAdapter({
-      hooks: { dispatch: vi.fn(() => new Promise(() => undefined)) },
+      hooks: { dispatch: vi.fn((): Promise<RuntimeHookOutcome> => new Promise(() => undefined)) },
       timeout_ms: 5,
     });
     try {
