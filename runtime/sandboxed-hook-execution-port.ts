@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 
 import type {
   RuntimeExternalHookRegistration,
@@ -184,14 +184,14 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
         limits: {
           timeoutMs: registration.timeout_ms,
           outputBytes: MAX_JSON_BYTES,
-          memoryMb: 128,
-          processLimit: 8,
+          memoryMb: 256,
+          processLimit: 16,
         },
         profile: {
           workspaceRoot,
           allowNetwork: false,
           allowUnixSockets: false,
-          allowRead: [executable],
+          allowRead: [executable, dirname(executable)],
           environment: {},
           egressAllowlist: [],
         },
