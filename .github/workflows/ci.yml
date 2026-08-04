@@ -34,6 +34,38 @@ jobs:
       - run: npm run check:cycles
       - run: npm run build
       - run: npm run lint
+      - name: Debug bwrap+node sandbox (no RLIMIT_AS)
+        run: |
+          NODE_BIN=$(which node)
+          NODE_DIR=$(dirname "$NODE_BIN")
+          echo "node: $NODE_BIN"
+          echo "dir: $NODE_DIR"
+          ls -la "$NODE_DIR"
+          echo "=== Test 1: bwrap unshare-all, no --as, node -e ==="
+          timeout 30 bwrap \
+            --unshare-all --new-session \
+            --proc /proc --dev /dev --tmpfs /tmp \
+            --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /sbin /sbin \
+            --ro-bind /lib /lib $(test -d /lib64 && echo "--ro-bind /lib64 /lib64") \
+            --ro-bind "$NODE_DIR" "$NODE_DIR" \
+            --tmpfs /tmp/hook-test \
+            --die-with-parent --hostname sandbox \
+            -- /usr/bin/prlimit --nproc=8 -- \
+            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT: $?"
+          echo "=== Test 2: bwrap ro-bind /, no --as, node -e ==="
+          timeout 30 bwrap \
+            --ro-bind / / \
+            -- /usr/bin/prlimit --nproc=8 -- \
+            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT: $?"
+          echo "=== Test 3: bwrap unshare-all, no prlimit at all, node -e ==="
+          timeout 30 bwrap \
+            --unshare-all --new-session \
+            --proc /proc --dev /dev --tmpfs /tmp \
+            --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /sbin /sbin \
+            --ro-bind /lib /lib $(test -d /lib64 && echo "--ro-bind /lib64 /lib64") \
+            --ro-bind "$NODE_DIR" "$NODE_DIR" \
+            --die-with-parent --hostname sandbox \
+            -- "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true}))' 2>&1 || echo "EXIT: $?"
       - run: npm test -- --maxWorkers=1
       - run: npm run test:coverage -- --maxWorkers=1
       - run: npm audit --omit=dev --audit-level=high
