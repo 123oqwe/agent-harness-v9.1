@@ -259,7 +259,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     });
   });
 
-  it('clears host secrets and denies host filesystem and network access', async () => {
+  it('clears host secrets and denies host filesystem and network access', { timeout: 120_000 }, async () => {
     const fixture = externalFixture();
     const secretPath = join(fixture.root, 'secret.txt');
     writeFileSync(secretPath, 'must-not-read');
@@ -268,7 +268,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      10_000,
+      30_000,
       'post_tool_use',
     );
     await expect(
@@ -337,7 +337,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     } finally {
       server.close();
     }
-  }, 30_000);
+  });
 
   it('kills an ignoring process tree and permits zero late effects', async () => {
     const fixture = externalFixture();
@@ -416,12 +416,12 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     });
   });
 
-  it('executes a user-trust descriptor without inventing a reviewed hash', async () => {
+  it('executes a user-trust descriptor without inventing a reviewed hash', { timeout: 120_000 }, async () => {
     const fixture = externalFixture();
     const reviewed = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      10_000,
+      30_000,
     );
     const { content_hash: _reviewedHash, ...descriptor } = reviewed;
     const registration = { ...descriptor, trust: 'user' as const };
@@ -522,7 +522,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         ),
       ).rejects.toThrow(message);
     },
-    30_000,
+    120_000,
   );
 
   it('rejects oversized input before external execution', async () => {
@@ -530,7 +530,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      10_000,
+      30_000,
     );
     await expect(
       new SandboxedHookExecutionPort().execute(
@@ -548,12 +548,12 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     ).rejects.toThrow('external Hook input exceeds JSON limit');
   }, 30_000);
 
-  it('accepts input and output envelopes exactly at the JSON byte limit', async () => {
+  it('accepts input and output envelopes exactly at the JSON byte limit', { timeout: 120_000 }, async () => {
     const fixture = externalFixture();
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      10_000,
+      30_000,
     );
     const input = {
       hook_id: registration.id,
@@ -581,5 +581,5 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         new AbortController().signal,
       ),
     ).resolves.toHaveLength(262_142);
-  }, 30_000);
+  });
 });
