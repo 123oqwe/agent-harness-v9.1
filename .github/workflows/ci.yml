@@ -34,6 +34,40 @@ jobs:
       - run: npm run check:cycles
       - run: npm run build
       - run: npm run lint
+      - name: Debug bwrap+node sandbox
+        run: |
+          echo "=== Node path ==="
+          which node
+          node --version
+          echo "=== bwrap smoke test (unshare-all + node) ==="
+          NODE_BIN=$(which node)
+          NODE_DIR=$(dirname "$NODE_BIN")
+          echo "node bin: $NODE_BIN"
+          echo "node dir: $NODE_DIR"
+          # Test: can bwrap run node with the sandbox config used by Hook execution?
+          timeout 30 bwrap \
+            --unshare-all \
+            --new-session \
+            --proc /proc \
+            --dev /dev \
+            --tmpfs /tmp \
+            --ro-bind /usr /usr \
+            --ro-bind /bin /bin \
+            --ro-bind /sbin /sbin \
+            --ro-bind /lib /lib \
+            $(test -d /lib64 && echo "--ro-bind /lib64 /lib64") \
+            --ro-bind "$NODE_DIR" "$NODE_DIR" \
+            --tmpfs /tmp/hook-test \
+            --die-with-parent \
+            --hostname sandbox \
+            -- \
+            /usr/bin/prlimit --as=536870912 --nproc=8 -- \
+            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT CODE: $?"
+          echo "=== bwrap smoke test (no unshare-all) ==="
+          timeout 30 bwrap \
+            --ro-bind / / \
+            -- /usr/bin/prlimit --as=536870912 --nproc=8 -- \
+            "$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ok:true,mem:process.memoryUsage().rss}))' 2>&1 || echo "EXIT CODE: $?"
       - run: npm test -- --maxWorkers=1
       - run: npm run test:coverage -- --maxWorkers=1
       - run: npm audit --omit=dev --audit-level=high
