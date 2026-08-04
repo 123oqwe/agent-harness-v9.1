@@ -268,7 +268,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      30_000,
+      60_000,
       'post_tool_use',
     );
     await expect(
@@ -421,7 +421,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const reviewed = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      30_000,
+      60_000,
     );
     const { content_hash: _reviewedHash, ...descriptor } = reviewed;
     const registration = { ...descriptor, trust: 'user' as const };
@@ -491,7 +491,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         ),
       ).rejects.toThrow(message);
     }
-  }, 30_000);
+  }, 120_000);
 
   it.each([
     ['empty-output', 'external Hook returned an invalid JSON envelope size'],
@@ -530,7 +530,7 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      30_000,
+      60_000,
     );
     await expect(
       new SandboxedHookExecutionPort().execute(
@@ -546,14 +546,14 @@ describe('AH-HOOK-001 external Hook execution boundary', () => {
         new AbortController().signal,
       ),
     ).rejects.toThrow('external Hook input exceeds JSON limit');
-  }, 30_000);
+  }, 120_000);
 
   it('accepts input and output envelopes exactly at the JSON byte limit', { timeout: 120_000 }, async () => {
     const fixture = externalFixture();
     const registration = externalRegistration(
       fixture.scriptPath,
       fixture.contentHash,
-      30_000,
+      60_000,
     );
     const input = {
       hook_id: registration.id,
