@@ -184,14 +184,20 @@ export class SandboxedHookExecutionPort implements RuntimeHookExecutionPort {
         limits: {
           timeoutMs: registration.timeout_ms,
           outputBytes: MAX_JSON_BYTES,
+          // 256 MB matches the CI bwrap smoke-test ceiling; Node.js 20 V8
+          // needs ~200 MB of virtual address space to initialise reliably.
           memoryMb: 256,
-          processLimit: 16,
+          processLimit: 8,
         },
         profile: {
           workspaceRoot,
           allowNetwork: false,
           allowUnixSockets: false,
-          allowRead: [executable, dirname(executable)],
+          // The executable is already realpathSync-resolved by
+          // assertExecutable; binding its parent directory read-only lets the
+          // sandboxed Node process find sibling runtime files (e.g. on
+          // GitHub Actions at /opt/hostedtoolcache/node/.../bin/).
+          allowRead: [dirname(executable)],
           environment: {},
           egressAllowlist: [],
         },
