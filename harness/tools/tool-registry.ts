@@ -156,3 +156,12 @@ export class ToolRegistry {
 
   size(): number { return this.tools.size; }
 }
+
+/**
+ * P2-08: Deferred tool loading — load full ToolSpec by name after discovery
+ * via tool_search. Enables on-demand schema loading instead of injecting all
+ * tool definitions into every prompt.
+ */
+export function tool_load(registry: ToolRegistry, name: string): ToolSpec | undefined {
+  return registry.get(name);
+}

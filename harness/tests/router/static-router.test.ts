@@ -149,9 +149,9 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       const r = router.route(task('rewrite this text'));
       expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(1);
     });
-    it('react/plan_execute get max_iterations=3', () => {
+    it('react/plan_execute get max_iterations=50', () => {
       const r = router.route(task('fix the bug then run the tests'));
-      expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(3);
+      expect((r.run_plan!.budget_allocation as { max_iterations: number }).max_iterations).toBe(50);
     });
   });
 

@@ -54,3 +54,23 @@ export * from './ui/ah_ui_coding_001.js';
 export * from './ui/ah_ui_evidence_001.js';
 export * from './ui/ah_ui_privacy_001.js';
 export * from './ui/ah_ui_task_001.js';
+
+// P1-06/P2-18: EventBus
+export * from './runtime/event-bus.js';
+// P1-07/P1-24: PluginManager, HealthMonitor
+export * from './runtime/plugin-manager.js';
+export * from './runtime/health-monitor.js';
+// P1-08/P2-23/P2-24: SessionManager + SteeringQueue
+export * from './runtime/session-manager.js';
+// P2-01..P2-28: Context RAG (chunking, embedding, compaction, validation, etc.)
+export * from './runtime/context-rag.js';
+// P2-05: Context offloading
+export * from './runtime/context-offload.js';
+// P2-14: Consent service
+export * from './security/consent-service.js';
+// P2-09/P2-10: MCP allowlist + client
+export * from './security/mcp-allowlist.js';
+// P2-15/P2-16/P2-17: Composite VFS backend
+export * from './vfs/composite-backend.js';
+// P2-08: Deferred tool loading
+export { tool_load } from './tools/tool-registry.js';

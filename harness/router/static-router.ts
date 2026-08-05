@@ -206,7 +206,7 @@ export class StaticRouter {
       registry_snapshot_refs: [this.deps.toolSnapshot.snapshot_id, this.deps.skillSnapshot.snapshot_id],
       derived_risk_assessment: { risk_tier: intent.requires_writes ? 2 : 1, egress: 'none' },
       required_consent: { required: intent.requires_writes },
-      budget_allocation: { max_iterations: strategy === 'direct' ? 1 : 3 },
+      budget_allocation: { max_iterations: strategy === 'direct' ? 1 : 50 },
       persistence_policy: { event_log: true, snapshot: true },
       cancellation_policy: { abortable: true },
       fallback_policy: { on_failure: 'abort' },
