@@ -330,12 +330,21 @@ export function loadPhase2MutationAuthority({
         `requirement ${manifestEntry.id} tests must be explicit safe paths`,
       );
     }
-    if (!exactArray(entry.sources, manifestEntry.owned_sources ?? [])) {
+    // When the manifest declares owned_sources, registry sources must match exactly.
+    // When the manifest does not declare owned_sources (non-Batch1 requirements
+    // in candidate-only state), registry sources are accepted as candidate sources.
+    const manifestOwnedSources = Object.hasOwn(manifestEntry, "owned_sources")
+      ? manifestEntry.owned_sources
+      : null;
+    if (manifestOwnedSources !== null && !exactArray(entry.sources, manifestOwnedSources)) {
       errors.push(
         `requirement ${manifestEntry.id} owned mutation sources must exactly match gate owned_sources`,
       );
     }
-    if (!exactArray(entry.integrationSources, manifestEntry.integration_sources ?? [])) {
+    const manifestIntegrationSources = Object.hasOwn(manifestEntry, "integration_sources")
+      ? manifestEntry.integration_sources
+      : null;
+    if (manifestIntegrationSources !== null && !exactArray(entry.integrationSources, manifestIntegrationSources)) {
       errors.push(
         `requirement ${manifestEntry.id} integration sources must exactly match gate integration_sources`,
       );
