@@ -1,0 +1,51 @@
+---
+# SessionTree Ownership Map — AH-RUNTIME-SESSIONTREE-001
+# Section 8 of agent-harness-phase2-prompt.md
+# Owner: packages/runtime-core (sole runtime authority)
+# Candidate-only; not formally verified.
+
+requirement: AH-RUNTIME-SESSIONTREE-001
+owner_module: packages/runtime-core
+mutation_class: critical
+
+owned_phase2_sources:
+  - packages/runtime-core/src/session-tree.ts
+  - session/session-event-codec.ts
+  - session/session-state-root.ts
+  - session/session-tree-checkpoint.ts
+  - session/sqlite-authority-internals.ts
+  - session/sqlite-session-tree-authority.ts
+  - session/trusted-python-host.ts
+
+integration_sources:
+  - session/durable-session.ts
+  - session/run-session.ts
+  - session/sqlite-session-store.ts
+
+build_runtime_assets:
+  - session/secure-checkpoint-host.py
+  - session/secure-sqlite-preflight.py
+  - session/trusted-python-supervisor.py
+
+root_exports:
+  - index.ts (re-exports session/durable-session.ts)
+  - harness.ts (imports session/durable-session.ts)
+
+behavioral_tests:
+  - tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts
+  - tests/phase-2/integration/ah-runtime-sessiontree-001.sqlite-lock.test.ts
+  - tests/phase-2/fixtures/session-tree-lock-holder.mjs
+
+security_tests:
+  - tests/phase-2/security/ah-runtime-sessiontree-001-security.test.ts
+  - tests/phase-2/security/ah-runtime-sessiontree-001-round6-security.test.ts
+  - tests/phase-2/security/trusted-python-host.security.test.ts
+
+mutation_configs:
+  - mutation/phase2-modules.mjs (AH-RUNTIME-SESSIONTREE-001 entry: status=ready, 7 sources, 3 integrationSources)
+
+three_way_alignment:
+  requirements_ndjson: owner=architecture (domain label)
+  phase2_gate_json: owner=packages/runtime-core
+  mutation_registry: status=ready, sources match gate owned_sources
+  note: ndjson uses domain labels; gate/mutation use package paths; both consistent
