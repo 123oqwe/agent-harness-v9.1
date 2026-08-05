@@ -17,6 +17,19 @@ interface McpConnection {
 
 const connections = new Map<string, McpConnection>();
 
+// Drain stdout/stderr to prevent pipe deadlock
+function drainStreams(child: ChildProcess): void {
+  child.stdout?.on('data', () => {});
+  child.stderr?.on('data', () => {});
+}
+
+// Clean up child processes on parent exit
+process.on('exit', () => {
+  for (const conn of connections.values()) {
+    try { conn.child.kill('SIGKILL'); } catch { /* already dead */ }
+  }
+});
+
 export async function connectMcpStdio(id: string, config: McpStdioConfig): Promise<ToolResult> {
   if (connections.has(id)) {
     return { success: true, output: { id, status: 'already_connected' } };
@@ -24,9 +37,17 @@ export async function connectMcpStdio(id: string, config: McpStdioConfig): Promi
   try {
     const proc = spawn(config.command, config.args ?? [], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...config.env },
+      env: { ...process.env, ...config.env },
+    });
+    drainStreams(proc);
+    proc.on('exit', () => {
+      connections.delete(id);
+    });
+    proc.on('error', () => {
+      connections.delete(id);
     });
     connections.set(id, { child: proc, initialized: false });
+    proc.unref();
     return {
       success: true,
       output: { id, status: 'connected', pid: proc.pid },
@@ -39,7 +60,11 @@ export async function connectMcpStdio(id: string, config: McpStdioConfig): Promi
 export async function disconnectMcpStdio(id: string): Promise<ToolResult> {
   const conn = connections.get(id);
   if (!conn) return { success: false, output: null, error: 'connection not found' };
-  conn.child.kill();
+  try { conn.child.kill('SIGTERM'); } catch { /* already dead */ }
+  // SIGKILL fallback after 5s
+  setTimeout(() => {
+    try { conn.child.kill('SIGKILL'); } catch { /* already dead */ }
+  }, 5000);
   connections.delete(id);
   return { success: true, output: { id, status: 'disconnected' } };
 }

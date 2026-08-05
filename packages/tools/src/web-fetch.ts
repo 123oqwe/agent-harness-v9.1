@@ -19,8 +19,24 @@ import type { ToolResult, ToolContext } from './types.js';
 
 const PRIVATE_IP_PATTERNS = [
   /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
-  /^169\.254\./, /^0\./, /^::1$/, /^fc00:/, /^fe80:/,
+  /^169\.254\./, /^0\./, /^::1$/, /^fc00:/, /^fd00:/, /^fe80:/,
+  /^::ffff:127\./, /^::ffff:10\./, /^::ffff:172\.(1[6-9]|2\d|3[01])\./,
+  /^::ffff:192\.168\./, /^::ffff:169\.254\./, /^::ffff:0\./,
 ];
+
+/** Extract IPv4 from IPv4-mapped IPv6 address (::ffff:a.b.c.d) */
+function extractIPv4FromMapped(ip: string): string | null {
+  const match = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  return match?.[1] ?? null;
+}
+
+/** Check if an IP address is private, including IPv4-mapped IPv6 */
+function isPrivateIp(ip: string): boolean {
+  if (PRIVATE_IP_PATTERNS.some(p => p.test(ip))) return true;
+  const ipv4 = extractIPv4FromMapped(ip);
+  if (ipv4 && PRIVATE_IP_PATTERNS.some(p => p.test(ipv4))) return true;
+  return false;
+}
 
 const BLOCKED_HOSTS = ['localhost', 'metadata.google.internal', '169.254.169.254'];
 const MAX_REDIRECT_DEPTH = 5;
@@ -150,7 +166,7 @@ function parseAndValidateUrl(urlStr: string): URL {
   const hostname = url.hostname;
   if (/^\d+$/.test(hostname)) {
     const ip = longToIp(parseInt(hostname, 10));
-    if (PRIVATE_IP_PATTERNS.some(p => p.test(ip))) {
+    if (isPrivateIp(ip)) {
       throw new Error(`SSRF blocked: obfuscated IP ${hostname} -> ${ip}`);
     }
   }
@@ -165,7 +181,7 @@ async function validateNotPrivate(hostname: string): Promise<string[]> {
   const resolvedIps: string[] = [];
   for (const addr of addresses) {
     resolvedIps.push(addr.address);
-    if (PRIVATE_IP_PATTERNS.some(p => p.test(addr.address))) {
+    if (isPrivateIp(addr.address)) {
       throw new Error(`SSRF blocked: ${hostname} resolves to private IP ${addr.address}`);
     }
   }

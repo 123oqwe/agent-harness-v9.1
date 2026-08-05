@@ -38,8 +38,8 @@ function extractPdfText(content: Buffer): { text: string; pages: PageReference[]
     const end = i + 1 < pageStarts.length ? pageStarts[i + 1]! : content.length;
     const pageContent = content.subarray(start, end);
     const pageText = extractTextFromStream(pageContent);
-    const startOffset = text.length;
     if (text) text += '\n\n--- Page Break ---\n\n';
+    const startOffset = text.length;
     text += pageText;
     pages.push({ page: i + 1, start_offset: startOffset, end_offset: text.length });
   }

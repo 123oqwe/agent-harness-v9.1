@@ -21,23 +21,37 @@ import { sha256Hex } from './markdown-parser.js';
 
 const PARSER_VERSION = '1.0.0';
 const PARSER_NAME = 'docx-native-zip';
+const MAX_DECOMPRESSED_SIZE = 100 * 1024 * 1024; // 100 MB limit to prevent ZIP bombs
 
 function extractZipEntry(zipBuf: Buffer, entryName: string): Buffer | null {
   // Minimal ZIP parser: find local file header for entryName
   let offset = 0;
   while (offset < zipBuf.length - 4) {
+    if (offset + 30 > zipBuf.length) break; // bounds check
     const sig = zipBuf.readUInt32LE(offset);
     if (sig !== 0x04034b50) break; // PK\x03\x04
+    if (offset + 30 + 26 > zipBuf.length) break; // bounds check for header fields
     const nameLen = zipBuf.readUInt16LE(offset + 26);
     const extraLen = zipBuf.readUInt16LE(offset + 28);
     const compMethod = zipBuf.readUInt16LE(offset + 8);
     const compSize = zipBuf.readUInt32LE(offset + 18);
     const name = zipBuf.subarray(offset + 30, offset + 30 + nameLen).toString('utf8');
     const dataOffset = offset + 30 + nameLen + extraLen;
+    if (dataOffset + compSize > zipBuf.length) break; // bounds check for data
     if (name === entryName) {
       const compData = zipBuf.subarray(dataOffset, dataOffset + compSize);
-      if (compMethod === 0) return compData; // stored, no compression
-      if (compMethod === 8) return unzipSync(compData); // deflate
+      if (compMethod === 0) {
+        if (compSize > MAX_DECOMPRESSED_SIZE) throw new DocumentIngestError('docx entry exceeds decompression limit', 'too_large');
+        return compData; // stored, no compression
+      }
+      if (compMethod === 8) {
+        try {
+          const decompressed = unzipSync(compData, { maxOutputLength: MAX_DECOMPRESSED_SIZE });
+          return decompressed;
+        } catch {
+          throw new DocumentIngestError('docx zip decompression failed', 'corrupted');
+        }
+      }
       return null;
     }
     offset = dataOffset + compSize;

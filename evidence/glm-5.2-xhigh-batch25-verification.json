@@ -1,0 +1,782 @@
+{
+  "timestamp": "2026-08-05T05:11:05.135Z",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "20839a4",
+  "batch": "Batches 2-5",
+  "summary": {
+    "total": 12,
+    "pass": 0,
+    "passWithNotes": 5,
+    "fail": 5,
+    "errors": 2
+  },
+  "results": [
+    {
+      "file": "packages/documents/src/ingestor.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "customParsers replaces all default parsers rather than merging. The docstring claims 'handles all registered formats' but passing customParsers silently drops all default format support, which may surprise callers expecting extension semantics.",
+          "location": "constructor"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Duplicate formats in customParsers are silently overwritten (last-wins) with no warning or error, making misconfiguration hard to diagnose.",
+          "location": "constructor loop"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No input validation on source_path or content. An empty/null/undefined source_path or content Buffer is passed directly to detectFormat and parser.parse, leading to undefined behavior rather than a typed error.",
+          "location": "ingest method"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "detectFormat is imported from markdown-parser.js, coupling format detection to a specific parser module. Format detection is a cross-cutting concern and should live in a dedicated utility to avoid circular dependency risk and improve testability.",
+          "location": "imports"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "Content is accepted as an in-memory Buffer with no size limit. Large file ingestion could cause unbounded memory pressure; consider documenting max size expectations or accepting a stream.",
+          "location": "ingest method signature"
+        }
+      ],
+      "summary": "Thin orchestrator with no critical issues; main concerns are ambiguous customParsers semantics, missing input validation, and misplaced format-detection import.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1334,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1023
+        },
+        "prompt_tokens": 668,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2002
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/docx-parser.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "ZIP bomb / decompression bomb vulnerability: unzipSync is called without any limit on decompressed output size. A small malicious DOCX could decompress to gigabytes, exhausting memory. The maxBytes check only applies to the compressed input, not the decompressed content.",
+          "location": "extractZipEntry, line 33 (unzipSync call)"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Buffer out-of-bounds reads: after reading the 4-byte ZIP signature, the code reads header fields at offset+8, offset+18, offset+26, offset+28 without verifying sufficient bytes remain. A truncated or malformed ZIP will cause an unhandled RangeError from readUInt16LE/readUInt32LE instead of a clean DocumentIngestError('corrupted').",
+          "location": "extractZipEntry, lines 25-29"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Data descriptors not handled: when bit 3 of the general purpose flag is set, compSize in the local file header is 0 and the actual size is in a trailing data descriptor. This causes extractZipEntry to read empty/truncated data and fail to advance past the entry, breaking parsing for many real-world DOCX files (especially those created by streaming ZIP libraries).",
+          "location": "extractZipEntry, line 27 (compSize read) and line 36 (offset advancement)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "XML entities are not decoded: text content extracted via regex retains raw XML entities like &amp;, &lt;, &gt;, &#160; etc. This produces incorrect text output for any document containing special characters.",
+          "location": "extractTextFromXml, run text extraction regex, line 48"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "unzipSync errors are not caught: invalid or truncated deflate streams will throw a raw zlib error that propagates as an unhandled exception instead of being wrapped in DocumentIngestError('corrupted').",
+          "location": "extractZipEntry, line 33; parse method does not wrap extraction in try/catch"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "Synchronous decompression and regex parsing on potentially large XML blocks the Node.js event loop. For a 100MB max input file, decompressed XML could be hundreds of MB, causing significant event loop blocking.",
+          "location": "parse method, lines 73-84; extractTextFromXml"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Heading level regex only captures single digit: /<w:pStyle\\s+w:val=\"Heading(\\d)\"/ matches Heading1-Heading9 but not Heading10 or higher. Also misses custom heading style names that don't follow the 'HeadingN' pattern.",
+          "location": "extractTextFromXml, line 44"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "CDATA sections in XML are not handled: the run text regex ([^<]*) will fail to extract text inside <![CDATA[...]]> blocks, silently dropping content.",
+          "location": "extractTextFromXml, run regex line 47"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Comment mismatch: code comment states 'Encrypted DOCX has an EncryptionInfo entry' but the code checks for 'EncryptedPackage'. While EncryptedPackage is the correct entry to check, the misleading comment could cause confusion during maintenance.",
+          "location": "parse method, line 66-67"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "extractZipEntry performs a full linear scan of all local file headers for each lookup. Called twice (EncryptedPackage, word/document.xml), resulting in 2x O(n) scan. Could use the central directory instead for O(1) lookups.",
+          "location": "extractZipEntry, overall design"
+        }
+      ],
+      "summary": "ZIP parser has critical robustness gaps (no bounds checking, no data descriptor support, no decompression size limit) that enable DoS via ZIP bombs and cause parsing failures on valid DOCX files; XML text extraction misses entities and CDATA sections.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4670,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3821
+        },
+        "prompt_tokens": 1434,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 6104
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/pdf-parser.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Page offset tracking is incorrect for all pages after the first. start_offset is captured before the page-break separator is appended, so it points to the separator string '\\n\\n--- Page Break ---\\n\\n' rather than the actual page text. Any consumer using [start_offset, end_offset) to extract per-page content will include the separator and misalign with the real text.",
+          "location": "extractPdfText, lines 30-35 (startOffset assignment vs separator insertion)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "unescapePdfString applies replacements in the wrong order. The sequence '\\\\n' (literal backslash + n in PDF) is first matched by /\\\\n/g and converted to a newline, but per PDF spec '\\\\n' should yield a literal backslash followed by 'n'. The '\\\\' (escaped backslash) replacement must be applied before all other escape replacements, or a single-pass state machine should be used.",
+          "location": "unescapePdfString, lines 56-62"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Encryption detection regex /\\/Encrypt\\s+\\d+\\s+0\\s+R/ only scans raw object definitions. In PDF 1.5+ the Encrypt entry can reside inside a compressed Object Stream (Type /ObjStm), making it invisible to this regex. A crafted encrypted PDF would bypass the check, causing the parser to extract garbage from encrypted content streams and silently ingest it as plaintext.",
+          "location": "parse method, encRe test, lines 79-84"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The content buffer is converted to a latin1 string at least twice (once for encRe.test, once for pageRe.exec in extractPdfText), and then each page subarray is converted again in extractTextFromStream. For a 100 MB file (the default maxBytes), this produces 300+ MB of transient string allocations per parse, creating a memory-exhaustion DoS vector under concurrent load.",
+          "location": "parse (encRe.test), extractPdfText (content.toString), extractTextFromStream (buf.toString)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Text extraction regex /\\(([^)]*)\\)\\s*Tj/g does not handle nested parentheses, which are valid in PDF literal strings (e.g., '(text (nested) more)'). The [^)]* class stops at the first closing paren, truncating the string and potentially misaligning subsequent matches.",
+          "location": "extractTextFromStream, tjRe pattern, line 41"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "unescapePdfString does not handle PDF octal escapes (\\ddd, e.g., \\053), backspace (\\b), or form feed (\\f). Octal escapes are commonly used in PDFs for non-ASCII characters, so extracted text may contain literal backslash sequences instead of the intended characters.",
+          "location": "unescapePdfString, lines 55-62"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Hex string literals (<48656C6C6F>) are not supported. PDFs may encode strings in hex form, and these will be silently skipped during text extraction.",
+          "location": "extractTextFromStream, lines 40-52"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "No decompression of FlateDecode content streams and no CID/ToUnicode CMap processing. The file header comment acknowledges this as a 'lightweight approach', but the parser will return empty or garbage text for the majority of real-world PDFs that use compressed streams or CID-keyed fonts.",
+          "location": "extractTextFromStream (overall design)"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "sha256Hex is imported from markdown-parser.js, creating an unexpected cross-parser dependency. This couples PDF parsing to markdown parsing and could cause circular import issues if markdown-parser ever imports from pdf-parser.",
+          "location": "import statement, line 13"
+        }
+      ],
+      "summary": "Page offset bug corrupts per-page references for all multi-page PDFs; escape-sequence ordering and encryption-detection bypass compound correctness and security concerns.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 6612,
+        "completion_tokens_details": {
+          "reasoning_tokens": 5731
+        },
+        "prompt_tokens": 1377,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 7989
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/markdown-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Image references (both markdown and HTML <img>) are extracted without any URL or path validation. Malicious markdown can embed file:///etc/passwd, http://169.254.169.254/latest/meta-data/, or ../../../etc/passwd as image sources. If these refs are fetched or resolved downstream, this enables SSRF and path traversal. The parser should at minimum categorize refs (URL vs path vs data URI) or validate schemes.",
+          "location": "parseImages, lines 96-107"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No code fence (```) or inline code awareness. Content inside code blocks that matches heading patterns (# foo), table patterns, or image patterns is incorrectly parsed as structural elements, producing false positives in headings, tables, and images arrays.",
+          "location": "parseHeadings, parseTables, parseImages"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "IMAGE_RE = /!\\[([^\\]]*)\\]\\(([^)]+)\\)/g does not handle title attributes (e.g. ![alt](url \"title\") captures 'url \"title\"' as ref) or URLs with nested parentheses (e.g. ![alt](https://example.com/f(1).png) truncates at first ')'). Reference-style images (![alt][ref]) are not handled at all.",
+          "location": "IMAGE_RE constant, line 11"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "HTML_IMG_RE only captures the alt attribute when it appears after src. If alt precedes src (e.g. <img alt=\"x\" src=\"y\">), alt is not captured. Also, unquoted src attributes (<img src=x>) are not matched at all.",
+          "location": "HTML_IMG_RE constant, line 12"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "UTF-8 BOM is not stripped from content before parsing. If the file starts with a BOM (\\uFEFF), the first heading on line 1 will not match HEADING_RE because ^# would require the BOM character to be #.",
+          "location": "parse method, content.toString('utf8')"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "YAML frontmatter (--- ... ---) is not detected or stripped. Frontmatter delimiter lines containing pipes could be misidentified as table rows, and frontmatter content could produce false heading/image matches.",
+          "location": "parse method"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Table cell parsing does not handle escaped pipes (\\|). Cells containing escaped pipes are incorrectly split into multiple cells.",
+          "location": "parseTables, slice(1,-1).split('|')"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "The parser creates multiple in-memory copies of the content: the original Buffer, the decoded string, and the lines array from text.split('\\n'). For a 50MB file (default max_bytes), peak memory usage could reach ~150MB+. Consider streaming or reusing buffers.",
+          "location": "parse method, parseTables"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "Module-level regexes with the 'g' flag (HEADING_RE, IMAGE_RE, HTML_IMG_RE) are shared across all parser instances. While safe under the current synchronous call pattern in single-threaded JS, this is fragile — if parseHeadings/parseImages were ever called via Promise.all or refactored to async iteration, lastIndex state would corrupt between yields.",
+          "location": "HEADING_RE, IMAGE_RE, HTML_IMG_RE constants"
+        }
+      ],
+      "summary": "Functional markdown parser with no critical vulnerabilities, but lacks image-ref validation (SSRF/path-traversal risk downstream), code-fence awareness, and has several regex edge cases in image/table parsing.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 9866,
+        "completion_tokens_details": {
+          "reasoning_tokens": 9082
+        },
+        "prompt_tokens": 1376,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 11242
+      }
+    },
+    {
+      "file": "packages/rag/src/injection-guard.ts",
+      "verdict": "parse_error",
+      "severity": "unknown",
+      "findings": [],
+      "summary": "length=0 finish=length",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 32768,
+        "completion_tokens_details": {
+          "reasoning_tokens": 32759
+        },
+        "prompt_tokens": 902,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 33670
+      }
+    },
+    {
+      "file": "packages/rag/src/query-engine.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "ACL check does not validate that query.tenant_id and query.principal_id are present and non-empty. If ACL entries are created with empty/undefined tenant_id or principal_ids containing undefined (e.g., from an ingestion bug), an attacker passing empty strings or undefined could match and access unauthorized chunks. Array.prototype.includes uses SameValueZero, so [undefined].includes(undefined) returns true.",
+          "location": "queryStore, ACL filtering loop"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "addChunkToStore and removeChunkFromStore perform multiple index updates (chunks, acl, fts, vector, metadata, graph) without any transaction boundary or rollback. If any intermediate step throws, the store is left in an inconsistent state (e.g., chunk in FTS but not in chunks Map, or ACL entry without corresponding chunk).",
+          "location": "addChunkToStore, removeChunkFromStore"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "No synchronization or locking around store mutations. Concurrent calls to addChunkToStore, removeChunkFromStore, deleteFromStore, or queryStore can interleave, causing race conditions. For example, a chunk could be deleted from store.chunks while queryStore is iterating store.acl, leading to inconsistent results or undefined behavior in index lookups.",
+          "location": "All store mutation and query functions"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Scores from different sources (FTS relevance, vector cosine similarity, fixed 0.3 for metadata, r.score*0.3 for graph) are on different scales but compared directly during deduplication ('keeping highest score'). This causes source-dependent ranking bias—e.g., a weak FTS match with score 5.0 would supersede a strong vector match with score 0.95, and metadata matches at fixed 0.3 would almost always be dropped.",
+          "location": "queryStore, deduplication loop"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "addChunkToStore calls store.graph.addChunk(chunk, [...store.chunks.values()]) on every insert, passing ALL chunks as a new array. This is O(n) allocation and likely O(n) graph rebuild per insert, making bulk ingestion O(n²). For large stores this causes significant CPU and memory pressure.",
+          "location": "addChunkToStore, graph.addChunk call"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "store.vector.setModel(model) is called on every addChunkToStore invocation. If VectorIndex.setModel clears or rejects existing embeddings when a model is set (common pattern to prevent dimension mismatch), each new chunk would wipe previous embeddings, making vector search return only the most recently added chunk. Even if idempotent, this is wasteful and fragile.",
+          "location": "addChunkToStore, vector.setModel call"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "query.top_k is used as-is after nullish coalescing (?? 10). A value of 0 or negative would propagate to topK*2 (0 or negative), potentially causing undefined behavior in index search methods or returning no results. Should clamp to minimum 1.",
+          "location": "queryStore, topK assignment"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "addChunkToStore does not check if chunk.chunk_id already exists. Re-adding a chunk with the same ID overwrites store.chunks and store.acl but may create duplicate entries in FTS, vector, metadata, or graph indices (depending on their addChunk semantics), leading to doubled scores or corrupted graph edges.",
+          "location": "addChunkToStore"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Metadata filtering adds ALL ACL-passing chunks matching filters with no limit, potentially flooding results with hundreds of low-relevance entries before deduplication and reranking. Should be capped at topK*2 like FTS/vector.",
+          "location": "queryStore, metadata filtering section"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "ACL filtering performs a full O(n) scan of store.acl for every query. For large stores this becomes a bottleneck. Should maintain a secondary index keyed by tenant_id for O(1) tenant lookup.",
+          "location": "queryStore, ACL filtering loop"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "deleteFromStore iterates all chunks via [...store.chunks.entries()].filter() to find matching source_hash. This is O(n) per deletion call. Should maintain a source_hash → chunk_ids index.",
+          "location": "deleteFromStore"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "query.text and query.filters are passed directly to store.fts.search and store.metadata.filter without any sanitization at this layer. Security depends entirely on the index implementations. If FTS uses SQLite FTS5 or similar, query.text could be vulnerable to query syntax injection depending on how the index handles special characters.",
+          "location": "queryStore, FTS and metadata search calls"
+        }
+      ],
+      "summary": "Functional RAG query engine with ACL enforcement, but lacks input validation for tenant/principal IDs, has non-atomic multi-index mutations, mixes incomparable score scales, and has O(n²) graph rebuild on every chunk insertion.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4766,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3700
+        },
+        "prompt_tokens": 1918,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 6684
+      }
+    },
+    {
+      "file": "packages/rag/src/chunker.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No validation of ChunkOptions. If max_chunk_size is 0 or negative, the function enters an infinite loop: end becomes 0 (or negative), chunkText is empty, and the forward-progress guard sets offset=end=0 repeatedly. Negative max_chunk_size also causes text.slice to interpret negative end as length+end, producing unexpectedly large chunks. If options originate from user/config input this is a DoS vector.",
+          "location": "chunkDocument, lines 18-22 (while loop and end calculation)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "text.slice(offset, end) operates on UTF-16 code units and can split surrogate pairs (e.g., emoji) when max_chunk_size falls mid-pair, producing malformed chunk text and a content_hash that doesn't correspond to valid Unicode.",
+          "location": "chunkDocument, line 33 (text.slice)"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "metadata is spread from result.metadata without key allowlisting. While tenant_id is correctly overridden from acl, an attacker who controls document metadata could inject arbitrary keys (e.g., fake acl entries, role fields) that downstream consumers may trust. Defense-in-depth: consider an explicit allowlist or prefix strategy.",
+          "location": "chunkDocument, line 44 (metadata: { ...result.metadata, tenant_id: acl.tenant_id })"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "When a sentence boundary character (., \\n, space) sits exactly at position 'end', lastIndexOf returns 'end' and end becomes end+1, producing a chunk one character larger than max_chunk_size. This silently violates the max constraint.",
+          "location": "chunkDocument, lines 25-31 (boundary detection, end = lastSentence + 1)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "chunk_id is built as `${sourceHash}-${chunkIndex}` with no validation that sourceHash is a safe identifier. If provenance.content_hash is empty, undefined, or contains path/SQL metacharacters, chunk_id could collide or be unsafe for downstream use (filenames, SQL keys, log injection).",
+          "location": "chunkDocument, line 36 (chunk_id construction)"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "Page lookup uses Array.find inside the chunk loop, making overall complexity O(chunks × pages). For documents with thousands of pages this becomes noticeable. A pre-built offset-to-page index would reduce this to O(chunks).",
+          "location": "chunkDocument, line 38 (result.pages?.find(...))"
+        }
+      ],
+      "summary": "Functional chunker with good tenant_id override guard, but lacks input validation on chunk options (infinite-loop risk with max_chunk_size≤0) and has minor Unicode/boundary/metadata-hardening concerns.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 7764,
+        "completion_tokens_details": {
+          "reasoning_tokens": 7177
+        },
+        "prompt_tokens": 763,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 8527
+      }
+    },
+    {
+      "file": "packages/rag/src/vector-index.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Model consistency is not enforced when embeddings are added before setModel() is called. The model field remains undefined, so addEmbedding skips the mismatch check entirely, allowing embeddings from different models to coexist silently. The model should be auto-set from the first embedding, or setModel should be required as a precondition.",
+          "location": "addEmbedding, lines 18-23"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The embeddings Map grows without bound. There is no eviction policy, maximum size limit, or clear() method. In a long-running agent process this can lead to unbounded memory consumption, especially if chunk embeddings are added faster than removed.",
+          "location": "embeddings Map, class VectorIndex"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "cosineSimilarity silently returns 0 on dimension mismatch instead of throwing or logging. This causes search() to return all-zero scores with an arbitrary ordering, producing misleading results rather than surfacing the error.",
+          "location": "cosineSimilarity, line 47"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "addEmbedding stores the embedding object by reference, not a defensive copy. If the caller mutates the vector or model after insertion, the index's internal state is silently corrupted. Similarly, getModel() returns the live model reference.",
+          "location": "addEmbedding, line 22; getModel, line 14"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No validation of queryVector or embedding vectors for NaN/Infinity values. A single NaN in a vector propagates through dot/norm calculations, producing NaN scores that sort inconsistently and corrupt the topK ordering.",
+          "location": "cosineSimilarity, lines 48-53; search, line 28"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "search() performs a full O(n) linear scan with no approximate nearest-neighbor indexing. For large embedding sets this creates CPU contention on the event loop, potentially blocking the agent runtime.",
+          "location": "search, lines 27-33"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "getChunkIds() allocates a new array on every call. For large indices this creates GC pressure if called frequently.",
+          "location": "getChunkIds, line 37"
+        }
+      ],
+      "summary": "In-memory vector index with unbounded growth, incomplete model enforcement, and silent error swallowing in similarity computation.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1583,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1077
+        },
+        "prompt_tokens": 692,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2275
+      }
+    },
+    {
+      "file": "packages/tools/src/web-fetch.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1, ::ffff:169.254.169.254) bypass all PRIVATE_IP_PATTERNS checks. An attacker controlling DNS can return AAAA records with mapped IPv4 addresses to reach internal services. The pattern ^::1$ only matches exact loopback; no pattern covers ::ffff:* mapped addresses. Exploitable on Linux where getaddrinfo returns mapped addresses as IPv6.",
+          "location": "PRIVATE_IP_PATTERNS, validateNotPrivate"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "DNS rebinding TOCTOU: validateNotPrivate resolves DNS, then fetch() re-resolves independently. An attacker can return a public IP for validation and a private IP for the actual fetch. Acknowledged in comments but not mitigated.",
+          "location": "webFetchInternal: validateNotPrivate then fetch()"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Missing CGNAT range 100.64.0.0/10 from PRIVATE_IP_PATTERNS. Missing IPv6 ULA fd00::/8 (only fc00: is checked, but ULA is fc00::/7). Missing IPv6 unspecified :: and other reserved ranges.",
+          "location": "PRIVATE_IP_PATTERNS"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "Response body not consumed or cancelled on redirect (3xx) and error (4xx/5xx) paths. This leaks keep-alive connections from the HTTP connection pool, potentially exhausting connections under sustained use.",
+          "location": "webFetchInternal: redirect handling and !response.ok early return"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "context.signal aborted state is not checked before proceeding. If the signal is already aborted, addEventListener('abort') never fires and the fetch proceeds despite cancellation being requested.",
+          "location": "webFetchInternal: context.signal.addEventListener"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "DNS lookup (dns.lookup) has no timeout. A slow or malicious DNS server can cause indefinite hang since AbortController/timeout only covers fetch(), not DNS resolution.",
+          "location": "validateNotPrivate: lookup(hostname, { all: true })"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "BLOCKED_HOSTS uses exact string match. Hostnames with trailing dots (e.g., 'localhost.', 'metadata.google.internal.') bypass the blocklist. Partially mitigated by private IP check for known metadata endpoints.",
+          "location": "parseAndValidateUrl: BLOCKED_HOSTS.includes(url.hostname)"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "Comment claims to block hex and octal IP formats but only decimal integer format is handled (^\\d+$). Hex (0x7f.0.0.1) and octal (0177.0.0.1) obfuscated IPs are not caught, relying solely on OS DNS behavior.",
+          "location": "parseAndValidateUrl: obfuscated IP check"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Reader is not cancelled when reader.read() throws (e.g., on abort). The underlying stream may remain open. Should cancel in a finally block around the read loop.",
+          "location": "webFetchInternal: chunk read loop"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "content_hash is computed on potentially truncated UTF-8 decoded content, not raw bytes. Hash does not represent the full response and may differ for non-UTF-8 content. Callers relying on hash for integrity are misled.",
+          "location": "webFetchInternal: createHash after truncation"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Timeout is per-fetch not per-operation. With 5 redirects, total wall time can reach 6×timeout_ms (180s default). Parent call's timeout remains active during recursive redirect calls, firing harmlessly but holding resources.",
+          "location": "webFetchInternal: setTimeout + recursive redirect call"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Negative or zero max_bytes produces unexpected results: slice(0, negative) returns empty buffer, content is empty but truncated=true. No input validation for max_bytes or timeout_ms bounds.",
+          "location": "webFetchInternal: maxBytes computation and chunk slicing"
+        }
+      ],
+      "summary": "SSRF protection has exploitable bypasses via IPv4-mapped IPv6 addresses and incomplete private IP ranges; response body leaks on non-2xx paths; DNS lookup lacks timeout.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 12105,
+        "completion_tokens_details": {
+          "reasoning_tokens": 11188
+        },
+        "prompt_tokens": 1719,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 13824
+      }
+    },
+    {
+      "file": "packages/tools/src/mcp-stdio.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "stdout and stderr pipes are never read or drained. If the child process writes more than the OS pipe buffer (~64KB), it will block indefinitely, causing a deadlock. No stream consumers are attached to proc.stdout or proc.stderr.",
+          "location": "connectMcpStdio - spawn stdio option"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "No 'exit' or 'error' event listener is attached to the child process. If the process crashes or fails to start, the connection remains in the map as a stale entry. Subsequent getConnection() calls return a dead handle with no indication of failure.",
+          "location": "connectMcpStdio - after spawn()"
+        },
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "No global cleanup handler (process.on('exit')) to kill child processes on parent shutdown. Child processes become orphaned and continue running after the parent exits.",
+          "location": "module scope - connections map"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "env: { ...config.env } replaces the entire environment. If config.env is undefined or incomplete, the child process loses PATH, HOME, and all other essential variables, likely causing command execution failure.",
+          "location": "connectMcpStdio - env option"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "disconnectMcpStdio calls kill() without awaiting process exit and immediately deletes from the map. If kill() throws (e.g., process already dead, ESRCH), the error is unhandled. Additionally, there is no SIGKILL fallback for processes that ignore SIGTERM.",
+          "location": "disconnectMcpStdio - conn.child.kill()"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "Race condition: two concurrent calls to connectMcpStdio with the same id can both pass the connections.has(id) check before either calls set(). The second set() overwrites the first, leaking the first child process (never killed, never tracked). Although there is no await between has() and set() currently, the async function signature makes this fragile.",
+          "location": "connectMcpStdio - has/set sequence"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The 'initialized' field on McpConnection is set to false on creation and never updated to true anywhere. It is dead state that misleads callers into thinking initialization tracking exists.",
+          "location": "McpConnection interface, connectMcpStdio"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No validation on config.command or config.args. While spawn() (without shell:true) prevents shell injection, an empty or non-string command will produce a confusing error. Caller is assumed to validate, but defense-in-depth is absent.",
+          "location": "connectMcpStdio - config usage"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "Child process keeps the Node.js event loop alive (no unref() called). This may prevent graceful parent process shutdown if connections are not explicitly disconnected.",
+          "location": "connectMcpStdio - spawn result"
+        }
+      ],
+      "summary": "Multiple high-severity issues: pipe deadlock from unread stdout/stderr, no process lifecycle event handlers causing stale connections, no orphan cleanup, and dropped environment variables.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2528,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1864
+        },
+        "prompt_tokens": 572,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 3100
+      }
+    },
+    {
+      "file": "packages/tools/src/escalate.ts",
+      "verdict": "parse_error",
+      "severity": "unknown",
+      "findings": [],
+      "summary": "length=4102 finish=stop",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 3667,
+        "completion_tokens_details": {
+          "reasoning_tokens": 2828
+        },
+        "prompt_tokens": 672,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 4339
+      }
+    },
+    {
+      "file": "packages/multimodal/src/artifact-store.ts",
+      "verdict": "fail",
+      "severity": "critical",
+      "findings": [
+        {
+          "severity": "critical",
+          "category": "resource",
+          "description": "Unbounded memory growth: the store Map has no eviction policy, TTL, max-size, or byte-budget. Multimodal artifacts (images/audio/video Buffers) accumulate forever until the process OOMs. This is a deterministic DoS vector in any long-running agent runtime.",
+          "location": "store declaration; storeArtifact()"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "No access control or tenant isolation: any caller can store, retrieve, list, or delete any artifact by id. In a multi-tenant agent harness this enables cross-tenant data leakage and tampering.",
+          "location": "all exported functions"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "retrieveArtifact returns the live stored Buffer reference rather than a copy (or read-only view). Callers can mutate stored artifact data in place, corrupting state seen by other consumers and breaking provenance guarantees.",
+          "location": "retrieveArtifact()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "storeArtifact silently overwrites an existing artifact with the same id without returning whether an overwrite occurred or emitting an event. Provenance (AH-MM-ARTIFACT-001) is undermined because prior artifact/data are lost without audit.",
+          "location": "storeArtifact()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "listArtifacts returns artifacts by reference from the live store; callers receive mutable references to the stored artifact metadata objects. Combined with no copy-on-read, in-place mutation can corrupt the registry.",
+          "location": "listArtifacts()"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No input validation: id is not validated (format/length), artifact structure is not validated, and data Buffer is not size-checked before insertion. Malformed or oversized inputs are accepted unconditionally.",
+          "location": "storeArtifact(), retrieveArtifact(), deleteArtifact()"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "No content-addressable deduplication: identical artifact payloads stored under different ids are retained multiple times, amplifying memory pressure.",
+          "location": "storeArtifact()"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "Although JS Map ops are atomic, there is no atomic check-then-act primitive (e.g., store-if-absent). Async callers performing get-then-set sequences are subject to TOCTOU races resulting in lost updates or duplicate work.",
+          "location": "storeArtifact(), retrieveArtifact()"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "No clearAll()/shutdown hook exists; in-process state cannot be flushed or inspected for teardown, complicating tests and graceful shutdown.",
+          "location": "module scope"
+        }
+      ],
+      "summary": "In-memory artifact store has unbounded growth (critical DoS/OOM), no access control, and returns mutable references that break provenance and isolation guarantees.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1240,
+        "completion_tokens_details": {
+          "reasoning_tokens": 667
+        },
+        "prompt_tokens": 402,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1642
+      }
+    }
+  ]
+}
