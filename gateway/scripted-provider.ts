@@ -523,8 +523,8 @@ export class ScriptedTestProvider {
       if (status === 429) {
         return deepFreeze({
           kind: 'rate_limited',
-          retryable: true,
-          detail: 'Provider rate limit exceeded',
+          retryable: false,
+          detail: 'Provider rate limit exceeded — do not retry with backoff',
           status,
         });
       }

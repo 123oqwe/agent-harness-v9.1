@@ -71,7 +71,7 @@ export function createPhase1ToolDefinitions(): ToolSpec[] {
       timeout_policy: { timeout_ms: 5000 },
       cancellation_policy: { cancellable: true },
       retry_policy: { max_retries: 0 },
-      idempotency_policy: { idempotent: true },
+      idempotency_policy: { idempotent: false },
       sandbox_policy: { sandbox: false },
       network_policy: { network_required: false },
       credential_requirements: [],

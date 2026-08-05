@@ -622,10 +622,24 @@ function ruleMatches(rule: Readonly<PolicyRule>, request: PolicyEvaluationReques
   return toolMatches && resourceAllowed(request.resource_ids, rule.resource_prefixes);
 }
 
+export interface AuditLogEntry {
+  readonly timestamp: string;
+  readonly tool_name: string;
+  readonly resource_ids: readonly string[];
+  readonly verdict: 'allow' | 'deny';
+  readonly reason_code: string;
+  readonly derived_risk_tier: number;
+  readonly tenant_id: string;
+  readonly user_id: string;
+  readonly decided_at: string;
+  readonly decision_hash: string;
+}
+
 export class PolicyEngine {
   readonly snapshot: Readonly<Policy>;
   readonly version: string;
   readonly policy_hash: string;
+  private readonly auditLog: AuditLogEntry[] = [];
 
   constructor(policy: Policy) {
     validatePolicy(policy);
@@ -691,10 +705,27 @@ export class PolicyEngine {
       matched_rule_id: rule?.id ?? null,
       ...(egressPolicy === undefined ? {} : { egress_policy: egressPolicy }),
     };
-    return deepFreeze({
+    const result = deepFreeze({
       ...semanticDecision,
       decided_at: request.context.now,
       decision_hash: hashValue(semanticDecision),
     });
+    this.auditLog.push({
+      timestamp: new Date().toISOString(),
+      tool_name: request.tool_name,
+      resource_ids: [...request.resource_ids],
+      verdict: allowed ? 'allow' : 'deny',
+      reason_code: reasonCode,
+      derived_risk_tier: tier,
+      tenant_id: request.context.tenant_id,
+      user_id: request.context.user_id,
+      decided_at: request.context.now,
+      decision_hash: result.decision_hash,
+    });
+    return result;
+  }
+
+  getAuditLog(): readonly AuditLogEntry[] {
+    return [...this.auditLog];
   }
 }

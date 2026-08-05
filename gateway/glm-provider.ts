@@ -266,7 +266,7 @@ export class GlmProvider {
       if (raw.status === 401 || raw.status === 403) {
         return { kind: 'auth', retryable: false, detail: 'Provider authentication failed', status: raw.status };
       }
-      if (raw.status === 429) return { kind: 'rate_limited', retryable: true, detail: 'Provider rate limited', status: raw.status };
+      if (raw.status === 429) return { kind: 'rate_limited', retryable: false, detail: 'Provider rate limited — do not retry with backoff, respect retry-after header', status: raw.status };
       if (raw.status >= 500) return { kind: 'server', retryable: true, detail: 'Provider server failure', status: raw.status };
       return { kind: 'invalid_request', retryable: false, detail: 'Provider rejected request', status: raw.status };
     }
