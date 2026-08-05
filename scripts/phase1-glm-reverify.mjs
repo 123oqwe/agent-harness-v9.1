@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -9,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKTREE = resolve(__dirname, '..');
 const MAIN_REPO = '/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1';
 const REQUIREMENTS_PATH = resolve(MAIN_REPO, 'spec/requirements/requirements.ndjson');
+/* global fetch, AbortSignal */
 const GLM_API_KEY = 'e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni';
 const GLM_ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
@@ -69,8 +69,8 @@ Respond in JSON ONLY:
     const content = data.choices?.[0]?.message?.content || '';
     let parsed;
     try { parsed = JSON.parse(content); } catch {
-      const m = content.match(/```(?:json)?\s*([\s\S]*?)```/); if (m) try { parsed = JSON.parse(m[1].trim()); } catch {}
-      if (!parsed) { const b = content.match(/\{[\s\S]*\}/); if (b) try { parsed = JSON.parse(b[0]); } catch {} }
+      const m = content.match(/```(?:json)?\s*([\s\S]*?)```/); if (m) try { parsed = JSON.parse(m[1].trim()); } catch { /* non-JSON */ }
+      if (!parsed) { const b = content.match(/\{[\s\S]*\}/); if (b) try { parsed = JSON.parse(b[0]); } catch { /* non-JSON */ } }
     }
     if (!parsed) return { verdict: 'pass_with_notes', severity: 'low', findings: [{ severity: 'low', category: 'parse', description: 'Unparseable response', location: 'GLM' }], summary: content.slice(0, 500), finishReason: data.choices?.[0]?.finish_reason, usage: data.usage };
     return { ...parsed, finishReason: data.choices?.[0]?.finish_reason, usage: data.usage };

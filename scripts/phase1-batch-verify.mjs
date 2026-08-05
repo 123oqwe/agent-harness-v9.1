@@ -9,6 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKTREE = resolve(__dirname, '..');
 const MAIN_REPO = '/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1';
 const REQUIREMENTS_PATH = resolve(MAIN_REPO, 'spec/requirements/requirements.ndjson');
+/* global fetch, AbortSignal */
 const GLM_API_KEY = 'e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni';
 const GLM_ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
@@ -107,8 +108,8 @@ Respond in JSON format ONLY (no markdown):
     let parsed;
     try { parsed = JSON.parse(content); } catch {
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) { try { parsed = JSON.parse(jsonMatch[1].trim()); } catch {} }
-      if (!parsed) { const braceMatch = content.match(/\{[\s\S]*\}/); if (braceMatch) { try { parsed = JSON.parse(braceMatch[0]); } catch {} } }
+      if (jsonMatch) { try { parsed = JSON.parse(jsonMatch[1].trim()); } catch { /* non-JSON */ } }
+      if (!parsed) { const braceMatch = content.match(/\{[\s\S]*\}/); if (braceMatch) { try { parsed = JSON.parse(braceMatch[0]); } catch { /* non-JSON */ } } }
     }
     if (!parsed) {
       return { verdict: 'pass_with_notes', severity: 'low',

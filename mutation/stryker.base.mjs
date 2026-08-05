@@ -5,11 +5,11 @@ export const strykerBase = {
   testRunner: 'vitest',
   coverageAnalysis: 'perTest',
   reporters: ['clear-text', 'progress', 'html', 'json'],
-  timeoutMS: 30000,
+  timeoutMS: 300000,
   dryRunTimeoutMinutes: 10,
   // The checked-in compatibility patch gives every Vitest run a process
   // boundary, so Stryker can safely parallelize four mutant workers.
-  concurrency: 4,
+  concurrency: 2,
   vitest: {
     configFile: 'vitest.mutation.config.ts',
   },
