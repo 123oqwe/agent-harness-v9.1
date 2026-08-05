@@ -1,5 +1,5 @@
 {
-  "commit": "0a3244e7",
+  "commit": "29e9b7fd",
   "model": "glm-5.2",
   "reasoning_effort": "xhigh",
   "results": [
@@ -58,45 +58,45 @@
       "findings": [
         {
           "severity": "high",
-          "category": "security",
-          "description": "Synchronous decompression via inflateRawSync and synchronous XML regex parsing block the Node.js event loop entirely. A 100MB compressed XLSX (the default max_bytes) can decompress to 500MB, causing seconds of event loop blocking. This is an easily exploitable denial-of-service vector \u2014 any user who can submit an XLSX file can freeze the runtime.",
-          "location": "extractZipEntries (inflateRawSync call), parse method"
-        },
-        {
-          "severity": "medium",
-          "category": "resource_management",
-          "description": "No bounds on the number of rows, cells, or shared strings produced during parsing. While decompressed size is capped at 500MB, the resulting JavaScript object graph (arrays of arrays of strings) has significant per-element overhead. A malicious sheet with many small cells could cause OOM well before the 500MB decompressed limit is reached.",
-          "location": "parseSheet, parseSharedStrings"
-        },
-        {
-          "severity": "medium",
           "category": "correctness",
-          "description": "ZIP entries with data descriptors (general purpose bit flag bit 3 set) are not handled. When this flag is set, compSize in the local file header is 0 and the actual size follows the compressed data in a data descriptor record. The parser reads compSize=0, fails to advance past the real compressed data, and either silently stops parsing or produces corrupted results. Valid XLSX files from some tools use data descriptors.",
-          "location": "extractZipEntries \u2014 compSize read at offset+18"
-        },
-        {
-          "severity": "medium",
-          "category": "correctness",
-          "description": "Regex-based XML parsing has multiple correctness gaps: (1) Self-closing cells like <c r=\"A1\"/> are not matched (regex requires </c>), causing empty cells to be silently dropped and shifting all subsequent column positions. (2) Inline string cells (t=\"inlineStr\" with <is><t>...</t></is>) are not matched, losing their values. (3) The cell regex requires the r attribute immediately after <c with t attribute immediately after r \u2014 any other attribute ordering causes cells to be skipped. (4) Cell column positions from the r reference (e.g., 'C1') are captured but never used to place cells at correct column indices; cells are pushed positionally, producing incorrect table structure when cells are sparse.",
+          "description": "The cell regex requires a fixed attribute ordering: `r` must be the first attribute and `t` must immediately follow. Real XLSX files commonly emit `<c r=\"A1\" s=\"0\" t=\"s\">` (style attribute between r and t). In this case the `t` attribute is silently not captured, so shared-string cells are treated as numeric values and the raw index (e.g. \"0\") is emitted instead of the actual string. This affects virtually all styled spreadsheets.",
           "location": "parseSheet \u2014 cellRe regex"
         },
         {
-          "severity": "low",
-          "category": "resource_management",
-          "description": "Text is built via repeated string concatenation (text += ...) inside a loop over sheets and rows. For large spreadsheets this is O(n\u00b2) in the output size. Should use an array and join.",
-          "location": "parse method \u2014 text += loop"
+          "severity": "high",
+          "category": "correctness",
+          "description": "ZIP entries with the general-purpose bit flag bit 3 set (data descriptors) have compSize=0 in the local file header. The parser reads compSize from the local header without checking the flag at offset+6, so it produces empty data for such entries and then sets offset=dataOffset+0, landing on compressed data rather than the next local header. This causes the loop to break, silently losing all subsequent entries (including sheets and shared strings). Many streaming ZIP generators produce files this way.",
+          "location": "extractZipEntries \u2014 compSize read at offset+18, no GP-flag check"
+        },
+        {
+          "severity": "medium",
+          "category": "dos",
+          "description": "inflateRawSync is used for decompression, blocking the event loop. Although output size is capped at 50 MB per entry and 200 MB total, synchronous inflation of a 50 MB compressed entry can block for hundreds of milliseconds or more, degrading service responsiveness under concurrent load.",
+          "location": "extractZipEntries \u2014 inflateRawSync call"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "XML entities (&amp;, &lt;, &gt;, &#NN;, etc.) are never decoded. Cell text and shared strings containing escaped characters will contain raw entity references instead of the intended characters, producing incorrect output.",
+          "location": "parseSharedStrings, parseSheet \u2014 regex text extraction"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Inline string cells (t=\"inlineStr\" with <is><t>...</t></is>), boolean cells (t=\"b\"), error cells (t=\"e\"), and date cells (t=\"d\") are not handled. Inline strings in particular are a valid OOXML cell type that will produce empty values.",
+          "location": "parseSheet \u2014 type handling"
         },
         {
           "severity": "low",
           "category": "correctness",
-          "description": "Duplicate ZIP entry names silently overwrite \u2014 last entry wins. Standard ZIP semantics typically use the first occurrence (as listed in the central directory). Could cause incorrect data extraction if a malicious XLSX includes duplicate entry names.",
-          "location": "extractZipEntries \u2014 entries.set(name, data)"
+          "description": "Self-closing cell elements (<c r=\"A1\"/>) are not matched by the regex which requires a literal </c> closing tag. Empty cells are silently skipped, which can cause column misalignment in the extracted rows.",
+          "location": "parseSheet \u2014 cellRe regex requires </c>"
         },
         {
           "severity": "low",
-          "category": "input_validation",
-          "description": "ZIP entry names are not validated for path traversal characters (../). While not directly exploitable in this code since names are only used as Map keys and matched against regex patterns (never used for filesystem operations), the lack of validation is a defense-in-depth gap that could become exploitable if the entries Map is exposed or reused elsewhere.",
-          "location": "extractZipEntries \u2014 entries.set(name, data)"
+          "category": "correctness",
+          "description": "Sheet names are not read from xl/workbook.xml or xl/_rels/workbook.xml.rels. Sheets are labeled 'Sheet 1', 'Sheet 2', etc. based on file sort order, which may not match actual sheet names or ordering defined in the workbook relationships.",
+          "location": "XlsxParser.parse \u2014 sheetFiles iteration"
         }
       ],
       "file": "packages/documents/src/parsers/xlsx-parser.ts"
@@ -176,5 +176,5 @@
     "fail": 1,
     "errors": 0
   },
-  "timestamp": "2026-08-05T11:07:58.000Z"
+  "timestamp": "2026-08-05T11:11:48.000Z"
 }

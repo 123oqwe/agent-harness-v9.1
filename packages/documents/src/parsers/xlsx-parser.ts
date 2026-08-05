@@ -33,9 +33,25 @@ function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
     const nameLen = zipBuf.readUInt16LE(offset + 26);
     const extraLen = zipBuf.readUInt16LE(offset + 28);
     const compMethod = zipBuf.readUInt16LE(offset + 8);
-    const compSize = zipBuf.readUInt32LE(offset + 18);
+    const genFlag = zipBuf.readUInt16LE(offset + 6);
+    let compSize = zipBuf.readUInt32LE(offset + 18);
     const name = zipBuf.subarray(offset + 30, offset + 30 + nameLen).toString('utf8');
     const dataOffset = offset + 30 + nameLen + extraLen;
+    // When bit 3 of the general purpose flag is set, the compressed size
+    // in the local file header is zero and the real size is in a data
+    // descriptor following the compressed data. Try to find it by scanning
+    // for the data descriptor signature (0x08074b50) or the next local
+    // file header / central directory header.
+    if (compSize === 0 && (genFlag & 0x08)) {
+      // Scan forward for the next local file header or central directory
+      let nextOffset = dataOffset;
+      while (nextOffset < zipBuf.length - 4) {
+        const nextSig = zipBuf.readUInt32LE(nextOffset);
+        if (nextSig === 0x04034b50 || nextSig === 0x02014b50) break;
+        nextOffset++;
+      }
+      compSize = nextOffset - dataOffset;
+    }
     if (dataOffset + compSize > zipBuf.length) break;
     const compData = zipBuf.subarray(dataOffset, dataOffset + compSize);
     let data: Buffer;
@@ -80,11 +96,15 @@ function parseSheet(xml: string, sharedStrings: string[]): string[][] {
   let m: RegExpExecArray | null;
   while ((m = rowRe.exec(xml)) !== null) {
     const cells: string[] = [];
-    const cellRe = /<c\s+r="([A-Z]+\d+)"(?:\s+t="([^"]*)")?[^>]*>(?:<v>([^<]*)<\/v>)?<\/c>/g;
+    // Match <c ...>...</c> cells, then extract r= and t= attributes separately
+    // to handle arbitrary attribute ordering (e.g., <c r="A1" s="0" t="s">).
+    const cellRe = /<c\s+([^>]*)>(?:<v>([^<]*)<\/v>)?<\/c>/g;
     let cMatch: RegExpExecArray | null;
     while ((cMatch = cellRe.exec(m[1]!)) !== null) {
-      const type = cMatch[2];
-      const value = cMatch[3] ?? '';
+      const attrs = cMatch[1] ?? '';
+      const value = cMatch[2] ?? '';
+      const typeMatch = attrs.match(/\bt="([^"]*)"/);
+      const type = typeMatch?.[1];
       if (type === 's') {
         cells.push(sharedStrings[parseInt(value, 10)] ?? '');
       } else {
