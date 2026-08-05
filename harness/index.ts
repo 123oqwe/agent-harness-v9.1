@@ -74,3 +74,15 @@ export * from './security/mcp-allowlist.js';
 export * from './vfs/composite-backend.js';
 // P2-08: Deferred tool loading
 export { tool_load } from './tools/tool-registry.js';
+// P2-12: LLM Cache
+export * from './gateway/llm-cache.js';
+
+// Managed-platform gateway: KeyVault, CapabilityRegistry, CircuitBreaker, RateLimiter, EconomicKernel, ManagedGateway
+export { KeyVault } from './gateway/key-vault.js';
+export { CapabilityRegistry, type ModelBinding, type ModelTier, type RouteResult, type UsageRecord } from './gateway/capability-registry.js';
+export { CircuitBreaker, type CircuitState } from './gateway/circuit-breaker.js';
+export { RateLimiter, type RateLimitConfig } from './gateway/rate-limiter.js';
+export { EconomicKernel, type Budget, type Settlement, type BudgetStatus } from './gateway/economic-kernel.js';
+export { ManagedGateway, type ManagedGatewayOptions } from './gateway/managed-gateway.js';
+export { GatewayWsServer, type WsServerOptions } from './gateway/ws-server.js';
+export { createManagedGateway, createHarnessForTask, startServer } from './gateway/server.js';

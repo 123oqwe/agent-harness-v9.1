@@ -16,6 +16,9 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DurableSession } from '../session/durable-session.js';
+import type { EventBus } from './event-bus.js';
+import type { PluginManager } from './plugin-manager.js';
+import { createEvent } from './event-bus.js';
 
 export type TerminationReason =
   | 'iteration_limit' | 'budget_exhausted' | 'user_cancel' | 'deadline'
@@ -32,6 +35,9 @@ export interface LoopConfig {
   data_dir?: string | undefined;
   run_id: string;
   goal: string;
+  auto_execute?: boolean | undefined;
+  eventBus?: EventBus | undefined;
+  pluginManager?: PluginManager | undefined;
 }
 
 export interface ModelTurn {
@@ -57,6 +63,8 @@ export interface LoopResult {
   decision_summaries: string[];
   progress_path?: string | undefined;
   context_reset_emitted: boolean;
+  paused?: boolean | undefined;
+  estimated_cost?: number | undefined;
 }
 
 export interface LoopDeps {
@@ -68,6 +76,8 @@ export interface LoopDeps {
   // goal checker: returns true if goal is satisfied
   goalSatisfied?: (turns: LoopTurn[]) => boolean;
   signal?: AbortSignal;
+  eventBus?: import('./event-bus.js').EventBus | undefined;
+  pluginManager?: import('./plugin-manager.js').PluginManager | undefined;
 }
 
 export class LoopError extends Error {
@@ -97,6 +107,24 @@ export class LoopEngine {
   constructor(private readonly config: LoopConfig, private readonly deps: LoopDeps) {}
 
   async run(): Promise<LoopResult> {
+    // P1-10: Plan mode — if auto_execute=false, pause before execution
+    if (this.config.auto_execute === false) {
+      this.deps.eventBus?.publish(createEvent('plan_ready', this.config.run_id, { strategy: this.config.strategy }));
+      this.deps.eventBus?.publish(createEvent('paused', this.config.run_id, { reason: 'plan_mode' }));
+      this.writeProgress();
+      return {
+        strategy: this.config.strategy, iterations: 0,
+        termination_reason: 'completed', turns: [], decision_summaries: [],
+        progress_path: this.config.data_dir ? join(this.config.data_dir, 'progress.json') : undefined,
+        context_reset_emitted: false, paused: true,
+      };
+    }
+
+    // P1-24: on_task_start hook
+    if (this.deps.pluginManager) {
+      await this.deps.pluginManager.trigger('on_task_start', { run_id: this.config.run_id });
+    }
+
     // Enter agent phase: network disabled by default, credentials stripped
     // Save credentials so they can be restored after the agent phase ends
     const savedCreds: Record<string, string | undefined> = {};
@@ -376,6 +404,8 @@ export class LoopEngine {
     this.decision_summaries.push(turn.decision_summary);
     // No private CoT stored — only decision summary
     this.deps.session.append('assistant', { decision_summary: turn.decision_summary, tool_calls: turn.tool_calls });
+    // P1-06: emit model_called event
+    this.deps.eventBus?.publish(createEvent('model_called', this.config.run_id, { iteration: this.iterations }));
     this.writeProgress();
   }
 
@@ -384,6 +414,12 @@ export class LoopEngine {
     this.terminated = true;
     this.termination_reason = reason;
     this.deps.session.append('system', { termination_reason: reason, iterations: this.iterations });
+    // P1-06: emit run_state_change on termination
+    this.deps.eventBus?.publish(createEvent('run_state_change', this.config.run_id, { state: reason }));
+    // P1-24: on_task_end hook
+    if (this.deps.pluginManager) {
+      void this.deps.pluginManager.trigger('on_task_end', { run_id: this.config.run_id });
+    }
   }
 
   /** Write progress.json after every turn and on every stop condition. */

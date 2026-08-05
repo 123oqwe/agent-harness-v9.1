@@ -19,6 +19,10 @@ import { createHash } from 'node:crypto';
 import { DurableSession, persistSession } from './session/durable-session.js';
 import { OverlayBackend } from './vfs/virtual-filesystem.js';
 import { LoopEngine, type LoopResult, type ModelTurn } from './runtime/loop.js';
+import type { EventBus } from './runtime/event-bus.js';
+import type { PluginManager } from './runtime/plugin-manager.js';
+import type { SessionManager } from './runtime/session-manager.js';
+import type { HealthMonitor } from './runtime/health-monitor.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import type { SandboxProfile as _SP } from './runtime/sandbox.js';
@@ -56,6 +60,13 @@ export interface HarnessConfig {
   provider: HarnessProvider;
   dataDir?: string;
   sessionLogPath?: string;
+  // P1-06/P1-07/P1-08/P1-24: optional runtime components
+  eventBus?: EventBus;
+  pluginManager?: PluginManager;
+  sessionManager?: SessionManager;
+  healthMonitor?: HealthMonitor;
+  // P1-10: plan mode — if false, pause before execution for user approval
+  autoExecute?: boolean;
 }
 
 function deterministicRunId(task: TaskContract): string {
@@ -121,6 +132,7 @@ export class Harness {
         run_id: runPlan.run_id,
         goal: task.goal,
         data_dir: this.config.dataDir,
+        auto_execute: this.config.autoExecute,
       },
       {
         session,
@@ -133,6 +145,8 @@ export class Harness {
           return this.executeTool(name, args, session);
         },
         goalSatisfied: (turns) => this.checkGoal(task, turns),
+        eventBus: this.config.eventBus,
+        pluginManager: this.config.pluginManager,
       },
     );
 

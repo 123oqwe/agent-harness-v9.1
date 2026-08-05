@@ -35,10 +35,13 @@ export async function parseDocument(vfs: VirtualFilesystem, input: ParseDocument
   if (binaryFormats.includes(format)) {
     const parserMap: Record<string, string> = {
       pdf: 'pdf-parse', docx: 'mammoth', pptx: 'pptxgenjs', xlsx: 'exceljs',
-      audio: 'transcribe_audio', video: 'ffmpeg+transcribe_audio',
-    };
-    return { path: input.path, pages: [], total_chars: 0, format, needs_external_parser: true, external_parser: parserMap[format] };
-  }
+     audio: 'transcribe_audio', video: 'ffmpeg+transcribe_audio',
+   };
+    const parser = parserMap[format];
+    return parser === undefined
+      ? { path: input.path, pages: [], total_chars: 0, format, needs_external_parser: true }
+      : { path: input.path, pages: [], total_chars: 0, format, needs_external_parser: true, external_parser: parser };
+ }
 
   // HTML: strip tags for text extraction
   if (format === 'html') {

@@ -35,10 +35,11 @@
     "./**/*.ts",
     "../spec/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage",
-    ".stryker-tmp"
-  ]
+ "exclude": [
+   "node_modules",
+   "dist",
+   "coverage",
+    ".stryker-tmp",
+    "tests/coverage"
+ ]
 }
