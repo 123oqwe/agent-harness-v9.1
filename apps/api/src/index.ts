@@ -13,11 +13,11 @@ export interface ApiCompositionBinding {
 export const composeApiApp = (candidate: unknown): ApiCompositionBinding => {
   try {
     if (candidate === null || typeof candidate !== "object") {
-      throw new TypeError("kernel object required");
+      throw new TypeError("kernel public port required");
     }
     const module = candidate as Record<string, unknown>;
     if (typeof module.createDefaultExecutionContext !== "function")
-      throw new TypeError("missing createDefaultExecutionContext");
+      throw new TypeError("kernel public port missing createDefaultExecutionContext");
     const Harness = module.Harness as {
       name?: unknown;
       prototype?: { run?: unknown };
@@ -26,9 +26,9 @@ export const composeApiApp = (candidate: unknown): ApiCompositionBinding => {
       Harness.name !== "Harness" ||
       typeof Harness.prototype?.run !== "function"
     )
-      throw new TypeError("missing Harness class");
+      throw new TypeError("kernel public port missing Harness class");
   } catch (cause) {
-    throw new TypeError("invalid API composition binding", { cause });
+    throw new TypeError("kernel public port validation failed", { cause });
   }
   return {
     workspace: workspaceIdentity.name,

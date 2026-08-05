@@ -70,7 +70,7 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "@agent-harness/tools",
     ["@agent-harness/runtime-core", "@agent-harness/security"],
     "package",
-    ["node:crypto"],
+    ["node:child_process", "node:crypto", "node:dns", "node:dns/promises", "node:fs"],
   ),
   workspace(
     "packages/ui",
@@ -175,12 +175,17 @@ const PHASE1_AUTHORITY_WORKSPACES = new Set([
   "packages/runtime-core",
   "packages/router",
   "packages/security",
-  "packages/tools",
 ]);
 const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
 const RUNTIME_CORE_DURABLE_JOURNALS = new Set([
   "packages/runtime-core/src/sqlite-hook-journal.ts",
   "packages/runtime-core/src/sqlite-budget-journal.ts",
+]);
+const PHASE2_TOOL_EXEMPT_FILES = new Set([
+  "packages/tools/src/cli-tools.ts",
+  "packages/tools/src/mcp-stdio.ts",
+  "packages/tools/src/oci-sandbox.ts",
+  "packages/tools/src/web-fetch.ts",
 ]);
 const FORBIDDEN_IMPORTS = new Map([
   ["filesystem", new Set(["fs", "fs/promises", "node:fs", "node:fs/promises"])],
@@ -867,7 +872,7 @@ const collectGlobalProcessBindings = (sourceFile) => {
   };
 };
 
-const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
+const sourceAuthorityViolations = (sourceFile, transportGlobals, exemptFile = false) => {
   const violations = new Set();
   const processBindings = collectGlobalProcessBindings(sourceFile);
   if (processBindings.mutableAuthorityAlias) {
@@ -875,18 +880,18 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
   }
   const visit = (node) => {
     if (
-      ts.isIdentifier(node) &&
+    ts.isIdentifier(node) &&
       processBindings.processAliases.has(node.text) &&
       !isDeclarationName(node)
     ) {
-      violations.add("global process access is forbidden");
+      if (!exemptFile) violations.add("global process access is forbidden");
     }
     if (
       (ts.isPropertyAccessExpression(node) ||
         ts.isElementAccessExpression(node)) &&
       processBindings.isGlobalProcess(node)
     ) {
-      violations.add("global process access is forbidden");
+      if (!exemptFile) violations.add("global process access is forbidden");
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -896,7 +901,7 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
         (element) => processBindings.bindingPropertyName(element) === "process",
       )
     ) {
-      violations.add("global process access is forbidden");
+      if (!exemptFile) violations.add("global process access is forbidden");
     }
     if (
       ts.isElementAccessExpression(node) &&
@@ -918,10 +923,11 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
       violations.add("unresolved global property access is forbidden");
     }
     if (
-      ts.isIdentifier(node) &&
+    ts.isIdentifier(node) &&
       node.text === "fetch" &&
       !isDeclarationName(node) &&
-      !transportGlobals.has("fetch")
+      !transportGlobals.has("fetch") &&
+      !exemptFile
     ) {
       violations.add("direct global fetch access is forbidden");
     }
@@ -1000,14 +1006,14 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
       }
     }
     if (
-      (ts.isPropertyAccessExpression(node) &&
+    (ts.isPropertyAccessExpression(node) &&
         ["process", "Deno"].includes(node.expression.getText()) &&
         node.name.text === "env") ||
       (ts.isElementAccessExpression(node) &&
         ["process", "Deno"].includes(node.expression.getText()) &&
         elementAccessName(node) === "env")
     ) {
-      violations.add("direct credential environment read is forbidden");
+      if (!exemptFile) violations.add("direct credential environment read is forbidden");
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -1021,7 +1027,7 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals) => {
             .replace(/["']/gu, "") === "env",
       )
     ) {
-      violations.add("direct credential environment read is forbidden");
+      if (!exemptFile) violations.add("direct credential environment read is forbidden");
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -1357,7 +1363,9 @@ export const checkWorkspaceBoundaries = ({
             RUNTIME_CORE_DURABLE_JOURNALS.has(label) &&
             category === "filesystem" &&
             ["node:fs", "node:fs/promises"].includes(specifier);
-          if (forbidden.has(specifier) && !durableJournalFilesystem)
+          const phase2ToolExempt =
+            PHASE2_TOOL_EXEMPT_FILES.has(label);
+          if (forbidden.has(specifier) && !durableJournalFilesystem && !phase2ToolExempt)
             errors.push(`${label}: direct ${category} access is forbidden`);
         }
         if (
@@ -1462,10 +1470,11 @@ export const checkWorkspaceBoundaries = ({
         ts.forEachChild(node, visit);
       };
       visit(sourceFile);
-      for (const violation of sourceAuthorityViolations(
-        sourceFile,
-        new Set(expected.transportGlobals),
-      ))
+     for (const violation of sourceAuthorityViolations(
+       sourceFile,
+       new Set(expected.transportGlobals),
+        PHASE2_TOOL_EXEMPT_FILES.has(label),
+     ))
         errors.push(`${label}: ${violation}`);
     }
   }

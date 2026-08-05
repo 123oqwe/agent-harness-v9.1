@@ -12,7 +12,7 @@ interface McpStdioConfig {
 }
 
 interface McpConnection {
-  process: ChildProcess;
+  child: ChildProcess;
   initialized: boolean;
 }
 
@@ -25,9 +25,9 @@ export async function connectMcpStdio(id: string, config: McpStdioConfig): Promi
   try {
     const proc = spawn(config.command, config.args ?? [], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, ...config.env },
+      env: { ...config.env },
     });
-    connections.set(id, { process: proc, initialized: false });
+    connections.set(id, { child: proc, initialized: false });
     return {
       success: true,
       output: { id, status: 'connected', pid: proc.pid },
@@ -40,7 +40,7 @@ export async function connectMcpStdio(id: string, config: McpStdioConfig): Promi
 export async function disconnectMcpStdio(id: string): Promise<ToolResult> {
   const conn = connections.get(id);
   if (!conn) return { success: false, output: null, error: 'connection not found' };
-  conn.process.kill();
+  conn.child.kill();
   connections.delete(id);
   return { success: true, output: { id, status: 'disconnected' } };
 }
