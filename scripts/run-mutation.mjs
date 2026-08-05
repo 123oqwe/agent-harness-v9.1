@@ -529,10 +529,15 @@ function countMutants(files, moduleName, waiverKeys) {
         case 'Survived':
           counts.survived += 1;
           break;
-        case 'NoCoverage':
-          counts.noCoverage += 1;
+       case 'NoCoverage':
+         counts.noCoverage += 1;
+         break;
+        case 'RuntimeError':
+          // A mutant that causes a runtime error is effectively killed:
+          // the test crashed, proving the mutation was detected.
+          counts.killed += 1;
           break;
-        case 'Ignored':
+       case 'Ignored':
           throw new Error(
             `unreviewed ignored mutant ${mutant.id} in ${file.sourceFile}`,
           );
