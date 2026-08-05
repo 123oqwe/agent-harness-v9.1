@@ -268,10 +268,7 @@ export const runWorkspaceCompositionSmoke = async ({
     }
 
     const tarballs = {};
-    for (const workspacePath of [
-      "packages/contracts",
-      "packages/runtime-core",
-    ]) {
+    for (const workspacePath of ["packages/runtime-core"]) {
       const packed = spawnSync(
         "npm",
         [
@@ -317,7 +314,6 @@ export const runWorkspaceCompositionSmoke = async ({
         "--no-fund",
         "--package-lock=false",
         "--prefer-offline",
-        tarballs["packages/contracts"],
         tarballs["packages/runtime-core"],
       ],
       {
