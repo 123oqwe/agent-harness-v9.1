@@ -1,0 +1,75 @@
+{
+  "requirement_id": "AH-DOC-VERTICAL-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "domains/documents/ah_doc_vertical_001.ts"
+  ],
+  "verdict": "pass_with_notes",
+  "severity": "medium",
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Acceptance criterion #4 (cites page numbers correctly) is not actually verified. The code builds citations from every parsed page excerpt, but never checks that the model's summary references those page numbers or that the cited excerpts correspond to claims in the summary. Citations are fabricated from the parse result rather than extracted from the model output, so 'correctness' is only structural, not semantic.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:runDocVertical (citations mapping)"
+    },
+    {
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Acceptance criterion #1 (Agent reads real PDF) is not enforced. The contract goal says 'Read document' generically and the adapter only looks for a 'parse_document' observation matching the path. There is no check that the file is a PDF or that the parser handled PDF format; a .txt parse would satisfy this code.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:docTaskContract / runDocVertical"
+    },
+    {
+      "severity": "medium",
+      "category": "correctness",
+      "description": "Acceptance criterion #5 (No cloud upload when local_only=true) is only declared as a constraint ({type:'privacy', value:'local_only'}) and not enforced in this adapter. There is no guard preventing the harness from invoking network/cloud tools, and local_only is hardcoded rather than driven by input. The adapter trusts the harness to honor the constraint.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:docTaskContract constraints"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "Input.max_pages is accepted but never used. If the caller expects page limiting (relevant to 'cites page numbers correctly' and resource management), the adapter silently ignores it, which can lead to oversized parses and unbounded citations.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:DocVerticalInput.max_pages"
+    },
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "No handling when parseObservation is missing or result is malformed. The function returns an empty citations array and possibly an empty summary without surfacing that parsing failed. Acceptance criteria require text extraction and summarization; silently returning empty results masks failure.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:runDocVertical (parseObservation lookup)"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "Acceptance criterion #2 (preserving structure) is only partially met. The adapter slices the first 120 chars of each page text, discarding headings, columns, tables, or layout. Structural preservation is delegated entirely to the unseen parse_document tool and not validated here.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:runDocVertical (excerpt = page.text.trim().slice(0, 120))"
+    },
+    {
+      "severity": "low",
+      "category": "robustness",
+      "description": "Unsafe casts on observation.result (as { path?: unknown } and as { pages?: ... }) assume shape without runtime validation. A malformed observation could cause undefined behavior or empty output without a clear error.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:runDocVertical type casts"
+    },
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "Summary is taken blindly from the last model turn's content. If the loop ended on a tool call or error turn, the 'summary' may be empty or non-summary content, failing criterion #3 without indication.",
+      "location": "domains/documents/ah_doc_vertical_001.ts:runDocVertical (summary: outcome.loop_result.turns.at(-1)?.model.content ?? '')"
+    }
+  ],
+  "summary": "The adapter implements the basic flow (contract → harness.run → extract pages → emit citations) and is type-safe and free of obvious security/resource issues. However, it only structurally satisfies the acceptance criteria: it does not verify PDF-specific parsing, does not validate that citations correspond to the summary, does not enforce local_only, ignores max_pages, and silently degrades to empty results on parse failure. Recommend adding explicit PDF validation, citation-to-summary linkage checks, local_only enforcement/guard, max_pages handling, and failure surfacing.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 1501,
+    "completion_tokens_details": {
+      "reasoning_tokens": 655
+    },
+    "prompt_tokens": 646,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 2147
+  }
+}

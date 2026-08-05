@@ -1,0 +1,34 @@
+{
+  "requirement_id": "AH-UI-EVIDENCE-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_evidence_001.ts"
+  ],
+  "review_focus": "security_and_critical_bugs",
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "The catch block returns the raw error.message directly to the UI result. If the underlying EvidenceRepositoryPort implementation throws errors containing sensitive internal details (e.g., database connection strings, file paths, stack traces, or internal system identifiers), those details would be propagated to the UI layer and potentially exposed to end users. Consider mapping known error types to generic user-facing messages and logging the original error internally instead.",
+      "location": "ui/ah_ui_evidence_001.ts: list() catch block, lines returning error.message"
+    }
+  ],
+  "summary": "The controller is simple and does not introduce injection, path traversal, SSRF, prototype pollution, or ReDoS risks. The spread copy and state logic are correct. The only notable concern is that raw error messages from the repository are forwarded to the UI, which could leak sensitive internal details depending on the repository implementation. This is a low-severity defensive coding issue rather than a confirmed vulnerability.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 933,
+    "completion_tokens_details": {
+      "reasoning_tokens": 716
+    },
+    "prompt_tokens": 401,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1334
+  }
+}

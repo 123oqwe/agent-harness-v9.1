@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-CODING-VERTICAL-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "domains/coding/ah_coding_vertical_001.ts"
+  ],
+  "tests_added": [
+    "tests/domain/coding-vertical.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/domain/coding-vertical.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 2,
+    "total": 2,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/domain/coding-vertical.test.ts > AH-CODING-VERTICAL-001 coding vertical (thin adapter) > delegates to Harness: reads, fixes, tests via unified pipeline 218ms\n ✓ tests/domain/coding-vertical.test.ts > AH-CODING-VERTICAL-001 coding vertical (thin adapter) > does not call Provider/Tool/VFS directly — all through Harness 40ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  00:01:12\n   Duration  980ms (transform 388ms, setup 0ms, import 526ms, tests 259ms, environment 0ms)\n\n\n",
+  "test_output_hash": "2711821e46f81e2e",
+  "test_output_sha256": "2711821e46f81e2e5a08ab06919f2aa0c5919a8bd36094b0cb67bffda79b577f",
+  "test_pass_count": 2,
+  "test_total_count": 2,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

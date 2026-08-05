@@ -1,0 +1,40 @@
+{
+  "requirement_id": "AH-UI-CODING-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_coding_001.ts"
+  ],
+  "review_focus": "security_and_critical_bugs",
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "The catch block returns e.message directly to the UI. Raw internal error messages (which may include stack details, internal paths, or implementation specifics from the Harness/runCodingVertical layer) could leak sensitive information to callers. Consider mapping known error types to safe, generic messages and logging the original error server-side.",
+      "location": "ui/ah_ui_coding_001.ts:runFix catch block (e.message branch)"
+    },
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "The non-success branch exposes result.outcome.loop_result.termination_reason in the user-facing error string. Depending on what termination_reason contains (e.g., internal agent loop diagnostics, model/provider identifiers, or sanitized tool output), this could leak internal state. Verify that termination_reason is safe to surface to UI consumers.",
+      "location": "ui/ah_ui_coding_001.ts:runFix non-success branch"
+    }
+  ],
+  "summary": "The controller is a thin wrapper around runCodingVertical with no injection, path traversal, SSRF, prototype pollution, or ReDoS exposure. Control flow and result shaping are correct. The only concerns are minor information-leakage risks from forwarding raw exception messages and internal termination_reason values to the UI; these are low severity and do not block the requirement.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 1055,
+    "completion_tokens_details": {
+      "reasoning_tokens": 771
+    },
+    "prompt_tokens": 445,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1500
+  }
+}

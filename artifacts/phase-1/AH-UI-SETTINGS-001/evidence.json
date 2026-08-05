@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-UI-SETTINGS-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_settings_001.ts"
+  ],
+  "tests_added": [
+    "tests/ui/ah-ui-settings-001.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/ui/ah-ui-settings-001.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 2,
+    "total": 2,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/ui/ah-ui-settings-001.test.ts > AH-UI-SETTINGS-001 authoritative settings store > reads, updates, and resets the injected store 2ms\n ✓ tests/ui/ah-ui-settings-001.test.ts > AH-UI-SETTINGS-001 authoritative settings store > rejects negative budgets before touching the store 0ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  00:17:28\n   Duration  250ms (transform 24ms, setup 0ms, import 35ms, tests 3ms, environment 0ms)\n\n\n",
+  "test_output_hash": "371893e7e7b4a8be",
+  "test_output_sha256": "371893e7e7b4a8bef91770322d2227d29a5c8088f18bcd5d9ac6876fc1cce3e3",
+  "test_pass_count": 2,
+  "test_total_count": 2,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

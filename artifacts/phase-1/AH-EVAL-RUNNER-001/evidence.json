@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-EVAL-RUNNER-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "verification/eval-runner.ts"
+  ],
+  "tests_added": [
+    "tests/verification/eval-runner.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/verification/eval-runner.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 38,
+    "total": 38,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > executes every suite kind and binds the exact git revision 554ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > checks the declared exit code and hashes both output streams 128ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > cannot represent an unexpected exit as pass 99ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > marks e2e strategy consistency false when its executable fails 102ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > keeps strategy consistency independent from non-e2e suite failures 185ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > requires every e2e strategy fixture to pass 188ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > passes arguments literally and never interprets shell syntax 25ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > honours per-case cwd and timeout without a shell 134ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > fails closed when the executable does not exist 21ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 0 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 1 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 2 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 3 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 4 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 5 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 6 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 7 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 8 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 9 1ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 10 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 11 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 12 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 13 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects malformed manifest 14 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > preserves EvalRunnerError identity and exact validation messages 1ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > rejects execution outside a repository with an exact revision error 28ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 0 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 1 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 2 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 3 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 4 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 5 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 6 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 7 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 8 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 9 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 10 0ms\n ✓ tests/verification/eval-runner.test.ts > AH-EVAL-RUNNER-001 argv-only evaluation runner > returns exact manifest diagnostic 11 0ms\n\n Test Files  1 passed (1)\n      Tests  38 passed (38)\n   Start at  00:02:13\n   Duration  1.75s (transform 43ms, setup 0ms, import 80ms, tests 1.47s, environment 0ms)\n\n\n",
+  "test_output_hash": "99e9f1ad756ce974",
+  "test_output_sha256": "99e9f1ad756ce974b3bdf9d45d08fc0672c1a695fe18934e270c185598610f06",
+  "test_pass_count": 38,
+  "test_total_count": 38,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

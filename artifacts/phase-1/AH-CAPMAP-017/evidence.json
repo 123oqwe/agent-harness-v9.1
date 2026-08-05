@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-CAPMAP-017",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "skills/skill-registry.ts"
+  ],
+  "tests_added": [
+    "tests/capability/ah-capmap-017.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/capability/ah-capmap-017.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 26,
+    "total": 26,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > registers a valid SkillSpec 81ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > rejects duplicate skill names fail-closed 23ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > rejects invalid SkillSpec 35ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > skills are declarative only (no executable code) 27ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > skill_search searches compact metadata without loading full instructions 16ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > skill_search filters by domain and risk ceiling 24ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > full SkillSpec loaded only after selection (progressive disclosure) 14ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > freezeSnapshot is immutable and content-addressed 13ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > ships 8 declarative base skills 11ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > no network calls during skill loading 11ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > skill search can never grant tools, capabilities or permissions 12ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry > does not embed a copied JSON Schema in source code 9ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > uses packaged declarative JSON as the single base-skill authority 18ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > returns sorted names, exact size and undefined for an unknown skill 10ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > uses exact default metadata and a typed validation error 9ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > returns exact compact metadata and matches trimmed case-insensitive terms 13ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > does not join adjacent metadata fields into false matches and sorts results 8ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > returns immutable compact metadata without leaking registry references 10ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > content hashing is key-order independent and sensitive to nested values and arrays 35ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > freezes every snapshot layer and invalidates the cache after registration 10ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > binds full disclosure to name, version and content hash 10ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > loads JSON deterministically and ignores unsupported extensions 13ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > parses files in sorted order and reports the first exact parse failure 12ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > fails directory loading atomically on parse, validation and duplicates 34ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > reports the failing file and preserves the old registry on failed reload 28ms\n ✓ tests/capability/ah-capmap-017.test.ts > AH-CAPMAP-017 Skill Registry boundary contracts > rejects a missing directory with its exact path 16ms\n\n Test Files  1 passed (1)\n      Tests  26 passed (26)\n   Start at  00:00:19\n   Duration  1.04s (transform 60ms, setup 0ms, import 153ms, tests 503ms, environment 0ms)\n\n\n",
+  "test_output_hash": "1b8c3a28569f468d",
+  "test_output_sha256": "1b8c3a28569f468d72d266c3bd5f82f1208406ede018e906ae5b39cdb183355b",
+  "test_pass_count": 26,
+  "test_total_count": 26,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

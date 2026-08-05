@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-TOOL-REGISTRY-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "tools/tool-registry.ts"
+  ],
+  "tests_added": [
+    "tests/tools/tool-registry.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/tools/tool-registry.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 16,
+    "total": 16,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > registers a valid ToolSpec 68ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > rejects duplicate names fail-closed 18ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > rejects invalid schema 12ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > rejects uncertified production tools 11ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > tool_search returns compact metadata without executing 12ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > progressive disclosure: loadFull returns complete schema only after selection 25ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > search filters by domain, transport, availability 19ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > freezeSnapshot is immutable and content-addressed 30ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > hashes nested ToolSpec content recursively 30ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > clones and deep-freezes nested registered ToolSpecs 12ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > rejects a same-name record that does not match the frozen version and hash 23ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > inSnapshot guards Runtime execution 11ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > loadFromDir reads JSON ToolSpec files 12ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > discovery never grants or executes (read-only) 10ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > loads schema from authoritative contract file > does not embed a copied JSON Schema in source code 9ms\n ✓ tests/tools/tool-registry.test.ts > AH-TOOL-REGISTRY-001 Tool Registry > loads schema from authoritative contract file > loads the packaged runtime contract at construction 21ms\n\n Test Files  1 passed (1)\n      Tests  16 passed (16)\n   Start at  00:14:32\n   Duration  676ms (transform 52ms, setup 0ms, import 116ms, tests 323ms, environment 0ms)\n\n\n",
+  "test_output_hash": "1bc04a6a31682649",
+  "test_output_sha256": "1bc04a6a31682649ac1c6043c2c3298da844806783da00196bdb0cf1fdf70286",
+  "test_pass_count": 16,
+  "test_total_count": 16,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

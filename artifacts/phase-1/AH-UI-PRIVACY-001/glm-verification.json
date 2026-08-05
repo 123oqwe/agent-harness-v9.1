@@ -1,0 +1,34 @@
+{
+  "requirement_id": "AH-UI-PRIVACY-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_privacy_001.ts"
+  ],
+  "review_focus": "security_and_critical_bugs",
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "parse",
+      "description": "Unparseable response",
+      "location": "GLM"
+    }
+  ],
+  "summary": "",
+  "finishReason": "length",
+  "usage": {
+    "completion_tokens": 4096,
+    "completion_tokens_details": {
+      "reasoning_tokens": 4094
+    },
+    "prompt_tokens": 524,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 4620
+  }
+}

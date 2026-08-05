@@ -1,0 +1,56 @@
+{
+  "requirement_id": "AH-SANDBOX-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "sandbox/process-sandbox.ts"
+  ],
+  "tests_added": [
+    "tests/sandbox/path-traversal.test.ts",
+    "tests/sandbox/symlink-escape.test.ts",
+    "tests/sandbox/network-denied.test.ts",
+    "tests/sandbox/limits.test.ts",
+    "tests/sandbox/shell-injection.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/sandbox/path-traversal.test.ts tests/sandbox/symlink-escape.test.ts tests/sandbox/network-denied.test.ts tests/sandbox/limits.test.ts tests/sandbox/shell-injection.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 17,
+    "total": 17,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/sandbox/path-traversal.test.ts > AH-SANDBOX-001 path traversal blocked > assertWithinWorkspace rejects cwd outside workspace root 4ms\n ✓ tests/sandbox/path-traversal.test.ts > AH-SANDBOX-001 path traversal blocked > assertWithinWorkspace accepts cwd inside workspace root 2ms\n ✓ tests/sandbox/path-traversal.test.ts > AH-SANDBOX-001 path traversal blocked > sandboxed process cannot read /etc/passwd outside workspace 52ms\n ✓ tests/sandbox/symlink-escape.test.ts > AH-SANDBOX-001 symlink escape blocked > cannot write outside workspace via symlink 72ms\n ✓ tests/sandbox/shell-injection.test.ts > AH-SANDBOX-001 shell injection blocked > argv mode does not interpret shell metacharacters 58ms\n ✓ tests/sandbox/shell-injection.test.ts > AH-SANDBOX-001 shell injection blocked > credentials stripped from child env 71ms\n ✓ tests/sandbox/network-denied.test.ts > AH-SANDBOX-001 network access denied > blocks a network egress attempt 169ms\n ✓ tests/sandbox/network-denied.test.ts > AH-SANDBOX-001 network access denied > reports the mechanism used 15ms\n ✓ tests/sandbox/network-denied.test.ts > AH-SANDBOX-001 network access denied > does not report PowerShell JobObject as AppContainer on Windows 1ms\n ✓ tests/sandbox/network-denied.test.ts > AH-SANDBOX-001 network access denied > Linux bubblewrap enforces real RLIMIT_AS, not just an env var 1ms\n ✓ tests/sandbox/network-denied.test.ts > AH-SANDBOX-001 network access denied > macOS seatbelt denies sensitive paths even with broad read 1ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > kills a sleeping process after timeoutMs 830ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > truncates stdout beyond outputBytes 23ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > AbortSignal cancels a running process 156ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > binary output captured as Buffer 23ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > stdin hang prevented (closed) 30ms\n ✓ tests/sandbox/limits.test.ts > AH-SANDBOX-001 limits enforced > provided stdin delivered then closed 18ms\n\n Test Files  5 passed (5)\n      Tests  17 passed (17)\n   Start at  00:11:01\n   Duration  1.41s (transform 219ms, setup 0ms, import 320ms, tests 1.53s, environment 1ms)\n\n\n",
+  "test_output_hash": "cf5413f8acff0ff4",
+  "test_output_sha256": "cf5413f8acff0ff43791cdec600967a1d1dc2934c529ea494c5fb31d20d05a42",
+  "test_pass_count": 17,
+  "test_total_count": 17,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "GLM response could not be parsed as JSON",
+        "location": "GLM response"
+      }
+    ],
+    "summary": ""
+  }
+}

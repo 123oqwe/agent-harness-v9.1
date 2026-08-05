@@ -1,0 +1,52 @@
+{
+  "requirement_id": "AH-CAPMAP-002",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "security/auth.ts"
+  ],
+  "tests_added": [
+    "tests/capability/ah-capmap-002.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/capability/ah-capmap-002.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 29,
+    "total": 29,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > hashes passwords with bcrypt cost 12 and never stores plaintext 427ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > POST /auth/login returns a 24h Secure HttpOnly host cookie for valid credentials 879ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > returns generic 401 for five invalid attempts, then 429 for exactly 15 minutes 2965ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > does not reveal whether an email exists and never logs credentials or email 854ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > GET /auth/me authorizes only a live session and logout invalidates it 1294ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > fails closed on duplicate session cookies and logout without a session 837ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > enforces account-wide rate limits even when an attacker rotates client identifiers 2664ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > enforces client-wide rate limits across account identifiers 3029ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > does not let a successful account reset the client-wide brute-force bucket 3337ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > strictly rejects malformed requests without reflecting PII 2ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > validates security-sensitive account, password, origin, and entropy boundaries 841ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > rejects duplicate identities and preserves store copies 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 password authentication and sessions > matches methods and paths exactly and maps unexpected failures to a generic response 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > POST /auth/webauthn/register uses the real library to issue a single-use challenge 884ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > POST /auth/webauthn/verify validates through the verifier, consumes challenge, and returns a session 861ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > real verifier fails closed on malformed WebAuthn data without leaking library errors 823ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > expires and consumes registration challenges before invoking the verifier 807ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > accepts a challenge immediately before expiry and enforces user verification 858ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > burns a challenge after a failed verification attempt 850ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > authenticates a registered credential without a password and atomically advances its counter 899ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > fails WebAuthn authentication closed for an expired or unknown ceremony 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > supports the OpenAPI method=webauthn login form without revealing credential registration 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > rejects every authentication verification invariant with one redacted deny audit 4ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > allows only one concurrent assertion to advance the same nonzero signature counter 2ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > rejects malformed stored credentials before they can enter the authentication index 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > burns an authentication ceremony on a malformed request and audits unknown ceremony denial once 1ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > bounds active WebAuthn ceremonies and releases capacity after their deadline 329ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 WebAuthn > fails closed when a WebAuthn adapter returns an invalid challenge 0ms\n ✓ tests/capability/ah-capmap-002.test.ts > AH-CAPMAP-002 audit retention > keeps redacted immutable events for 90 days and purges only older events 851ms\n\n Test Files  1 passed (1)\n      Tests  29 passed (29)\n   Start at  23:57:42\n   Duration  25.04s (transform 95ms, setup 0ms, import 429ms, tests 24.31s, environment 0ms)\n\n\n",
+  "test_output_hash": "f5c7e6dbecdaff07",
+  "test_output_sha256": "f5c7e6dbecdaff0751224521027fb30779c4af6bef82c13b1500dc9fbd46a8ee",
+  "test_pass_count": 29,
+  "test_total_count": 29,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "GLM response could not be parsed as JSON",
+        "location": "GLM response"
+      }
+    ],
+    "summary": ""
+  }
+}

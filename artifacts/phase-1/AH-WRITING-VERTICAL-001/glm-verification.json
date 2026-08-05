@@ -1,0 +1,57 @@
+{
+  "requirement_id": "AH-WRITING-VERTICAL-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "domains/writing/ah_writing_vertical_001.ts"
+  ],
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "requirements",
+      "description": "Acceptance criterion 4 ('Output meets all brief requirements') is not strictly enforced. When self-check fails, the code appends a warning to the draft rather than iterating, retrying, or failing. The produced output may still not satisfy the brief requirements.",
+      "location": "domains/writing/ah_writing_vertical_001.ts:runWritingVertical (allMet / output)"
+    },
+    {
+      "severity": "low",
+      "category": "robustness",
+      "description": "No input validation. An empty requirements array causes self_check.every to return true, so output is set to the draft unconditionally, potentially masking a missing-requirements scenario. An empty brief is also accepted without guard.",
+      "location": "domains/writing/ah_writing_vertical_001.ts:runWritingVertical / writingTaskContract"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "Self-check depends on the harness preserving the exact criterion string in verification_report.records and using status === 'passed'. Any mismatch in naming or status vocabulary silently yields met=false for all requirements.",
+      "location": "domains/writing/ah_writing_vertical_001.ts:runWritingVertical (verificationByCriterion)"
+    },
+    {
+      "severity": "low",
+      "category": "error_handling",
+      "description": "No try/catch around harness.run; failures propagate to the caller. Acceptable for a thin adapter but worth noting given the function constructs a structured output type.",
+      "location": "domains/writing/ah_writing_vertical_001.ts:runWritingVertical"
+    },
+    {
+      "severity": "low",
+      "category": "security",
+      "description": "Brief and requirement strings are interpolated directly into the goal prompt without sanitization. For a local-only adapter this is low risk, but prompt-injection via brief content is not mitigated.",
+      "location": "domains/writing/ah_writing_vertical_001.ts:writingTaskContract"
+    }
+  ],
+  "summary": "The adapter correctly wires brief → draft → self-check → output per AH-WRITING-VERTICAL-001 and delegates orchestration to the harness. However, criterion 4 is only weakly satisfied: failed requirements produce a warning rather than guaranteed compliance, and there is no input validation or explicit handling of empty requirements. Findings are low severity; recommend adding validation, a retry/fail path on unmet requirements, and confirming the harness status vocabulary.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 1373,
+    "completion_tokens_details": {
+      "reasoning_tokens": 901
+    },
+    "prompt_tokens": 543,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1916
+  }
+}

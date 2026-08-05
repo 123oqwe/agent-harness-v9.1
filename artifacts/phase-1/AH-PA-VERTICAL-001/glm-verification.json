@@ -1,0 +1,33 @@
+{
+  "requirement_id": "AH-PA-VERTICAL-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "domains/personal-assistant/ah_pa_vertical_001.ts"
+  ],
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "parse",
+      "description": "GLM response could not be parsed as JSON",
+      "location": "GLM response"
+    }
+  ],
+  "summary": "",
+  "finishReason": "length",
+  "usage": {
+    "completion_tokens": 4096,
+    "completion_tokens_details": {
+      "reasoning_tokens": 4096
+    },
+    "prompt_tokens": 865,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 4961
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "requirement_id": "AH-VFS-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "vfs/virtual-filesystem.ts"
+  ],
+  "tests_added": [
+    "tests/vfs/virtual-filesystem.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/vfs/virtual-filesystem.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 30,
+    "total": 30,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > assertSafeVfsPath > rejects relative paths 3ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > assertSafeVfsPath > rejects traversal 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > assertSafeVfsPath > rejects null bytes 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > assertSafeVfsPath > accepts clean absolute paths 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > backend routing > routes /workspace to LocalBackend 4ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > backend routing > routes /memories to StoreBackend 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > backend routing > rejects unknown prefix 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > backend routing > longest prefix wins 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > deny-by-default permissions > denies a path with no rule (deny-by-default) 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > deny-by-default permissions > enforces read-only on /evidence 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > path traversal & symlink escape > rejects traversal via assertSafeVfsPath on every routed access 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > path traversal & symlink escape > blocks symlink escape outside root 2ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > OverlayBackend transactional commit/discard > stages writes then commits atomically to LocalBackend 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > OverlayBackend transactional commit/discard > discards partial edits so nothing reaches the target 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > OverlayBackend transactional commit/discard > cannot commit a finalized overlay 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > EvidenceBackend WORM > write-once: second write throws 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > EvidenceBackend WORM > delete is forbidden 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > list / search / receipts > list returns entries under a prefix 4ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > list / search / receipts > search finds files containing the needle 2ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > list / search / receipts > every operation produces a receipt with sha256 for reads/writes 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > AH-VFS-001 Virtual Filesystem > cross-backend aliasing > a deny on /workspace/protected blocks read even though /workspace is allowed 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > StoreBackend list/read/delete/exists 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > EvidenceBackend list/read/exists + WORM delete throws 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > OverlayBackend list/read/delete/exists/tombstones 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > OverlayBackend markCommitted blocks further writes 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > VFS exists returns false for denied path 0ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > VFS delete removes a file 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > OverlayBackend read-through: staged write returns staged content, un-staged path falls through to base 1ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > commitOverlay restores original content when second file commit fails 2ms\n ✓ tests/vfs/virtual-filesystem.test.ts > VFS backend direct coverage > commitOverlay restores deleted files when commit fails 2ms\n\n Test Files  1 passed (1)\n      Tests  30 passed (30)\n   Start at  00:17:59\n   Duration  380ms (transform 97ms, setup 0ms, import 128ms, tests 37ms, environment 0ms)\n\n\n",
+  "test_output_hash": "eefe123e47c1988b",
+  "test_output_sha256": "eefe123e47c1988be12a82a7ca2e085ee11a18ead795e2da62b30f9279eeb2e8",
+  "test_pass_count": 30,
+  "test_total_count": 30,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "GLM response could not be parsed as JSON",
+        "location": "GLM response"
+      }
+    ],
+    "summary": ""
+  }
+}

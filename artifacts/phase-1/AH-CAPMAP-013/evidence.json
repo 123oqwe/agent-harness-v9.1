@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-CAPMAP-013",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "runtime/retry.ts"
+  ],
+  "tests_added": [
+    "tests/capability/ah-capmap-013.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/capability/ah-capmap-013.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 25,
+    "total": 25,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > calls fn at most maxAttempts times 7ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > non-retryable error (400) does NOT trigger retry 1ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > retryable errors: 429, 500, 502, 503, 504, network, timeout 2ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > default baseDelay=1000 maxDelay=30000 jitterMs=500 maxAttempts=3 3ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > backoff: attempt N waits baseDelay * 2^(N-1) + random(0, jitterMs) 39ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > RetryExhausted includes last error and attempt count 274ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > retry > all retry attempts logged with attempt number, delay, error 23ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > circuit breaker > opens after 5 consecutive failures, blocks for 60s 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > circuit breaker > half-open allows 1 probe request after cooldown 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > circuit breaker > success resets consecutive failures 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > idempotency enforcement > does NOT retry when idempotencyKey is absent (prevents non-idempotent replay) 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > idempotency enforcement > retries when idempotencyKey is present (safe to replay) 423ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 400 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 401 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 403 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 404 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 422 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 499 as non-retryable 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > classifies HTTP 408 as timeout and malformed statuses as unknown 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > reopens a failed half-open probe and reports exact remaining cooldown 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > validates circuit and retry configuration 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > caps delay, validates jitter and clock, and preserves original non-retryable error 1ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > treats a blank idempotency key as unsafe to replay 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > exposes typed, exact retry and circuit errors 0ms\n ✓ tests/capability/ah-capmap-013.test.ts > AH-CAPMAP-013 retry + circuit breaker > boundary behavior > uses zero default jitter without calling crypto for a zero range 1ms\n\n Test Files  1 passed (1)\n      Tests  25 passed (25)\n   Start at  23:59:48\n   Duration  1.25s (transform 141ms, setup 0ms, import 170ms, tests 780ms, environment 0ms)\n\n\n",
+  "test_output_hash": "31aa0b9fd647b10b",
+  "test_output_sha256": "31aa0b9fd647b10bf25420e47a034628eb8100b2ef39946ef90bc389b0dbcad1",
+  "test_pass_count": 25,
+  "test_total_count": 25,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "Unparseable response",
+        "location": "GLM"
+      }
+    ],
+    "summary": "",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

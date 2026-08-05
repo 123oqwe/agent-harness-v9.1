@@ -1,0 +1,27 @@
+{
+  "requirement_id": "AH-TOOL-LIST-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "tools/list-directory.ts"
+  ],
+  "review_focus": "security_and_critical_bugs",
+  "verdict": "pass",
+  "severity": "none",
+  "findings": [],
+  "summary": "The listDirectory function is a thin delegation wrapper that passes the input path directly to vfs.list(). Security controls such as path traversal prevention, access control, and input validation are the responsibility of the VirtualFilesystem implementation, which is not in scope for this file review. No injection, SSRF, credential leakage, prototype pollution, or ReDoS vulnerabilities are present in this code. The function does not introduce resource leaks or state corruption. Error propagation from vfs.list() is left to the caller/framework, which is an acceptable pattern for a tool wrapper.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 805,
+    "completion_tokens_details": {
+      "reasoning_tokens": 672
+    },
+    "prompt_tokens": 327,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1132
+  }
+}

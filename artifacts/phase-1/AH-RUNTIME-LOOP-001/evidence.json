@@ -1,0 +1,52 @@
+{
+  "requirement_id": "AH-RUNTIME-LOOP-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "runtime/loop.ts"
+  ],
+  "tests_added": [
+    "tests/runtime/loop.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/runtime/loop.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 10,
+    "total": 10,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > normalizes model exceptions and always emits one terminal event 4ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > direct maps length to malformed_response without tool execution 1ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > direct maps content_filter to model_refusal without tool execution 0ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > passes the remaining real token budget into every model call 2ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > records one bounded observation for every tool call 12ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > emits a rejected observation for the oscillating call 1ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > validates a frozen DAG without mutating it and consumes a tool call once 7ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > rejects invalid plan: 'duplicate IDs' 0ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > rejects invalid plan: 'missing edge endpoint' 0ms\n ✓ tests/runtime/loop.test.ts > Phase 1 truthful LoopEngine > rejects invalid plan: 'cycle' 0ms\n\n Test Files  1 passed (1)\n      Tests  10 passed (10)\n   Start at  00:09:04\n   Duration  344ms (transform 88ms, setup 0ms, import 121ms, tests 28ms, environment 0ms)\n\n\n",
+  "test_output_hash": "1cf5ef175f3027cf",
+  "test_output_sha256": "1cf5ef175f3027cf7224d7117ab62dfbd99f6070477977620961e64b7a5abe16",
+  "test_pass_count": 10,
+  "test_total_count": 10,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "GLM response could not be parsed as JSON",
+        "location": "GLM response"
+      }
+    ],
+    "summary": ""
+  }
+}

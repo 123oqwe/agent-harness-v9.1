@@ -1,0 +1,70 @@
+{
+  "requirement_id": "AH-CAPMAP-020",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "runtime/notifications.ts"
+  ],
+  "tests_added": [
+    "tests/capability/ah-capmap-020.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/capability/ah-capmap-020.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 17,
+    "total": 17,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 4
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > POST creates notification with id, user_id, type, title, body, created_at, read=false 3ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > GET returns unread notifications sorted by created_at desc 1ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > GET ?include_read=true returns all 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > PATCH marks as read 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > DELETE dismisses notification 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > notification types: info, warning, error, success, approval_request 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > notifications expire after 30 days (configurable) 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > no external delivery (no email/push/SMS) 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > body max 500 chars 1ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > user can only see their own notifications 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > notification creation requires authenticated session 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > rejects invalid configuration, type, title, clock, and IDs 1ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > fails closed for cross-user or missing mutation attempts 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > does not expose mutable queue authority 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > orders equal timestamps by monotonic sequence and removes empty indexes 1ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > purges only expired records and keeps other users isolated 0ms\n ✓ tests/capability/ah-capmap-020.test.ts > AH-CAPMAP-020 in-app notifications > excludes a notification at the exact expiration boundary 0ms\n\n Test Files  1 passed (1)\n      Tests  17 passed (17)\n   Start at  00:00:47\n   Duration  379ms (transform 36ms, setup 0ms, import 57ms, tests 11ms, environment 0ms)\n\n\n",
+  "test_output_hash": "af6abfba0fe71638",
+  "test_output_sha256": "af6abfba0fe71638d019a822d1a7943a557c37dcb93ff18065bde139f1a3d64d",
+  "test_pass_count": 17,
+  "test_total_count": 17,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "correctness",
+        "description": "ttlDays=0 is permitted by validation but results in expires_at equal to creation time. The list() filter uses strict greater-than (Date.parse(expires_at) > now), so notifications created with ttlDays=0 become immediately unlistable and effectively invisible. Consider requiring ttlDays >= 1 or using >= in the expiry comparison.",
+        "location": "runtime/notifications.ts: constructor + list()"
+      },
+      {
+        "severity": "low",
+        "category": "correctness",
+        "description": "markRead unconditionally sets read=true regardless of any input payload. While the acceptance criteria only requires {read: true} to mark as read, the service signature does not accept a read parameter, so a hypothetical {read: false} cannot be handled at this layer. This is acceptable for Phase 1 but worth noting if the API contract evolves.",
+        "location": "runtime/notifications.ts: markRead()"
+      },
+      {
+        "severity": "low",
+        "category": "correctness",
+        "description": "body.length counts UTF-16 code units rather than Unicode code points/grapheme clusters. Strings containing surrogate pairs (e.g., emoji) may be rejected slightly earlier than a strict 500-character interpretation. Conservative and safe, but may differ from a UI-side character counter.",
+        "location": "runtime/notifications.ts: create() body validation"
+      },
+      {
+        "severity": "low",
+        "category": "resource_management",
+        "description": "purgeExpired() is provided but never invoked automatically; expired notifications remain in memory until explicitly purged. The list() path filters them out, so behavior is correct, but memory could grow unbounded without scheduled purging. Not a defect given the in-memory Phase 1 scope.",
+        "location": "runtime/notifications.ts: purgeExpired()"
+      }
+    ],
+    "summary": "The NotificationService correctly satisfies all AH-CAPMAP-020 acceptance criteria: create() produces notifications with id, user_id, type, title, body, created_at, read=false (plus expires_at/seq); list() returns unread items sorted by created_at desc with include_read support; markRead() and dismiss() enforce ownership; the five required types are validated; 30-day TTL is configurable; no external delivery is present; and body is capped at 500 chars. Error handling is robust (empty user/title, invalid type, oversized body, invalid clock, duplicate/empty id, ownership checks). Immutability is preserved via Object.freeze and defensive copies. Findings are minor edge cases and operational notes, none of which violate the requirements."
+  }
+}

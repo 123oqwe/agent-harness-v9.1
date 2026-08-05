@@ -1,0 +1,46 @@
+{
+  "requirement_id": "AH-TOOL-LIST-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "tools/list-directory.ts"
+  ],
+  "tests_added": [
+    "tests/tools/list-directory.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/tools/list-directory.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 2,
+    "total": 2,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass",
+    "glm_severity": "none",
+    "findings_count": 0
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/tools/list-directory.test.ts > AH-TOOL-LIST-001 list_directory > lists entries in a directory 6ms\n ✓ tests/tools/list-directory.test.ts > AH-TOOL-LIST-001 list_directory > returns empty for empty directory 2ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  00:13:33\n   Duration  269ms (transform 39ms, setup 0ms, import 60ms, tests 9ms, environment 0ms)\n\n\n",
+  "test_output_hash": "bd4acf608c077b4b",
+  "test_output_sha256": "bd4acf608c077b4bd9d62099806e064d595daea708b15971fd99aa55585c61b4",
+  "test_pass_count": 2,
+  "test_total_count": 2,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass",
+    "severity": "none",
+    "findings": [],
+    "summary": "The listDirectory function is a thin delegation wrapper that passes the input path directly to vfs.list(). Security controls such as path traversal prevention, access control, and input validation are the responsibility of the VirtualFilesystem implementation, which is not in scope for this file review. No injection, SSRF, credential leakage, prototype pollution, or ReDoS vulnerabilities are present in this code. The function does not introduce resource leaks or state corruption. Error propagation from vfs.list() is left to the caller/framework, which is an acceptable pattern for a tool wrapper.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

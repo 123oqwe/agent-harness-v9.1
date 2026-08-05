@@ -1,0 +1,46 @@
+{
+  "requirement_id": "AH-TOOL-EDIT-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "tools/edit-file.ts"
+  ],
+  "tests_added": [
+    "tests/tools/edit-file.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/tools/edit-file.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 7,
+    "total": 7,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass",
+    "glm_severity": "none",
+    "findings_count": 0
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > replaces all occurrences and writes with checkpoint 6ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > throws when pattern not found 3ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > rejects an empty find string before writing 1ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > rejects a whitespace-only fallback with the exact path 2ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > rejects exact and whitespace-fallback no-op replacements 2ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > uses a unique whitespace-trimmed fallback for model-proposed snippets 3ms\n ✓ tests/tools/edit-file.test.ts > AH-TOOL-EDIT-001 edit_file > fails closed when the whitespace-trimmed fallback is ambiguous 2ms\n\n Test Files  1 passed (1)\n      Tests  7 passed (7)\n   Start at  00:12:31\n   Duration  316ms (transform 57ms, setup 0ms, import 85ms, tests 20ms, environment 0ms)\n\n\n",
+  "test_output_hash": "870dc2d7a6602c8e",
+  "test_output_sha256": "870dc2d7a6602c8e3bd8580c74d57fa96bd250e4c7590b41b3f8f81688927fcc",
+  "test_pass_count": 7,
+  "test_total_count": 7,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass",
+    "severity": "none",
+    "findings": [],
+    "summary": "The edit_file tool uses safe string operations (split/join with literal strings, not regex) avoiding ReDoS and injection risks. No prototype pollution, SSRF, or credential leakage vectors present. Path traversal is delegated to the VFS abstraction layer which is the appropriate boundary. Error handling propagates exceptions cleanly without leaking sensitive data beyond the user-supplied path. The replacement count logic is correct for both exact-match and trimmed-match paths. No critical bugs or resource state issues identified.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

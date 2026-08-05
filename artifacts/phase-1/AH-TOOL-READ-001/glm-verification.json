@@ -1,0 +1,46 @@
+{
+  "requirement_id": "AH-TOOL-READ-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "tools/read-file.ts"
+  ],
+  "review_focus": "security_and_critical_bugs",
+  "verdict": "pass_with_notes",
+  "severity": "medium",
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "security",
+      "description": "The size limit is applied AFTER vfs.read() loads the entire file into memory. The 'max_bytes' parameter only truncates the returned content but does not prevent a multi-GB file from being fully buffered first, defeating the stated purpose of the size limit and enabling memory-exhaustion DoS. If the VFS supports stat/size inspection, the file size should be checked before reading; otherwise the tool should document that the VFS itself must enforce read limits.",
+      "location": "tools/read-file.ts:9 (const data = vfs.read(input.path))"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "max_bytes is not validated. Negative values trigger Uint8Array.subarray's negative-index semantics: e.g. max_bytes=-1 returns all but the last byte while 'truncated' is set to true, producing inconsistent output (claims truncated but returns nearly full content). NaN is treated as 0 by subarray but 'truncated' (data.length > NaN) evaluates to false, also inconsistent. Should clamp/validate max_bytes to a non-negative integer.",
+      "location": "tools/read-file.ts:10-12"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "Truncation via subarray(0, max) can split a multi-byte UTF-8 sequence, causing replacement characters (U+FFFD) in the returned content. For text files this corrupts the last character; for tools that re-inject content this could cause subtle data corruption. Consider decoding then slicing on character boundaries, or noting truncation unit is bytes.",
+      "location": "tools/read-file.ts:11 (data.subarray(0, max).toString('utf8'))"
+    }
+  ],
+  "summary": "The tool is small and delegates path resolution to the VFS (so path-traversal concerns belong to the VFS layer, not shown). However, the size limit is enforced only on the returned payload, not on the in-memory read, which undermines its DoS-protection intent. Input validation for max_bytes (negative/NaN) is missing and leads to inconsistent truncated/content output. UTF-8 boundary splitting on truncation is a minor correctness concern. No credential leakage or injection vectors introduced by this file.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 2378,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1905
+    },
+    "prompt_tokens": 400,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 2778
+  }
+}

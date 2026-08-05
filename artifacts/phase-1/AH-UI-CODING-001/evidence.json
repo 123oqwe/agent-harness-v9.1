@@ -1,0 +1,59 @@
+{
+  "requirement_id": "AH-UI-CODING-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_coding_001.ts"
+  ],
+  "tests_added": [
+    "tests/ui/ah-ui-coding-001.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/ui/ah-ui-coding-001.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 1,
+    "total": 1,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 2
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/ui/ah-ui-coding-001.test.ts > AH-UI-CODING-001 coding workspace (via Harness) > runFix delegates to Harness 207ms\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  00:16:24\n   Duration  927ms (transform 386ms, setup 0ms, import 523ms, tests 208ms, environment 0ms)\n\n\n",
+  "test_output_hash": "2fe92987abce1b1a",
+  "test_output_sha256": "2fe92987abce1b1a72594e8748689876d01941a110ba82faf5d75b080c01ae5c",
+  "test_pass_count": 1,
+  "test_total_count": 1,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "error_handling",
+        "description": "The catch block returns e.message directly to the UI. Raw internal error messages (which may include stack details, internal paths, or implementation specifics from the Harness/runCodingVertical layer) could leak sensitive information to callers. Consider mapping known error types to safe, generic messages and logging the original error server-side.",
+        "location": "ui/ah_ui_coding_001.ts:runFix catch block (e.message branch)"
+      },
+      {
+        "severity": "low",
+        "category": "error_handling",
+        "description": "The non-success branch exposes result.outcome.loop_result.termination_reason in the user-facing error string. Depending on what termination_reason contains (e.g., internal agent loop diagnostics, model/provider identifiers, or sanitized tool output), this could leak internal state. Verify that termination_reason is safe to surface to UI consumers.",
+        "location": "ui/ah_ui_coding_001.ts:runFix non-success branch"
+      }
+    ],
+    "summary": "The controller is a thin wrapper around runCodingVertical with no injection, path traversal, SSRF, prototype pollution, or ReDoS exposure. Control flow and result shaping are correct. The only concerns are minor information-leakage risks from forwarding raw exception messages and internal termination_reason values to the UI; these are low severity and do not block the requirement.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

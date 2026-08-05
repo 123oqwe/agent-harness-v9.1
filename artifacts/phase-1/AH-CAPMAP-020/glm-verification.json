@@ -1,0 +1,51 @@
+{
+  "requirement_id": "AH-CAPMAP-020",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "runtime/notifications.ts"
+  ],
+  "verdict": "pass_with_notes",
+  "severity": "low",
+  "findings": [
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "ttlDays=0 is permitted by validation but results in expires_at equal to creation time. The list() filter uses strict greater-than (Date.parse(expires_at) > now), so notifications created with ttlDays=0 become immediately unlistable and effectively invisible. Consider requiring ttlDays >= 1 or using >= in the expiry comparison.",
+      "location": "runtime/notifications.ts: constructor + list()"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "markRead unconditionally sets read=true regardless of any input payload. While the acceptance criteria only requires {read: true} to mark as read, the service signature does not accept a read parameter, so a hypothetical {read: false} cannot be handled at this layer. This is acceptable for Phase 1 but worth noting if the API contract evolves.",
+      "location": "runtime/notifications.ts: markRead()"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "body.length counts UTF-16 code units rather than Unicode code points/grapheme clusters. Strings containing surrogate pairs (e.g., emoji) may be rejected slightly earlier than a strict 500-character interpretation. Conservative and safe, but may differ from a UI-side character counter.",
+      "location": "runtime/notifications.ts: create() body validation"
+    },
+    {
+      "severity": "low",
+      "category": "resource_management",
+      "description": "purgeExpired() is provided but never invoked automatically; expired notifications remain in memory until explicitly purged. The list() path filters them out, so behavior is correct, but memory could grow unbounded without scheduled purging. Not a defect given the in-memory Phase 1 scope.",
+      "location": "runtime/notifications.ts: purgeExpired()"
+    }
+  ],
+  "summary": "The NotificationService correctly satisfies all AH-CAPMAP-020 acceptance criteria: create() produces notifications with id, user_id, type, title, body, created_at, read=false (plus expires_at/seq); list() returns unread items sorted by created_at desc with include_read support; markRead() and dismiss() enforce ownership; the five required types are validated; 30-day TTL is configurable; no external delivery is present; and body is capped at 500 chars. Error handling is robust (empty user/title, invalid type, oversized body, invalid clock, duplicate/empty id, ownership checks). Immutability is preserved via Object.freeze and defensive copies. Findings are minor edge cases and operational notes, none of which violate the requirements.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 1581,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1069
+    },
+    "prompt_tokens": 1467,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 3048
+  }
+}

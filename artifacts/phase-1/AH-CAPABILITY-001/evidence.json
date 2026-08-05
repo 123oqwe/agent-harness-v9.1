@@ -1,0 +1,55 @@
+{
+  "requirement_id": "AH-CAPABILITY-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "security/capability.ts",
+    "security/authorization-service.ts"
+  ],
+  "tests_added": [
+    "tests/security/capability-issue.test.ts",
+    "tests/security/capability-replay.test.ts",
+    "tests/security/capability-child.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/security/capability-issue.test.ts tests/security/capability-replay.test.ts tests/security/capability-child.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 38,
+    "total": 38,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > issues all Contract fields in a signed immutable envelope 10ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > rejects malformed issue input, invalid ordering, excessive lifetime and user-content fields 1ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > strictly validates every issue field and injected authority dependency 45ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > fails closed for invalid clocks, UUID generation, not-before and exact expiry boundaries 3ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > rejects signature, claims and confirmation-key tampering before execution 2ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > rejects malformed envelopes, unknown records and malformed Contract claims 2ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > uses recursive canonical hashing without changing array order 1ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > implements the PEP authority port without exposing signing authority 1ms\n ✓ tests/security/capability-issue.test.ts > AuthorizationService issue and verify > rejects expired and revoked capabilities 7ms\n ✓ tests/security/capability-issue.test.ts > credential reachability boundary > exchanges once at dispatch, passes credential explicitly, and disposes it without env leakage 5ms\n ✓ tests/security/capability-issue.test.ts > credential reachability boundary > disposes credentials when dispatch fails and rejects reused capabilities before exchange 2ms\n ✓ tests/security/capability-issue.test.ts > credential reachability boundary > rejects the wrong confirmation key before credential exchange 1ms\n ✓ tests/security/capability-issue.test.ts > credential reachability boundary > rejects malformed exchanged credentials and zeroes bytes before disposal 3ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > allows exactly one winner under concurrent replay 19ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > persists use across Authorization Service restart 53ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > issues an attenuated child with a service-signed parent delegation proof 14ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > allows only one child issuance when the same parent is raced 5ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > rejects forged delegation proof and prevents a parent from self-signing a child 2ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > strictly validates parent grant material, proof scope and child request shape 9ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > rejects expanded tools, resources, budget, identity changes and mismatched child hashes 6ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > accepts every supported attenuated budget value at exact boundaries 18ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > rejects every expansion and type-confusion budget boundary exactly 25ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > treats resources as path segments rather than unsafe string prefixes 5ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > reports every malformed grant-set and child-request boundary exactly 6ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > rejects mixed child tool and resource grants when any one grant exceeds the parent 4ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > binds every parent grant hash, child claim hash, and inherited identity field 13ms\n ✓ tests/security/capability-child.test.ts > Authorization Service child capabilities > validates every signed delegation-proof binding and ignores JSON key order 10ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > serializes concurrent replay across independent service instances sharing durable state 48ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > fails closed when durable state is corrupted 6ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > covers missing, mismatched, duplicate and revoked in-memory state transitions 3ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > covers durable state transitions, strict imports and lock timeout 92ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > rejects relative durable paths and invalid lock limits 1ms\n ✓ tests/security/capability-replay.test.ts > atomic single-use capability consumption > fails closed when an on-disk state document is corrupted 6ms\n ✓ tests/security/capability-replay.test.ts > capability cryptographic and durable-state boundaries > canonicalizes nested objects while preserving array order and primitives 0ms\n ✓ tests/security/capability-replay.test.ts > capability cryptographic and durable-state boundaries > rejects invalid signature alphabet at both anchors and fails closed on verifier exceptions 2ms\n ✓ tests/security/capability-replay.test.ts > capability cryptographic and durable-state boundaries > validates UUID anchors, version, and variant bits exactly 0ms\n ✓ tests/security/capability-replay.test.ts > capability cryptographic and durable-state boundaries > reports every persisted state-document violation exactly 26ms\n ✓ tests/security/capability-replay.test.ts > capability cryptographic and durable-state boundaries > reports duplicate IDs, invalid paths, lock limits, and lock timeout exactly 5ms\n\n Test Files  3 passed (3)\n      Tests  38 passed (38)\n   Start at  23:56:43\n   Duration  1.02s (transform 482ms, setup 0ms, import 659ms, tests 465ms, environment 1ms)\n\n\n",
+  "test_output_hash": "9bbd5c12bc9998be",
+  "test_output_sha256": "9bbd5c12bc9998be81c6e47ecadd11164ec39a12d7d09817b06049494dd9d33c",
+  "test_pass_count": 38,
+  "test_total_count": 38,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "parse",
+        "description": "GLM response could not be parsed as JSON",
+        "location": "GLM response"
+      }
+    ],
+    "summary": ""
+  }
+}

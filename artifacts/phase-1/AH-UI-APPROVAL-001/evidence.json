@@ -1,0 +1,46 @@
+{
+  "requirement_id": "AH-UI-APPROVAL-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_approval_001.ts"
+  ],
+  "tests_added": [
+    "tests/ui/ah-ui-approval-001.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/ui/ah-ui-approval-001.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 3,
+    "total": 3,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass",
+    "glm_severity": "none",
+    "findings_count": 0
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/ui/ah-ui-approval-001.test.ts > AH-UI-APPROVAL-001 authority-backed approval UI > lists only authority-owned pending requests 3ms\n ✓ tests/ui/ah-ui-approval-001.test.ts > AH-UI-APPROVAL-001 authority-backed approval UI > delegates decisions without issuing a capability or grant 1ms\n ✓ tests/ui/ah-ui-approval-001.test.ts > AH-UI-APPROVAL-001 authority-backed approval UI > fails closed when the authority rejects the decision 0ms\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  00:15:49\n   Duration  236ms (transform 23ms, setup 0ms, import 32ms, tests 5ms, environment 0ms)\n\n\n",
+  "test_output_hash": "25060c319f99a916",
+  "test_output_sha256": "25060c319f99a916475a92356acbab53c0c5cf380e29d0cfbf5fd60b20cfcbf7",
+  "test_pass_count": 3,
+  "test_total_count": 3,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass",
+    "severity": "none",
+    "findings": [],
+    "summary": "The ApprovalController is a thin delegation layer over ApprovalAuthorityPort. No injection, path traversal, SSRF, credential leakage, prototype pollution, or ReDoS vectors exist. The spread copy in list() prevents external mutation of internal state. The decide() method handles the rejected case with a safe fallback message. Input validation and persistence logic are correctly delegated to the authority implementation, which is out of scope for this file. No security vulnerabilities or critical bugs found.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

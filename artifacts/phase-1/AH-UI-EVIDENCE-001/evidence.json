@@ -1,0 +1,53 @@
+{
+  "requirement_id": "AH-UI-EVIDENCE-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_evidence_001.ts"
+  ],
+  "tests_added": [
+    "tests/ui/ah-ui-evidence-001.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/ui/ah-ui-evidence-001.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 2,
+    "total": 2,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass_with_notes",
+    "glm_severity": "low",
+    "findings_count": 1
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/ui/ah-ui-evidence-001.test.ts > AH-UI-EVIDENCE-001 typed evidence port > returns empty and success projections without reading node:fs 5ms\n ✓ tests/ui/ah-ui-evidence-001.test.ts > AH-UI-EVIDENCE-001 typed evidence port > returns an error when the evidence authority fails 0ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  00:16:40\n   Duration  420ms (transform 44ms, setup 0ms, import 65ms, tests 6ms, environment 0ms)\n\n\n",
+  "test_output_hash": "54afd4c6c5ec6277",
+  "test_output_sha256": "54afd4c6c5ec62777ca5bdd2cc3596e6e196c533a29be442ca88bf47df24ec05",
+  "test_pass_count": 2,
+  "test_total_count": 2,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low",
+    "findings": [
+      {
+        "severity": "low",
+        "category": "error_handling",
+        "description": "The catch block returns the raw error.message directly to the UI result. If the underlying EvidenceRepositoryPort implementation throws errors containing sensitive internal details (e.g., database connection strings, file paths, stack traces, or internal system identifiers), those details would be propagated to the UI layer and potentially exposed to end users. Consider mapping known error types to generic user-facing messages and logging the original error internally instead.",
+        "location": "ui/ah_ui_evidence_001.ts: list() catch block, lines returning error.message"
+      }
+    ],
+    "summary": "The controller is simple and does not introduce injection, path traversal, SSRF, prototype pollution, or ReDoS risks. The spread copy and state logic are correct. The only notable concern is that raw error messages from the repository are forwarded to the UI, which could leak sensitive internal details depending on the repository implementation. This is a low-severity defensive coding issue rather than a confirmed vulnerability.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

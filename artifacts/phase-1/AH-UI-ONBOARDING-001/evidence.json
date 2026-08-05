@@ -1,0 +1,46 @@
+{
+  "requirement_id": "AH-UI-ONBOARDING-001",
+  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "ui/ah_ui_onboarding_001.ts"
+  ],
+  "tests_added": [
+    "tests/ui/ah-ui-onboarding-001.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/ui/ah-ui-onboarding-001.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 2,
+    "total": 2,
+    "failed": false
+  },
+  "coverage": {
+    "collected": true
+  },
+  "security_checks": {
+    "glm_verifier": "pass",
+    "glm_severity": "none",
+    "findings_count": 0
+  },
+  "verifier_result": "pass",
+  "verifier_model": "glm-5.2-xhigh",
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n ✓ tests/ui/ah-ui-onboarding-001.test.ts > AH-UI-ONBOARDING-001 authority-backed onboarding > requires external authentication and policy acceptance 4ms\n ✓ tests/ui/ah-ui-onboarding-001.test.ts > AH-UI-ONBOARDING-001 authority-backed onboarding > never stores or returns the authentication token 0ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  00:16:56\n   Duration  259ms (transform 33ms, setup 0ms, import 44ms, tests 5ms, environment 0ms)\n\n\n",
+  "test_output_hash": "99ed4699e262dea0",
+  "test_output_sha256": "99ed4699e262dea0fed5284e41430d04042709d3e6aa932521380636bc1ac7f9",
+  "test_pass_count": 2,
+  "test_total_count": 2,
+  "independent_verifier": {
+    "model": "glm-5.2",
+    "reasoning_effort": "xhigh",
+    "verdict": "pass",
+    "severity": "none",
+    "findings": [],
+    "summary": "The OnboardingController is secure and correct for its stated purpose. No injection, path traversal, SSRF, credential leakage, prototype pollution, or ReDoS vectors exist. The authToken is only passed to the authority and never stored, logged, or reflected in error messages. Object spreads ({...step}, {...value}) copy only own enumerable properties, preventing prototype pollution. Defensive copying on return values prevents external state mutation. The auth gate cannot be bypassed: advancing past the 'auth' step requires a truthy authToken and a successful authenticate() call, and the 'policy' step requires acceptPolicy(true) to return true. State remains consistent on failure paths (step.completed and current_step are only mutated after all guards pass). Error messages are generic and leak no sensitive information. No critical bugs or error-handling gaps identified.",
+    "review_focus": "security_and_critical_bugs"
+  }
+}

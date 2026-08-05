@@ -1,0 +1,51 @@
+{
+  "requirement_id": "AH-RESEARCH-VERTICAL-001",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
+  "tree": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "source_files": [
+    "domains/research/ah_research_vertical_001.ts"
+  ],
+  "verdict": "pass_with_notes",
+  "severity": "medium",
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "error_handling",
+      "description": "`record.evidence.conflicts` is accessed without optional chaining. If `record.evidence` is undefined or null (e.g., a verification record without an evidence object), this will throw a TypeError and abort the whole task. Use `record.evidence?.conflicts` and guard accordingly.",
+      "location": "conflicts extraction: `const value = record.evidence.conflicts;`"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "The adapter does not verify that all given sources were actually read. Sources that were not read, or whose `read_file` observation is missing/failed, are silently omitted from evidence and citations. This weakens the 'all sources read' success criterion and can produce incomplete output without any warning.",
+      "location": "runResearchVertical, after filtering observations and inside the `for (const src of input.sources)` loop"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "Evidence is only captured when the query string appears verbatim (case-insensitive) in the source content. Sources that are relevant but do not contain the exact query substring are excluded, which may cause missed evidence and missing citations.",
+      "location": "evidence extraction: `const idx = content.toLowerCase().indexOf(input.query.toLowerCase());`"
+    },
+    {
+      "severity": "low",
+      "category": "correctness",
+      "description": "The code casts `observation.result` to `{ path?: unknown }` and `{ content?: string }` without runtime validation. If the harness returns a different shape for `read_file` results, evidence extraction silently fails. A type guard or schema check would make the adapter robust.",
+      "location": "readResult lookup and content extraction"
+    }
+  ],
+  "summary": "The adapter generally satisfies the requirement shape: it builds a research contract, extracts evidence from read_file observations, pulls conflicts from verification records, and returns a report with citations. However, it has a medium error-handling risk around unguarded access to `record.evidence.conflicts`, and several low-severity correctness gaps: it does not confirm all sources were read, relies on exact query substring matching, and uses unsafe casts on observation results. Security and resource management are acceptable; no injection or resource leak issues were found.",
+  "finishReason": "stop",
+  "usage": {
+    "completion_tokens": 2194,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1736
+    },
+    "prompt_tokens": 749,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 2943
+  }
+}
