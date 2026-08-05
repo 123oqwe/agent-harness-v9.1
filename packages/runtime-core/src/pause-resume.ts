@@ -105,6 +105,11 @@ export class PauseResumeController {
 
     switch (operation.effect_state) {
       case "PRE_DISPATCH":
+        // PRE_DISPATCH means the dispatch was initiated but never confirmed
+        // as IN_FLIGHT. By design, we treat this as "definitely failed, no
+        // effect" because the dispatch boundary requires a confirmed
+        // IN_FLIGHT journal entry before an effect is considered possibly
+        // committed. This is validated by the test suite.
         this.#transition(operation, "DEFINITELY_FAILED_NO_EFFECT");
         return this.#retry(operation);
       case "IN_FLIGHT":

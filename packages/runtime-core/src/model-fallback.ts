@@ -144,6 +144,7 @@ export class ModelFallbackController<Selection = unknown, Result = unknown> {
   readonly #gateway: ModelFallbackGatewayPort<Selection, Result>;
   readonly #cache: ModelFallbackCachePort;
   readonly #context: ModelFallbackContextPort;
+  readonly #maxFallbackDepth: number;
 
   constructor(options: ModelFallbackOptions<Selection, Result>) {
     if (typeof options?.gateway?.switchProvider !== "function" ||
@@ -156,6 +157,7 @@ export class ModelFallbackController<Selection = unknown, Result = unknown> {
     this.#gateway = options.gateway;
     this.#cache = options.cache;
     this.#context = options.context;
+    this.#maxFallbackDepth = (options as { maxFallbackDepth?: number })?.maxFallbackDepth ?? 16;
   }
 
   async execute(input: ModelFallbackInput<Selection>): Promise<ModelFallbackResult<Result>> {
@@ -182,8 +184,10 @@ export class ModelFallbackController<Selection = unknown, Result = unknown> {
     let failure = input.initial_failure;
     let current = input.current_provider;
     let generation = input.context_generation;
+    let depth = 0;
 
-    for (;;) {
+    while (depth < this.#maxFallbackDepth) {
+      depth += 1;
       const classification = this.#gateway.classifyFailure(failure);
       if (!classification.fallback_allowed) {
         throw new ModelFallbackError("fallback_forbidden", classification.reason_code);
@@ -202,6 +206,10 @@ export class ModelFallbackController<Selection = unknown, Result = unknown> {
       }
       if (visited.includes(candidate.provider_id)) {
         throw new ModelFallbackError("fallback_loop", candidate.provider_id);
+      }
+
+      if (input.dispatch_context.signal?.aborted) {
+        throw new ModelFallbackError("fallback_forbidden", "aborted");
       }
 
       await this.#cache.invalidate({
@@ -246,5 +254,7 @@ export class ModelFallbackController<Selection = unknown, Result = unknown> {
         current = candidate;
       }
     }
+
+    throw new ModelFallbackError("fallback_loop", `exceeded max depth ${this.#maxFallbackDepth}`);
   }
 }

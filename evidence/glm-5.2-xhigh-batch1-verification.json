@@ -1,0 +1,689 @@
+{
+  "timestamp": "2026-08-05T03:51:22.245Z",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "6cfe26b",
+  "summary": {
+    "total": 10,
+    "pass": 0,
+    "passWithNotes": 8,
+    "fail": 2,
+    "errors": 0
+  },
+  "results": [
+    {
+      "file": "packages/runtime-core/src/context-compiler.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "roleFor() unconditionally assigns 'assistant' role to all recent_conversation items. If this layer contains interleaved user/assistant messages (as the name implies), the compiled output will have invalid role sequencing for most LLM APIs that require strict user/assistant alternation.",
+          "location": "roleFor function, line ~107"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "When preparation.action === 'context_reset', the new session_id from the compactor response is assigned without validation via requiredId(). A compromised or buggy compactor could inject an invalid or malicious session_id into the manifest.",
+          "location": "compile() method, context_reset branch"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Compactor response fields are not validated: preparation.offloaded handles (path, sha256, source_id), preparation.omitted_ids, and preparation.recent_conversation entry IDs are trusted without schema validation. Malformed compactor output propagates unchecked into the manifest and effective layers.",
+          "location": "compile() method, post-compaction processing"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Offloaded tool result token_count is set to entry.preview_token_count ?? 0, but the VFS pointer object itself (containing path, sha256, source_id, preview fields) consumes tokens in the actual LLM call that are not accounted for, potentially causing silent context overflow.",
+          "location": "compile() method, effectiveLayers.tool_results mapping"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "offloadedVfsHandles are shallow-copied via [...preparation.offloaded] without deep cloning. deepFreeze() then freezes the original compactor-owned handle objects, which could cause errors if the compactor reuses or mutates them in subsequent calls.",
+          "location": "compile() method, offloadedVfsHandles assignment and deepFreeze call"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "input.selected is validated in #validate() before the compaction await, but cloned after it (const selected = clone(input.selected)). If the caller mutates input.selected concurrently during the async compaction, the manifest may contain data that was not validated (TOCTOU).",
+          "location": "compile() method, between #validate() call and selected clone"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "If preparation.action is a value other than 'cancelled', 'none', 'compact', or 'context_reset' (e.g. 'offload'), the code continues processing without explicit handling. The contextChanged check partially covers this via offloaded.length > 0, but the semantic intent is unclear for unknown actions.",
+          "location": "compile() method, post-compaction action handling"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Content is cloned multiple times: input.layers \u2192 effectiveLayers (full clone), then each entry is cloned again in the assembly loop. For large contexts this triples memory usage unnecessarily.",
+          "location": "compile() method, clone(input.layers) and per-item clone in loop"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No length limits on selected.tool_ids, selected.skill_ids, selected.rag_source_ids, or selected.disclosures arrays. A malicious caller could provide extremely large arrays causing memory exhaustion during validation loops.",
+          "location": "#validate() method, selected field validation"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "layerTrust() returns 'mixed' for empty arrays because Set size is 0, not 1. An empty layer having 'mixed' trust is semantically incorrect and could affect downstream trust decisions.",
+          "location": "layerTrust function"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "canonicalJson() does not handle undefined values in arrays correctly: JSON.stringify(undefined) returns undefined (not a string), producing malformed JSON like [,1,2] when joined. Mitigated by prior JSON cloning which strips undefined, but the function is not robust in isolation.",
+          "location": "canonicalJson function"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "clone(input.selected) at the end of #validate() is effectively dead code \u2014 the result is discarded. It serves as an implicit JSON-serializability check but is wasteful and unclear in intent.",
+          "location": "#validate() method, last line"
+        }
+      ],
+      "summary": "Well-structured compiler with strong input validation, but has gaps in compactor response validation, role mapping for recent_conversation, VFS token accounting, and TOCTOU on selected disclosure.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 9936,
+        "completion_tokens_details": {
+          "reasoning_tokens": 9019
+        },
+        "prompt_tokens": 4748,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 14684
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/hook-system.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "In #executeHandler, if request.signal is already aborted before addEventListener is called, the cancel listener is never triggered. The handler will run until timeout instead of being cancelled immediately.",
+          "location": "#executeHandler"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "canonicalJson returns undefined when passed undefined (via JSON.stringify), which violates its string return type and can cause hash() to throw a TypeError when passed to createHash().update(). While cloneJson strips undefined from payloads, journal records or other external inputs might not be sanitized.",
+          "location": "canonicalJson"
+        }
+      ],
+      "summary": "Well-structured hook system with a minor concurrency bug in abort signal handling and a robustness issue in canonical JSON serialization.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 11968,
+        "completion_tokens_details": {
+          "reasoning_tokens": 11788
+        },
+        "prompt_tokens": 5970,
+        "prompt_tokens_details": {
+          "cached_tokens": 5952
+        },
+        "total_tokens": 17938
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/sqlite-hook-journal.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "#assertIdentity does not verify tenant_id, run_id, or session_id. In commit(), the row is fetched by claim_token_hash only, so these fields are not guaranteed to match.",
+          "location": "#assertIdentity, called from commit()"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "If hkdfSync() or createHmac() throws in the constructor, the error propagates without closing the database handle, leaking the open file descriptor.",
+          "location": "constructor, hkdfSync/createHmac block"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The database file is created by new Database(databasePath) with default umask permissions before chmodSync restricts it to 0o600. A brief TOCTOU window exists.",
+          "location": "constructor, new Database / chmodSync sequence"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "If chmodSync throws (e.g., permission error), the already-open database handle is not closed, leaking the file descriptor.",
+          "location": "constructor, chmodSync call"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Decrypted outcome JSON is cast to HookJournalRecord['outcome'] via 'as' without runtime structural validation.",
+          "location": "#decryptOutcome, JSON.parse result cast"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Once a row enters RECONCILIATION state, no method transitions it out. The idempotency key is permanently blocked for that scope.",
+          "location": "claim(), RECONCILIATION handling"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "All async methods contain no await points and execute synchronously via better-sqlite3's blocking API.",
+          "location": "claim, commit, release, reconcile methods"
+        }
+      ],
+      "summary": "Well-implemented encrypted SQLite hook journal with AES-256-GCM, HKDF key derivation, and proper lease management, but has an incomplete identity check in commit() and minor resource leak paths in the constructor.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 16384,
+        "completion_tokens_details": {
+          "reasoning_tokens": 16382
+        },
+        "prompt_tokens": 4445,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 20829
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/pause-resume.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "Race condition: resume() reads operation state via getOperation then later writes via recordOperation with no locking, CAS, or transaction boundary. Two concurrent resume() calls for the same operation_id will both observe the same initial state and both proceed to execute read-back or reconciliation, potentially returning duplicate actions and corrupting the state machine. The journal port interface (getOperation/recordOperation) provides no atomic compare-and-swap.",
+          "location": "resume()"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "PRE_DISPATCH transitions directly to DEFINITELY_FAILED_NO_EFFECT and retries without any read-back or reconciliation. If a crash occurred after the effect was dispatched but before the journal was updated to IN_FLIGHT, the journal still reads PRE_DISPATCH and the controller declares 'definitely failed, no effect' \u2014 which is false. This can cause duplicate real-world side effects on retry, which is the exact scenario this system is designed to prevent.",
+          "location": "resume() case 'PRE_DISPATCH'"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "The PauseResumeJournalPort interface exposes only synchronous getOperation/recordOperation with no transaction, optimistic concurrency token, or atomic transition primitive. Any SQLite-backed implementation cannot enforce serializable transitions through this interface, making race conditions unavoidable at the port boundary.",
+          "location": "PauseResumeJournalPort interface"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No timeout or cancellation on async calls to readBack.query() and reconciliation.reconcile(). If either port hangs indefinitely, the resume() promise never settles, blocking the caller and leaving the operation in an intermediate state (e.g., RECONCILING) with no recovery path.",
+          "location": "#resolveReadBack, #reconcile"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "In #resolveReadBack's catch block, two sequential transitions are performed: first to EFFECT_UNKNOWN, then to RECONCILING. The intermediate EFFECT_UNKNOWN state is persisted to the journal, creating an unnecessary journal entry and a window where a concurrent observer could see an inconsistent intermediate state. Should transition directly to RECONCILING.",
+          "location": "#resolveReadBack catch block"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No authorization or caller-identity verification in resume(). Any caller who knows a valid run_id and operation_id pair can trigger state transitions and obtain resume actions. The run_id scope check prevents cross-run access but does not verify the caller is authorized to act on that run.",
+          "location": "resume()"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No state-transition validation in #transition(). Any state can transition to any other state (e.g., EFFECT_CONFIRMED \u2192 PRE_DISPATCH) without error. A bug in the control flow could silently corrupt the state machine. A transition table or guard would prevent illegal transitions.",
+          "location": "#transition()"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "No size limit on stored_outcome_json. A malicious or buggy upstream could supply an arbitrarily large JSON string that passes JSON.parse validation but causes excessive memory consumption when persisted by the journal.",
+          "location": "#confirmed()"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "requiredId() is reused to validate stored_outcome_json, which is not an identifier. The error message 'stored_outcome_json is required' is misleading since the function name implies ID validation. Functionally works but reduces debuggability.",
+          "location": "#confirmed()"
+        }
+      ],
+      "summary": "Race conditions from non-atomic read-then-write journal access and unsafe PRE_DISPATCH-to-retry transition risk duplicate side effects in a system whose purpose is effect safety.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4220,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3471
+        },
+        "prompt_tokens": 1841,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 6061
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/budget-ledger.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "recordModelCall does not validate #spent for safe-integer overflow after accumulation. The constructor validates spent_usd_micros with nonNegativeSafeInteger during replay, but recordModelCall performs 'this.#spent += event.usd_micros' without checking the result. Over a long session, accumulated spending could exceed Number.MAX_SAFE_INTEGER, causing silent precision loss in remaining budget calculations.",
+          "location": "recordModelCall \u2014 this.#spent += event.usd_micros"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "No transaction boundary or locking around journal append. sequence and previous_hash are computed from in-memory state, not from the journal itself. If two BudgetLedger instances share the same journal backing store (e.g., SQLite), concurrent recordModelCall invocations will compute colliding sequence numbers and identical previous_hash values, corrupting the hash chain. The BudgetJournalPort interface provides no compare-and-swap or lock mechanism.",
+          "location": "recordModelCall \u2014 journal.append / sequence computation"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The #events Map grows unboundedly for the lifetime of the ledger instance. Long-running sessions with many model calls will accumulate entries indefinitely with no eviction, compaction, or size cap, leading to unbounded memory growth.",
+          "location": "BudgetLedger.#events Map"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "requested_max_output_tokens is not validated in authorizeModelCall. A negative or non-integer value would flow through Math.min unchecked, producing a negative max_output_tokens in the authorization result, which could propagate to downstream model call execution.",
+          "location": "authorizeModelCall \u2014 max_output_tokens computation"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "recordModelCall does not enforce the budget ceiling. A caller can record calls whose projected cost exceeds the remaining budget, bypassing authorizeModelCall entirely. The ceiling is advisory\u2014authorization and recording are decoupled with no enforcement at the recording boundary.",
+          "location": "recordModelCall \u2014 no ceiling check"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Hash chain integrity relies on JSON.stringify producing deterministic property ordering. If a journal implementation (e.g., SQLite column-based storage) reconstructs event objects with a different property insertion order than the original, hashEvent will produce a different digest and replay validation will fail with a false hash-chain-invalid error.",
+          "location": "hashEvent / constructor replay loop"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "BudgetJournalPort defines synchronous read() and append() methods. This constrains journal backends to synchronous I/O (e.g., better-sqlite3) or in-memory storage. Async backends would require interface changes, and synchronous SQLite access under WAL mode could cause lock contention under concurrent load.",
+          "location": "BudgetJournalPort interface"
+        }
+      ],
+      "summary": "Well-structured budget ledger with hash-chain integrity and idempotent replay, but lacks overflow guards on accumulated spending, concurrency control for shared journals, and memory bounds for long-running sessions.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 6952,
+        "completion_tokens_details": {
+          "reasoning_tokens": 6326
+        },
+        "prompt_tokens": 2622,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 9574
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/sqlite-budget-journal.ts",
+      "verdict": "pass_with_notes",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "The WAL file created by SQLite in WAL mode is not chmod'd to 0o600. The chmodSync call occurs before exec(SCHEMA) sets PRAGMA journal_mode=WAL, so the WAL file inherits default permissions.",
+          "location": "constructor \u2014 chmodSync followed by exec(SCHEMA)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The constructor does not close the database handle if chmodSync, exec(SCHEMA), getMetadata.get('hmac_salt'), or hkdfSync throws an exception.",
+          "location": "constructor \u2014 between new Database and key-check try/catch"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The read() method authenticates each event's HMAC but does not verify the hash chain or check for gaps in the sequence.",
+          "location": "read() method"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The parent directory is created with mkdirSync using default permissions (typically 0o755), which allows other users to traverse and list the directory.",
+          "location": "constructor \u2014 mkdirSync"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "There is a TOCTOU window between database file creation and chmodSync(0o600) where the file exists with default permissions.",
+          "location": "constructor \u2014 new Database followed by chmodSync"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Object.freeze(event as BudgetEvent) only freezes the top-level object. Nested objects such as event.scope remain mutable.",
+          "location": "read() \u2014 Object.freeze"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "The hmac_key_check metadata value enables offline key verification: an attacker with read access to the database file can verify whether a guessed master key is correct.",
+          "location": "constructor \u2014 insertMetadata.run('hmac_key_check', ...)"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "The caller's masterKey Uint8Array is not wiped by the constructor. The internal Buffer copy is properly zeroed in a finally block, but the original masterKey remains.",
+          "location": "constructor \u2014 Buffer.from(masterKey)"
+        }
+      ],
+      "summary": "Well-structured HMAC-authenticated append-only journal with strong crypto practices, but WAL file permission exposure and constructor resource leaks need attention.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 16384,
+        "completion_tokens_details": {
+          "reasoning_tokens": 16384
+        },
+        "prompt_tokens": 2206,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 18590
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/compaction.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "If prepared.commit() throws after the handoff file has already been written to the VFS, the system is left in an inconsistent state: the handoff file is orphaned, the fresh session is uncommitted, and there is no rollback or cleanup mechanism. The caller receives an exception with no CompactionResult and no way to know the handoff file exists.",
+          "location": "compact() \u2014 await prepared.commit()"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "The compact() method is async with no internal locking or mutual exclusion. Concurrent invocations for the same session can race: multiple fresh sessions may be prepared, multiple handoff files written, and commit() called multiple times. While offload file paths are hash-deterministic (providing some idempotency), handoff paths incorporate the new session_id, so concurrent context_reset calls produce distinct orphaned files.",
+          "location": "compact()"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "Offload and handoff files are written to the VFS on every compaction run with no cleanup, TTL, or garbage collection mechanism. Over time, scratch files accumulate unboundedly. Failed operations (e.g., commit throwing) leave orphaned files that are never reclaimed.",
+          "location": "compact() \u2014 this.#vfs.write(path, payload) and this.#vfs.write(handoffPath, handoff)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "cloneJson uses JSON.stringify/JSON.parse which silently drops undefined-valued properties and functions. If item.content is undefined, the offload payload will omit the content field entirely, yet the returned OffloadedContextHandle still reports a token_count. The hash is computed over a payload missing content, creating a mismatch between what was supposedly offloaded and what was actually written.",
+          "location": "cloneJson() and offload payload construction"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The context_reset handoff payload includes the full state object, which contains the entire security state (approvals, grants, denials, current_revocations, effects, receipts, idempotency_ids). This sensitive data is written to a scratch file on disk. While necessary for session continuity, if the VFS scratch directory is not properly access-controlled or tenant-isolated, this could leak security state to unauthorized parties.",
+          "location": "compact() \u2014 handoff canonicalJson construction"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "canonicalJson is typed to return string but JSON.stringify(undefined) returns undefined, not a string. If a primitive undefined value reaches the non-object branch, sha256 would receive undefined. This is not reachable through current code paths (cloneJson strips undefined values first), but it is a latent type-safety defect that could surface if the function is reused elsewhere.",
+          "location": "canonicalJson()"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "There is no limit on the number of offload_items or the size of their content. A caller (or compromised upstream) could pass thousands of items or very large content payloads, causing excessive VFS writes and memory consumption during cloneJson/canonicalJson processing.",
+          "location": "compact() \u2014 offload loop and #validate()"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "The BeforeCompactPort defines a 'force_prompt' action, but the compact() method treats it identically to 'deny' and 'skip' \u2014 simply cancelling with reason_code 'hook_force_prompt'. If 'force_prompt' is intended to trigger user interaction rather than cancellation, this behavior may not match the port's semantics.",
+          "location": "compact() \u2014 hook.action !== 'continue' check"
+        }
+      ],
+      "summary": "Well-structured deterministic compaction with solid validation and immutability, but lacks rollback on commit failure, concurrency protection, and file lifecycle management.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 7786,
+        "completion_tokens_details": {
+          "reasoning_tokens": 6997
+        },
+        "prompt_tokens": 2965,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 10751
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/steering.ts",
+      "verdict": "pass_with_notes",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "#commands Map and #consumed Set grow unboundedly for the lifetime of the controller. Commands are never evicted after consumption, causing memory growth proportional to total steering commands in long-running sessions. No compaction or eviction mechanism exists.",
+          "location": "SteeringController class fields, drain()"
+        },
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "drain() appends a consumed event to the journal for each command individually with no transaction boundary. If the journal is backed by SQLite or another transactional store, each append is a separate transaction. A failure mid-loop leaves a partial journal state where some commands are marked consumed and others are not, and the caller receives an exception with no way to know which commands were persisted.",
+          "location": "drain()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "enqueue() calls onImmediate and iterates listeners after the command is already journaled and inserted into #commands. If onImmediate or any listener throws, the caller receives an exception even though the command was successfully enqueued. A retry with the same command_id would be treated as a replay, causing the caller to believe the original enqueue failed when it actually succeeded.",
+          "location": "enqueue()"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "canonicalJson and deepFreeze use unbounded recursion on untrusted content. A deeply nested JSON payload (e.g., 50k levels of nested arrays/objects) can cause a stack overflow (RangeError) that is not caught by the try/catch in cloneJson, since canonicalJson and deepFreeze are called outside that guard. This is a DoS vector via crafted steering content or malicious journal data during rebuild.",
+          "location": "canonicalJson(), deepFreeze(), fingerprint(), #rebuild()"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "#nextOrdinal is local to each controller instance. If two controller instances share the same journal for the same scope (multi-process or multi-worker scenario), both rebuild from the journal but can then assign colliding ordinals to new commands. There is no inter-process locking or atomic ordinal allocation mechanism.",
+          "location": "enqueue(), #rebuild()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "cloneJson uses JSON.stringify/JSON.parse which is lossy for non-JSON types: Date objects become strings, NaN/Infinity become null, undefined object properties are stripped, BigInt throws. Content containing these types will have a different fingerprint than expected and will be silently altered. This could cause fingerprint mismatches on replay across different serialization paths.",
+          "location": "cloneJson()"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No maximum length validation on command_id, tenant_id, run_id, session_id, or content size. Extremely long strings or large content payloads are accepted, hashed, and journaled without bounds, enabling memory and storage DoS.",
+          "location": "requiredId(), enqueue()"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "If a listener calls subscribe() or the returned unsubscribe function during notification iteration, the #listeners Set is modified during iteration. While modern JS engines handle this deterministically, newly added listeners may or may not receive the current event, and removed listeners may still be invoked, leading to subtle inconsistencies.",
+          "location": "enqueue() listener loop"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The journal append in enqueue happens before #commands.set and #nextOrdinal increment. If the process crashes after append but before the in-memory update, the rebuild will correctly recover. However, if append is non-atomic (e.g., buffered/async internally despite the void return type), the in-memory state and journal can diverge. The interface contract should explicitly require synchronous, durable append.",
+          "location": "SteeringJournalPort interface, enqueue()"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "#disposition returns non-queued only for 'kill' and 'human_cancel' priorities. The 'security' priority is not treated as immediate despite being higher rank than 'human_correction'. This may be intentional but could be a gap if security steering is expected to take immediate effect.",
+          "location": "#disposition()"
+        }
+      ],
+      "summary": "Functional and well-structured with good idempotency and validation, but has unbounded memory growth, missing transaction boundaries for batch journal appends, and uncaught recursion depth risks on untrusted input.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 5571,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4665
+        },
+        "prompt_tokens": 2681,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 8252
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/model-fallback.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "The for(;;) loop has no maximum fallback depth. If switchProvider returns an unbounded sequence of unique provider IDs and dispatchExact keeps failing with fallback-allowed classifications, the loop runs indefinitely, accumulating visited entries, cache invalidations, and context recompilations without bound.",
+          "location": "ModelFallbackController.execute"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "AbortSignal from dispatch_context is forwarded to dispatchExact but never checked before calling cache.invalidate or context.recompile. If the caller aborts, expensive recompilation and cache invalidation operations continue needlessly.",
+          "location": "ModelFallbackController.execute - before cache.invalidate and context.recompile"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "deadline_at is passed through dispatch_context but never enforced by the controller. Fallback attempts can proceed well past the deadline, wasting resources on cache invalidation, context recompilation, and dispatch.",
+          "location": "ModelFallbackController.execute"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "The sequence cache.invalidate -> generation += 1 -> context.recompile is not atomic. If the process crashes or another concurrent fallback operation interleaves between invalidation and recompilation, the system is left with an invalidated cache and no compiled context at the new generation, creating an inconsistent state.",
+          "location": "ModelFallbackController.execute - invalidate/recompile sequence"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "No coordination between concurrent execute() calls for overlapping providers. Two concurrent fallbacks can simultaneously invalidate the same provider's cache and recompile context at conflicting generations, causing race conditions in the underlying cache and context ports.",
+          "location": "ModelFallbackController.execute"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "When dispatchExact fails after a successful context.recompile, the compiled context for the candidate provider is not cleaned up or tracked. Repeated failures accumulate orphaned compiled contexts, depending on the context port's implementation.",
+          "location": "ModelFallbackController.execute - catch block"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "manifest_hash is validated with a permissive identifier regex (/^[0-9A-Za-z][0-9A-Za-z._:-]{0,127}$/) while all other hashes require strict 64-character lowercase hex (/^[0-9a-f]{64}$/). This inconsistency allows non-hash strings to be used as integrity-binding manifest hashes passed to dispatchExact and returned in results.",
+          "location": "execute - compiled.manifest_hash validation"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "context_generation overflow is only checked on input, not after incrementing within the loop. If generation reaches Number.MAX_SAFE_INTEGER, subsequent increments produce unsafe integers passed to context.recompile and dispatchExact.",
+          "location": "execute - generation += 1"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "attempt_id from the original dispatch_context is reused across all fallback attempts without generating a unique identifier per attempt, making individual fallback attempts indistinguishable in downstream observability and audit trails.",
+          "location": "execute - dispatchExact call"
+        }
+      ],
+      "summary": "Unbounded fallback loop without max depth, missing abort/deadline enforcement, non-atomic invalidate-recompile sequence, and no concurrency coordination make this unsafe for production use.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 5700,
+        "completion_tokens_details": {
+          "reasoning_tokens": 5033
+        },
+        "prompt_tokens": 1958,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 7658
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/session-tree.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The catch block in #execute converts all non-SessionTreeError, non-authority-fault exceptions to AUTHORITY_FAILURE. This masks programming errors (e.g., TypeError, RangeError) as authority failures, making bugs in SessionTree itself difficult to diagnose. Consider re-throwing unexpected internal errors or adding a distinct error code for internal failures.",
+          "location": "#execute catch block"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "#project is called twice in #execute \u2014 once before the commit to get expected_tree_head and once after to verify durability. For large trees (up to max_tree_events of 100,000), this doubles the I/O and CPU cost per mutation. Consider having the authority return the updated projection atomically with the commit, or caching the post-commit projection.",
+          "location": "#execute"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "positiveSequence uses error code INVALID_TARGET for all sequence validations, including source point and source head validation where the value being validated is not a 'target'. This makes error diagnosis misleading for callers and logs.",
+          "location": "positiveSequence"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "The bySession.has(childSessionId) and byCommand.get(commandId) checks in #execute follow a check-then-act pattern. Between the local check and the authority commit, a concurrent process could create the same child or command. This is mitigated by the authority's uniqueness enforcement and the TREE_HEAD_CONFLICT retry, but SESSION_CONFLICT and COMMAND_CONFLICT from the authority are not retried, so a caller could receive a spurious conflict error under contention.",
+          "location": "#execute"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "In #project, jsonClone(rawEvent.data, ...) is called for every event to validate JSON-serializability, but for branch/fork events the data is re-validated and re-cloned by lineageData \u2192 immutable \u2192 jsonClone. The first jsonClone call is redundant for these events and wastes CPU on large logs.",
+          "location": "#project"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "SessionTree does not validate that a historical point's security anchor is 'equal to or more restrictive than the parent ceiling' as stated in the SessionTreeSessionPoint comment. This is by design (deferred to the authority), but a misbehaving authority could persist stale or overly-permissive security anchors in lineage events without detection by this layer.",
+          "location": "validateSecurity / SessionTreeSessionPoint comment"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Post-commit verification via re-projection can fail transiently (e.g., authority loadTree failure) even though the commit was durable. The caller would receive AUTHORITY_FAILURE and might retry, which would then return replayed:true. The end state is correct but the caller observes a spurious error on the first attempt.",
+          "location": "#execute post-commit verification"
+        }
+      ],
+      "summary": "Well-structured projection/validator with thorough input validation and scope enforcement; minor concerns around error masking, double projection cost, and check-then-act patterns mitigated by authority contract.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 12762,
+        "completion_tokens_details": {
+          "reasoning_tokens": 12107
+        },
+        "prompt_tokens": 6088,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 18850
+      }
+    }
+  ]
+}
