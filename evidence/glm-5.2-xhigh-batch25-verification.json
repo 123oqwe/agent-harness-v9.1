@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-05T05:11:05.135Z",
+  "timestamp": "2026-08-05T05:30:07.027Z",
   "model": "glm-5.2",
   "reasoning_effort": "xhigh",
   "commit": "20839a4",
@@ -7,9 +7,9 @@
   "summary": {
     "total": 12,
     "pass": 0,
-    "passWithNotes": 5,
+    "passWithNotes": 7,
     "fail": 5,
-    "errors": 2
+    "errors": 0
   },
   "results": [
     {
@@ -292,21 +292,58 @@
     },
     {
       "file": "packages/rag/src/injection-guard.ts",
-      "verdict": "parse_error",
-      "severity": "unknown",
-      "findings": [],
-      "summary": "length=0 finish=length",
-      "finishReason": "length",
-      "usage": {
-        "completion_tokens": 32768,
-        "completion_tokens_details": {
-          "reasoning_tokens": 32759
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Regex-based prompt injection detection is trivially bypassable via synonyms ('forget prior', 'override above'), unicode homoglyphs, zero-width characters, HTML entity encoding, base64, or whitespace/obfuscation tricks. This should not be the sole layer of injection defense.",
+          "location": "INJECTION_PATTERNS, INJECTION_SANITIZE_PATTERNS"
         },
-        "prompt_tokens": 902,
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Detection and sanitization pattern sets are mismatched, causing false confidence. For example, '<script>alert(1)' (no closing tag) is detected by /<\\s*script\\b/gi but not removed by SANITIZE_PATTERNS (which require a closing or self-closing tag). Similarly, onclick=\"alert(1) (no closing quote) is detected by /on\\w+\\s*=\\s*[\"']/gi but not sanitized by /on\\w+\\s*=\\s*[\"'][^\"']*[\"']/gi. safeChunkForRetrieval runs the sanitize path but the payload survives unchanged.",
+          "location": "safeChunkForRetrieval, SANITIZE_PATTERNS vs INJECTION_PATTERNS"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "safeChunkForRetrieval only sanitizes when detectInjection returns non-empty. HTML/JS payloads that do not match any INJECTION_PATTERNS (e.g., an <img> tag with onerror, or a bare <iframe>) pass through completely unsanitized, since SANITIZE_PATTERNS is never applied in that branch.",
+          "location": "safeChunkForRetrieval"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No handling of encoded or obfuscated payloads: HTML entities (&lt;script&gt;), unicode escapes, case-mixed 'JaVaScRiPt:', nested/fragmented tokens, or non-English injection phrasings are not covered.",
+          "location": "INJECTION_PATTERNS, SANITIZE_PATTERNS"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "Neutralization markers like [NEUTRALIZED:injection] are emitted into downstream text. These tokens are visible to LLM consumers and could leak filter implementation details or be abused as delimiters in secondary injection. Consider whether opaque redaction is preferable.",
+          "location": "INJECTION_SANITIZE_PATTERNS replacements"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "No concurrency issues: all patterns are module-level read-only constants and String.match with the global flag does not mutate lastIndex, so concurrent calls to detectInjection/sanitizeChunkText are safe.",
+          "location": "detectInjection, sanitizeChunkText"
+        }
+      ],
+      "summary": "Functional but shallow regex-based injection guard with detection/sanitization mismatches that can leave detected payloads intact, and trivial bypassability; acceptable as defense-in-depth only.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 3482,
+        "completion_tokens_details": {
+          "reasoning_tokens": 2892
+        },
+        "prompt_tokens": 836,
         "prompt_tokens_details": {
           "cached_tokens": 0
         },
-        "total_tokens": 33670
+        "total_tokens": 4318
       }
     },
     {
@@ -687,21 +724,70 @@
     },
     {
       "file": "packages/tools/src/escalate.ts",
-      "verdict": "parse_error",
-      "severity": "unknown",
-      "findings": [],
-      "summary": "length=4102 finish=stop",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Math.random() is used in escalation ID generation, which is not cryptographically secure. Predictable IDs could allow enumeration or spoofing of escalation records. Use crypto.randomBytes() instead.",
+          "location": "escalateToHuman, id generation line"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "The audit_hash is computed without any secret or HMAC key, making it a plain integrity hash that anyone can recompute. This provides no tamper-evidence for the audit trail. Use HMAC with a server-side secret.",
+          "location": "audit_hash computation"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The context object is stored by reference rather than deep-copied. If the caller mutates the context after escalation, the stored audit record changes silently and the audit_hash no longer matches, breaking audit integrity.",
+          "location": "record.context = input.context"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "No input validation is performed. reason could be empty or extremely long, urgency is only type-checked at compile time (not runtime), and context could contain circular references causing JSON.stringify to throw an unhandled exception.",
+          "location": "escalateToHuman function entry"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "The audit trail is stored only in memory and is lost on process restart. For a system explicitly designed to maintain an audit trail, this means escalations and their records are non-persistent and non-recoverable.",
+          "location": "auditTrail module-level variable"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "getAuditTrail() returns a shallow copy. While top-level fields are readonly, the nested context object is shared by reference, allowing callers to mutate stored audit data via the returned copy.",
+          "location": "getAuditTrail return statement"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "auditTrail.shift() is O(n) on an array that can hold up to 10,000 elements. Under high throughput this causes unnecessary CPU and memory churn. A circular buffer or index-based approach would be more efficient.",
+          "location": "auditTrail.shift() call"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "Shared mutable auditTrail array has no synchronization. Although currently safe due to the absence of await points within escalateToHuman, the async signature implies potential for future race conditions if await points are added between the length check, shift, and push operations.",
+          "location": "auditTrail read-modify-write sequence"
+        }
+      ],
+      "summary": "Functional but has weak audit integrity (non-cryptographic ID/hash, mutable shared references, no persistence) and missing input validation.",
       "finishReason": "stop",
       "usage": {
-        "completion_tokens": 3667,
+        "completion_tokens": 2035,
         "completion_tokens_details": {
-          "reasoning_tokens": 2828
+          "reasoning_tokens": 1499
         },
-        "prompt_tokens": 672,
+        "prompt_tokens": 606,
         "prompt_tokens_details": {
           "cached_tokens": 0
         },
-        "total_tokens": 4339
+        "total_tokens": 2641
       }
     },
     {
