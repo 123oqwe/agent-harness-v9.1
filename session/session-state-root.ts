@@ -115,6 +115,15 @@ export function resolveSessionDatabaseLocation(
 ): Readonly<{ path: string; name: string }> {
   assertTrustedSessionStateRoot(root);
   const absolute = resolve(dbPath);
+
+  // Reject null bytes that could truncate paths at the SQLite C API boundary.
+  if (absolute.includes("\0")) {
+    throw new SessionStateRootError(
+      "DATABASE_OUTSIDE_STATE_ROOT",
+      "session database path contains null bytes",
+    );
+  }
+
   const parent = realpathSync(dirname(absolute));
   const name = basename(absolute);
   if (parent !== root.path || name.length === 0 || name === "." || name === "..") {
@@ -123,5 +132,38 @@ export function resolveSessionDatabaseLocation(
       "session database is outside the trusted state root",
     );
   }
-  return Object.freeze({ path: absolute, name });
+
+  // Resolve the full path to reject symlinks pointing outside the trust root.
+  // For existing files, realpathSync follows symlinks to their target; for
+  // non-existing files, lstatSync on the parent (already realpath'd) is trusted.
+  let resolved: string;
+  try {
+    const stat = lstatSync(absolute);
+    if (stat.isSymbolicLink()) {
+      // Symlink: resolve to target and re-validate the resolved path's parent.
+      const realPath = realpathSync(absolute);
+      const realParent = realpathSync(dirname(realPath));
+      if (realParent !== root.path) {
+        throw new SessionStateRootError(
+          "DATABASE_OUTSIDE_STATE_ROOT",
+          "session database symlink target is outside the trusted state root",
+        );
+      }
+      resolved = realPath;
+    } else {
+      resolved = absolute;
+    }
+  } catch (error) {
+    if (error instanceof SessionStateRootError) throw error;
+    // ENOENT is expected for new databases; the parent is already validated.
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      throw new SessionStateRootError(
+        "DATABASE_IDENTITY_CHANGED",
+        `session database path resolution failed: ${(error as Error).message}`,
+      );
+    }
+    resolved = absolute;
+  }
+
+  return Object.freeze({ path: resolved, name });
 }

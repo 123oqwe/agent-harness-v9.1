@@ -1,0 +1,272 @@
+{
+  "commit": "a0566443",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "results": [
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "In afterModelCall, if this.#ledger.recordModelCall() throws, this.#pending.delete(callId) is never reached because there is no try/finally. This permanently leaves the call ID in the pending set, causing all future beforeModelCall invocations with the same run_id/iteration/attempt to throw 'budget call is already pending'. The delete should be in a finally block to ensure cleanup regardless of ledger errors.",
+          "location": "afterModelCall"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The #pending Set has no cancellation or expiry mechanism. If a model call fails (network error, timeout, exception) and the caller never invokes afterModelCall, the entry leaks permanently in the set. This causes unbounded growth of the set over time and permanently blocks retries for the same run_id/iteration/attempt combination. There is no cancelModelCall or similar cleanup method on the RuntimeBudgetPort interface.",
+          "location": "BudgetLedgerRuntimeAdapter.#pending / beforeModelCall / afterModelCall"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "No input validation is performed on token values in beforeModelCall or afterModelCall. Negative values, NaN, or zero for requested_max_output_tokens, estimated_input_tokens, input_tokens, or output_tokens are passed directly to the ledger without checks. Malformed or adversarial inputs could corrupt budget accounting.",
+          "location": "beforeModelCall, afterModelCall"
+        }
+      ],
+      "file": "runtime/budget-port.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "In ContextResetSessionAdapter.prepare(), the scope mismatch check compares input.run_id against this.#rootSessionId (which was set from options.root_session_id in the constructor). This compares a run ID against a session ID \u2014 a semantic type mismatch. If run_id and root_session_id are distinct concepts in this system (as suggested by RuntimeBeforeCompactInput having both fields), this check is incorrect. It could either block legitimate context resets (false rejection when run_id \u2260 root_session_id) or allow unauthorized ones (if they happen to match). The adapter should either store a root_run_id for comparison, or the input should include a field that semantically matches root_session_id.",
+          "location": "ContextResetSessionAdapter.prepare()"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "The pressure field in RuntimeBeforeCompactInput is not validated before being passed to the hook payload. NaN, Infinity, or negative values would be forwarded unchecked. Additionally, JSON.stringify(NaN) and JSON.stringify(Infinity) both produce 'null', which means inputs with NaN or Infinity pressure would produce identical hashes \u2014 causing invocation_id and idempotency_key collisions for semantically different inputs.",
+          "location": "CompactionHookRuntimeAdapter.dispatch()"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "The commit() closure returned by prepare() has no guard against being called multiple times. If tree.branch() is not idempotent, concurrent or repeated calls to commit() with the same fingerprint would attempt to create duplicate branches with identical command_id and child_session_id, potentially causing errors or duplicate entries in the session tree.",
+          "location": "ContextResetSessionAdapter.prepare() \u2192 commit()"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "The dispatch method does not validate that result.action is one of the expected values ('continue' | 'deny' | 'skip' | 'force_prompt') before returning it. If dispatchHookBoundary returns an unexpected action string, it would be passed through to the caller unchanged, potentially causing unexpected behavior downstream.",
+          "location": "CompactionHookRuntimeAdapter.dispatch()"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "String identifier fields (tenant_id, run_id, session_id, previous_session_id) are not validated for being non-empty or well-formed. Empty strings or malformed identifiers would be used to generate fingerprints and session IDs without any checks, potentially creating invalid session tree branches or hook invocations.",
+          "location": "CompactionHookRuntimeAdapter.dispatch(), ContextResetSessionAdapter.prepare()"
+        }
+      ],
+      "file": "runtime/compaction-port.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Unsafe type assertions 'as ResolvedProvider' in both switchProvider and dispatchExact bypass TypeScript's type system. FallbackProviderBinding only includes a subset of ResolvedProvider properties (provider_id, registry_snapshot_hash, provider_metadata_hash, selection_request_hash). If the gateway's switchProvider or dispatchExact implementations access any property not in this subset (e.g., credentials, endpoint, routing config), they will encounter undefined values at runtime, potentially causing silent failures, incorrect provider routing, or authentication errors. The type system cannot catch these mismatches because the assertion suppresses the error.",
+          "location": "switchProvider, dispatchExact"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The dispatchExact method accepts context_generation and context_manifest_hash as required fields in its parameter type, but silently drops both when forwarding the context to this.#gateway.dispatchExact. If the gateway uses these fields for request integrity verification, replay protection, or audit logging, their omission could cause security-relevant failures or gaps in the audit trail. If the gateway does not need them, the adapter's parameter type is misleadingly permissive.",
+          "location": "dispatchExact"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "No runtime validation is performed on visitedProviderIds before passing to the gateway. A caller could pass an empty array, an array with duplicates, or an array containing non-string values (if TypeScript types are bypassed at runtime). This could cause the gateway to revisit already-tried providers, creating infinite fallback loops or exhausting provider pools. The adapter also does not validate that operation_id is a non-empty string or that selection is well-formed, trusting the caller entirely.",
+          "location": "switchProvider"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "classifyFailure returns reason_code directly from error.code without sanitization or validation. If error.code is an empty string, undefined (if the type is violated at runtime), or contains unexpected values, downstream consumers relying on reason_code for branching logic may behave incorrectly. The method also does not handle the case where providerError.retryable is truthy but not strictly true (e.g., 1 or 'true'), since it uses strict equality (=== true), which could cause retryable errors to be classified as non-fallback.",
+          "location": "classifyFailure"
+        }
+      ],
+      "file": "runtime/model-fallback-port.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Parse error. Raw: ",
+          "location": "N/A"
+        }
+      ],
+      "file": "runtime/sandboxed-hook-execution-port.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "The read() method performs an unsafe cast (data as unknown as RuntimeSteeringEvent) after only validating that data is a record with schema_version === 'steering-event/v1'. No other fields of RuntimeSteeringEvent (such as scope, type, or any payload fields) are validated. If persisted session event data is corrupted, tampered with, or written by a non-TypeScript caller bypassing compile-time checks, malformed objects missing required fields will be returned as valid RuntimeSteeringEvent instances, causing undefined behavior downstream.",
+          "location": "read()"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "The read() method returns all steering events from the session without filtering by the journal's scope (tenant_id, run_id, session_id). While append() enforces scope matching, read() does not. This asymmetry means that if a DurableSession is shared across journals with different tenant_id or run_id values (the constructor only validates session_id), events from one scope would be readable by another, creating a potential cross-tenant or cross-run data leakage path.",
+          "location": "read()"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "The append() method only validates that the event's scope matches the journal's scope. It does not perform any runtime validation of the event's structure or fields before persisting it via session.append(). If a caller bypasses TypeScript type checking (e.g., via 'any' or JavaScript interop), malformed events could be persisted, which would later cause read() to either throw or return invalid data.",
+          "location": "append()"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "The read() method throws immediately upon encountering a single steering event with invalid data (missing schema_version or wrong schema_version). This means one corrupted or legacy event prevents reading all other valid steering events in the session, creating a potential denial-of-service vector if an attacker can inject even one malformed event.",
+          "location": "read()"
+        }
+      ],
+      "file": "runtime/session-steering-journal.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "hashSessionEvent uses JSON.stringify(data) for hashing, which produces non-deterministic output for objects with different key insertion orders. Two semantically equivalent objects with keys in different orders will produce different hashes, causing false verification failures in verifySessionEventChain. This is particularly problematic if data is reconstructed programmatically or processed through systems that reorder JSON keys. A canonical JSON serialization (e.g., sorted keys) should be used for hash computation.",
+          "location": "hashSessionEvent"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "hashSessionEvent does not handle cases where JSON.stringify throws. If data contains circular references or BigInt values, JSON.stringify will throw a TypeError that propagates uncaught with a non-descriptive message. This could cause unexpected failures in verifySessionEventChain when processing untrusted or malformed event data.",
+          "location": "hashSessionEvent"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "verifySessionEventChain does not validate event types using isSessionEventType (which is defined in this file but never called). Events with invalid or unexpected type values can pass chain verification as long as the hash is consistent. If events originate from an untrusted source (e.g., deserialized from a database or network), invalid event types could be accepted into the chain without detection.",
+          "location": "verifySessionEventChain"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "JSON.stringify silently transforms certain values: undefined values in objects are omitted, undefined in arrays becomes null, NaN and Infinity become null. This means semantically different data (e.g., {a: undefined} vs {}) could produce identical hashes, undermining the integrity guarantee of the hash chain for edge-case data.",
+          "location": "hashSessionEvent"
+        }
+      ],
+      "file": "session/session-event-codec.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "resolveSessionDatabaseLocation returns the unresolved path ('absolute') for non-symlink existing files and ENOENT (non-existent) cases, instead of constructing the path from the already-validated resolved parent ('parent', which equals root.path) plus 'name'. This means the returned path can traverse through symlink components in the parent directory chain that were validated via realpathSync but not resolved in the output. An attacker who can replace one of those symlink components (e.g., in a sticky-bit directory like /tmp) between the check and the caller's use of the path can redirect database creation outside the trust root. The symlink branch correctly returns the fully-resolved realPath, making the non-symlink/ENOENT branches inconsistent and unnecessarily risky. The fix is to return parent + path.sep + name (or root.path + path.sep + name) instead of absolute.",
+          "location": "resolveSessionDatabaseLocation, lines ~100-115 (else branch and ENOENT catch: resolved = absolute)"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "realpathSync(dirname(absolute)) is called outside the try/catch block in resolveSessionDatabaseLocation. If the parent directory does not exist, contains a dangling symlink, or otherwise cannot be resolved, the raw Node.js error (e.g., ENOENT) propagates uncaught without being wrapped in SessionStateRootError, inconsistent with the error handling pattern used elsewhere in the function.",
+          "location": "resolveSessionDatabaseLocation, line: const parent = realpathSync(dirname(absolute));"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "createTrustedSessionStateRoot does not wrap errors from realpathSync(path). If the path does not exist, contains null bytes, or has an unresolvable symlink chain, a raw Node.js error propagates instead of a SessionStateRootError with code STATE_ROOT_UNTRUSTED, breaking the error contract expected by callers.",
+          "location": "createTrustedSessionStateRoot, line: const canonical = realpathSync(path);"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "createTrustedSessionStateRoot does not explicitly check for null bytes in the input 'path' before passing it to realpathSync. While Node.js fs functions typically reject null-byte paths, the rejection comes as a raw ERR_INVALID_ARG_VALUE rather than a SessionStateRootError. resolveSessionDatabaseLocation correctly performs this check on 'absolute', but the same validation is missing here.",
+          "location": "createTrustedSessionStateRoot, function entry"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "In the symlink branch of resolveSessionDatabaseLocation, 'name' is derived from basename(absolute) (the symlink's name), while 'resolved' is set to realPath (the symlink target's fully-resolved path). If the symlink changes the filename (e.g., /root/link -> /root/actual.db), the returned 'name' will be 'link' but 'path' will be '/root/actual.db', creating an inconsistency that could confuse callers expecting name to match the final path component of 'path'.",
+          "location": "resolveSessionDatabaseLocation, symlink branch: resolved = realPath; with name = basename(absolute)"
+        }
+      ],
+      "file": "session/session-state-root.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Parse error. Raw: ",
+          "location": "N/A"
+        }
+      ],
+      "file": "session/session-tree-checkpoint.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Parse error. Raw: ",
+          "location": "N/A"
+        }
+      ],
+      "file": "session/sqlite-authority-internals.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Parse error. Raw: ",
+          "location": "N/A"
+        }
+      ],
+      "file": "session/sqlite-session-tree-authority.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Parse error. Raw: ",
+          "location": "N/A"
+        }
+      ],
+      "file": "session/trusted-python-host.ts"
+    }
+  ],
+  "summary": {
+    "total": 11,
+    "pass": 0,
+    "passWithNotes": 11,
+    "fail": 0,
+    "errors": 0
+  },
+  "timestamp": "2026-08-05T10:41:12.000Z"
+}
