@@ -165,14 +165,9 @@ describe("Phase 2 batch-zero release structure", () => {
     expect(
       EXPECTED_WORKSPACES.map(({ path }: { path: string }) => path),
     ).toEqual([
-      "packages/contracts",
       "packages/runtime-core",
-      "packages/router",
-      "packages/security",
       "packages/tools",
       "packages/ui",
-      "packages/api",
-      "packages/eval",
       "packages/documents",
       "packages/rag",
       "packages/multimodal",
