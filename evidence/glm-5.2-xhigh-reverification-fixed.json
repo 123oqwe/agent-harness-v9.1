@@ -1,0 +1,390 @@
+{
+  "timestamp": "2026-08-05T07:19:41.827Z",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "094d6b8",
+  "batch": "re-verification of fixed files",
+  "summary": {
+    "total": 7,
+    "pass": 0,
+    "passWithNotes": 6,
+    "fail": 1,
+    "errors": 0
+  },
+  "results": [
+    {
+      "file": "packages/multimodal/src/artifact-store.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The `data` Buffer is stored by reference, not copied. A caller can mutate the buffer after calling storeArtifact(), silently corrupting stored artifact data. The code copies on retrieve but not on store, creating an asymmetry.",
+          "location": "storeArtifact - store.set(artifact.artifact_id, { artifact, data })"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "retrieveArtifact copies the data Buffer but returns the artifact metadata object by reference. The comment 'Return a copy to prevent mutation of stored data' is misleading—callers can still mutate the stored artifact object. listArtifacts has the same issue, returning live references to stored artifact objects.",
+          "location": "retrieveArtifact - return { artifact: entry.artifact, data: Buffer.from(entry.data) }; listArtifacts - all.map(v => v.artifact)"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "A single artifact whose data.byteLength exceeds MAX_DATA_BYTES (256 MB) is not rejected. The eviction while-loop empties the store, then the oversized artifact is stored anyway, violating the byte budget. There is no per-artifact size cap or rejection path.",
+          "location": "storeArtifact - while loop and store.set"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Map preserves original insertion order when an existing key is overwritten via set(). An artifact that is updated (re-stored with new data) retains its original 'oldest' position and can be evicted prematurely even though it was recently refreshed. This breaks LRU-style eviction expectations.",
+          "location": "evictOldest - store.keys().next().value"
+        }
+      ],
+      "summary": "Security fixes (input validation, buffer copy on retrieve, byte-budget tracking) are in place, but data is not copied on store, artifact metadata is returned by mutable reference, oversized single artifacts can exceed the budget, and eviction order does not account for overwrites.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2221,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1810
+        },
+        "prompt_tokens": 716,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2937
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/docx-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "XML entities (&amp;, &lt;, &gt;, &quot;, &apos; and numeric entities) are not decoded. Extracted text will contain raw entity references instead of actual characters, producing incorrect output for any document containing special characters.",
+          "location": "extractTextFromXml — runRe capture group, no entity decoding step"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Encrypted DOCX detection is ineffective for standard ECMA-376 encrypted files. Standard encrypted DOCX files are OLE2 (CFB) containers (signature 0xD0CF11E0), not ZIP archives. extractZipEntry will return null for 'EncryptedPackage' because the ZIP signature check fails immediately, causing the file to be misclassified as 'corrupted' instead of 'encrypted'.",
+          "location": "parse() — extractZipEntry(content, 'EncryptedPackage') call and subsequent ZIP signature check"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "ZIP files using data descriptors (general purpose bit flag bit 3 set) will have compSize=0 in the local file header. The parser reads compSize=0, produces an empty buffer for stored entries or throws 'corrupted' for deflated entries. This affects DOCX files created by some third-party tools.",
+          "location": "extractZipEntry — compSize read at offset+18, no check for data descriptor flag (offset+6, bit 3)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Special OOXML elements are not handled: <w:tab/> (tabs), <w:br/> (line breaks), <w:cr/> (carriage returns), and <w:noBreakHyphen/> are silently dropped, producing incomplete text extraction.",
+          "location": "extractTextFromXml — only <w:t> elements are extracted"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "unzipSync is synchronous and can block the event loop for up to 100 MB decompression. The parse method is async but contains no await points, so the entire CPU-intensive decompression and regex processing runs synchronously on the event loop.",
+          "location": "extractZipEntry — unzipSync call; parse() method"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Redundant bounds check: 'offset + 30 + 26 > zipBuf.length' (i.e., offset+56) is unnecessary because the first check 'offset + 30 > zipBuf.length' already guarantees all 30-byte header fields (max read at offset+28, 2 bytes) are within bounds.",
+          "location": "extractZipEntry — second bounds check line"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Heading style regex only captures single digit: /Heading(\\d)/ would parse 'Heading10' as level 1. Also does not handle custom or localized heading style names.",
+          "location": "extractTextFromXml — styleMatch regex"
+        }
+      ],
+      "summary": "Security posture is adequate (ZIP bomb limits, bounds checks, no injection vectors), but several correctness issues remain: undecoded XML entities, ineffective encrypted-DOCX detection for standard OLE2 format, missing data descriptor handling, and incomplete text element extraction.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 7805,
+        "completion_tokens_details": {
+          "reasoning_tokens": 7123
+        },
+        "prompt_tokens": 1555,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 9360
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/pdf-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "unescapePdfString processes escape sequences in the wrong order. The replacement of \\\\n, \\\\r, \\\\t, \\\\(, \\\\)' happens before \\\\\\\\. For input '\\\\n' (escaped backslash + literal 'n'), the /\\\\n/g regex matches the second backslash and 'n', producing a backslash + newline instead of the correct backslash + 'n'. The \\\\\\\\→\\\\ replacement must run first, or a single-pass character scanner should be used.",
+          "location": "unescapePdfString function"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Page boundary regex /\\/Type\\s*\\/Page[^s]/g produces false positives: it matches /Type /PageTree, /Type /PageLabel, and any /Page* token that isn't /Pages, since [^s] only excludes the letter 's'. It also fails to match /Type /Page at end-of-content (no trailing character for [^s] to consume). A word-boundary or negative-lookahead approach (e.g., /\\/Type\\s*\\/Page(?!s)\\b/) would be more robust.",
+          "location": "extractPdfText, pageRe definition"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Text extraction regex /\\(([^)]*)\\)\\s*Tj/g does not account for escaped parentheses \\( and \\) inside PDF string literals. A string like '(text\\)more) Tj' is incorrectly split at the first unescaped ')', producing truncated/garbled output. The same issue applies to the TJ array regex /\\[([^\\]]*)\\]\\s*TJ/g which breaks on ']' inside string literals.",
+          "location": "extractTextFromStream, tjRe and tjArrayRe definitions"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "Encryption detection via /\\/Encrypt\\s+\\d+\\s+0\\s+R/ is heuristic and can be bypassed. If the /Encrypt entry resides in a compressed object stream (ObjStm, common in PDF 1.5+), uses non-standard whitespace, or is referenced indirectly in a way that doesn't match the regex, an encrypted PDF will pass the check and produce garbage text instead of returning the typed 'encrypted' error. Consider also scanning for /Filter /Standard or checking the trailer dictionary directly.",
+          "location": "parse method, encRe definition"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "content.toString('latin1') is called at least twice on the full buffer (once in parse for encryption check, once in extractPdfText for page detection), plus once per page subarray in extractTextFromStream. For a 100 MB file (the default max_bytes), this creates multiple ~100 MB string copies simultaneously. Consider searching the Buffer directly or caching the string conversion.",
+          "location": "parse (encRe.test), extractPdfText (pageRe.exec), extractTextFromStream (buf.toString)"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "No support for FlateDecode-compressed content streams, which are used in virtually all modern PDFs. The parser will extract little to no text from typical real-world PDFs. This appears to be a known limitation per the 'lightweight approach' docstring, but consumers should be aware that text extraction quality will be very low for production PDFs.",
+          "location": "extractTextFromStream / extractPdfText"
+        }
+      ],
+      "summary": "No critical security vulnerabilities remain after fixes, but several medium correctness issues in escape handling, page detection, and text extraction regexes could produce garbled output; encryption detection remains heuristic.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4974,
+        "completion_tokens_details": {
+          "reasoning_tokens": 4199
+        },
+        "prompt_tokens": 1324,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 6298
+      }
+    },
+    {
+      "file": "packages/tools/src/web-fetch.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "IPv6 ULA range (fc00::/7) is incompletely blocked. Patterns only match ^fc00: and ^fd00: prefixes, leaving fc01: through fcff: and fd01: through fdff: unblocked. An attacker controlling DNS can resolve a hostname to e.g. fc01::1, bypassing the private IP check, enabling SSRF to internal IPv6 resources.",
+          "location": "PRIVATE_IP_PATTERNS, isPrivateIp"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "IPv6 link-local range (fe80::/10) is incompletely blocked. Pattern ^fe80: only matches fe80: prefix, missing fe90: through febf:. Attacker can use DNS to resolve to fe90::1 or similar, bypassing SSRF protection for link-local addresses.",
+          "location": "PRIVATE_IP_PATTERNS, isPrivateIp"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "DNS rebinding TOCTOU remains unmitigated. validateNotPrivate resolves DNS and checks IPs, but fetch() independently re-resolves DNS, creating a window for DNS rebinding attacks. Acknowledged in comments but not fixed; for a re-verification after security fixes, this is still present.",
+          "location": "webFetchInternal - fetch() call after validateNotPrivate()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "IPv6 literal addresses in URLs are mishandled. url.hostname includes brackets (e.g., [::1]) for IPv6, so lookup() receives a bracketed string and fails with ENOTFOUND. Legitimate public IPv6 addresses are blocked, and the error message is misleading (DNS failure instead of SSRF block).",
+          "location": "webFetchInternal - validateNotPrivate(url.hostname)"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Missing private/special-use IP ranges: CGNAT 100.64.0.0/10, benchmark testing 198.18.0.0/15, and broadcast 255.255.255.255 are not blocked, allowing potential SSRF to these ranges.",
+          "location": "PRIVATE_IP_PATTERNS"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Pre-aborted context.signal is not checked before proceeding. If context.signal is already aborted, addEventListener('abort', onAbort) never fires because the event already dispatched. The fetch proceeds and only the timeout can abort it.",
+          "location": "webFetchInternal - context.signal.addEventListener"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Response body reader is not cancelled on error during the read loop. If reader.read() throws (non-timeout error), the finally block clears the timeout and removes the listener but does not cancel the reader, potentially leaving the underlying stream open.",
+          "location": "webFetchInternal - chunk read loop and finally block"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "extractIPv4FromMapped is redundant. All IPv4 private ranges already have ::ffff: counterparts in PRIVATE_IP_PATTERNS, so the function never finds a private IPv4 that wasn't already caught by the pattern list.",
+          "location": "extractIPv4FromMapped, isPrivateIp"
+        }
+      ],
+      "summary": "IPv6 private range patterns have critical gaps (fc00::/7 and fe80::/10 incompletely matched) enabling SSRF bypass via DNS; DNS rebinding TOCTOU remains unmitigated.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 11875,
+        "completion_tokens_details": {
+          "reasoning_tokens": 11164
+        },
+        "prompt_tokens": 1882,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 13757
+      }
+    },
+    {
+      "file": "packages/tools/src/mcp-stdio.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The SIGKILL fallback setTimeout in disconnectMcpStdio is never cleared and never .unref()'d. This keeps the Node.js event loop alive for 5 seconds after every disconnect, directly contradicting the proc.unref() call's intent to allow clean exit. The timer should be stored and cleared when the child exits, and/or .unref()'d.",
+          "location": "disconnectMcpStdio, setTimeout callback"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "PID-reuse / TOCTOU risk: the SIGKILL fallback timer calls conn.child.kill('SIGKILL') unconditionally after 5s without checking whether the child has already exited. If the child died (from SIGTERM or naturally) and the OS recycled the PID, the signal could be delivered to an unrelated process. A flag set by the 'exit' handler should gate the SIGKILL.",
+          "location": "disconnectMcpStdio, SIGKILL setTimeout"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "connectMcpStdio returns { success: true } immediately after spawn() returns. Spawn failures (ENOENT, EACCES) are reported asynchronously via the 'error' event, so callers receive a false-positive success for a process that never started. Consider awaiting a short startup probe or deferring success until the process is confirmed alive.",
+          "location": "connectMcpStdio, return statement after connections.set"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The full parent environment is forwarded to the child via { ...process.env, ...config.env }. If the MCP server is untrusted or compromised, sensitive host environment variables (credentials, tokens) are leaked. Consider an allowlist or explicit env construction.",
+          "location": "connectMcpStdio, env option"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "disconnectMcpStdio deletes the connection from the map immediately, but the child's 'exit' handler also calls connections.delete(id). If a new connection with the same id is established within the 5s SIGKILL window, the pending timer still references the old conn object (safe), but the map state is briefly ambiguous. Minor, but tracking an 'exited' flag on the connection object would make the lifecycle explicit.",
+          "location": "disconnectMcpStdio / 'exit' handler interaction"
+        }
+      ],
+      "summary": "Re-verification passes with notes: pipe-draining and exit cleanup fixes are sound, but the SIGKILL fallback timer leaks (not cleared/unref'd) and lacks an exit-state guard creating a low-probability PID-reuse risk.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2466,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1914
+        },
+        "prompt_tokens": 711,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 3177
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/model-fallback.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "AbortSignal is checked only at loop entry but not passed to cache.invalidate() or context.recompile(). If the signal aborts during these awaits, the operations continue running and cannot be cancelled, wasting resources.",
+          "location": "execute() — cache.invalidate and context.recompile calls"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "maxFallbackDepth option is read via an unsafe cast and never validated. A value of 0, negative, NaN, or non-numeric type would cause the loop to never execute, immediately throwing fallback_loop without any fallback attempt.",
+          "location": "constructor — (options as { maxFallbackDepth?: number })?.maxFallbackDepth"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "deadline_at from FallbackDispatchContext is declared but never enforced by the controller between fallback attempts. A deadline that has already passed will not prevent additional fallback iterations, only dispatchExact can enforce it.",
+          "location": "execute() — while loop"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "All errors from dispatchExact (including programming errors like TypeError) are caught and treated as retriable failures. The next iteration's classifyFailure must correctly reject non-retriable errors to avoid masking bugs.",
+          "location": "execute() — catch block"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "cache.invalidate is called before context.recompile. If recompile throws, the old provider's cache is already invalidated but no new context is compiled, leaving the system with a stale cache state for the old provider. This may be intentional but could cause issues on retry.",
+          "location": "execute() — cache.invalidate followed by context.recompile"
+        }
+      ],
+      "summary": "Well-structured fallback controller with solid input validation, loop prevention, and immutability; remaining issues are minor resource and edge-case concerns.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4034,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3651
+        },
+        "prompt_tokens": 2009,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "total_tokens": 6043
+      }
+    },
+    {
+      "file": "packages/runtime-core/src/pause-resume.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "The resume() method performs a non-atomic read-modify-write cycle: getOperation → process → recordOperation. Two concurrent resume() calls for the same operation_id could both read the same state (e.g., IN_FLIGHT), receive divergent readBack/reconciliation results, and produce conflicting transitions (e.g., one transitions to EFFECT_CONFIRMED, the other to DEFINITELY_FAILED_NO_EFFECT). The last journal write wins, potentially causing a duplicate effect execution on retry. No mutex, CAS, or version check is present in this controller; concurrency safety is entirely delegated to the journal port implementation.",
+          "location": "resume(), #resolveReadBack(), #reconcile(), #transition()"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The scope-mismatch error ('pause/resume operation scope mismatch') confirms that an operation_id exists but belongs to a different run_id. This is a minor information disclosure that could allow an attacker to enumerate valid operation_ids across runs. Consider returning a generic 'not found' error instead.",
+          "location": "resume() — operation.run_id !== input.run_id branch"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "In #resolveReadBack error and indeterminate paths, two sequential journal writes occur (EFFECT_UNKNOWN then RECONCILING). If the process crashes between these writes, the operation is left in EFFECT_UNKNOWN state. This is recoverable on next resume (EFFECT_UNKNOWN → RECONCILING), so not a bug, but the double-write could be collapsed into a single direct transition to RECONCILING for efficiency and reduced journal churn.",
+          "location": "#resolveReadBack() — catch block and indeterminate branch"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "The #confirmed() method uses requiredId() to validate stored_outcome_json, producing the error message 'stored_outcome_json is required' for empty strings, which is semantically misleading when the value is present but empty vs. absent. A dedicated non-empty-string check with a clearer message would improve diagnostics.",
+          "location": "#confirmed()"
+        }
+      ],
+      "summary": "Well-structured with proper input validation, scope checks, JSON validation, and defensive freezing; primary remaining concern is non-atomic read-modify-write concurrency on journal transitions.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 3867,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3383
+        },
+        "prompt_tokens": 1858,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 5725
+      }
+    }
+  ]
+}
