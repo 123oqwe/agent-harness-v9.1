@@ -5,7 +5,7 @@
  */
 import { spawn } from 'node:child_process';
 import type { ToolResult } from './types.js';
-import { resolve, isAbsolute } from 'node:path';
+import { isAbsolute } from 'node:path';
 
 const ALLOWED_DIRS = ['workspace', 'output', 'tmp', 'artifacts'];
 
@@ -18,11 +18,13 @@ function validatePath(path: string, field: string): void {
     throw new Error(`${field} must be a relative path without traversal`);
   }
   // Must be within an allowed directory
-  const resolved = resolve(path);
-  if (!ALLOWED_DIRS.some(dir => resolved.startsWith(dir + '/') || resolved === dir)) {
+  const normalized = path.replace(/\\/g, '/').replace(/^\.?\//, '');
+  if (!ALLOWED_DIRS.some(dir => normalized === dir || normalized.startsWith(dir + '/'))) {
     throw new Error(`${field} must be within an allowed directory (${ALLOWED_DIRS.join(', ')})`);
   }
 }
+
+const MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10MB cap per stream
 
 function runCli(command: string, args: string[], stdin: string, timeoutMs = 30000): Promise<ToolResult> {
   return new Promise((resolve) => {
@@ -33,10 +35,34 @@ function runCli(command: string, args: string[], stdin: string, timeoutMs = 3000
       });
       let stdout = '';
       let stderr = '';
+      let stdoutBytes = 0;
+      let stderrBytes = 0;
+      let outputCapped = false;
       proc.stdin?.write(stdin);
       proc.stdin?.end();
-      proc.stdout?.on('data', d => stdout += d);
-      proc.stderr?.on('data', d => stderr += d);
+      proc.stdout?.on('data', d => {
+        if (stdoutBytes + d.length > MAX_OUTPUT_BYTES) {
+          if (!outputCapped) {
+            stderr += '\n[stdout truncated at ' + MAX_OUTPUT_BYTES + ' bytes]';
+            outputCapped = true;
+          }
+          proc.kill('SIGKILL');
+          return;
+        }
+        stdoutBytes += d.length;
+        stdout += d;
+      });
+      proc.stderr?.on('data', d => {
+        if (stderrBytes + d.length > MAX_OUTPUT_BYTES) {
+          if (!outputCapped) {
+            stderr += '\n[stderr truncated at ' + MAX_OUTPUT_BYTES + ' bytes]';
+            outputCapped = true;
+          }
+          return;
+        }
+        stderrBytes += d.length;
+        stderr += d;
+      });
       proc.on('close', code => {
         if (code === 0) {
           try {
@@ -50,6 +76,10 @@ function runCli(command: string, args: string[], stdin: string, timeoutMs = 3000
       });
       proc.on('error', err => {
         resolve({ success: false, output: null, error: err.message });
+      });
+      proc.on('timeout', () => {
+        proc.kill('SIGKILL');
+        resolve({ success: false, output: null, error: 'process timed out' });
       });
     } catch (e) {
       resolve({ success: false, output: null, error: e instanceof Error ? e.message : String(e) });

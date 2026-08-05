@@ -1,0 +1,235 @@
+{
+  "commit": "f8ee8953",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "results": [
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "ZIP bomb vulnerability: extractZipEntries decompresses ALL entries into memory simultaneously with no limit on total decompressed size or entry count. Each entry can decompress to 100MB (MAX_DECOMPRESSED_SIZE), so a 100MB input ZIP with many entries could exhaust memory (e.g., 1000 entries \u00d7 100MB = 100GB). Additionally, non-slide entries (images, media) are decompressed unnecessarily, amplifying memory waste. Only slide XML files are needed but everything is inflated upfront.",
+          "location": "extractZipEntries function, lines 18-39"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Data descriptor (streaming ZIP) entries are not handled. When general purpose bit flag bit 3 is set, compSize in the local file header is 0 and the actual size follows in a data descriptor record after the compressed data. The parser uses compSize=0, producing empty data for stored entries or a decompression failure for deflated entries, and advances offset incorrectly, causing subsequent entries (including slides) to be missed or misparsed.",
+          "location": "extractZipEntries, compSize read at offset+18, offset advancement at line 38"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "XML entities are not decoded in extracted slide text. The regex captures raw entity references like &lt;, &gt;, &amp;, &quot;, &apos; and numeric character references without decoding them. This produces incorrect text output with literal entity strings instead of actual characters.",
+          "location": "extractTextFromSlideXml function, line 43"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Page offset calculation is incorrect for slides after the first. startOffset is captured before the slide break delimiter is appended, so for page N>1, start_offset points to the beginning of '\\n\\n--- Slide Break ---\\n\\n' rather than the actual slide content. Page references will include delimiter text when used to extract page content.",
+          "location": "parse method, lines 68-72 (startOffset and pages.push)"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Entries with unsupported compression methods are silently skipped with no logging or error. If a slide XML file uses an unsupported compression, the slide will be missing from the output with no indication of the problem.",
+          "location": "extractZipEntries, line 36 (else branch with continue)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No ZIP64 extension support. For files requiring ZIP64 (sizes > 4GB), the compSize and other size fields in local file headers are set to 0xFFFFFFFF with actual values in the extra field. The parser reads the incorrect 32-bit sizes, leading to data truncation or parsing failures.",
+          "location": "extractZipEntries, compSize read via readUInt32LE at offset+18"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "Only validates the ZIP local file header signature (0x04034b50), not PPTX-specific structure. A non-PPTX ZIP file (e.g., DOCX, XLSX, or arbitrary ZIP) would be accepted and processed, potentially producing misleading results or empty output without an appropriate error.",
+          "location": "parse method, line 56"
+        }
+      ],
+      "file": "packages/documents/src/parsers/pptx-parser.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "ZIP bomb vulnerability: while each individual entry is capped at MAX_DECOMPRESSED_SIZE (100MB), there is no limit on the total decompressed size across all entries or on the number of entries. A 100MB input file (the default max_bytes) could contain thousands of highly-compressed entries, each decompressing to ~100MB, causing OOM. The per-entry cap is insufficient; a cumulative decompressed-size counter and entry-count limit are needed.",
+          "location": "extractZipEntries function, lines 18-39"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "ZIP parsing does not check the general purpose bit flag (offset+6, bit 3). When bit 3 is set (data descriptor mode), the compressed and uncompressed sizes in the local file header are zero, and actual sizes follow the compressed data in a data descriptor record. This causes compSize=0, resulting in empty entry data and silent data loss for any XLSX written with streaming/data-descriptor mode.",
+          "location": "extractZipEntries function, line 22 (compSize read at offset+18)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Sheet files are sorted alphabetically with sort(), which produces incorrect ordering for 10+ sheets (e.g., 'sheet10.xml' sorts before 'sheet2.xml'). The correct sheet order and names are defined in xl/workbook.xml, which is never read. This causes sheets to be numbered and ordered incorrectly.",
+          "location": "parse method, line: sheetFiles.sort()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Cell regex requires r= to be the first attribute after <c and requires a literal </c> closing tag. It fails to match: (1) self-closing cells like <c r=\"A1\"/>, (2) cells where attributes are in a different order, (3) cells with formulas (<f> element before <v>), causing silent data loss in common real-world XLSX files.",
+          "location": "parseSheet function, cellRe definition"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No handling of inline string cells (t=\"inlineStr\" with <is><t> child elements), boolean cells (t=\"b\"), or error cells (t=\"e\"). Inline strings are common in XLSX files generated by some libraries; these cells will produce empty or raw numeric values instead of actual text.",
+          "location": "parseSheet function, cell type handling"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Column positions are not preserved. The cell reference (e.g., r=\"A1\", r=\"C1\") is captured but never used to place values at their correct column index. Sparse rows (where some cells are omitted) produce incorrectly packed arrays, shifting values left and corrupting table structure.",
+          "location": "parseSheet function, cells.push logic"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Synchronous decompression via inflateRawSync blocks the Node.js event loop. For large or numerous compressed entries, this can cause significant latency and unresponsiveness in the process.",
+          "location": "extractZipEntries function, inflateRawSync call"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No XML entity decoding is performed on extracted text. Entities like &amp;, &lt;, &gt;, &quot;, and numeric character references remain as literal strings in the output, producing incorrect text content.",
+          "location": "parseSharedStrings and parseSheet functions"
+        }
+      ],
+      "file": "packages/documents/src/parsers/xlsx-parser.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "The `migrating` flag is not protected with try/finally. If any unexpected error occurs during the async migration (e.g., history.push throws, or an unforeseen exception propagates from processBatch), `this.migrating` is never reset to `false`, permanently locking the migrator and preventing all future migrations.",
+          "location": "migrate() \u2014 async IIFE return block, lines 47-60"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The `history` array grows without bound. Every migration call pushes a new entry with no limit, cap, or eviction policy. In a long-running process with frequent migrations, this constitutes unbounded memory growth.",
+          "location": "history field and history.push() in migrate()"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "Errors from `reembedFn` are silently swallowed \u2014 the catch block only increments `failed` without recording the error message, stack trace, or which chunk_id failed. This makes debugging migration failures effectively impossible.",
+          "location": "processBatch() \u2014 catch block"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "The returned vector is only checked for being a non-empty array. Its length is not validated against `newModel.dimensions`, nor are element types verified to be numbers. A malformed vector (wrong dimensions, non-numeric elements) would be stored and could corrupt downstream similarity search or storage.",
+          "location": "processBatch() \u2014 vector validation after reembedFn call"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Partial migration leaves the system in an inconsistent state: some embeddings are updated to `newModel` while others remain on `oldModel`. The result reports `rollback_available: false` with no mechanism to undo partial migrations, leaving the caller with no recovery path.",
+          "location": "processBatch() and MigrationResult.rollback_available"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Type safety is bypassed via casts (`(emb as { model: RagEmbeddingModel }).model = newModel`) to mutate properties that may be `readonly` in the `RagEmbedding` type. If the type definition enforces immutability, this circumvents that contract and could mask bugs if the type structure changes.",
+          "location": "processBatch() \u2014 in-place mutation lines"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "No null/undefined validation on `embeddings` or `chunkTexts` parameters. If either is null/undefined, the method will throw an unhandled TypeError at `.filter()` or `.get()` respectively, after `migrating` has already been set to `true` (in the embeddings case), potentially leaving the flag stuck.",
+          "location": "migrate() \u2014 parameter usage without guards"
+        }
+      ],
+      "file": "packages/rag/src/embedding-migrator.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "Path validation is fundamentally broken. `resolve(path)` returns an absolute path (e.g., `/home/user/workspace/file`), but the allowed-directory check compares against relative names like `'workspace/'`. Since an absolute path never starts with a relative directory name, the check `resolved.startsWith(dir + '/')` always evaluates to false. This means either all valid paths are rejected (DoS) or the security control is effectively non-functional, leaving path traversal protection unreliable.",
+          "location": "validatePath function, lines 14-24"
+        },
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "Unbounded stdout/stderr accumulation. The `runCli` function concatenates all process output into in-memory strings (`stdout += d`, `stderr += d`) without any size limit. A malicious or buggy subprocess could produce gigabytes of output, causing OOM and process crash. Should enforce a max buffer size and kill the process if exceeded.",
+          "location": "runCli function, lines 30-31"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "No SIGKILL fallback after timeout. The `spawn` `timeout` option sends SIGTERM after the timeout, but if the child process ignores or catches SIGTERM, it will hang indefinitely and the Promise will never resolve, leaking the process and file descriptors. Should implement a manual timeout with escalating SIGKILL.",
+          "location": "runCli function, line 27"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "No symlink resolution in path validation. Even if the path validation worked correctly, an attacker could create a symlink inside an allowed directory (e.g., `workspace/link -> /etc/passwd`) and the validation would pass since it only checks the path string, not the resolved target. Should use `fs.realpath()` to resolve symlinks before checking boundaries.",
+          "location": "validatePath function"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The `modify` action is declared in the TypeScript type (`action: 'create' | 'read' | 'modify'`) but is not implemented in the embedded Python code. The Python script only handles `create` and `read`, falling through to the `else` branch which returns `{'error': 'unknown action'}` for `modify`.",
+          "location": "manipulateSpreadsheet function, Python script lines"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "The `path.includes('..')` check is overly broad and will reject legitimate filenames containing consecutive dots, such as `file..backup.xlsx` or `my..report.docx`. Should use a more precise traversal check, such as normalizing the path and verifying it stays within the allowed directory after resolution.",
+          "location": "validatePath function, line 18"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "The `language` parameter in `ocrDocument` is passed directly to `pytesseract.image_to_string()` without any validation or whitelist. While pytesseract typically uses the Tesseract API directly, an unvalidated language string could cause unexpected behavior or errors depending on the Tesseract version and configuration.",
+          "location": "ocrDocument function, Python script"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "Missing structural validation for input data. `generatePresentation` does not validate that `slides` is a non-empty array or that each slide has required fields. `generateDocument` does not validate that heading `level` is a positive integer within a valid range. These could cause Python exceptions or unexpected behavior.",
+          "location": "generatePresentation, generateDocument functions"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "No file locking mechanism for concurrent operations. Multiple simultaneous calls to `manipulateSpreadsheet` or other tools targeting the same file path could cause race conditions, data corruption, or file locking errors at the OS level.",
+          "location": "All exported tool functions"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "The `proc.stdin?.write(stdin)` call has no error handling. If the write fails (e.g., pipe closed, EPIPE), the error is silently ignored and the process may hang waiting for input that was never delivered. Should handle the `error` event on stdin and use callback or stream API.",
+          "location": "runCli function, line 32"
+        }
+      ],
+      "file": "packages/tools/src/cli-tools.ts"
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "pass": 0,
+    "passWithNotes": 1,
+    "fail": 3,
+    "errors": 0
+  },
+  "timestamp": "2026-08-05T10:57:32.000Z"
+}

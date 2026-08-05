@@ -15,14 +15,20 @@ import { inflateRawSync } from 'node:zlib';
 const PARSER_VERSION = '1.0.0';
 const PARSER_NAME = 'xlsx-native-zip';
 const MAX_DECOMPRESSED_SIZE = 100 * 1024 * 1024;
+const MAX_TOTAL_DECOMPRESSED = 500 * 1024 * 1024;
+const MAX_ENTRY_COUNT = 10000;
 
 function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
   const entries = new Map<string, Buffer>();
+  let totalDecompressed = 0;
   let offset = 0;
   while (offset < zipBuf.length - 4) {
     if (offset + 30 > zipBuf.length) break;
     const sig = zipBuf.readUInt32LE(offset);
     if (sig !== 0x04034b50) break;
+    if (entries.size >= MAX_ENTRY_COUNT) {
+      throw new DocumentIngestError('xlsx zip contains too many entries', 'too_large');
+    }
     const nameLen = zipBuf.readUInt16LE(offset + 26);
     const extraLen = zipBuf.readUInt16LE(offset + 28);
     const compMethod = zipBuf.readUInt16LE(offset + 8);
@@ -41,6 +47,10 @@ function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
       catch { throw new DocumentIngestError('xlsx zip decompression failed', 'corrupted'); }
     }
     else { offset = dataOffset + compSize; continue; }
+    totalDecompressed += data.length;
+    if (totalDecompressed > MAX_TOTAL_DECOMPRESSED) {
+      throw new DocumentIngestError('xlsx total decompressed size exceeds limit', 'too_large');
+    }
     entries.set(name, data);
     offset = dataOffset + compSize;
   }
