@@ -1,0 +1,180 @@
+{
+  "commit": "0a3244e7",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "results": [
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "XML entities (&lt;, &gt;, &amp;, &quot;, &apos;, numeric entities) are not decoded during text extraction. The regex captures raw entity strings, producing incorrect text output for any slide containing escaped characters.",
+          "location": "extractTextFromSlideXml, line 52"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "ZIP data descriptors are not handled. The general purpose bit flag (offset+6) is never checked. When bit 3 is set, compSize/compressedSize in the local file header is 0, causing deflate entries to fail with 'corrupted' and all subsequent entries to be lost because offset advances by 0. PPTX files produced by some tools use data descriptors.",
+          "location": "extractZipEntries, lines 20-38"
+        },
+        {
+          "severity": "medium",
+          "category": "resource_management",
+          "description": "All ZIP entries are decompressed and held in memory before filtering for slide XML files. Binary payloads (images, media, fonts) are decompressed unnecessarily, wasting up to MAX_TOTAL_DECOMPRESSED (500MB) of memory. Entry names should be checked before decompression to skip non-slide files.",
+          "location": "extractZipEntries / parse, lines 18-39 and 63-66"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Page start_offset for slides after the first includes the slide-break delimiter ('\\n\\n--- Slide Break ---\\n\\n') rather than pointing to the actual slide content. The offset is captured before the delimiter is appended.",
+          "location": "parse, lines 73-77"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "All decompression (inflateRawSync) and text extraction runs synchronously in an async method. For large PPTX files (up to 100MB compressed, 500MB decompressed), this blocks the event loop for the entire duration.",
+          "location": "extractZipEntries, line 34; parse, line 64"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Parser relies solely on local file headers and ignores the central directory. Malformed or crafted ZIPs where local headers don't match the central directory could cause incorrect data extraction or silent entry loss. No validation against the central directory is performed.",
+          "location": "extractZipEntries, lines 18-39"
+        },
+        {
+          "severity": "low",
+          "category": "input_validation",
+          "description": "No bounds check on nameLen/extraLen before computing dataOffset. If nameLen is large (up to 65535), subarray may return a truncated name. While dataOffset+compSize>zipBuf.length check prevents out-of-bounds reads, entries with truncated names could be silently missed.",
+          "location": "extractZipEntries, lines 26-30"
+        }
+      ],
+      "file": "packages/documents/src/parsers/pptx-parser.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "Synchronous decompression via inflateRawSync and synchronous XML regex parsing block the Node.js event loop entirely. A 100MB compressed XLSX (the default max_bytes) can decompress to 500MB, causing seconds of event loop blocking. This is an easily exploitable denial-of-service vector \u2014 any user who can submit an XLSX file can freeze the runtime.",
+          "location": "extractZipEntries (inflateRawSync call), parse method"
+        },
+        {
+          "severity": "medium",
+          "category": "resource_management",
+          "description": "No bounds on the number of rows, cells, or shared strings produced during parsing. While decompressed size is capped at 500MB, the resulting JavaScript object graph (arrays of arrays of strings) has significant per-element overhead. A malicious sheet with many small cells could cause OOM well before the 500MB decompressed limit is reached.",
+          "location": "parseSheet, parseSharedStrings"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "ZIP entries with data descriptors (general purpose bit flag bit 3 set) are not handled. When this flag is set, compSize in the local file header is 0 and the actual size follows the compressed data in a data descriptor record. The parser reads compSize=0, fails to advance past the real compressed data, and either silently stops parsing or produces corrupted results. Valid XLSX files from some tools use data descriptors.",
+          "location": "extractZipEntries \u2014 compSize read at offset+18"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Regex-based XML parsing has multiple correctness gaps: (1) Self-closing cells like <c r=\"A1\"/> are not matched (regex requires </c>), causing empty cells to be silently dropped and shifting all subsequent column positions. (2) Inline string cells (t=\"inlineStr\" with <is><t>...</t></is>) are not matched, losing their values. (3) The cell regex requires the r attribute immediately after <c with t attribute immediately after r \u2014 any other attribute ordering causes cells to be skipped. (4) Cell column positions from the r reference (e.g., 'C1') are captured but never used to place cells at correct column indices; cells are pushed positionally, producing incorrect table structure when cells are sparse.",
+          "location": "parseSheet \u2014 cellRe regex"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "Text is built via repeated string concatenation (text += ...) inside a loop over sheets and rows. For large spreadsheets this is O(n\u00b2) in the output size. Should use an array and join.",
+          "location": "parse method \u2014 text += loop"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Duplicate ZIP entry names silently overwrite \u2014 last entry wins. Standard ZIP semantics typically use the first occurrence (as listed in the central directory). Could cause incorrect data extraction if a malicious XLSX includes duplicate entry names.",
+          "location": "extractZipEntries \u2014 entries.set(name, data)"
+        },
+        {
+          "severity": "low",
+          "category": "input_validation",
+          "description": "ZIP entry names are not validated for path traversal characters (../). While not directly exploitable in this code since names are only used as Map keys and matched against regex patterns (never used for filesystem operations), the lack of validation is a defense-in-depth gap that could become exploitable if the entries Map is exposed or reused elsewhere.",
+          "location": "extractZipEntries \u2014 entries.set(name, data)"
+        }
+      ],
+      "file": "packages/documents/src/parsers/xlsx-parser.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "Exported functions access input properties (e.g., input.file_path) without first validating that input is a non-null object. If called with null/undefined from untrusted RPC input, this throws an uncaught TypeError. Additionally, validatePath throws occur outside runCli's try-catch, so validation errors propagate as unhandled rejections, inconsistent with runCli's always-resolve pattern.",
+          "location": "manipulateSpreadsheet, generatePresentation, generateDocument, ocrDocument \u2014 before runCli call"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "validatePath performs lexical checks only and does not resolve symlinks (e.g., via fs.realpath). If a symlink is created within an allowed directory (e.g., workspace/link -> /etc), a path like 'workspace/link/passwd' passes validation but accesses files outside allowed directories. In an agent harness where the model can write files via other tools, this enables path traversal.",
+          "location": "validatePath function"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "OCR tool calls PIL Image.open without explicit decompression bomb protections. While modern PIL has Image.MAX_IMAGE_PIXELS, behavior varies by version (warning vs. error). A malicious image placed in an allowed directory could cause OOM during image decoding before any output cap triggers.",
+          "location": "ocrDocument \u2014 Python: img = Image.open(data[\"image_path\"])"
+        },
+        {
+          "severity": "medium",
+          "category": "resource_management",
+          "description": "When stderr exceeds MAX_OUTPUT_BYTES, the process is NOT killed (unlike stdout overflow which calls proc.kill('SIGKILL')). The process continues running and consuming resources until the 30s timeout. Multiple concurrent invocations producing large stderr could lead to resource exhaustion.",
+          "location": "runCli \u2014 proc.stderr?.on('data', ...) handler"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "No error listener is attached to proc.stdin. If the child process exits before reading all stdin (e.g., import failure causes immediate sys.exit), an EPIPE error event on proc.stdin has no handler, potentially causing an uncaught exception that crashes the Node.js process.",
+          "location": "runCli \u2014 proc.stdin?.write(stdin) without proc.stdin.on('error', ...)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "manipulateSpreadsheet declares action 'modify' in the TypeScript type, but the Python code only handles 'create' and 'read'. The 'modify' action falls through to the else branch returning {\"error\": \"unknown action\"}. Additionally, the 'data' field is typed but never used by the Python implementation.",
+          "location": "manipulateSpreadsheet \u2014 TypeScript type vs Python implementation"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "stdout and stderr are accumulated via string concatenation (stdout += d) where d is a Buffer. Multi-byte UTF-8 characters split across data chunks will be corrupted because Buffer.toString('utf8') is applied per-chunk independently. Should use StringDecoder or collect Buffer chunks and concatenate once.",
+          "location": "runCli \u2014 proc.stdout?.on('data', ...) and proc.stderr?.on('data', ...)"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "No size limit on stdin input. JSON.stringify(input) could produce arbitrarily large output written via a single proc.stdin.write() call without backpressure handling, risking memory pressure or silent data loss for large inputs.",
+          "location": "runCli \u2014 proc.stdin?.write(stdin)"
+        },
+        {
+          "severity": "low",
+          "category": "input_validation",
+          "description": "Python code does not validate input fields before use. headings[].level is passed directly to doc.add_heading without type/range checking; language parameter in OCR is passed to pytesseract without sanitization. Malformed inputs cause unhandled Python exceptions rather than structured error responses.",
+          "location": "generateDocument Python code, ocrDocument Python code"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "OCR tool spawns tesseract as a subprocess via pytesseract. When the parent Python process is killed (timeout, output cap), the tesseract child process may become orphaned and continue running, consuming CPU/memory resources beyond the tool's lifecycle.",
+          "location": "ocrDocument \u2014 pytesseract.image_to_string()"
+        }
+      ],
+      "file": "packages/tools/src/cli-tools.ts"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "pass": 0,
+    "passWithNotes": 2,
+    "fail": 1,
+    "errors": 0
+  },
+  "timestamp": "2026-08-05T11:07:58.000Z"
+}

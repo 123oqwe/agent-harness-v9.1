@@ -14,8 +14,9 @@ import { inflateRawSync } from 'node:zlib';
 
 const PARSER_VERSION = '1.0.0';
 const PARSER_NAME = 'xlsx-native-zip';
-const MAX_DECOMPRESSED_SIZE = 100 * 1024 * 1024;
-const MAX_TOTAL_DECOMPRESSED = 500 * 1024 * 1024;
+const MAX_DECOMPRESSED_SIZE = 50 * 1024 * 1024;
+const MAX_TOTAL_DECOMPRESSED = 200 * 1024 * 1024;
+const MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
 const MAX_ENTRY_COUNT = 10000;
 
 function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
@@ -109,7 +110,7 @@ export class XlsxParser implements DocumentParser {
     source_path: string,
     options: DocumentIngestOptions,
   ): Promise<DocumentIngestResult> {
-    const maxBytes = options.max_bytes ?? 100 * 1024 * 1024;
+    const maxBytes = Math.min(options.max_bytes ?? 50 * 1024 * 1024, MAX_COMPRESSED_SIZE);
     if (content.byteLength > maxBytes) {
       throw new DocumentIngestError(`xlsx exceeds max bytes`, 'too_large');
     }
