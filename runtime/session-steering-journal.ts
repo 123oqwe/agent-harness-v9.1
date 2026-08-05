@@ -37,7 +37,11 @@ export class SessionSteeringJournal {
       if (!isRecord(data) || data.schema_version !== "steering-event/v1") {
         throw new Error("invalid steering session event");
       }
-      events.push(data as unknown as RuntimeSteeringEvent);
+      const steering = data as unknown as RuntimeSteeringEvent;
+      // Filter by journal scope so a shared session does not leak events
+      // from other tenants/runs.
+      if (!sameScope(this.scope, steering.scope)) continue;
+      events.push(steering);
     }
     return events;
   }

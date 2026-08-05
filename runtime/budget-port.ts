@@ -136,14 +136,17 @@ export class BudgetLedgerRuntimeAdapter implements RuntimeBudgetPort {
     if (!this.#pending.has(callId)) {
       throw new Error("budget usage has no authorized pending call");
     }
-    this.#ledger.recordModelCall({
-      call_id: callId,
-      cached_input_tokens: 0,
-      uncached_input_tokens: input.input_tokens,
-      output_tokens: input.output_tokens,
-      pricing: this.#pricing,
-    });
-    this.#pending.delete(callId);
+    try {
+      this.#ledger.recordModelCall({
+        call_id: callId,
+        cached_input_tokens: 0,
+        uncached_input_tokens: input.input_tokens,
+        output_tokens: input.output_tokens,
+        pricing: this.#pricing,
+      });
+    } finally {
+      this.#pending.delete(callId);
+    }
   }
 
   #callId(input: {

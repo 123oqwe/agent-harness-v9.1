@@ -27,8 +27,23 @@ export function hashSessionEvent(
   data: unknown,
   previousHash: string,
 ): string {
+  // Deterministic JSON serialization: sort object keys recursively so that
+  // semantically equivalent objects with different key insertion orders
+  // produce the same hash.
+  const canonical = JSON.stringify(data, (_key, value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return Object.keys(value).sort().reduce<Record<string, unknown>>(
+        (sorted, k) => {
+          sorted[k] = (value as Record<string, unknown>)[k];
+          return sorted;
+        },
+        {},
+      );
+    }
+    return value;
+  });
   return createHash("sha256")
-    .update(`${seq}|${type}|${timestamp}|${JSON.stringify(data)}|${previousHash}`)
+    .update(`${seq}|${type}|${timestamp}|${canonical}|${previousHash}`)
     .digest("hex");
 }
 
