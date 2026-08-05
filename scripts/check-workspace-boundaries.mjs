@@ -45,65 +45,30 @@ const workspace = (
   });
 
 export const EXPECTED_WORKSPACES = Object.freeze([
-  workspace("packages/contracts", "@agent-harness/contracts", [], "package"),
   workspace(
     "packages/runtime-core",
     "@agent-harness/runtime-core",
-    ["@agent-harness/contracts"],
+    [],
     "package",
     ["node:async_hooks", "node:crypto"],
   ),
   workspace(
-    "packages/router",
-    "@agent-harness/router",
-    ["@agent-harness/contracts", "@agent-harness/runtime-core"],
-    "package",
-  ),
-  workspace(
-    "packages/security",
-    "@agent-harness/security",
-    ["@agent-harness/contracts"],
-    "package",
-  ),
-  workspace(
     "packages/tools",
     "@agent-harness/tools",
-    ["@agent-harness/runtime-core", "@agent-harness/security"],
+    ["@agent-harness/runtime-core"],
     "package",
     ["node:child_process", "node:crypto", "node:dns", "node:dns/promises", "node:fs", "node:http", "node:https", "node:path"],
   ),
   workspace(
     "packages/ui",
     "@agent-harness/ui",
-    ["@agent-harness/api"],
-    "package",
-  ),
-  workspace(
-    "packages/api",
-    "@agent-harness/api",
-    [
-      "@agent-harness/runtime-core",
-      "@agent-harness/router",
-      "@agent-harness/security",
-      "@agent-harness/tools",
-      "@agent-harness/documents",
-      "@agent-harness/rag",
-      "@agent-harness/multimodal",
-    ],
-    "package",
-    ["node:crypto"],
-    ["fetch"],
-  ),
-  workspace(
-    "packages/eval",
-    "@agent-harness/eval",
-    ["@agent-harness/api"],
+    [],
     "package",
   ),
   workspace(
     "packages/documents",
     "@agent-harness/documents",
-    ["@agent-harness/contracts"],
+    [],
     "package",
     ["node:buffer", "node:crypto", "node:zlib"],
   ),
@@ -124,25 +89,27 @@ export const EXPECTED_WORKSPACES = Object.freeze([
   workspace(
     "apps/api",
     "@agent-harness/app-api",
-    ["@agent-harness/api"],
+    [],
     "app",
+    [],
+    ["fetch"],
   ),
   workspace(
     "apps/web",
     "@agent-harness/app-web",
-    ["@agent-harness/api", "@agent-harness/ui"],
+    ["@agent-harness/ui"],
     "app",
   ),
   workspace(
     "apps/desktop",
     "@agent-harness/app-desktop",
-    ["@agent-harness/api", "@agent-harness/ui"],
+    ["@agent-harness/ui"],
     "app",
   ),
   workspace(
     "apps/tui",
     "@agent-harness/app-tui",
-    ["@agent-harness/api", "@agent-harness/ui"],
+    ["@agent-harness/ui"],
     "app",
   ),
 ]);
@@ -173,8 +140,6 @@ const SOURCE_EXTENSIONS = new Set([
 ]);
 const PHASE1_AUTHORITY_WORKSPACES = new Set([
   "packages/runtime-core",
-  "packages/router",
-  "packages/security",
 ]);
 const PHASE2_AUTHORITY_PATH = "verification/gates/phase2-gate.json";
 const RUNTIME_CORE_DURABLE_JOURNALS = new Set([

@@ -126,7 +126,6 @@ describe("Phase 2 incremental monorepo architecture", () => {
         readFileSync(join(repositoryRoot, path, "package.json"), "utf8"),
       ) as { dependencies: Record<string, string> };
       expect(manifest.dependencies, path).toEqual({
-        "@agent-harness/api": "0.0.0",
         "@agent-harness/ui": "0.0.0",
       });
     }
@@ -137,14 +136,9 @@ describe("Phase 2 incremental monorepo architecture", () => {
     { timeout: 120_000 },
     async () => {
       const paths = [
-        "packages/contracts",
         "packages/runtime-core",
-        "packages/router",
-        "packages/security",
         "packages/tools",
         "packages/ui",
-        "packages/api",
-        "packages/eval",
         "packages/documents",
         "packages/rag",
         "packages/multimodal",
@@ -264,8 +258,8 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
   it("rejects package-to-app and app-to-app dependency edges", () => {
     const root = copyArchitectureFixture();
-    updateJson(root, "packages/api/package.json", (manifest) => {
-      manifest.dependencies = { "@agent-harness/app-api": "0.0.0" };
+    updateJson(root, "packages/tools/package.json", (manifest) => {
+      manifest.dependencies = { "@agent-harness/runtime-core": "0.0.0", "@agent-harness/app-api": "0.0.0" };
     });
     updateJson(root, "apps/web/package.json", (manifest) => {
       manifest.dependencies = { "@agent-harness/app-api": "0.0.0" };
@@ -278,7 +272,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
   it("rejects dependency cycles and edges outside the frozen source DAG", () => {
     const root = copyArchitectureFixture();
-    updateJson(root, "packages/contracts/package.json", (manifest) => {
+    updateJson(root, "packages/documents/package.json", (manifest) => {
       manifest.dependencies = { "@agent-harness/runtime-core": "0.0.0" };
     });
 
@@ -316,30 +310,30 @@ describe("Phase 2 incremental monorepo architecture", () => {
       [
         "known duplicate",
         [
-          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/runtime-core', path: 'packages/runtime-core' } as const);",
           "export class StaticRouter {}",
         ].join("\n"),
       ],
       [
         "renamed business implementation",
         [
-          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/runtime-core', path: 'packages/runtime-core' } as const);",
           "export function chooseExecutionRoute() { return 'direct'; }",
         ].join("\n"),
       ],
       [
         "unbound extra export",
         [
-          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+          "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/runtime-core', path: 'packages/runtime-core' } as const);",
           "export { hiddenRouter } from './hidden-router.js';",
         ].join("\n"),
       ],
     ] as const) {
       const root = copyArchitectureFixture();
-      writeFileSync(join(root, "packages/router/src/index.ts"), `${source}\n`);
+      writeFileSync(join(root, "packages/runtime-core/src/index.ts"), `${source}\n`);
       if (label === "unbound extra export") {
         writeFileSync(
-          join(root, "packages/router/src/hidden-router.ts"),
+          join(root, "packages/runtime-core/src/hidden-router.ts"),
           "export const hiddenRouter = () => 'direct';\n",
         );
       }
@@ -354,7 +348,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("rejects hidden renamed implementations outside the scaffold index", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/router/src/renamed-router.ts"),
+      join(root, "packages/runtime-core/src/renamed-router.ts"),
       "export function chooseExecutionRoute() { return 'direct'; }\n",
     );
 
@@ -368,7 +362,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
     (extension) => {
       const root = copyArchitectureFixture();
       writeFileSync(
-        join(root, `packages/router/src/renamed-router${extension}`),
+        join(root, `packages/runtime-core/src/renamed-router${extension}`),
         "export function chooseExecutionRoute() { return 'direct'; }\n",
       );
 
@@ -413,16 +407,16 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("does not authorize a router implementation with another owner's requirement comment", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/router/src/renamed-router.ts"),
+      join(root, "packages/runtime-core/src/renamed-router.ts"),
       [
         "// AH-RUNTIME-SESSIONTREE-001 belongs to packages/runtime-core.",
         "export function chooseExecutionRoute() { return 'direct'; }",
       ].join("\n"),
     );
     writeFileSync(
-      join(root, "packages/router/src/index.ts"),
+      join(root, "packages/runtime-core/src/index.ts"),
       [
-        "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/router', path: 'packages/router' } as const);",
+        "export const workspaceIdentity = Object.freeze({ name: '@agent-harness/runtime-core', path: 'packages/runtime-core' } as const);",
         "export { chooseExecutionRoute } from './renamed-router.js';",
       ].join("\n"),
     );
@@ -435,7 +429,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("fails closed for nonliteral hidden business declarations", () => {
     const root = copyArchitectureFixture();
     writeFileSync(
-      join(root, "packages/router/src/computed-router.ts"),
+      join(root, "packages/runtime-core/src/computed-router.ts"),
       [
         "const routeName = getRouteName();",
         "export default { [routeName]: () => 'direct' };",
@@ -542,7 +536,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
       join(root, "packages/runtime-core/src/index.ts"),
       [
         'void import("node:fs");',
-        'void import("@agent-harness/contracts/private.js");',
+        'void import("@agent-harness/runtime-core/private.js");',
         'void import("./missing-feature.js");',
         "void import(moduleName);",
         'void require("node:child_process");',
@@ -598,14 +592,14 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("limits global transport access to the frozen workspace authority allowlist", () => {
     const allowedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(allowedRoot, "packages/api/src/index.ts"),
+      join(allowedRoot, "apps/api/src/index.ts"),
       'void fetch("https://example.invalid");\n',
     );
     expect(runChecker(allowedRoot).status).toBe(0);
 
     const deniedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(deniedRoot, "packages/api/src/index.ts"),
+      join(deniedRoot, "apps/api/src/index.ts"),
       'void new WebSocket("wss://example.invalid");\n',
     );
     const denied = runChecker(deniedRoot);
@@ -789,7 +783,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
   it("resolves a multi-level constant transport key only for its authority workspace", () => {
     const allowedRoot = copyArchitectureFixture();
     writeFileSync(
-      join(allowedRoot, "packages/api/src/index.ts"),
+      join(allowedRoot, "apps/api/src/index.ts"),
       'const key0 = "fetch"; const key1 = key0; void globalThis[key1];\n',
     );
     expect(runChecker(allowedRoot).status).toBe(0);
@@ -900,6 +894,7 @@ describe("Phase 2 incremental monorepo architecture", () => {
       const packages = lock.packages as Record<string, Record<string, unknown>>;
       packages["apps/web"]!.dependencies = {
         "@agent-harness/ui": "0.0.0",
+        "@agent-harness/rogue": "0.0.0",
       };
     });
 

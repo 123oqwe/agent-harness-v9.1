@@ -19,7 +19,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agent-harness/runtime-core": "0.0.0",
-    "@agent-harness/security": "0.0.0"
+    "@agent-harness/runtime-core": "0.0.0"
   }
 }
