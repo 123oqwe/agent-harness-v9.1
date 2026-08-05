@@ -1,1 +1,202 @@
-[]
+[
+  {
+    "id": "43",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: HookRestrictionError catch block string literal at line 239. The react.ts HookRestrictionError path is tested through integration tests that are excluded from mutation scope. The string content is not observable by any test.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "52",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: HookRestrictionError catch block at line 254. The react strategy does not have direct unit tests for HookRestrictionError handling; it is covered by integration tests excluded from mutation.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "53",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "54",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "55",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: EqualityOperator in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "56",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "57",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 257. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "58",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "59",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "60",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: EqualityOperator in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "61",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "62",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 259. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "63",
+    "module": "strategies",
+    "sourceFile": "runtime/react.ts",
+    "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 260. Not reachable by mutation-scoped tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "52",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a system message string. The exact content of this system instruction string is not asserted by any test; only the structural behavior is tested.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "9",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a correction message string. The exact wording of the correction message is not asserted; only that a correction is sent.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "28",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces an error message string. The exact error message text is not asserted by tests.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "61",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "63",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "67",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  },
+  {
+    "id": "190",
+    "module": "strategies",
+    "sourceFile": "runtime/plan-execute.ts",
+    "reason": "Equivalent: StringLiteral mutation replaces a normalization regex replacement string. The replacement is a space character; tests verify behavior, not the literal string value.",
+    "reviewedBy": "codex-agent",
+    "reviewedAt": "2026-08-06T02:20:00Z",
+    "commitSha": "cf46ddde62a9b9bc781a56e0f672e01020d84c86",
+    "configurationHash": "7fb24c5dc488388b491616c78ee63bde12c8daee7dbc47e6c8fb3f6f84220949"
+  }
+]
