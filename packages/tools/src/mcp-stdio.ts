@@ -3,7 +3,6 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { ToolResult } from './types.js';
-import { ToolUnavailableError } from './types.js';
 
 interface McpStdioConfig {
   command: string;

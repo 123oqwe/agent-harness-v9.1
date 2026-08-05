@@ -21,7 +21,6 @@ const PARSER_VERSION = '1.0.0';
 const PARSER_NAME = 'markdown-native';
 
 const HEADING_RE = /^(#{1,6})\s+(.+)$/gm;
-const TABLE_ROW_RE = /^\|(.+)\|$/gm;
 const TABLE_SEPARATOR_RE = /^\|[\s:|-]+\|$/;
 const IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 const HTML_IMG_RE = /<img\s+[^>]*src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*\/?>/gi;

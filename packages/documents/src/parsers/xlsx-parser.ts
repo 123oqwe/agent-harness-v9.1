@@ -6,7 +6,7 @@
  */
 import type {
   DocumentFormat, DocumentIngestOptions, DocumentIngestResult,
-  DocumentParser, HeadingNode, ImageReference, SourceProvenance, TableNode,
+  DocumentParser, SourceProvenance, TableNode,
 } from '../types.js';
 import { DocumentIngestError } from '../types.js';
 import { sha256Hex } from './markdown-parser.js';

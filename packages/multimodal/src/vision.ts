@@ -5,7 +5,7 @@
  * Returns typed unavailable when no vision provider is configured.
  */
 import type { MultimodalArtifact } from './types.js';
-import { MultimodalUnavailableError, createArtifact } from './types.js';
+import { MultimodalUnavailableError } from './types.js';
 
 export interface VisionInput {
   image_data: Buffer;
@@ -19,14 +19,14 @@ export interface VisionResult {
   artifact: MultimodalArtifact;
 }
 
-export async function understandImage(input: VisionInput): Promise<VisionResult> {
+export async function understandImage(_input: VisionInput): Promise<VisionResult> {
   throw new MultimodalUnavailableError(
     'no vision provider configured',
     'provider_unavailable',
   );
 }
 
-export async function verifyGeneratedContent(imageData: Buffer, expectedDescription: string): Promise<{
+export async function verifyGeneratedContent(_imageData: Buffer, _expectedDescription: string): Promise<{
   verified: boolean;
   confidence: number;
   actual_description: string;

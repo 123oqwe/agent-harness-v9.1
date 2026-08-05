@@ -11,7 +11,7 @@ interface BehaviorVerifyInput {
   assertions: Array<{ type: string; selector?: string; expected?: string }>;
 }
 
-export async function behaviorVerify(input: BehaviorVerifyInput): Promise<ToolResult> {
+export async function behaviorVerify(_input: BehaviorVerifyInput): Promise<ToolResult> {
   // Playwright is not available in this environment
   throw new ToolUnavailableError(
     'Playwright not configured for behavior verification',

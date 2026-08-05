@@ -4,7 +4,7 @@
  * Returns typed unavailable when no provider is configured.
  */
 import type { MultimodalArtifact } from './types.js';
-import { MultimodalUnavailableError, createArtifact } from './types.js';
+import { MultimodalUnavailableError } from './types.js';
 
 export interface SpeechGenInput {
   text: string;
@@ -12,7 +12,7 @@ export interface SpeechGenInput {
   language?: string;
 }
 
-export async function generateSpeech(input: SpeechGenInput): Promise<{ artifact: MultimodalArtifact; audio_data: Buffer }> {
+export async function generateSpeech(_input: SpeechGenInput): Promise<{ artifact: MultimodalArtifact; audio_data: Buffer }> {
   throw new MultimodalUnavailableError(
     'no TTS provider configured',
     'provider_unavailable',
@@ -24,7 +24,7 @@ export interface TranscribeInput {
   language?: string;
 }
 
-export async function transcribeAudio(input: TranscribeInput): Promise<{ text: string; language: string; confidence: number }> {
+export async function transcribeAudio(_input: TranscribeInput): Promise<{ text: string; language: string; confidence: number }> {
   throw new MultimodalUnavailableError(
     'no ASR provider configured',
     'provider_unavailable',

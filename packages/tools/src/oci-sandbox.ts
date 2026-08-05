@@ -14,7 +14,7 @@ interface OciSandboxConfig {
   memory_limit_mb?: number;
 }
 
-export async function runInOciSandbox(config: OciSandboxConfig): Promise<ToolResult> {
+export async function runInOciSandbox(_config: OciSandboxConfig): Promise<ToolResult> {
   const runtime = detectOciRuntime();
   if (!runtime) {
     throw new ToolUnavailableError(

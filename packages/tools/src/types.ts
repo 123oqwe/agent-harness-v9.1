@@ -11,7 +11,7 @@ export interface ToolContext {
   readonly credentials?: Readonly<Record<string, string>>;
 }
 
-export interface TypedTool<I, O> {
+export interface TypedTool<I, _O> {
   readonly name: string;
   readonly version: string;
   readonly requires_credentials: boolean;

@@ -11,7 +11,7 @@ export interface ImageEditInput {
   preserve_identity?: boolean;
 }
 
-export async function editImage(input: ImageEditInput): Promise<{ artifact: MultimodalArtifact; image_data: Buffer }> {
+export async function editImage(_input: ImageEditInput): Promise<{ artifact: MultimodalArtifact; image_data: Buffer }> {
   throw new MultimodalUnavailableError(
     'no image editing provider configured',
     'provider_unavailable',

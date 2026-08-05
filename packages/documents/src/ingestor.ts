@@ -8,7 +8,6 @@
 import type {
   DocumentFormat, DocumentIngestOptions, DocumentIngestResult, DocumentParser,
 } from './types.js';
-import { DocumentIngestError } from './types.js';
 import { detectFormat } from './parsers/markdown-parser.js';
 import { MarkdownParser } from './parsers/markdown-parser.js';
 import { DocxParser } from './parsers/docx-parser.js';

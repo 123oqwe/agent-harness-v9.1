@@ -7,8 +7,7 @@
  *
  * For encrypted DOCX files, returns typed DocumentIngestError('encrypted').
  */
-import { createHash } from 'node:crypto';
-import { gunzipSync, unzipSync } from 'node:zlib';
+import { unzipSync } from 'node:zlib';
 import type {
   DocumentFormat,
   DocumentIngestOptions,
@@ -16,8 +15,6 @@ import type {
   DocumentParser,
   HeadingNode,
   SourceProvenance,
-  TableNode,
-  ImageReference,
 } from '../types.js';
 import { DocumentIngestError } from '../types.js';
 import { sha256Hex } from './markdown-parser.js';
@@ -49,16 +46,15 @@ function extractZipEntry(zipBuf: Buffer, entryName: string): Buffer | null {
 }
 
 function extractTextFromXml(xml: string): { text: string; headings: HeadingNode[] } {
-  const headings: HeadingNode[] = [];
-  let text = '';
-  let inParagraph = false;
-  let paragraphText = '';
-  let headingLevel = 0;
+ const headings: HeadingNode[] = [];
+ let text = '';
 
-  // Extract paragraphs and heading styles
-  const paraRe = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
-  let match: RegExpExecArray | null;
-  while ((match = paraRe.exec(xml)) !== null) {
+ // Extract paragraphs and heading styles
+ const paraRe = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
+let paragraphText: string;
+let headingLevel: number;
+let match: RegExpExecArray | null;
+while ((match = paraRe.exec(xml)) !== null) {
     const paraContent = match[1]!;
     paragraphText = '';
     // Check for heading style

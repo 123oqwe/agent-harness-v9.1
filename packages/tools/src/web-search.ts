@@ -10,7 +10,7 @@ interface WebSearchInput {
   max_results?: number;
 }
 
-export async function webSearch(input: WebSearchInput): Promise<ToolResult> {
+export async function webSearch(_input: WebSearchInput): Promise<ToolResult> {
   // No search provider configured — return typed unavailable
   throw new ToolUnavailableError(
     'no web search provider configured',

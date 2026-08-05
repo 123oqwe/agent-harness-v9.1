@@ -10,7 +10,7 @@
  */
 import type {
   DocumentFormat, DocumentIngestOptions, DocumentIngestResult,
-  DocumentParser, HeadingNode, ImageReference, PageReference, SourceProvenance, TableNode,
+  DocumentParser, PageReference, SourceProvenance,
 } from '../types.js';
 import { DocumentIngestError } from '../types.js';
 import { sha256Hex } from './markdown-parser.js';

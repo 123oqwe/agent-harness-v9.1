@@ -4,7 +4,7 @@
  * Returns typed unavailable when no provider is configured.
  */
 import type { MultimodalArtifact } from './types.js';
-import { MultimodalUnavailableError, createArtifact } from './types.js';
+import { MultimodalUnavailableError } from './types.js';
 
 export interface ImageGenInput {
   prompt: string;
@@ -18,7 +18,7 @@ export interface ImageGenResult {
   image_data: Buffer;
 }
 
-export async function generateImage(input: ImageGenInput): Promise<ImageGenResult> {
+export async function generateImage(_input: ImageGenInput): Promise<ImageGenResult> {
   throw new MultimodalUnavailableError(
     'no image generation provider configured (set OPENAI_API_KEY or equivalent)',
     'provider_unavailable',

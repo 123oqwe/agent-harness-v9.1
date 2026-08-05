@@ -5,7 +5,6 @@
  */
 import { spawn } from 'node:child_process';
 import type { ToolResult } from './types.js';
-import { ToolUnavailableError } from './types.js';
 
 function runCli(command: string, args: string[], stdin: string, timeoutMs = 30000): Promise<ToolResult> {
   return new Promise((resolve) => {
