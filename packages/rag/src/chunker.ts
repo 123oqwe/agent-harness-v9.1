@@ -62,8 +62,13 @@ export function chunkDocument(
       });
       chunkIndex++;
     }
+    const prevOffset = offset;
     offset = end - options.overlap;
-    if (offset >= end || offset < 0 || end >= text.length) break; // prevent infinite loop
+    // Ensure forward progress: if overlap would move backward or stay same, advance to end
+    if (offset <= prevOffset || offset < 0) {
+      offset = end;
+    }
+    if (end >= text.length || offset >= text.length) break;
   }
   return chunks;
 }

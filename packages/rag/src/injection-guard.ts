@@ -1,5 +1,4 @@
 import type { RagChunk } from './types.js';
-import { RagError } from './types.js';
 
 const INJECTION_PATTERNS = [
   /ignore\s+(all\s+)?previous\s+instructions?/gi,

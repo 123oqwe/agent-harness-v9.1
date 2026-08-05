@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { RagChunk, RagQuery, RagRetrievalResult, RagAclEntry } from './types.js';
-import { RagError } from './types.js';
 import { FtsIndex } from './fts-index.js';
 import { VectorIndex } from './vector-index.js';
 import { MetadataIndex } from './metadata-index.js';

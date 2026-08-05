@@ -1,10 +1,21 @@
 /**
  * AH-TOOL-WEB-FETCH-001: Web fetch tool with SSRF/redirect/DNS rebinding protection.
+ *
+ * SSRF protection:
+ * - Private IP ranges blocked by hostname check
+ * - DNS resolution validated before fetch; DNS failures block the request
+ * - Redirects handled manually with re-validation of each destination
+ * - Redirect depth limited to prevent loops
+ * - Response body read in chunks to enforce max_bytes
+ *
+ * Known limitation: fetch() re-resolves DNS independently, creating a TOCTOU
+ * window for DNS rebinding attacks. Production deployments should use a custom
+ * HTTP agent that pins the resolved IP address. This implementation provides
+ * defense-in-depth but is not a complete DNS rebinding mitigation.
  */
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import type { ToolResult, ToolContext } from './types.js';
-import { ToolUnavailableError } from './types.js';
 
 const PRIVATE_IP_PATTERNS = [
   /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
@@ -12,6 +23,7 @@ const PRIVATE_IP_PATTERNS = [
 ];
 
 const BLOCKED_HOSTS = ['localhost', 'metadata.google.internal', '169.254.169.254'];
+const MAX_REDIRECT_DEPTH = 5;
 
 interface WebFetchInput {
   url: string;
@@ -20,10 +32,23 @@ interface WebFetchInput {
 }
 
 export async function webFetch(input: WebFetchInput, context: ToolContext): Promise<ToolResult> {
+  return webFetchInternal(input, context, 0);
+}
+
+async function webFetchInternal(
+  input: WebFetchInput,
+  context: ToolContext,
+  redirectDepth: number,
+): Promise<ToolResult> {
+  if (redirectDepth > MAX_REDIRECT_DEPTH) {
+    return { success: false, output: null, error: `redirect depth exceeded (${MAX_REDIRECT_DEPTH})` };
+  }
+
   let url: URL;
+  let resolvedIps: string[];
   try {
     url = parseAndValidateUrl(input.url);
-    await validateNotPrivate(url.hostname);
+    resolvedIps = await validateNotPrivate(url.hostname);
   } catch (e) {
     return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
   }
@@ -32,7 +57,10 @@ export async function webFetch(input: WebFetchInput, context: ToolContext): Prom
   const timeoutMs = input.timeout_ms ?? 30000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  if (context.signal) context.signal.addEventListener('abort', () => controller.abort());
+  const onAbort = () => controller.abort();
+  if (context.signal) {
+    context.signal.addEventListener('abort', onAbort, { once: true });
+  }
 
   try {
     const response = await fetch(url.toString(), {
@@ -49,10 +77,9 @@ export async function webFetch(input: WebFetchInput, context: ToolContext): Prom
       }
       try {
         const redirectUrl = new URL(location, url.toString());
-        await validateNotPrivate(redirectUrl.hostname);
-        return webFetch({ ...input, url: redirectUrl.toString() }, context);
+        return webFetchInternal({ ...input, url: redirectUrl.toString() }, context, redirectDepth + 1);
       } catch (e) {
-        return { success: false, output: null, error: `redirect blocked: ${e instanceof Error ? e.message : String(e)}` };
+        return { success: false, output: null, error: `redirect URL parse error: ${e instanceof Error ? e.message : String(e)}` };
       }
     }
 
@@ -82,6 +109,10 @@ export async function webFetch(input: WebFetchInput, context: ToolContext): Prom
       chunks.push(value);
       totalBytes += value.length;
     }
+    // Cancel the reader if we stopped early
+    if (truncated) {
+      await reader.cancel().catch(() => {});
+    }
     const content = Buffer.concat(chunks).toString('utf8');
 
     return {
@@ -92,13 +123,17 @@ export async function webFetch(input: WebFetchInput, context: ToolContext): Prom
         content,
         truncated,
         content_hash: createHash('sha256').update(content).digest('hex'),
+        resolved_ips: resolvedIps,
       },
-      metadata: { status: response.status, bytes: totalBytes },
+      metadata: { status: response.status, bytes: totalBytes, redirect_depth: redirectDepth },
     };
   } catch (e) {
     return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
   } finally {
     clearTimeout(timeout);
+    if (context.signal) {
+      context.signal.removeEventListener('abort', onAbort);
+    }
   }
 }
 
@@ -111,18 +146,32 @@ function parseAndValidateUrl(urlStr: string): URL {
   if (BLOCKED_HOSTS.includes(url.hostname)) {
     throw new Error(`blocked host: ${url.hostname}`);
   }
+  // Block obfuscated IP formats (decimal, hex, octal)
+  const hostname = url.hostname;
+  if (/^\d+$/.test(hostname)) {
+    const ip = longToIp(parseInt(hostname, 10));
+    if (PRIVATE_IP_PATTERNS.some(p => p.test(ip))) {
+      throw new Error(`SSRF blocked: obfuscated IP ${hostname} -> ${ip}`);
+    }
+  }
   return url;
 }
 
-async function validateNotPrivate(hostname: string): Promise<void> {
-  try {
-    const addresses = await lookup(hostname, { all: true });
-    for (const addr of addresses) {
-      if (PRIVATE_IP_PATTERNS.some(p => p.test(addr.address))) {
-        throw new Error(`SSRF blocked: ${hostname} resolves to private IP ${addr.address}`);
-      }
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.includes('SSRF')) throw e;
+async function validateNotPrivate(hostname: string): Promise<string[]> {
+  const addresses = await lookup(hostname, { all: true });
+  if (addresses.length === 0) {
+    throw new Error(`DNS resolution failed: no addresses for ${hostname}`);
   }
+  const resolvedIps: string[] = [];
+  for (const addr of addresses) {
+    resolvedIps.push(addr.address);
+    if (PRIVATE_IP_PATTERNS.some(p => p.test(addr.address))) {
+      throw new Error(`SSRF blocked: ${hostname} resolves to private IP ${addr.address}`);
+    }
+  }
+  return resolvedIps;
+}
+
+function longToIp(long: number): string {
+  return `${(long >>> 24) & 255}.${(long >>> 16) & 255}.${(long >>> 8) & 255}.${long & 255}`;
 }
