@@ -24,6 +24,8 @@ Characteristics:
 - No TLS needed (no network)
 - Capability: in-memory signing
 - VFS: all backends in-process
+- Router: Phase 1 StaticRouter only; the Phase 3 adaptive DAG is not pulled forward
+- Registries: one immutable RunPlan snapshot for providers, tools, skills, environment, and verification
 - tRPC: only for UI API exposure
 - Event bus: not needed
 - F8 message security: not needed
@@ -93,10 +95,12 @@ F8 enforcement point: when Phase 4+ event bus is active, `obo_token + jws_signat
 
 ## Module Dependency Direction (harness-boundary.md, no cycles)
 
-- runtime depends on: security, context
-- router depends on: runtime (re-route = new RunPlan), security
-- tools depend on: security (PEP), sandbox
+- router depends on: contracts, registry read interfaces, and Policy constraint interfaces; never on Runtime implementation
+- runtime depends on: contracts, security, context, VFS, and gateway interfaces; it consumes frozen RunPlan revisions
+- tools depend on: Tool Registry interfaces, security (PEP), VFS, and sandbox
 - vfs: independent, shared by tools/RAG/memory
+
+Re-route is an event emitted by Runtime and consumed through the Router interface to create a new RunPlan revision; this does not introduce a package cycle.
 
 Verify with: `madge --circular` (at build time)
 

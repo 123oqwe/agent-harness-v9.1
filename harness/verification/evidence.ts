@@ -33,8 +33,23 @@ export function createEvidence(data: Omit<EvidenceRecord, 'id' | 'timestamp' | '
 
 export function hashRecord(record: EvidenceRecord): string {
   const payload = JSON.stringify({
-    id: record.id, run_id: record.run_id, strategy: record.strategy,
-    result_digest: record.result_digest, timestamp: record.timestamp, prev_hash: record.prev_hash,
+    id: record.id,
+    run_id: record.run_id,
+    request_prompt: record.request_prompt,
+    route_decision: record.route_decision,
+    route_reason: record.route_reason,
+    plan_revision: record.plan_revision,
+    strategy: record.strategy,
+    state_transitions: record.state_transitions,
+    action_digests: record.action_digests,
+    policy_decisions: record.policy_decisions,
+    observations: record.observations,
+    result_digest: record.result_digest,
+    output: record.output,
+    timing_ms: record.timing_ms,
+    redacted_errors: record.redacted_errors,
+    timestamp: record.timestamp,
+    prev_hash: record.prev_hash,
   });
   return createHash('sha256').update(payload).digest('hex');
 }

@@ -6,6 +6,7 @@
  */
 
 import type { ProviderRequest, ParsedResponse, Message } from '../gateway/provider.js';
+import type { ToolSpec } from '../gateway/provider.js';
 import type { RoutingResult } from '../router/static-router.js';
 
 export type ReasoningStrategy = 'direct' | 'react' | 'plan_execute';
@@ -55,5 +56,6 @@ export interface ReasoningStrategyHandler {
     ctx: StrategyContext,
     model: ModelCaller,
     toolExecutor?: ToolExecutor,
+    availableTools?: ToolSpec[],
   ): Promise<StrategyResult>;
 }

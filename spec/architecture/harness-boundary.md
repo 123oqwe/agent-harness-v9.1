@@ -23,6 +23,21 @@ Agent Harness is the complete product technical system containing 14 modules. It
 13. Observability & Audit (Tracing/Profiler/Replay/Anomaly)
 14. Evaluation & Evolution (Observe/Extract/Synthesize/Optimize)
 
+### Phase ownership without duplicate subsystems
+
+| Phase | Adds or completes |
+|-------|-------------------|
+| 1 | Complete single-agent product kernel: static intent Router, provider/tool/skill registries, three reasoning strategies, durable runtime, nine local tools, eight base skills, VFS/sandbox/permission chain, evidence and base eval |
+| 2 | Context engineering, progressive disclosure, RAG, multimodal/document expansion, richer session control, product UX and optional rootless OCI adapter |
+| 3 | Full adaptive Router DAG and multi-agent orchestration; extends the Phase 1 Router contract |
+| 4 | Cross-session memory, consented personalization, advanced assurance/observability, and shadow-only capability evolution |
+| 5 | Certified external effects and provider reconciliation |
+| 6 | Durable missions, cron/routines, proactive/mobile/voice surfaces and sandbox sleep/wake |
+| 7 | Enterprise identity/policy/tenant controls and microVM isolation |
+| 8 | Production certification and operations only; no new runtime authority |
+
+Security controls, registry snapshots, event sourcing, Evidence Packages and budgets are cross-cutting invariants, not separate late-phase replacements.
+
 ## Module Boundary Table (can/cannot)
 See requirements and module-boundaries.md for detailed can/cannot table for each module.
 
@@ -50,6 +65,8 @@ harness/
 ├── router/           # Router DAG, Task Profiler, Constraint Solver
 ├── security/         # Policy Engine, PEP, Capability, Authorization Service
 ├── tools/            # Tool implementations (read_file, write_file, etc.)
+│   └── registry      # ToolRegistry/tool_search; same frozen snapshot used by Router and Runtime
+├── skills/           # SkillRegistry/skill_search, declarative base/project/global/enterprise skills
 ├── context/          # Context Compiler, Compaction, Context Window Layout
 ├── memory/           # Memory Store, Consolidation, Provenance
 ├── rag/              # Ingestion, Indexing, Retrieval, Reranking
@@ -76,9 +93,11 @@ Modules communicate via:
 2. Event bus (for async, Phase 4+)
 3. tRPC (for API exposure, Phase 2+)
 
+Contract and registry snapshot references cross module boundaries; implementations do not import upward-layer concrete classes.
+
 ### Module Independence
 Each module has its own package.json exports. Dependencies flow downward:
-- runtime depends on: security, context
-- router depends on: runtime (for re-route = new RunPlan revision), security
-- tools depend on: security (for PEP), sandbox
+- router depends on: contracts, registry read interfaces, and Policy constraints
+- runtime depends on: contracts plus security/context/VFS/gateway interfaces and consumes RunPlan revisions
+- tools depend on: Tool Registry interfaces, security (PEP), VFS, and sandbox
 - No circular dependencies. Agent should verify with `madge --circular` during build.

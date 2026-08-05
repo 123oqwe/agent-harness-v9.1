@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tool & Skill Catalog (v9, 15 tools) — tool-skill-fabric.md + diagram 13 -->
+<!-- Tool & Skill Catalog (v9.2, 31 phased tools) — registry/search + representative tables -->
 <svg width="1400" height="880" viewBox="0 0 1400 880" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#8b949e"/></marker>
 </defs>
 <rect x="0" y="0" width="1400" height="880" fill="#0d1117" rx="8"/>
-<text x="20" y="28" fill="#fbcfe8" font-size="16" font-weight="bold">Tool &amp; Skill Catalog (v9, 15 tools)</text>
+<text x="20" y="28" fill="#fbcfe8" font-size="16" font-weight="bold">Tool &amp; Skill Fabric (v9.2, 31 phased tools + Registry/Search)</text>
 <text x="20" y="46" fill="#8b949e" font-size="11">tool-skill-fabric.md · 9 Phase-1 + 6 Phase-2/3 (run_tests = execute_command profile, NOT a separate tool) · each tool: Transport · Effect · Risk · VFS · diagram 13</text>
 <!-- ============ Phase 1 table (9 tools) ============ -->
 <rect x="20" y="58" width="680" height="252" fill="#161b22" stroke="#58a6ff" stroke-width="2" rx="6"/>
@@ -73,7 +73,7 @@
 <text x="30" y="300" fill="#8b949e" font-size="7">All file-touching tools (✓) are thin wrappers over VFS (F4): single file-access authority.</text>
 <!-- ============ Phase 2-3 table (6 tools) ============ -->
 <rect x="720" y="58" width="660" height="252" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
-<text x="730" y="76" fill="#3fb950" font-size="11" font-weight="bold">Phase 2-3 Tools (6)</text>
+<text x="730" y="76" fill="#3fb950" font-size="11" font-weight="bold">Representative Phase 2-3 tools (6 shown)</text>
 <rect x="730" y="84" width="640" height="20" fill="#21262d" stroke="#30363d" stroke-width="0.5" rx="3"/>
 <text x="735" y="98" fill="#f0f6fc" font-size="8" font-weight="bold">Tool</text>
 <text x="945" y="98" fill="#f0f6fc" font-size="8" font-weight="bold">Transport</text>
@@ -131,8 +131,8 @@
 <text x="30" y="412" fill="#e3b341" font-size="11" font-weight="bold">ToolSpec required fields (v9, expanded from v8 ToolDefinition)</text>
 <text x="30" y="430" fill="#8b949e" font-size="9">schemas · effects · risk_feature_extractor · preconditions · postconditions · timeout · cancellation · retry · idempotency · sandbox · network · credentials · data_egress</text>
 <text x="30" y="446" fill="#8b949e" font-size="9">receipt · verification · reconciliation · compensation · tests · maturity · certification · run_phase_binding (setup | agent) · egress_policy_ref</text>
-<text x="30" y="464" fill="#fbbf24" font-size="9">Only production_certified tools enter the production Registry. Skill can only SUGGEST tool grants — Policy decides.</text>
-<text x="30" y="482" fill="#8b949e" font-size="8">SkillSpec (parallel): input/output schema · required context · required tools · allowed effect classes · workflow template · verification template · failure policy · risk ceiling · eval suite</text>
+<text x="30" y="464" fill="#fbbf24" font-size="9">ToolRegistry + tool_search: compact metadata first, full schema after selection; search never executes/grants. Production requires certification.</text>
+<text x="30" y="482" fill="#8b949e" font-size="8">SkillRegistry + skill_search: summary/tags/tool needs first, instructions_ref after selection; Skill can only suggest grants — Policy decides.</text>
 <text x="30" y="498" fill="#8b949e" font-size="8">Two-phase binding (FG2): setup-phase tools (e.g. package_install) vs agent-phase tools; credentials via single-exchange at dispatch (CTRL-CRED-REACH-001), never env across loop</text>
 <!-- ============ MCP Allowlist + Generated Tools trust ============ -->
 <rect x="20" y="514" width="670" height="158" fill="#0d1117" stroke="#f85149" stroke-width="2" rx="6"/>
@@ -147,13 +147,13 @@
 <rect x="710" y="514" width="670" height="158" fill="#0d1117" stroke="#fbbf24" stroke-width="2" rx="6"/>
 <text x="720" y="534" fill="#fbbf24" font-size="11" font-weight="bold">Generated Tools Trust Pipeline (no auto-promote)</text>
 <text x="720" y="554" fill="#f85149" font-size="9" font-weight="bold">untrusted</text>
-<text x="775" y="554" fill="#8b949e" font-size="8">→ sandbox-only · no secrets · no external write · network denied by default</text>
-<text x="720" y="575" fill="#fbbf24" font-size="9" font-weight="bold">verified</text>
-<text x="775" y="575" fill="#8b949e" font-size="8">→ 10+ uses, 80% success</text>
-<text x="720" y="596" fill="#3fb950" font-size="9" font-weight="bold">trusted</text>
-<text x="775" y="596" fill="#8b949e" font-size="8">→ 50+ uses, 90% success, human review</text>
-<text x="720" y="617" fill="#58a6ff" font-size="9" font-weight="bold">builtin</text>
-<text x="775" y="617" fill="#8b949e" font-size="8">→ manual publication only</text>
+<text x="775" y="554" fill="#8b949e" font-size="8">→ sandbox-only · no secrets/external write · network deny by default</text>
+<text x="720" y="575" fill="#fbbf24" font-size="9" font-weight="bold">Phase 4</text>
+<text x="775" y="575" fill="#8b949e" font-size="8">→ offline/replay/shadow signals only; trust unchanged</text>
+<text x="720" y="596" fill="#3fb950" font-size="9" font-weight="bold">Phase 8</text>
+<text x="775" y="596" fill="#8b949e" font-size="8">→ human-signed cert + reproducible source + SBOM + adversarial tests</text>
+<text x="720" y="617" fill="#58a6ff" font-size="9" font-weight="bold">publish</text>
+<text x="775" y="617" fill="#8b949e" font-size="8">→ explicit registry publication; never automatic/builtin</text>
 <text x="720" y="640" fill="#f85149" font-size="9">★ Success count does NOT auto-promote. Agent should NOT auto-promote.</text>
 <text x="720" y="658" fill="#8b949e" font-size="8">Success count ≠ trust. Manual review required at every promotion gate.</text>
 <!-- ============ Footer ============ -->
@@ -177,7 +177,7 @@
 <text x="30" y="760" fill="#8b949e" font-size="9">read_file · list_directory · search_files · write_file · edit_file · create_artifact → thin wrappers over Virtual Filesystem.</text>
 <text x="30" y="776" fill="#8b949e" font-size="9">VFS enforces permission rules for both tool calls AND RAG retrieval; OverlayBackend makes edit_file a real per-RunPlan transaction (atomic commit / rollback).</text>
 <text x="30" y="800" fill="#fbcfe8" font-size="9" font-weight="bold">Sources:</text>
-<text x="30" y="816" fill="#8b949e" font-size="9">tool-skill-fabric.md (15 tools, ToolSpec, MCP allowlist, generated tools, output_mode) · diagram 13 (security control mapping: CTRL-PLUGIN-SIGN-001 / CTRL-EGRESS-001 / CTRL-SCREEN-ISOLATION-001 / CTRL-CRED-REACH-001)</text>
-<text x="30" y="832" fill="#f85149" font-size="9">v9 corrections: 15 tools (9 P1 + 6 P2-3), reduced from v8's 20 · run_tests is a controlled execute_command profile, NOT a separate tool · ToolSpec expands v8 ToolDefinition</text>
-<text x="30" y="848" fill="#8b949e" font-size="8">Mobile surface tools (send_push_notification · receive_channel_message · steer_session) are Phase 6 — see tool-skill-fabric.md, not counted in the 15 core tools.</text>
+<text x="30" y="816" fill="#8b949e" font-size="9">tool-skill-fabric.md: authoritative full list · 31 tools = P1 9 + P2 11 + P3 5 + P6 6 · ToolSpec/SkillSpec · Registry/Search · MCP · generated tools</text>
+<text x="30" y="832" fill="#f85149" font-size="9">run_tests is a controlled execute_command profile, not a tool · search_files searches VFS content; tool_search/skill_search discover registry metadata</text>
+<text x="30" y="848" fill="#8b949e" font-size="8">Tables above are compact representatives; later phases add media/doc/computer-use/mobile/voice/schedule tools without replacing the Phase 1 registry.</text>
 </svg>

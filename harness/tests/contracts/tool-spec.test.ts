@@ -57,4 +57,56 @@ describe('AH-CONTRACT-TOOLSPEC-001: tool-spec schema', () => {
     });
     expect(result.valid).toBe(false);
   });
+ 
+  // ADR-014: transport, tool_group, cli_toolchain_ref
+  it('ADR-014: valid transport passes', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      transport: 'http_api',
+    });
+    expect(result.valid).toBe(true);
+  });
+ 
+  it('ADR-014: invalid transport fails', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      transport: 'graphql',
+    });
+    expect(result.valid).toBe(false);
+  });
+ 
+  it('ADR-014: valid tool_group passes', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      tool_group: 'media_gen',
+    });
+    expect(result.valid).toBe(true);
+  });
+ 
+  it('ADR-014: tool_group with uppercase fails', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      tool_group: 'MediaGen',
+    });
+    expect(result.valid).toBe(false);
+  });
+ 
+  it('ADR-014: valid cli_toolchain_ref passes', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      transport: 'cli_wrapper',
+      cli_toolchain_ref: 'openpyxl',
+    });
+    expect(result.valid).toBe(true);
+  });
+ 
+  it('ADR-014: all three new fields together pass', () => {
+    const result = validateFixture('tool-spec.schema.json', {
+      ...baseValid,
+      transport: 'cli_wrapper',
+      tool_group: 'doc',
+      cli_toolchain_ref: 'python-pptx',
+    });
+    expect(result.valid).toBe(true);
+  });
 });

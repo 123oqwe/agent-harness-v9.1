@@ -13,6 +13,15 @@ Level bound to actual verification strength, not file existence.
 - Sees: requirements + output + evidence + test results + success criteria only
 - Different model family from implementation
 
+### Per-Phase acceptance order
+
+Each Phase closes in two non-substitutable steps:
+
+1. The repository-local gate builds, type-checks, tests, runs requirement evals/security/fault cases, validates manifests and maturity paths, and emits reproducible Evidence Packages. No external model is needed for this step.
+2. Only after the local gate passes, a read-only independent GLM-5.2 xhigh run receives the frozen requirements, source revision, tests and evidence. It evaluates semantic completeness and adversarial product tasks, cannot edit source/tests/evidence, and emits a separate signed review record.
+
+A model review cannot turn a failing local gate into PASS, and a local green test suite cannot replace the independent semantic review. Human approval remains mandatory wherever Policy or release rules require it.
+
 ## Quality Scoring (4 dimensions)
 mechanical: test_coverage, safety_checks
 semantic: correctness, completeness (by independent reviewer)

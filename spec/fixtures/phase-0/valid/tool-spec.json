@@ -1,5 +1,7 @@
 {
   "name": "valid-name",
+  "summary": "Valid compact discovery summary",
+  "tags": ["test"],
   "version": "valid-version",
   "domains": [],
   "implementation_status": "interface_only",

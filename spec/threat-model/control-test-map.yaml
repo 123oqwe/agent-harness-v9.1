@@ -14,3 +14,5 @@ CTRL-CRED-REACH-001: harness/tests/security/cred-reach.test.ts
 CTRL-MSG-INTEGRITY-001: harness/tests/security/msg-tamper.test.ts
 CTRL-TOOL-MASK-001: harness/tests/gateway/cache-invalidation.test.ts
 CTRL-VFS-001: harness/tests/security/context-leak.test.ts
+CTRL-MEDIA-EGRESS-001: harness/tests/security/media-egress.test.ts
+CTRL-VOICE-BIOMETRIC-001: harness/tests/security/voice-biometric.test.ts

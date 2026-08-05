@@ -69,6 +69,7 @@
     "implementation_maturity": {
       "enum": [
         "not_started",
+        "in_progress",
         "stub",
         "partial",
         "implemented",

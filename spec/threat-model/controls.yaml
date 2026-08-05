@@ -45,3 +45,9 @@
 - control_id: CTRL-VFS-001
   name: Virtual filesystem as single file-access authority with backend routing and permission rules
   type: preventive
+- control_id: CTRL-MEDIA-EGRESS-001
+  name: Generation tool egress restricted to provider allowlist; prompt/content not logged externally (ADR-014)
+  type: preventive
+- control_id: CTRL-VOICE-BIOMETRIC-001
+  name: Voice clone requires biometric consent proof; biometric template not persisted (ADR-014)
+  type: preventive

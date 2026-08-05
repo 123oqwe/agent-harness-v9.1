@@ -30,7 +30,7 @@
 
 <rect x="20" y="255" width="380" height="45" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
 <text x="30" y="270" fill="#58a6ff" font-size="9" font-weight="bold">CTRL-TAINT-001</text>
-<text x="30" y="283" fill="#8b949e" font-size="8">untrusted 内容 taint 标签 · M2 Context & Data</text>
+<text x="30" y="283" fill="#8b949e" font-size="8">untrusted 内容 taint 标签 · M2 Context &amp; Data</text>
 <text x="30" y="294" fill="#6e7681" font-size="7">src/security/taint.ts · tests/security/injection.test.ts</text>
 
 <rect x="20" y="305" width="380" height="45" fill="#21262d" stroke="#bc8cff" stroke-width="1" rx="4"/>
@@ -50,7 +50,7 @@
 
 <rect x="20" y="455" width="380" height="45" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
 <text x="30" y="470" fill="#58a6ff" font-size="9" font-weight="bold">CTRL-CONTEXT-ISOLATION-001</text>
-<text x="30" y="483" fill="#8b949e" font-size="8">context graph 隔离 · M2 Context & Data</text>
+<text x="30" y="483" fill="#8b949e" font-size="8">context graph 隔离 · M2 Context &amp; Data</text>
 <text x="30" y="494" fill="#6e7681" font-size="7">src/security/context-leak.ts · tests/security/context-leak.test.ts</text>
 
 <rect x="20" y="505" width="380" height="45" fill="#1a0808" stroke="#f85149" stroke-width="1" rx="4"/>
@@ -149,7 +149,7 @@
 <text x="460" y="772" fill="#8b949e" font-size="9">CTRL-EGRESS-002 (step 9 dispatch)</text>
 
 <rect x="910" y="680" width="460" height="100" fill="#21262d" stroke="#58a6ff" stroke-width="2" rx="4"/>
-<text x="1140" y="698" fill="#58a6ff" font-size="11" font-weight="bold" text-anchor="middle">M2 Context & Data (2 CTRL)</text>
+<text x="1140" y="698" fill="#58a6ff" font-size="11" font-weight="bold" text-anchor="middle">M2 Context &amp; Data (2 CTRL)</text>
 <text x="920" y="716" fill="#8b949e" font-size="9">CTRL-TAINT-001 (untrusted 内容 taint)</text>
 <text x="920" y="730" fill="#8b949e" font-size="9">CTRL-CONTEXT-ISOLATION-001 (拓扑隔离)</text>
 <text x="920" y="750" fill="#6e7681" font-size="8">注入模式库: 10+ regex (ignore previous, role redef, etc.)</text>

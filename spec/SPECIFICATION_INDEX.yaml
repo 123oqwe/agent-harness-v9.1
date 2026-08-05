@@ -1,9 +1,9 @@
-# Specification Index — Agent Harness v9.1
+# Specification Index — Agent Harness v9.2.1
 # Master index of all specification files
 
-version: "9.1"
-status: "SPECIFICATION_READY"
-generated: "2026-07-16"
+version: "9.2.1"
+status_source: "../control/current-state.json"
+generated: "2026-07-21"
 
 normative_precedence: "NORMATIVE_PRECEDENCE.md"
 
@@ -101,6 +101,7 @@ evals:
 
 deployment:
   directory: "deployment/"
+  sandbox_toolchain: "deployment/sandbox-toolchain.yaml"
 
 operations:
   directory: "operations/"
@@ -117,7 +118,7 @@ factory:
   worktree_manager: "../factory/worktree-manager/worktree_manager.py"
 
 adrs:
-  count: 13
+  count: 14
   directory: "adr/"
 
 appendix:

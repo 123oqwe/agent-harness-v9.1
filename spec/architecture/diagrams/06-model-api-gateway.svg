@@ -7,7 +7,7 @@
 <marker id="ag" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#3fb950"/></marker>
 </defs>
 <rect x="0" y="0" width="1400" height="620" fill="#0d1117" rx="8"/>
-<text x="20" y="28" fill="#fbbf24" font-size="15" font-weight="bold">Model/API Gateway — Capability Registry + Dynamic Routing (v9)</text>
+<text x="20" y="28" fill="#fbbf24" font-size="15" font-weight="bold">Model/API Gateway — Provider Registry + Router Binding Resolver (v9.2)</text>
 <text x="20" y="46" fill="#8b949e" font-size="11">v7: 静态 fallback 列表 · v9: Capability Registry → 能力匹配 → 隐私匹配 → 成本/延迟优化 · 多模型工作流</text>
 <rect x="20" y="65" width="1360" height="120" fill="#161b22" stroke="#fbbf24" stroke-width="2" rx="6"/>
 <text x="30" y="83" fill="#fbbf24" font-size="11" font-weight="bold">Model Capability Registry</text>
@@ -26,7 +26,7 @@
 <text x="680" y="148" fill="#8b949e" font-size="9">reasoning=0.75 · cost=low · latency=low</text>
 <text x="500" y="163" fill="#3fb950" font-size="9">Llama-3-70B (local)</text>
 <text x="680" y="163" fill="#8b949e" font-size="9">reasoning=0.70 · local=true · cost=free · privacy=best</text>
-<text x="20" y="205" fill="#fbbf24" font-size="12" font-weight="bold">Model Router 选择流程:</text>
+<text x="20" y="205" fill="#fbbf24" font-size="12" font-weight="bold">One Router 内的 Model Binding Resolver:</text>
 <rect x="20" y="215" width="300" height="40" fill="#161b22" stroke="#3fb950" stroke-width="2" rx="6"/>
 <text x="30" y="233" fill="#3fb950" font-size="11" font-weight="bold">1. 任务需要什么能力?</text>
 <text x="30" y="249" fill="#8b949e" font-size="10">modality · reasoning · coding · vision · tool_calling</text>
@@ -66,12 +66,12 @@
 <text x="30" y="378" fill="#58a6ff" font-size="11" font-weight="bold">Model API (推理/生成)</text>
 <text x="30" y="394" fill="#8b949e" font-size="10">OpenAI · Gemini · Anthropic · Image gen · Speech · Video · Embedding · Reranking</text>
 <text x="30" y="408" fill="#8b949e" font-size="9">负责: 推理 · 内容生成 · 理解</text>
-<text x="30" y="422" fill="#8b949e" font-size="9">Router: Model/API Router</text>
+<text x="30" y="422" fill="#8b949e" font-size="9">Execution authority: ModelGateway + ProviderAdapter</text>
 <rect x="700" y="360" width="680" height="80" fill="#161b22" stroke="#e3b341" stroke-width="2" rx="6"/>
 <text x="710" y="378" fill="#e3b341" font-size="11" font-weight="bold">Action Tool/API (改变现实)</text>
 <text x="710" y="394" fill="#8b949e" font-size="10">Gmail · Calendar · GitHub · Slack · Database · Browser · Filesystem · Deploy · Payment</text>
 <text x="710" y="408" fill="#8b949e" font-size="9">负责: 读取或改变现实系统</text>
-<text x="710" y="422" fill="#8b949e" font-size="9">Router: Tool Router</text>
+<text x="710" y="422" fill="#8b949e" font-size="9">Execution authority: ToolRegistry + Action Control/PEP</text>
 <rect x="20" y="455" width="1360" height="45" fill="#1a0808" stroke="#f85149" stroke-width="2" rx="6"/>
 <text x="30" y="473" fill="#f85149" font-size="11" font-weight="bold">Model Fallback (v9: 11种之一)</text>
 <text x="30" y="489" fill="#8b949e" font-size="10">primary → fallback_1 → fallback_2 → local · 必须满足 ProviderPolicy · 不能 fallback 回 primary · 记录到 trace</text>

@@ -6,6 +6,7 @@
  */
 
 import type { Message, ProviderRequest, ParsedResponse } from '../gateway/provider.js';
+import type { ToolSpec } from '../gateway/provider.js';
 import type { StrategyContext, StrategyResult, ModelCaller, ReasoningStrategyHandler } from './reasoning-strategy.js';
 
 export class DirectStrategy implements ReasoningStrategyHandler {
@@ -15,6 +16,8 @@ export class DirectStrategy implements ReasoningStrategyHandler {
     messages: Message[],
     ctx: StrategyContext,
     model: ModelCaller,
+    _toolExecutor?: unknown,
+    _availableTools?: ToolSpec[],
   ): Promise<StrategyResult> {
     const req: ProviderRequest = { messages };
     const response: ParsedResponse = model.complete(req);

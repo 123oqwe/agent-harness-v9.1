@@ -7,7 +7,17 @@
 
 export interface SkillSpec {
   name: string;
+  /**
+   * Compact catalog text returned by skill_search before full instructions are loaded
+   */
+  summary: string;
+  tags: string[];
   version: string;
+  /**
+   * Content-addressed instructions loaded only after Router selects this skill
+   */
+  instructions_ref: string;
+  precedence_scope: "builtin" | "global" | "project" | "enterprise";
   supported_experience_profiles: unknown[];
   input_schema_ref: string;
   output_schema_ref: string;

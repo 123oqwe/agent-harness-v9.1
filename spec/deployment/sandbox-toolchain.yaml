@@ -1,0 +1,54 @@
+# Sandbox Toolchain Spec (ADR-014)
+#
+# Declares external binaries and Python packages that cli_wrapper tools
+# depend on. The runtime verifies availability at sandbox init and before
+# each cli_wrapper tool spawn. On missing dependency the tool returns a
+# structured error (tool_unavailable) so the agent can fall back to
+# execute_command_sandboxed or ask the user to install.
+#
+# This is NOT a Docker image spec. The host/VM must pre-install these.
+# Phase 7 microVM image build (ADR-013 G-OS1) will bake this list in.
+
+version: 1
+
+python:
+  min_version: "3.11"
+  packages:
+    openpyxl:
+      min_version: "3.1"
+      used_by: [manipulate_spreadsheet]
+    python-pptx:
+      min_version: "0.6"
+      used_by: [generate_presentation]
+    python-docx:
+      min_version: "1.1"
+      used_by: [generate_document]
+    reportlab:
+      min_version: "4.0"
+      used_by: [generate_document]
+    Pillow:
+      min_version: "10.0"
+      used_by: [ocr_document, generate_image_postprocess]
+
+binaries:
+  ffmpeg:
+    min_version: "6.0"
+    codecs: [libx264, libmp3lame, libvorbis, aac]
+    used_by: [edit_video]
+  tesseract:
+    min_version: "5.3"
+    languages: [eng, chi_sim, chi_tra, jpn, kor]
+    used_by: [ocr_document]
+
+verification:
+  run_at: sandbox_init
+  commands:
+    python: "python3 -c 'import openpyxl, pptx, docx, reportlab, PIL; print(\"ok\")'"
+    ffmpeg: "ffmpeg -version"
+    tesseract: "tesseract --version"
+  on_fail: block_tool_and_report
+  error_code: tool_unavailable
+
+fallback:
+  when_missing: execute_command_sandboxed
+  note: "Agent may pip install / apt install inside sandbox if egress_policy permits, or ask user."

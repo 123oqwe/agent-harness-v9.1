@@ -5,13 +5,13 @@ import * as path from 'path';
 const schemaPath = path.resolve(__dirname, '../../../spec/contracts/provider-adapter.schema.json');
 
 describe('AH-GATEWAY-TESTPROVIDER-001: ScriptedTestProvider', () => {
-  it('provider-adapter schema exists and defines scripted_test type', () => {
+  it('provider-adapter schema exists and defines scripted_test type', async () => {
     expect(fs.existsSync(schemaPath)).toBe(true);
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
     expect(schema.properties.provider_type.enum).toContain('scripted_test');
   });
 
-  it('schema requires all ProviderAdapter interface methods', () => {
+  it('schema requires all ProviderAdapter interface methods', async () => {
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
     const required = schema.required;
     expect(required).toContain('normalize_request');
@@ -24,12 +24,12 @@ describe('AH-GATEWAY-TESTPROVIDER-001: ScriptedTestProvider', () => {
     expect(required).toContain('validate_data_policy');
   });
 
-  it('schema has additionalProperties: false', () => {
+  it('schema has additionalProperties: false', async () => {
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
     expect(schema.additionalProperties).toBe(false);
   });
 
-  it('valid fixture has all required fields', () => {
+  it('valid fixture has all required fields', async () => {
     const fixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-1/valid/provider-adapter.json');
     expect(fs.existsSync(fixturePath)).toBe(true);
     const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
@@ -39,7 +39,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: ScriptedTestProvider', () => {
     }
   });
 
-  it('invalid fixture is missing a required field', () => {
+  it('invalid fixture is missing a required field', async () => {
     const fixturePath = path.resolve(__dirname, '../../../spec/fixtures/phase-1/invalid/provider-adapter.json');
     expect(fs.existsSync(fixturePath)).toBe(true);
     const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
@@ -48,7 +48,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: ScriptedTestProvider', () => {
     expect(missing.length).toBeGreaterThan(0);
   });
 
-  it('scripted_test provider_type is distinct from real providers', () => {
+  it('scripted_test provider_type is distinct from real providers', async () => {
     const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
     const types = schema.properties.provider_type.enum;
     expect(types).toContain('scripted_test');
@@ -89,7 +89,7 @@ function req(messages: Message[], tools: string[] = []): ProviderRequest {
 }
 
 describe('ScriptedTestProvider: queue mode', () => {
-  it('returns responses in order, one per call', () => {
+  it('returns responses in order, one per call', async () => {
     const p = new ScriptedTestProvider({
       queue: [res('first'), res('second'), res('third')],
     });
@@ -98,13 +98,13 @@ describe('ScriptedTestProvider: queue mode', () => {
     expect(p.resolve(req([msg('user', 'hi')])).content).toBe('third');
   });
 
-  it('throws ScriptedResponseExhaustedError when queue is empty (no silent pass)', () => {
+  it('throws ScriptedResponseExhaustedError when queue is empty (no silent pass)', async () => {
     const p = new ScriptedTestProvider({ queue: [res('only')] });
     p.resolve(req([msg('user', 'hi')]));
     expect(() => p.resolve(req([msg('user', 'hi')]))).toThrow(ScriptedResponseExhaustedError);
   });
 
-  it('decrements remainingQueueLength as responses are consumed', () => {
+  it('decrements remainingQueueLength as responses are consumed', async () => {
     const p = new ScriptedTestProvider({ queue: [res('a'), res('b')] });
     expect(p.remainingQueueLength).toBe(2);
     p.resolve(req([msg('user', 'x')]));
@@ -115,7 +115,7 @@ describe('ScriptedTestProvider: queue mode', () => {
 });
 
 describe('ScriptedTestProvider: map mode', () => {
-  it('returns the response matching the input hash', () => {
+  it('returns the response matching the input hash', async () => {
     const messages = [msg('user', 'what is 2+2?')];
     const key = __hashMessages(messages);
     const p = new ScriptedTestProvider({
@@ -124,7 +124,7 @@ describe('ScriptedTestProvider: map mode', () => {
     expect(p.resolve(req(messages)).content).toBe('4');
   });
 
-  it('returns different responses for different inputs deterministically', () => {
+  it('returns different responses for different inputs deterministically', async () => {
     const a = [msg('user', 'hello')];
     const b = [msg('user', 'goodbye')];
     const p = new ScriptedTestProvider({
@@ -138,7 +138,7 @@ describe('ScriptedTestProvider: map mode', () => {
     expect(p.resolve(req(a)).content).toBe('hi there');
   });
 
-  it('throws ScriptedResponseMissingError when no map entry matches', () => {
+  it('throws ScriptedResponseMissingError when no map entry matches', async () => {
     const known = [msg('user', 'known')];
     const unknown = [msg('user', 'unknown')];
     const p = new ScriptedTestProvider({ map: { [__hashMessages(known)]: res('ok') } });
@@ -147,7 +147,7 @@ describe('ScriptedTestProvider: map mode', () => {
 });
 
 describe('ScriptedTestProvider: call metadata', () => {
-  it('records messages, tools requested, usage, and timestamps', () => {
+  it('records messages, tools requested, usage, and timestamps', async () => {
     const p = new ScriptedTestProvider({
       queue: [
         res('answer', { usage: { input_tokens: 10, output_tokens: 5 } }),
@@ -165,7 +165,7 @@ describe('ScriptedTestProvider: call metadata', () => {
     expect(log[0].lookup_mode).toBe('queue');
   });
 
-  it('increments call index across multiple calls', () => {
+  it('increments call index across multiple calls', async () => {
     const p = new ScriptedTestProvider({ queue: [res('a'), res('b')] });
     p.resolve(req([msg('user', '1')]));
     p.resolve(req([msg('user', '2')]));
@@ -174,7 +174,7 @@ describe('ScriptedTestProvider: call metadata', () => {
     expect(p.callCount).toBe(2);
   });
 
-  it('records lookup_mode as map for map hits', () => {
+  it('records lookup_mode as map for map hits', async () => {
     const m = [msg('user', 'mapped')];
     const p = new ScriptedTestProvider({ map: { [__hashMessages(m)]: res('hit') } });
     p.resolve(req(m));
@@ -183,7 +183,7 @@ describe('ScriptedTestProvider: call metadata', () => {
 });
 
 describe('ScriptedTestProvider: ProviderAdapter interface', () => {
-  it('implements all eight required methods', () => {
+  it('implements all eight required methods', async () => {
     const p = new ScriptedTestProvider({ queue: [res('x')] });
     expect(typeof p.normalizeRequest).toBe('function');
     expect(typeof p.parseResponse).toBe('function');
@@ -195,37 +195,37 @@ describe('ScriptedTestProvider: ProviderAdapter interface', () => {
     expect(typeof p.validateDataPolicy).toBe('function');
   });
 
-  it('checkHealth returns healthy without network', () => {
+  it('checkHealth returns healthy without network', async () => {
     const p = new ScriptedTestProvider();
     expect(p.checkHealth()).toBe('healthy');
   });
 
-  it('validateDataPolicy allows by default', () => {
+  it('validateDataPolicy allows by default', async () => {
     const p = new ScriptedTestProvider();
     expect(p.validateDataPolicy(req([msg('user', 'x')]))).toEqual({ allowed: true });
   });
 
-  it('normalizeToolCall normalizes a provider tool call shape', () => {
+  it('normalizeToolCall normalizes a provider tool call shape', async () => {
     const p = new ScriptedTestProvider();
     const tc = p.normalizeToolCall({ id: 'tc_1', name: 'read_file', arguments: { path: '/a' } });
     expect(tc).toEqual({ id: 'tc_1', name: 'read_file', arguments: { path: '/a' } });
   });
 
-  it('mapError classifies exhausted queue as non-retryable invalid_request', () => {
+  it('mapError classifies exhausted queue as non-retryable invalid_request', async () => {
     const p = new ScriptedTestProvider();
     const err = p.mapError(new ScriptedResponseExhaustedError());
     expect(err.kind).toBe('invalid_request');
     expect(err.retryable).toBe(false);
   });
 
-  it('mapError classifies rate-limit and auth messages', () => {
+  it('mapError classifies rate-limit and auth messages', async () => {
     const p = new ScriptedTestProvider();
     expect(p.mapError(new Error('rate limit exceeded')).kind).toBe('rate_limited');
     expect(p.mapError(new Error('invalid api key 401')).kind).toBe('auth');
     expect(p.mapError(new Error('timeout waiting for response')).kind).toBe('timeout');
   });
 
-  it('meterUsage returns usage and estimates output tokens when absent', () => {
+  it('meterUsage returns usage and estimates output tokens when absent', async () => {
     const p = new ScriptedTestProvider();
     const u = p.meterUsage(res('hello world', { usage: { input_tokens: 3, output_tokens: 0 } }));
     expect(u.input_tokens).toBe(3);
@@ -245,21 +245,21 @@ describe('ScriptedTestProvider: ProviderAdapter interface', () => {
 });
 
 describe('ScriptedTestProvider: ModelGateway injection', () => {
-  it('is injectable via ModelGateway.resolve and drivable via complete', () => {
+  it('is injectable via ModelGateway.resolve and drivable via complete', async () => {
     const gw = new ModelGateway([new ScriptedTestProvider({ queue: [res('via-gw')] })]);
     const adapter = gw.resolve('scripted_test');
     expect(adapter).toBeInstanceOf(ScriptedTestProvider);
-    expect(gw.complete('scripted_test', req([msg('user', 'hi')])).response.content).toBe('via-gw');
+    expect((await gw.complete('scripted_test', req([msg('user', 'hi')]))).response.content).toBe('via-gw');
   });
 
-  it('ModelGateway.resolve throws for an unregistered provider type', () => {
+  it('ModelGateway.resolve throws for an unregistered provider type', async () => {
     const gw = new ModelGateway();
     expect(() => gw.resolve('openai')).toThrow(/No provider registered/);
   });
 });
 
 describe('ScriptedTestProvider: zero network', () => {
-  it('makes no fetch/http calls in any code path (smoke)', () => {
+  it('makes no fetch/http calls in any code path (smoke)', async () => {
     const originalFetch = (globalThis as { fetch?: unknown }).fetch;
     (globalThis as { fetch?: unknown }).fetch = () => {
       throw new Error('UNEXPECTED NETWORK CALL');

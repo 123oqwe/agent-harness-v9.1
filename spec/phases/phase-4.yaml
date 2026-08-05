@@ -3,6 +3,12 @@ name: "Memory, Assurance, Observability & Evolution Shadow"
 status: BLOCKED
 objective: "Memory, Assurance, Observability & Evolution Shadow"
 
+delivers:
+  - "Six memory types with provenance, trust, TTL, conflict resolution, approval, local-only handling, deletion propagation, backend API, and frontend center"
+  - "Consented user personalization as a proposal track separate from agent capability evolution"
+  - "Advanced evaluation, independent verification, redacted traces, replay, events, and OTel export"
+  - "Offline, replay, shadow, rollback, drift, dedup, and tech-debt evolution; generated tools remain untrusted shadow candidates"
+
 dependencies:
   - phase-0
   - phase-1
@@ -32,12 +38,14 @@ requirements:
   - AH-MEM-TRUST-001
   - AH-MEM-TTL-001
   - AH-MEM-UI-001
+  - AH-PERSONALIZATION-001
   - AH-OBS-EVENTS-001
   - AH-OBS-OTEL-001
   - AH-OBS-TRACE-001
   - AH-EVOL-DEDUP-001
   - AH-EVOL-TECHDEBT-001
   - AH-EVOL-EVALDRIFT-001
+  - AH-UI-MEMORY-001
 
 fixtures:
   - fixtures/phase-4/valid/
@@ -68,6 +76,7 @@ deployment_target:
   phase_8: "production"
 
 gate_command: "python3 factory/phase-gates/gate_runner.py phase4"
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run evaluates memory correctness/deletion, observability redaction, verifier independence, personalization consent, and evolution non-escalation."
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-4/"
 
@@ -80,6 +89,7 @@ exit_criteria:
   - all_phase_requirements_verified: true
   - regression_tests_pass: true
   - active_stub_count: 0
+  - independent_glm_5_2_xhigh: PASS
 
 blocked_conditions:
   - "Previous phase gate not passed"

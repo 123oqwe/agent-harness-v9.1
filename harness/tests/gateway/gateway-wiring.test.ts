@@ -4,7 +4,7 @@ import { ScriptedTestProvider } from '../../gateway/scripted-provider.js';
 import { RateLimiter, LLMCache, UsageMeter, CapabilityRegistry } from '../../gateway/capability-registry.js';
 
 describe('P1-18: RateLimiter wired into ModelGateway', () => {
-  it('rejects requests when rate limit exceeded', () => {
+  it('rejects requests when rate limit exceeded', async () => {
     const rl = new RateLimiter({ rpm_limit: 1, tpm_limit: 100000, concurrent_limit: 5 });
     const provider = new ScriptedTestProvider({
       queue: [
@@ -15,17 +15,17 @@ describe('P1-18: RateLimiter wired into ModelGateway', () => {
     const gw = new ModelGateway([provider], { rateLimiter: rl, userId: 'user1' });
 
     // First request should succeed
-    const r1 = gw.complete('scripted_test', { messages: [{ role: 'user', content: 'x' }] });
+    const r1 = await gw.complete('scripted_test', { messages: [{ role: 'user', content: 'x' }] });
     expect(r1.response.content).toBe('a');
 
-    // Second request should be rate limited
-    expect(() => gw.complete('scripted_test', { messages: [{ role: 'user', content: 'y' }] }))
-      .toThrow(/Rate limit/);
+   // Second request should be rate limited
+    await expect(gw.complete('scripted_test', { messages: [{ role: 'user', content: 'y' }] }))
+      .rejects.toThrow(/Rate limit/);
   });
 });
 
 describe('P2-12: LLMCache wired into ModelGateway', () => {
-  it('returns cached response without calling provider', () => {
+  it('returns cached response without calling provider', async () => {
     const cache = new LLMCache();
     const provider = new ScriptedTestProvider({
       queue: [{ content: 'first', stop_reason: 'stop' }],
@@ -33,7 +33,7 @@ describe('P2-12: LLMCache wired into ModelGateway', () => {
     const gw = new ModelGateway([provider], { cache });
 
     // First call hits provider
-    const r1 = gw.complete('scripted_test', {
+    const r1 = await gw.complete('scripted_test', {
       messages: [{ role: 'user', content: 'hello' }],
       model: 'test-model',
     });
@@ -41,7 +41,7 @@ describe('P2-12: LLMCache wired into ModelGateway', () => {
     expect(provider.callCount).toBe(1);
 
     // Second call with same input should hit cache (not provider)
-    const r2 = gw.complete('scripted_test', {
+    const r2 = await gw.complete('scripted_test', {
       messages: [{ role: 'user', content: 'hello' }],
       model: 'test-model',
     });
@@ -51,7 +51,7 @@ describe('P2-12: LLMCache wired into ModelGateway', () => {
 });
 
 describe('P1-17: UsageMeter wired into ModelGateway', () => {
-  it('records usage on each model call', () => {
+  it('records usage on each model call', async () => {
     const reg = new CapabilityRegistry();
     reg.register({
       model_id: 'scripted-test', provider_type: 'scripted_test',
@@ -68,7 +68,7 @@ describe('P1-17: UsageMeter wired into ModelGateway', () => {
     });
     const gw = new ModelGateway([provider], { usageMeter: meter });
 
-    gw.complete('scripted_test', { messages: [{ role: 'user', content: 'x' }] });
+    await gw.complete('scripted_test', { messages: [{ role: 'user', content: 'x' }] });
 
     expect(meter.getEntries().length).toBe(1);
  expect(meter.getTotalCost()).toBeGreaterThan(0);

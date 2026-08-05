@@ -154,7 +154,11 @@
           "type": "integer"
         },
         "summarize_at_window_ratio": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0.4,
+          "maximum": 0.85,
+          "default": 0.7,
+          "description": "Lossy compaction boundary after VFS offload; 0.40 is the offload boundary and 0.85 is the hard context_reset boundary."
         },
         "tool_masking": {
           "type": "boolean"

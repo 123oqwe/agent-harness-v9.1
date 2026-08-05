@@ -8,7 +8,7 @@
 <marker id="ay" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#fbbf24"/></marker>
 </defs>
 <rect x="0" y="0" width="1400" height="980" fill="#0d1117" rx="8"/>
-<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Failure Recovery & Reconciliation — 决策树 (v9)</text>
+<text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Failure Recovery &amp; Reconciliation — 决策树 (v9)</text>
 <text x="20" y="46" fill="#8b949e" font-size="11">operation.machine.json (37态) + external-effect.machine.json (14态) + runtime-core.md effect-state-aware resume · failure-recovery.md</text>
 
 <!-- Entry: failure detected -->

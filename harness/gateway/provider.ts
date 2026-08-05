@@ -29,6 +29,7 @@ export interface ParsedResponse {
 export interface Usage {
   input_tokens: number;
   output_tokens: number;
+  reasoning_tokens?: number;  // o-series / Claude thinking
 }
 
 export interface ProviderRequest {
@@ -63,8 +64,25 @@ export type StreamEvent =
 
 export interface ProviderAdapter {
   readonly provider_type: 'openai' | 'anthropic' | 'google' | 'local' | 'scripted_test';
+
+  /**
+   * Normalize a ProviderRequest into the provider's native HTTP request body.
+   * Returns the body object that will be sent as JSON to the provider's API.
+   */
   normalizeRequest(req: ProviderRequest): unknown;
+
+  /**
+   * Execute the HTTP request to the provider. Takes the normalized request body
+   * and an API key, returns the raw JSON response. This is the actual network call.
+   * For scripted_test providers, this is a no-op (returns the input directly).
+   */
+  executeRequest(normalizedReq: unknown, apiKey: string, opts?: { timeoutMs?: number; signal?: AbortSignal }): Promise<unknown>;
+
+  /**
+   * Parse the raw JSON response from the provider into a ParsedResponse.
+   */
   parseResponse(raw: unknown): ParsedResponse;
+
   normalizeToolCall(raw: unknown): ToolCall;
   streamEvents(req: ProviderRequest): AsyncIterable<StreamEvent>;
   mapError(raw: unknown): ProviderError;

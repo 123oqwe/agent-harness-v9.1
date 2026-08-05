@@ -5,6 +5,21 @@
 - Error classification: network (transient), tool (tool-specific), model (provider), truncation (structural - do NOT execute)
 - No private CoT storage: only plan, decision summary, tool calls, evidence, error classification
 
+### Eight loop families and their Phase owner
+
+These are explicit state machines coordinated through events; they are not eight recursive model loops and they do not create competing sources of truth.
+
+| Loop | First complete Phase | Authority and termination |
+|------|----------------------|---------------------------|
+| Request reasoning | 1 | Static Router selects direct, ReAct, or plan_execute; TaskContract success, budget, deadline, cancel, or typed failure terminates it |
+| Tool execution | 1 | Runtime proposes; the 12-step Action Control pipeline authorizes and dispatches each call; receipt or typed error returns control |
+| Verification and recovery | 1, advanced in 4 | Deterministic local eval and Evidence Package first; Independent Verifier may request bounded recovery but cannot edit implementation or expected results |
+| Steering and context maintenance | 2 | Three queues, active-plan rewrite, offload, compaction, and context_reset are event-log transitions, never hidden prompt mutation |
+| Adaptive routing and multi-agent | 3 | One Router revises RunPlan; AgentGraph children are bounded by DAG completion, attenuated budgets/capabilities, and merge policy |
+| Memory and personalization | 4 | Outcome creates proposals; provenance/trust/consent/TTL/conflict checks decide persistence; session event log remains runtime authority |
+| Capability evolution | 4 | Offline replay and shadow comparison produce proposals only; rollback/quarantine/human certification bound promotion |
+| Mission and schedule | 6 | Durable mission/occurrence state, leases, idempotency, fresh context/authorization, sleep/wake, cancel, and budget terminate each activation |
+
 ## Session Model
 - Event log = authority (source of truth)
 - Snapshot = acceleration (rebuildable)
@@ -47,6 +62,9 @@ Defaults (all platforms):
 - Symlink escape: resolved via realpath before access (VFS FG4 enforces at the VFS layer; sandbox is defense-in-depth)
 
 The sandbox profile is part of the ToolSpec's `sandbox` field and is enforced at action-control step 9. Phase 7 microVM replaces this for multi-tenant; Phase 1 uses OS-native because it is sufficient for single-user local execution and aligns with Codex/Claude Code.
+
+### OCI Sandbox Security (P2-27)
+Phase 2 optional rootless OCI sandbox uses seccomp profile to restrict syscalls and avoids user namespaces (uses rootless Podman --userns=nomodel). Default is Phase 1 OS-native sandbox (Seatbelt/bubblewrap). Phase 7 microVM replaces OCI.
 
 ## Pause/Resume (v9 correction)
 v8 had generic reExecuteFromStep. v9 uses effect-state-aware resume:
@@ -109,7 +127,7 @@ type TerminationReason =
 ```
 
 ### Stop Conditions (all agent-tunable via RunPlan)
-- max_iterations: default 25 (agent should tune per domain)
+- max_iterations: default 50 (agent should tune per domain: coding 50, research 80, writing 30)
 - max_repeated_tool_calls: default 3 (same tool + same args)
 - budget_exhausted: when BudgetGuard returns 0 remaining
 - truncation: stop_reason === "length" → do NOT execute truncated tool call, error to LLM
@@ -125,15 +143,38 @@ type TerminationReason =
 | Truncation | structural | do NOT execute, error to LLM |
 | Malformed JSON | repairable | JSON repair (max 2 attempts) |
 
+### Error Classification Details (P1-09)
+- rate_limited (429): NOT retried — retrying aggravates the throttle. Caller respects retry-after.
+- server (5xx) / timeout: retried with exponential backoff (max 3).
+- auth (401) / invalid_request (400): NOT retried — caller must fix input.
+- truncation (stop_reason=length): NOT retried — return error to LLM so it can split the task (P1-12).
+- Truncation recovery (P1-12): detect input vs output truncation. Input too long → trigger MemoryPressureManager offload. Output too long → return error to LLM with "output too long, split into multiple steps". Phase 1 does output-only (error message); Phase 2 does offload+compaction.
+
+### Interrupt/Resume (P1-05)
+Run state machine: CREATED → PLANNING → RUNNING → PAUSED → COMPLETED/FAILED/CANCELLED.
+When needs_human is set, the loop saves current step state to progress.json and enters PAUSED.
+On resume, the loop loads the saved state and continues from the interrupted phase (not from scratch).
+ask_user tool uses this mechanism to pause for user input.
+
+### Plan Mode (P1-10)
+kernel.run() accepts auto_execute: bool = True. When auto_execute=false, after generating the plan,
+the loop enters PAUSED state and emits plan_ready event. User approves via POST /task/{id}/approve.
+Approval resumes from PAUSED using the interrupt/resume mechanism.
+
+### Crash Recovery (P1-13)
+progress.json is written after every turn and on every stop condition:
+{run_id, current_step, goal, completed_steps, open_tasks, last_error, checkpoint_refs}.
+On startup, check for unfinished tasks (status=RUNNING but process dead). If found, restore from
+the last checkpoint — completed steps are not re-executed, paused steps resume from PAUSED.
+
 ### Session Model
 Event sourcing: append-only event log is source of truth. Snapshot is acceleration (can rebuild from log).
 Agent should use SQLite for event log (consistent with ADR-004/ADR-006).
 
-### Compaction Trigger
-`shouldCompact(tokens, window, settings)`: when tokens > window * 0.4 (Smart Zone boundary, agent-tunable threshold).
+### Context pressure thresholds
+`shouldOffload(tokens, window)`: at 40%, mechanically offload large reversible payloads to VFS.
+`shouldCompact(tokens, window)`: at 70% after offload, run cache-aligned summarization.
+`shouldReset(tokens, window)`: at 85% when offload + compaction cannot recover, or earlier on measured goal regression/oscillation, write handoff and start a fresh context.
 
-Context zones (industry consensus: performance degrades past ~40% of window):
-- Smart Zone: tokens < 40% of window — full model capability
-- Caution Zone: 40%-70% — compaction triggered here to stay out of Dumb Zone
-- Dumb Zone: > 70% — forced context_reset (see Stop Conditions); do NOT rely on compaction alone at this point
+These are one policy, not three competing defaults: 40% is the soft offload boundary, 70% is the lossy-compaction boundary, and 85% is the hard reset boundary. RunPlan may lower thresholds for a domain but cannot raise the hard reset above the model's safe input budget.
  Must preserve: goals, constraints, decisions, approvals, side effects, open tasks, security state.

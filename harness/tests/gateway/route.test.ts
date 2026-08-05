@@ -2,15 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ModelGateway,
   CircuitBreaker,
-  GatewayRetryExhaustedError,
-  type RouteResult,
 } from '../../gateway/model-gateway';
 import {
   CapabilityRegistry,
   KeyVault,
   RateLimiter,
-  UsageMeter,
-  type ModelCapabilityEntry,
 } from '../../gateway/capability-registry';
 import { ScriptedTestProvider } from '../../gateway/scripted-provider';
 
@@ -57,8 +53,8 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     gateway = new ModelGateway([provider], { registry, keyVault: vault });
   });
 
-  it('routes through CapabilityRegistry and returns RouteResult', () => {
-    const result = gateway.route(
+  it('routes through CapabilityRegistry and returns RouteResult', async () => {
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'write code' }] },
       { tier: 'work', requiredCapabilities: ['code', 'reasoning'] },
     );
@@ -68,9 +64,9 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     expect(result.fallbackTriggered).toBe(false);
   });
 
-  it('selects cheapest model when budget is tight', () => {
+  it('selects cheapest model when budget is tight', async () => {
     // With very tight budget, should pick cheap-model ($0.14/M)
-    const result = gateway.route(
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'write code' }] },
       { tier: 'work', requiredCapabilities: ['code'], budgetRemaining: 0.001 },
     );
@@ -80,7 +76,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     expect(result.response.content).toBe('result');
   });
 
-  it('selects premium model when budget is ample', () => {
+  it('selects premium model when budget is ample', async () => {
     // With ample budget, should pick premium-model (highest capability)
     provider = new ScriptedTestProvider({
       queue: [
@@ -89,19 +85,19 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     });
     gateway = new ModelGateway([provider], { registry, keyVault: vault });
 
-    const result = gateway.route(
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'write code' }] },
       { tier: 'work', requiredCapabilities: ['code', 'reasoning'], budgetRemaining: 1000 },
     );
     expect(result.response.content).toBe('premium-result');
   });
 
-  it('fails over to next provider on failure', () => {
+  it('fails over to next provider on failure', async () => {
     // First provider fails, second succeeds
     const failingProvider = new ScriptedTestProvider({
       queue: [], // empty queue = exhaustion = failure
     });
-    const successProvider = new ScriptedTestProvider({
+    const _successProvider = new ScriptedTestProvider({
       queue: [
         { content: 'fallback-result', stop_reason: 'stop', usage: { input_tokens: 100, output_tokens: 50 }, model: 'mid-model' },
       ],
@@ -112,13 +108,13 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     // For now, test that a single provider failure throws appropriately
     gateway = new ModelGateway([failingProvider], { registry, keyVault: vault });
 
-    expect(() => gateway.route(
+    expect(async () => { await gateway.route(
       { messages: [{ role: 'user', content: 'test' }] },
       { tier: 'work', requiredCapabilities: ['code'] },
-    )).toThrow();
+    )}).rejects.toThrow();
   });
 
-  it('returns real cost from provider usage data', () => {
+  it('returns real cost from provider usage data', async () => {
     provider = new ScriptedTestProvider({
       queue: [
         { content: 'ok', stop_reason: 'stop', usage: { input_tokens: 1000, output_tokens: 500 }, model: 'mid-model' },
@@ -126,7 +122,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     });
     gateway = new ModelGateway([provider], { registry, keyVault: vault });
 
-    const result = gateway.route(
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'test' }] },
       { tier: 'work', requiredCapabilities: ['code'] },
     );
@@ -135,7 +131,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     expect(result.costUsd).toBeCloseTo(0.00028, 5);
   });
 
-  it('rate limiter blocks excessive requests', () => {
+  it('rate limiter blocks excessive requests', async () => {
     const rl = new RateLimiter({ rpm_limit: 1, tpm_limit: 100000, concurrent_limit: 1 });
     provider = new ScriptedTestProvider({
       queue: [
@@ -146,20 +142,20 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     gateway = new ModelGateway([provider], { registry, keyVault: vault, rateLimiter: rl });
 
     // First call should succeed
-    const r1 = gateway.route(
+    const r1 = await gateway.route(
       { messages: [{ role: 'user', content: 'first' }] },
       { tier: 'work', requiredCapabilities: ['code'], userId: 'user1' },
     );
     expect(r1.response.content).toBe('first');
 
     // Second call should be rate limited (RPM=1)
-    expect(() => gateway.route(
+    expect(async () => { await gateway.route(
       { messages: [{ role: 'user', content: 'second' }] },
       { tier: 'work', requiredCapabilities: ['code'], userId: 'user1' },
-    )).toThrow(/Rate limit/);
+    )}).rejects.toThrow(/Rate limit/);
   });
 
-  it('budget blocks expensive models', () => {
+  it('budget blocks expensive models', async () => {
     provider = new ScriptedTestProvider({
       queue: [
         { content: 'expensive', stop_reason: 'stop', usage: { input_tokens: 10000, output_tokens: 5000 }, model: 'premium-model' },
@@ -168,13 +164,13 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     gateway = new ModelGateway([provider], { registry, keyVault: vault });
 
     // Budget of $0.0001 is too small for any model with 500 input + 2000 output
-    expect(() => gateway.route(
+    expect(async () => { await gateway.route(
       { messages: [{ role: 'user', content: 'test' }] },
       { tier: 'work', requiredCapabilities: ['code', 'reasoning', 'vision'], budgetRemaining: 0.00001 },
-    )).toThrow();
+    )}).rejects.toThrow();
   });
 
-  it('works without registry (fallback to direct provider mode)', () => {
+  it('works without registry (fallback to direct provider mode)', async () => {
     provider = new ScriptedTestProvider({
       queue: [
         { content: 'direct', stop_reason: 'stop', usage: { input_tokens: 10, output_tokens: 5 } },
@@ -183,7 +179,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     // No registry, no keyVault — should still work via direct provider
     gateway = new ModelGateway([provider]);
 
-    const result = gateway.route(
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'test' }] },
       { tier: 'work' },
     );
@@ -191,7 +187,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     expect(result.costUsd).toBe(0); // no registry = no price info = $0
   });
 
-  it('passes tool_choice through to provider request', () => {
+  it('passes tool_choice through to provider request', async () => {
     provider = new ScriptedTestProvider({
       queue: [
         { content: 'tool-result', stop_reason: 'tool_use', usage: { input_tokens: 10, output_tokens: 5 }, model: 'mid-model',
@@ -200,7 +196,7 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
     });
     gateway = new ModelGateway([provider], { registry, keyVault: vault });
 
-    const result = gateway.route(
+    const result = await gateway.route(
       { messages: [{ role: 'user', content: 'read file' }] },
       {
         tier: 'work', requiredCapabilities: ['tool_calling'],
@@ -216,10 +212,10 @@ describe('Gateway route(): CapabilityRegistry + KeyVault + Budget + Failover', (
 });
 
 describe('CircuitBreaker half-open probe fix (G13)', () => {
-  it('HALF_OPEN blocks second concurrent probe', () => {
+  it('HALF_OPEN blocks second concurrent probe', async () => {
     // This tests the fix for G13: previously half_open always returned true
-    const cb = new CircuitBreaker({ failureThreshold: 2, recoveryTimeoutMs: 50 });
-    const serverErr = { kind: 'server', retryable: true, detail: '500' };
+   const cb = new CircuitBreaker({ failureThreshold: 2, recoveryTimeoutMs: 50 });
+    const serverErr = { kind: 'server', retryable: true, detail: '500' } as const;
 
     // Trip the breaker
     cb.recordFailure(serverErr);

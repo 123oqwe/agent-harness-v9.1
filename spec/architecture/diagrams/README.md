@@ -14,7 +14,7 @@
 | 6 | [06-model-api-gateway.svg](06-model-api-gateway.svg) | Model/API Gateway — Capability Registry + Provider Policy + Dynamic Selection | ✓ redrawn v9 (Capability Registry + F5/F11) |
 | 7 | [07-operation-state-machine.svg](07-operation-state-machine.svg) | Operation State Machine v9 (37 states) — CREATED → COMPILED → ... → EFFECT_CONFIRMED | ✓ redrawn v9 (37 states, no re-router overlay) |
 | 8 | [08-mission-layer.svg](08-mission-layer.svg) | Mission Layer + Dynamic Capability + Self-Evolving Toolchain (Phase 6) | ✓ redrawn v9 (RunPlan, 10 states, no v6.1) |
-| 9 | [09-tool-skill-catalog.svg](09-tool-skill-catalog.svg) | Concrete Tool & Skill Catalog — 15 Tools v9 (9 P1 + 6 P2-3) | ✓ redrawn v9 (15 tools, ToolSpec, VFS) |
+| 9 | [09-tool-skill-catalog.svg](09-tool-skill-catalog.svg) | Tool & Skill Fabric — Registry/Search and 31 phased tools (9 P1 + 11 P2 + 5 P3 + 6 P6) | ✓ normalized v9.2 (representative tables, authoritative list in tool-skill-fabric.md) |
 
 ## New Diagrams (v9.1)
 

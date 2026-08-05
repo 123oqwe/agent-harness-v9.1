@@ -15,6 +15,32 @@
 - memory: ~5K
 - reserved output: ~4K
 
+### Proportional Budget Allocation (P2-01)
+
+Layer budgets are NOT hardcoded — they are proportional to the model's context
+window. ContextManager accepts `model_context_window` and allocates each layer
+as a percentage:
+
+| Layer | % of context window |
+|-------|---------------------|
+| system/policy | 5% (cached, immutable) |
+| task | 3% |
+| active plan | 1.5% |
+| recent conversation | 50% (cached prefix) |
+| retrieved evidence | 12% (RAG, tool outputs) |
+| tool definitions | 3% (cached) |
+| tool results | 20% |
+| memory | 3% |
+| reserved output | max(4K, 2.5%) |
+
+Example: GPT-4o (128K) → system 6.4K, conversation 64K, tool results 25.6K.
+Claude Sonnet (200K) → system 10K, conversation 100K, tool results 40K.
+Gemini (1M) → system 50K, conversation 500K, tool results 200K.
+
+`build_for_phase` computes layer budgets from the proportional percentages, not
+fixed token counts. The reserved output floor is max(4K, context_window * 2.5%)
+so small context windows still have enough generation headroom (P1-12).
+
 Rule: Low-trust content (tool output, RAG, web) must be isolated from system/policy.
 
 ## Active Plan Injection (G-MAN1)
@@ -31,7 +57,7 @@ The active plan layer (~2K tokens) is REWRITTEN at the end of every turn and re-
 - Constraints: one-line key constraints
 
 ### Distinct from compaction
-- Compaction: lossy LLM summary when window exceeds 40%, rewrites middle.
+- Compaction: lossy LLM summary at the 70% boundary only after reversible offload cannot restore the 40% target; rewrites the middle at a cache breakpoint.
 - Active plan injection: mechanical rewrite of plan layer every turn, no LLM cost, targets end-of-window.
 - Both run: injection every turn, compaction when triggered.
 
@@ -50,7 +76,7 @@ Key fact recall >= 0.95, constraint preservation = 1.0.
 
 Before invoking LLM-based compaction (lossy, slow, costly), the Runtime performs mechanical offloading: when a tool call input or result exceeds `context_strategy.offload_token_threshold` (default 20000), it is written to the VFS and replaced in the conversation layer by a file pointer plus a short preview (first 10 lines). The full content is retrievable via `read_file`/`grep` through VFS.
 
-Offloading is reversible and cache-friendlier than compaction: it trims the conversation layer without rewriting the stable prefix, and the content is not lost (unlike a summary). Compaction is triggered only after offloading no longer keeps the window under the Smart-Zone boundary.
+Offloading is reversible and cache-friendlier than compaction: it trims the conversation layer without rewriting the stable prefix, and the content is not lost. At 40% context pressure the Runtime offloads; at 70% after offload it may compact; at 85% when recovery still fails it performs context_reset. These thresholds are the single normative policy shared with runtime-core.md and model-api-gateway.md.
 
 ### Linear Checkpoint Growth (DeltaChannel)
 
@@ -66,9 +92,17 @@ episodic, semantic, procedural, preference, relationship, goal.
 Each: conflict resolution, TTL, weight, deletion.
 Model must NOT directly write chat conclusions as high-trust facts.
 
+Memory starts in Phase 4 and serves cross-session recall and consented personalization. It never replaces the append-only session event log as in-run authority. The Outcome pipeline creates a proposal with provenance; trust, consent, conflict, scope, TTL, and local-only policy decide whether it becomes a record. User personalization and agent capability evolution are separate proposal tracks and cannot promote each other.
+
+Progressive disclosure applies to memory and RAG: retrieval first returns compact identifiers, type, provenance, trust, recency and scores; full content enters context only after ACL/VFS checks and token-budget selection.
+
 ## RAG
 5 subsystems: ingest, index, retrieve, rerank, pack.
 ACL filter BEFORE retrieval. No cross-tenant vector cache.
+
+### Audio/Video Ingestion (P2-22)
+parse_document detects file type: audio → transcribe_audio tool, video → ffmpeg extract audio track → transcribe_audio.
+Transcription results are indexed as document content in RAG. No separate tool needed — reuses transcribe_audio.
 
 ### VFS as retrieval authority (FG4)
 RAG `retrieve` goes through the Virtual Filesystem (architecture/virtual-filesystem.md), so a path denied by VFS permission rules is denied at both `read_file` and `retrieve`. This closes the framework gap where an indexed chunk could bypass a `read_file` deny. Offloaded tool results (FG10) also land in VFS and are retrievable.

@@ -4,7 +4,11 @@
 ![06-model-api-gateway.svg](diagrams/06-model-api-gateway.svg)
 
 ## Capability Registry (expanded for all domains)
-text_reasoning, code, long_context, structured_output, tool_calling, vision_understanding, pdf_document_understanding, image_generation, image_editing, audio_understanding, speech_generation, video_understanding, video_generation, embedding, reranking, local_execution, data_region, data_retention, pricing, health_state
+text_reasoning, code, long_context, structured_output, tool_calling, vision_understanding, pdf_document_understanding, image_generation, image_editing, audio_understanding, speech_generation, video_understanding, video_generation, embedding, reranking, local_execution, data_region, data_retention, pricing, health_state, transcription, music_generation, realtime_speech
+
+ADR-014 added the last three: `transcription` (ASR verbatim; distinct from `audio_understanding` which is semantic), `music_generation`, and `realtime_speech` (bidirectional streaming voice; distinct from `speech_generation` which is one-shot TTS). These support the vertical-domain generation tools (generate_speech, transcribe_audio, generate_music, voice_converse, clone_voice).
+
+Phase 1 provides the ProviderAdapter registry and a deterministic `ModelGateway.resolve()` over a frozen snapshot, including ScriptedTestProvider for offline gates. Phase 3 Router optimization may choose among compatible bindings, but it still calls this Gateway; no separate “model router” owns execution. Provider resolution can never override Policy, data region/retention, model allowlists, RunPlan budgets, or required capabilities.
 
 ## Provider Adapter Must Implement
 request_normalizer, structured_output_handler, tool_call_normalizer, response_parser, streaming_event_handler, error_mapper, usage_meter, rate_limiter, circuit_breaker, health_checker, data_policy_validator, fallback_compatibility_checker
@@ -59,7 +63,7 @@ Agent should implement as a DAG of model calls, not a sequence. Each node specif
 
 ## Prompt Cache Engineering (FG5 / FG11)
 
-The 7-layer context window (context-memory-rag.md) already assumes prefix caching (system/policy layer and recent-conversation layer are marked "cached prefix"). The Gateway must manage the cache, not just assume it. KV-cache hit rate is the single most important production metric for long agent loops and multi-agent DAGs (Phase 3): uncached input tokens cost ~10x cached tokens on frontier models, and a 50-tool-call x N-agent DAG with all-miss cache is economically infeasible inside BudgetGuard.
+The 9-layer context window (context-memory-rag.md) already assumes prefix caching (system/policy, recent conversation, and tool-definition layers mark stable cache boundaries). The Gateway must manage the cache, not just assume it. KV-cache hit rate is a primary production metric for long agent loops and multi-agent DAGs (Phase 3): all-miss cache behavior can make a large DAG exceed BudgetGuard.
 
 ### Cache layers and invalidation matrix
 
@@ -92,5 +96,4 @@ Enabled via RunPlan `context_strategy.tool_masking = true`. The Gateway reads `c
 
 Compaction (context-memory-rag.md) and context_reset rewrite the conversation layer and break the cached prefix. Compaction triggers must align with cache breakpoints: compact at a breakpoint boundary so the post-compaction prefix is still a cache hit for the stable portion. See context-memory-rag.md FG10 for mechanical offloading that defers compaction.
 
-Summarization threshold is `context_strategy.summarize_at_window_ratio` (default 0.85 of max_input_tokens); it triggers only after offloading (FG10) cannot keep the window under the Smart-Zone boundary.
-
+The shared threshold policy is: mechanical VFS offload at 40%, cache-aligned summarization at 70% after offload, and context_reset at 85% when recovery still cannot restore the target. `context_strategy.summarize_at_window_ratio` defaults to 0.70; the Gateway records cache invalidation at compaction/reset and never treats 0.85 as a competing compaction default.

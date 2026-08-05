@@ -30,6 +30,22 @@
 - PEP enforces deny-by-default (per trust-boundaries.md): every action denied unless explicitly allowed by Policy
 - step 5 split into 5a (Pre-Approval Auto-Review, G-CX1) + 5b (Consent check)
 
+## Permission authorities
+
+There is no “security router.” Routing can propose an action, but these independent authorities make the binding decision:
+
+| Authority | Owns | Cannot do |
+|-----------|------|-----------|
+| Identity/Auth | principal and authenticated session | grant a tool action by itself |
+| Policy Decision Point | deny-by-default user/org/product rules and derived consent requirement | issue a Capability or handle secrets |
+| Consent Service | exact user approval record for the shown ActionManifest | expand the approved manifest |
+| Authorization Service | short-lived, attenuated, single-use Capability bound to manifest/run/step/tool/effect | override Policy or consent |
+| PEP / Execution Supervisor | per-action schema, token, TOCTOU, budget, VFS, sandbox and egress enforcement | create policy or self-approve |
+| Secrets Broker | single-exchange credential scoped to one authorized dispatch | expose credentials to the loop environment |
+| Audit Sink | immutable decisions, receipts and denials | participate in execution |
+
+Every tool, skill-triggered tool, RAG file access, model/API call, scheduled activation and child-agent action crosses the relevant enforcement point. A Router, Skill, Tool Registry, memory record, hook, or model output cannot grant permission.
+
 
 ## Implementation Notes
 

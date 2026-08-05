@@ -53,6 +53,8 @@ VFS enforces read/write permission rules per path prefix, evaluated for EVERY ac
 
 CTRL-VFS-001: Virtual filesystem as single file-access authority with backend routing and permission rules.
 
+VFS is a Phase 1 dependency, not a later optimization. The coding/document/research verticals cannot be considered complete while file tools or Evidence bypass it. Phase 2 RAG, Phase 4 Memory, Phase 5 external receipts, and Phase 6 mission handoffs add consumers to the same interface; they do not create new file authorities.
+
 ## Relationship to existing modules
 
 - `tool-skill-fabric.md`: file tools (`read_file`, `write_file`, `edit_file`, `search_files`) are thin wrappers over VFS.

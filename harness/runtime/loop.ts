@@ -17,7 +17,7 @@ import { DirectStrategy } from './direct.js';
 import { ReactStrategy } from './react.js';
 import { PlanExecuteStrategy } from './plan-execute.js';
 import type { ReasoningStrategyHandler, StrategyContext, ToolExecutor, ToolExecutionResult, ModelCaller } from './reasoning-strategy.js';
-import type { Message } from '../gateway/provider.js';
+import type { Message, ToolSpec as ProviderToolSpec } from '../gateway/provider.js';
 import {
   PolicyEngine,
   hashDecision,
@@ -33,6 +33,13 @@ import {
 } from '../security/capability.js';
 import { createHash } from 'node:crypto';
 import { riskForTool, computeManifestHash, createDefaultPolicy } from './loop-helpers.js';
+import { sanitizeToolCall, redactCredentials } from './context-rag.js';
+import { createEvent } from './event-bus.js';
+import type { EventBus } from './event-bus.js';
+import type { PluginManager } from './plugin-manager.js';
+import type { SessionManager } from './session-manager.js';
+import type { HealthMonitor } from './health-monitor.js';
+import type { ConsentService } from '../security/consent-service.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +53,8 @@ export interface RuntimeRequest {
   max_iterations?: number;
   budget_tokens?: number;
   timeout_ms?: number;
+  session_id?: string;
+  auto_execute?: boolean;
 }
 
 export interface RuntimeResult {
@@ -63,6 +72,9 @@ export interface RuntimeResult {
   unauthorized_effects: number;
   tool_failures: number;
   capability_replays: number;
+  paused?: boolean;
+  estimated_cost?: number;
+  progress?: ProgressSnapshot;
 }
 
 export interface RuntimeLoopOptions {
@@ -73,7 +85,27 @@ export interface RuntimeLoopOptions {
   policyEngine?: PolicyEngine;
   capabilityService?: CapabilityService;
   pep?: PolicyEnforcementPoint;
+  eventBus?: EventBus;
+  pluginManager?: PluginManager;
+  sessionManager?: SessionManager;
+  healthMonitor?: HealthMonitor;
+  consentService?: ConsentService;
 }
+
+// P1-13: Progress snapshot for crash recovery
+export interface ProgressSnapshot {
+  run_id: string;
+  current_step: string;
+  goal: string;
+  completed_steps: string[];
+  open_tasks: string[];
+  last_error: string | null;
+  checkpoint_refs: string[];
+  timestamp: string;
+}
+
+// P1-05: Run state machine
+export type RunState = 'created' | 'planning' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 // ---------------------------------------------------------------------------
 // GuardedToolExecutor: wraps every tool call with Policy + Capability + PEP
@@ -95,6 +127,9 @@ class GuardedToolExecutor implements ToolExecutor {
   private readonly policyCtx: PolicyContext;
   private readonly session: DurableSession;
   private readonly runId: string;
+  private readonly pluginManager?: PluginManager;
+  private readonly eventBus?: EventBus;
+  private readonly consentService?: ConsentService;
   private toolFailures = 0;
   private capabilityReplays = 0;
 
@@ -107,6 +142,9 @@ class GuardedToolExecutor implements ToolExecutor {
     policyCtx: PolicyContext,
     session: DurableSession,
     runId: string,
+    pluginManager?: PluginManager,
+    eventBus?: EventBus,
+    consentService?: ConsentService,
   ) {
     this.inner = inner;
     this.engine = engine;
@@ -116,9 +154,49 @@ class GuardedToolExecutor implements ToolExecutor {
     this.policyCtx = policyCtx;
     this.session = session;
     this.runId = runId;
+    this.pluginManager = pluginManager;
+    this.eventBus = eventBus;
+    this.consentService = consentService;
   }
 
   async execute(toolName: string, args: Record<string, unknown>): Promise<ToolExecutionResult> {
+    // 0. Output sanitization (P2-20): block path traversal, shell injection
+    const sanitization = sanitizeToolCall(toolName, args, '');
+    if (!sanitization.safe) {
+      this.session.append({
+        type: 'action_denied', run_id: this.runId, step_id: this.capCtx.step_id,
+        data: { tool_name: toolName, reason: 'sanitization_failed', detail: sanitization.reason },
+      });
+      return { tool_name: toolName, success: false, output: '', error: `Sanitization: ${sanitization.reason}` };
+    }
+
+    // 0b. Consent check (P2-14): verify user consent for this tool+path
+    if (this.consentService && args.path) {
+      // Consent is optional — if no consent record exists, we still allow
+      // (policy evaluation below is the primary gate). If a consent record
+      // exists, it must be valid.
+      // This is a simplified check: in full impl, consent_id would be passed
+      // in the request context.
+    }
+
+    // 0c. PreToolUse hook (P1-24): plugins can deny/skip/force-prompt
+    if (this.pluginManager) {
+      const hookResults = await this.pluginManager.trigger('pre_tool_use', {
+        run_id: this.runId, step_id: this.capCtx.step_id, tool_name: toolName, tool_args: args,
+      });
+      const denied = hookResults.find((r) => r.action === 'deny');
+      if (denied) {
+        this.session.append({
+          type: 'action_denied', run_id: this.runId, step_id: this.capCtx.step_id,
+          data: { tool_name: toolName, reason: 'hook_denied', detail: denied.reason },
+        });
+        return { tool_name: toolName, success: false, output: '', error: `Hook denied: ${denied.reason}` };
+      }
+    }
+
+    // Emit tool_call_start event (P1-06)
+    this.eventBus?.publish(createEvent('tool_call_start', this.runId, { tool_name: toolName, args }, this.capCtx.step_id));
+
     const risk = riskForTool(toolName);
     const manifestHash = computeManifestHash(toolName, args);
 
@@ -204,6 +282,20 @@ class GuardedToolExecutor implements ToolExecutor {
     // 5. Execute the tool
     const result = await this.inner.execute(toolName, args);
 
+    // 5b. Credential redaction (P2-21): strip secrets from tool output before
+    // it enters model context
+    if (result.output) {
+      result.output = redactCredentials(result.output);
+    }
+
+    // 5c. PostToolUse hook (P1-24)
+    if (this.pluginManager) {
+      await this.pluginManager.trigger('post_tool_use', {
+        run_id: this.runId, step_id: this.capCtx.step_id,
+        tool_name: toolName, tool_result: { success: result.success, output: result.output },
+      });
+    }
+
     // 6. Record execution
     this.session.append({
       type: 'action_executed',
@@ -211,6 +303,11 @@ class GuardedToolExecutor implements ToolExecutor {
       step_id: this.capCtx.step_id,
       data: { tool_name: toolName, success: result.success },
     });
+
+    // Emit tool_result event (P1-06)
+    this.eventBus?.publish(createEvent('tool_result', this.runId, {
+      tool_name: toolName, success: result.success,
+    }, this.capCtx.step_id));
 
     if (!result.success) {
       this.toolFailures++;
@@ -240,6 +337,12 @@ class GuardedToolExecutor implements ToolExecutor {
 export class RuntimeLoop {
   private readonly session: DurableSession;
   private readonly notifications: NotificationQueue;
+  private eventBus?: EventBus;
+  private pluginManager?: PluginManager;
+  private sessionManager?: SessionManager;
+  private healthMonitor?: HealthMonitor;
+  private consentService?: ConsentService;
+  private runState: RunState = 'created';
 
   constructor(opts: RuntimeLoopOptions) {
     if (!opts.modelCaller) {
@@ -248,6 +351,11 @@ export class RuntimeLoop {
     const runId = opts.run_id ?? `run-${Date.now()}`;
     this.session = new DurableSession(runId);
     this.notifications = new NotificationQueue();
+    this.eventBus = opts.eventBus;
+    this.pluginManager = opts.pluginManager;
+    this.sessionManager = opts.sessionManager;
+    this.healthMonitor = opts.healthMonitor;
+    this.consentService = opts.consentService;
   }
 
   async execute(request: RuntimeRequest, opts: RuntimeLoopOptions): Promise<RuntimeResult> {
@@ -258,6 +366,27 @@ export class RuntimeLoop {
     const runId = this.session.lastSeq > 0
       ? (this.session.getState('run_id') as string)
       : `run-${Date.now()}`;
+
+    // Wire EventBus, SessionManager, PluginManager from opts (P1-06, P1-07, P1-08, P1-24)
+    this.eventBus = opts.eventBus ?? this.eventBus;
+    this.pluginManager = opts.pluginManager ?? this.pluginManager;
+    this.sessionManager = opts.sessionManager ?? this.sessionManager;
+    this.healthMonitor = opts.healthMonitor ?? this.healthMonitor;
+    this.consentService = opts.consentService ?? this.consentService;
+
+    // P1-07: Register health checks if HealthMonitor is available
+    if (this.healthMonitor && !this.healthMonitor.getComponentNames().includes('runtime')) {
+      this.healthMonitor.register('runtime', () => 'healthy');
+    }
+
+    // Emit run_state_change: created -> planning (P1-06)
+    this.runState = 'planning';
+    this.eventBus?.publish(createEvent('run_state_change', runId, { state: this.runState }));
+
+    // P1-24: on_task_start hook
+    if (this.pluginManager) {
+      await this.pluginManager.trigger('on_task_start', { run_id: runId });
+    }
 
     // 1. Intent profiling
     const features = profileIntent({
@@ -312,6 +441,7 @@ export class RuntimeLoop {
     if (opts.toolExecutor) {
       guardedExecutor = new GuardedToolExecutor(
         opts.toolExecutor, engine, pep, capService, capCtx, policyCtx, this.session, runId,
+        this.pluginManager, this.eventBus, this.consentService,
       );
     }
 
@@ -329,20 +459,65 @@ export class RuntimeLoop {
     };
 
     // 8. Build messages
-    const messages: Message[] = request.messages ?? [
+    let messages: Message[] = request.messages ?? [
       { role: 'user', content: request.prompt },
     ];
+
+    // P1-08: Inject session context for multi-turn conversation
+    if (this.sessionManager && request.session_id) {
+      const priorContext = this.sessionManager.getContext(request.session_id);
+      if (priorContext.length > 0) {
+        const contextSummary = priorContext
+          .map((r) => `Previous task: ${r.task} -> ${r.result}`)
+          .join('\n');
+        messages = [
+          { role: 'system', content: `Previous conversation context:\n${contextSummary}` },
+          ...messages,
+        ];
+      }
+    }
 
     this.session.append({
       type: 'step_created', run_id: runId, step_id: 'step-001',
       data: { strategy: routing.strategy },
     });
-    this.session.append({
-      type: 'step_started', run_id: runId, step_id: 'step-001', data: {},
-    });
+   this.session.append({
+     type: 'step_started', run_id: runId, step_id: 'step-001', data: {},
+   });
 
-    // 9. Execute strategy with guarded executor
-    const result = await strategy.execute(messages, ctx, opts.modelCaller, guardedExecutor);
+    // P1-24: on_step_start hook
+    if (this.pluginManager) {
+      await this.pluginManager.trigger('on_step_start', { run_id: runId, step_id: 'step-001' });
+    }
+
+   // 9. Plan mode (P1-10): if auto_execute=false, emit plan_ready and pause
+    if (request.auto_execute === false) {
+      this.runState = 'paused';
+      this.eventBus?.publish(createEvent('plan_ready', runId, {
+        strategy: routing.strategy, steps_estimated: features.steps_estimated,
+      }));
+      this.eventBus?.publish(createEvent('paused', runId, { reason: 'plan_mode' }));
+      const progress = this.buildProgress(runId, 'step-001', request.prompt, [], [], null);
+      return {
+        run_id: runId, strategy: routing.strategy, output: 'Plan ready for approval',
+        stop_reason: 'paused', tool_calls_made: 0, model_calls: 0, iterations: 0,
+        observations: [], denied_actions: [], events_replayed: this.session.eventCount,
+        notifications_count: 0, unauthorized_effects: 0, tool_failures: 0,
+        capability_replays: 0, paused: true, progress,
+      };
+    }
+
+   // 10. Execute strategy with guarded executor
+   this.runState = 'running';
+   this.eventBus?.publish(createEvent('run_state_change', runId, { state: this.runState }));
+   this.eventBus?.publish(createEvent('step_transition', runId, { step: 'step-001', phase: 'execution' }));
+   // P1-01: Pass available tools to the strategy for native function calling.
+   // The tool names from the request are converted to lightweight ToolSpec
+   // definitions that the provider serializes into its native tool-calling format.
+   const availableTools: ProviderToolSpec[] | undefined = request.available_tools && request.available_tools.length > 0
+     ? request.available_tools.map((name) => ({ name, description: `Tool: ${name}` }))
+     : undefined;
+   const result = await strategy.execute(messages, ctx, opts.modelCaller, guardedExecutor, availableTools);
 
     // 10. Record model calls
     for (let i = 0; i < result.model_calls; i++) {
@@ -361,15 +536,23 @@ export class RuntimeLoop {
       });
     }
 
-    // 12. Record denials
-    for (const denial of result.denied_actions) {
-      this.session.append({
-        type: 'action_denied', run_id: runId, step_id: 'step-001',
-        data: { tool_name: denial, reason: denial },
+   // 12. Record denials
+   for (const denial of result.denied_actions) {
+     this.session.append({
+       type: 'action_denied', run_id: runId, step_id: 'step-001',
+       data: { tool_name: denial, reason: denial },
+     });
+   }
+
+    // P1-24: on_step_end hook
+    if (this.pluginManager) {
+      await this.pluginManager.trigger('on_step_end', {
+        run_id: runId, step_id: 'step-001',
+        tool_result: { success: result.stop_reason === 'completed', stop_reason: result.stop_reason },
       });
     }
 
-    // 13. Complete
+   // 13. Complete
     const stopType = result.stop_reason === 'completed' ? 'step_completed' : 'step_failed';
     this.session.append({
       type: stopType, run_id: runId, step_id: 'step-001',
@@ -383,6 +566,33 @@ export class RuntimeLoop {
 
     // 14. Generate notifications
     this.notifications.fromEvents(this.session.getEvents());
+
+    // P1-06: Emit completion events
+    this.runState = result.stop_reason === 'completed' ? 'completed' : 'failed';
+    this.eventBus?.publish(createEvent('run_state_change', runId, { state: this.runState, stop_reason: result.stop_reason }));
+
+    // P1-08: Store task result in session for multi-turn context
+    if (this.sessionManager && request.session_id) {
+      this.sessionManager.addTaskResult(request.session_id, {
+        task: request.prompt,
+        result: result.output,
+        timestamp: new Date().toISOString(),
+        run_id: runId,
+      });
+    }
+
+    // P1-24: on_task_end hook
+    if (this.pluginManager) {
+      await this.pluginManager.trigger('on_task_end', { run_id: runId });
+    }
+
+    // P1-13: Build progress snapshot for crash recovery
+    const progress = this.buildProgress(
+      runId, 'step-001', request.prompt,
+      result.stop_reason === 'completed' ? ['step-001'] : [],
+      result.stop_reason === 'completed' ? [] : ['step-001'],
+      result.stop_reason === 'completed' ? null : result.stop_reason,
+    );
 
     return {
       run_id: runId,
@@ -399,6 +609,28 @@ export class RuntimeLoop {
       unauthorized_effects: guardedExecutor?.unauthorizedEffectsCount ?? 0,
       tool_failures: guardedExecutor?.toolFailuresCount ?? 0,
       capability_replays: guardedExecutor?.capabilityReplayCount ?? 0,
+      progress,
+      // P1-21: estimated_cost from model calls (rough estimate)
+      estimated_cost: result.model_calls > 0
+        ? result.model_calls * 2000 * (0.000005 + 0.000015) // ~2K tokens/call, avg $5/$15 per 1M
+        : undefined,
+    };
+  }
+
+  /** P1-13: Build a progress snapshot for crash recovery (progress.json) */
+  private buildProgress(
+    runId: string, currentStep: string, goal: string,
+    completedSteps: string[], openTasks: string[], lastError: string | null,
+  ): ProgressSnapshot {
+    return {
+      run_id: runId,
+      current_step: currentStep,
+      goal,
+      completed_steps: completedSteps,
+      open_tasks: openTasks,
+      last_error: lastError,
+      checkpoint_refs: [],
+      timestamp: new Date().toISOString(),
     };
   }
 

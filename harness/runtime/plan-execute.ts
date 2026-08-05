@@ -7,6 +7,7 @@
  */
 
 import type { Message, ProviderRequest } from '../gateway/provider.js';
+import type { ToolSpec } from '../gateway/provider.js';
 import type { StrategyContext, StrategyResult, ToolExecutor, ModelCaller, ReasoningStrategyHandler } from './reasoning-strategy.js';
 
 export interface PlanStep {
@@ -39,6 +40,7 @@ export class PlanExecuteStrategy implements ReasoningStrategyHandler {
     ctx: StrategyContext,
     model: ModelCaller,
     toolExecutor?: ToolExecutor,
+    _availableTools?: ToolSpec[],
   ): Promise<StrategyResult> {
     const observations: string[] = [];
     const deniedActions: string[] = [];

@@ -10,7 +10,7 @@
 </defs>
 <rect x="0" y="0" width="1400" height="1080" fill="#0d1117" rx="8"/>
 <text x="20" y="28" fill="#fbcfe8" font-size="15" font-weight="bold">Routing System — Dependency-Aware DAG (v9, replaces v8 8-parallel-routers + Re-router)</text>
-<text x="20" y="46" fill="#8b949e" font-size="11">routing-system.md · 13 阶段顺序依赖 DAG · 3 层实现(0 LLM → 1 LLM → 0 LLM) · Router 输出 risk assessment(非 policy) · 无独立 Re-router(re-route = 新 RunPlan revision)</text>
+<text x="20" y="46" fill="#8b949e" font-size="11">一个 Router: Phase 1 Static 子集 → Phase 3 完整 13-stage DAG · model/tool/skill/RAG 是 typed resolvers · Security 是约束/veto, 不是 router</text>
 
 <!-- Left lane: 3-layer implementation -->
 <rect x="10" y="70" width="180" height="780" fill="#161b22" stroke="#30363d" rx="6"/>
@@ -55,7 +55,7 @@
 
 <rect x="230" y="110" width="780" height="40" fill="#21262d" stroke="#58a6ff" stroke-width="1" rx="4"/>
 <text x="245" y="128" fill="#58a6ff" font-size="10" font-weight="bold">S0</text>
-<text x="275" y="128" fill="#f0f6fc" font-size="10">Identity & Immutable Policy Constraints</text>
+<text x="275" y="128" fill="#f0f6fc" font-size="10">Identity &amp; Immutable Policy Constraints</text>
 <text x="700" y="128" fill="#8b949e" font-size="8">安全在此进入(v9 修正,在 routing 之前)</text>
 <text x="700" y="140" fill="#f85149" font-size="8">policy authority 供 immutable 约束</text>
 <line x1="620" y1="150" x2="620" y2="160" stroke="#8b949e" stroke-width="1.5" marker-end="url(#ar)"/>
@@ -192,7 +192,7 @@
 <text x="40" y="988" fill="#8b949e" font-size="9">• 独立 Re-router 组件(局部重新路由)</text>
 <text x="40" y="1003" fill="#8b949e" font-size="9">• Parallel Candidate Resolution</text>
 <text x="40" y="1018" fill="#8b949e" font-size="9">• RunConfiguration (v8 术语)</text>
-<text x="40" y="1033" fill="#8b949e" font-size="9">• 20+ tools</text>
+<text x="40" y="1033" fill="#8b949e" font-size="9">• 31 tools delivered by phase through one Tool Registry</text>
 <rect x="710" y="905" width="660" height="140" fill="#0d1117" stroke="#3fb950" stroke-width="2" rx="4"/>
 <text x="1040" y="923" fill="#3fb950" font-size="10" font-weight="bold" text-anchor="middle">v9 (当前)</text>
 <text x="720" y="943" fill="#3fb950" font-size="9">• 13 阶段顺序依赖 DAG (S0-S12)</text>
@@ -201,5 +201,5 @@
 <text x="720" y="988" fill="#8b949e" font-size="9">• re-route = 新 RunPlan revision + 撤旧 Capability</text>
 <text x="720" y="1003" fill="#8b949e" font-size="9">• Policy 在 S0 进入(非 S7 之后)</text>
 <text x="720" y="1018" fill="#8b949e" font-size="9">• RunPlan (术语, 22 必填字段)</text>
-<text x="720" y="1033" fill="#8b949e" font-size="9">• 15 tools (9 P1 + 6 P2-3)</text>
+<text x="720" y="1033" fill="#8b949e" font-size="9">• frozen provider/tool/skill/environment/eval snapshots · 31 phased tools</text>
 </svg>

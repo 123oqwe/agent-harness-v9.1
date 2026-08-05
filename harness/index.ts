@@ -9,7 +9,6 @@
 // Gateway: model abstraction and scripted test provider
 export {
   ScriptedTestProvider,
-  ModelGateway,
   ScriptedResponseExhaustedError,
   ScriptedResponseMissingError,
 } from './gateway/scripted-provider.js';
@@ -58,6 +57,7 @@ export type {
   RiskRegulatorySensitivity,
   EgressPolicy,
   EgressDomainRule,
+  AuditLogEntry,
 } from './security/policy-engine.js';
 
 export {
@@ -136,16 +136,24 @@ export type {
 } from './vfs/virtual-filesystem.js';
 
 // Runtime: sandbox
-export { Sandbox } from './runtime/sandbox.js';
+
+export {
+  Sandbox,
+  generateSandboxProfile,
+  detectPlatform,
+  isNativeSandboxAvailable,
+} from './runtime/sandbox.js';
 
 export type {
   SandboxConfig,
   SandboxExecuteRequest,
   SandboxResult,
+  SandboxProfile,
+  Platform,
 } from './runtime/sandbox.js';
 
 // Tools: tool registry and search
-export { ToolRegistry, tool_search, ToolValidationError, ToolConflictError } from './tools/tool-registry.js';
+export { ToolRegistry, tool_search, tool_load, ToolValidationError, ToolConflictError } from './tools/tool-registry.js';
 export type { ToolSpec as RegistryToolSpec, SearchResult, ToolSearchOptions } from './tools/tool-registry.js';
 
 // Skills: skill registry and search
@@ -160,9 +168,17 @@ export type { SkillSpec, SkillSearchResult, SkillSearchOptions } from './tools/s
 
 // Gateway: model gateway
 export {
+  ModelGateway,
   ModelGateway as EnhancedModelGateway,
   GatewayTimeoutError,
   GatewayRetryExhaustedError,
+  GatewayTruncationError,
+  GatewayRateLimitedError,
+  isBackoffRetryable,
+  CircuitBreaker,
+  CircuitOpenError,
+  type CircuitState,
+  type CircuitBreakerOptions,
 } from './gateway/model-gateway.js';
 export type { ModelProfile, GatewayCallOptions, GatewayCallResult, GatewayTelemetry } from './gateway/model-gateway.js';
 
@@ -185,7 +201,19 @@ export type { SessionEvent, SessionSnapshot, RestoreResult, EventType } from './
 
 // Runtime: loop, retry, notifications
 export { RuntimeLoop } from './runtime/loop.js';
-export type { RuntimeRequest, RuntimeResult, RuntimeLoopOptions } from './runtime/loop.js';
+export type { RuntimeRequest, RuntimeResult, RuntimeLoopOptions, ProgressSnapshot, RunState } from './runtime/loop.js';
+
+// Runtime: context offloading
+export {
+  offloadToolResult,
+  contextPressure,
+  shouldOffload,
+  shouldCompact,
+  shouldReset,
+  DEFAULT_OFFLOAD_OPTIONS,
+} from './runtime/context-offload.js';
+export type { OffloadOptions, OffloadResult } from './runtime/context-offload.js';
+
 export { withRetry, createRetryableError, isRetryable, calculateBackoff } from './runtime/retry.js';
 export type { RetryOptions, RetryResult, RetryableError } from './runtime/retry.js';
 export { NotificationQueue } from './runtime/notifications.js';
@@ -225,3 +253,79 @@ export { getCodingUIState } from './ui/ah_ui_coding_001.js';
 export { getEvidenceUIState } from './ui/ah_ui_evidence_001.js';
 export { getPrivacyUIState } from './ui/ah_ui_privacy_001.js';
 export { getTaskUIState } from './ui/ah_ui_task_001.js';
+
+// Gateway: capability registry, usage meter, key vault, rate limiter, LLM cache, fallback chain
+export {
+  CapabilityRegistry,
+  UsageMeter,
+  KeyVault,
+  RateLimiter,
+  LLMCache,
+  FallbackChain,
+  DEFAULT_RATE_LIMITS,
+} from './gateway/capability-registry.js';
+export type {
+  ModelCapabilityEntry,
+  UsageEntry,
+  RateLimitConfig,
+  CacheEntry,
+  FallbackChainOptions,
+} from './gateway/capability-registry.js';
+
+// Runtime: event bus, plugin manager, session manager, health monitor
+export { EventBus, createEvent } from './runtime/event-bus.js';
+export type { BusEvent, StreamEventType, StreamMode, EventBusOptions } from './runtime/event-bus.js';
+export { PluginManager } from './runtime/plugin-manager.js';
+export type { HookType, HookContext, HookResult, HookAction, HookHandler, HookRegistration } from './runtime/plugin-manager.js';
+export { SessionManager, SteeringQueue, DEFAULT_STEERING_LIMITS } from './runtime/session-manager.js';
+export type { SessionTaskResult, SessionRecord, SessionManagerOptions, SteeringQueueType, SteeringQueueLimits } from './runtime/session-manager.js';
+export { HealthMonitor } from './runtime/health-monitor.js';
+export type { HealthState, HealthCheck, HealthReport } from './runtime/health-monitor.js';
+
+// Runtime: context RAG (chunking, embedding, compaction, validation, etc.)
+export {
+  semanticChunk,
+  allocateContextBudget,
+  DEFAULT_LAYER_PERCENTAGES,
+  hybridSearch,
+  cosineSimilarity,
+  computeFingerprint,
+  fingerprintsEqual,
+  compactMessages,
+  validateStructuredOutput,
+  validationRetryPrompt,
+  reduceState,
+  sanitizeToolCall,
+  redactCredentials,
+  detectInjectionRegex,
+  verifyDocumentOutput,
+  DEFAULT_COMPACTION_CONFIG,
+  DEFAULT_CHUNK_OPTIONS,
+} from './runtime/context-rag.js';
+export type {
+  TextChunk,
+  ChunkingOptions,
+  ContextLayerBudget,
+  EmbeddingResult,
+  EmbeddingProvider,
+  FileFingerprint,
+  CompactionConfig,
+  CompactionResult,
+  ValidationResult,
+  ReducerStrategy,
+  FewShotExample,
+  ExampleSelector,
+  SanitizationResult,
+  InjectionCheckResult,
+  DocVerificationResult,
+} from './runtime/context-rag.js';
+
+// Security: consent service, MCP allowlist
+export { ConsentService } from './security/consent-service.js';
+export type { ConsentRecord, ConsentRequest } from './security/consent-service.js';
+export { McpAllowlist, McpClient } from './security/mcp-allowlist.js';
+export type { McpAllowlistEntry, McpServerConfig, McpTool, McpTransportType } from './security/mcp-allowlist.js';
+
+// VFS: composite backend
+export { CompositeBackend } from './vfs/composite-backend.js';
+export type { BackendType, BackendRoute } from './vfs/composite-backend.js';

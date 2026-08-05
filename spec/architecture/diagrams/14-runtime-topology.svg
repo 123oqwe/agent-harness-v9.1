@@ -159,9 +159,9 @@
 <!-- Module independence -->
 <rect x="20" y="710" width="1360" height="190" fill="#161b22" stroke="#30363d" rx="6"/>
 <text x="700" y="730" fill="#fbcfe8" font-size="12" font-weight="bold" text-anchor="middle">模块依赖方向 (harness-boundary.md, 无循环)</text>
-<text x="40" y="755" fill="#3fb950" font-size="9">runtime depends on: security, context</text>
-<text x="300" y="755" fill="#58a6ff" font-size="9">router depends on: runtime (re-route=new RunPlan), security</text>
-<text x="700" y="755" fill="#e3b341" font-size="9">tools depend on: security (PEP), sandbox</text>
+<text x="40" y="755" fill="#3fb950" font-size="9">runtime → contracts + security/context/VFS/gateway interfaces</text>
+<text x="300" y="755" fill="#58a6ff" font-size="9">router → contracts + registry reads + Policy constraints (not Runtime)</text>
+<text x="700" y="755" fill="#e3b341" font-size="9">tools → registry + PEP + VFS + sandbox</text>
 <text x="1000" y="755" fill="#39c5cf" font-size="9">vfs: 独立, 被 tools/RAG/memory 共用</text>
 <text x="40" y="780" fill="#8b949e" font-size="9">验证: madge --circular (构建时)</text>
 <text x="40" y="800" fill="#fbbf24" font-size="9">5 横切平面:</text>

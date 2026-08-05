@@ -1,7 +1,7 @@
 /** AH-TOOL-009: parse_document - parse local formats and return text with anchors */
 export interface ParseDocumentInput {
   path: string;
-  format?: 'txt' | 'md' | 'json' | 'csv';
+  format?: 'txt' | 'md' | 'json' | 'csv' | 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'html' | 'audio' | 'video';
   max_pages?: number;
 }
 
@@ -17,10 +17,30 @@ export interface ParseDocumentResult {
   sections: ParsedSection[];
   total_pages: number;
   total_chars: number;
+  needs_external_parser?: boolean;
+  external_parser?: string;
+}
+
+export function detectFormat(path: string): ParseDocumentInput['format'] {
+  const ext = path.toLowerCase().split('.').pop() ?? '';
+  switch (ext) {
+    case 'txt': return 'txt';
+    case 'md': case 'markdown': return 'md';
+    case 'json': return 'json';
+    case 'csv': return 'csv';
+    case 'pdf': return 'pdf';
+    case 'docx': case 'doc': return 'docx';
+    case 'pptx': case 'ppt': return 'pptx';
+    case 'xlsx': case 'xls': return 'xlsx';
+    case 'html': case 'htm': return 'html';
+    case 'mp3': case 'wav': case 'flac': case 'aac': case 'ogg': case 'm4a': return 'audio';
+    case 'mp4': case 'avi': case 'mov': case 'mkv': case 'webm': return 'video';
+    default: return 'txt';
+  }
 }
 
 export function parseDocument(content: string, input: ParseDocumentInput): ParseDocumentResult {
-  const format = input.format ?? 'txt';
+  const format = input.format ?? detectFormat(input.path);
   const maxPages = input.max_pages ?? 100;
 
   switch (format) {
@@ -30,10 +50,34 @@ export function parseDocument(content: string, input: ParseDocumentInput): Parse
       return parseCsv(content, input.path);
     case 'md':
       return parseMarkdown(content, input.path, maxPages);
+    case 'html':
+      return parseHtml(content, input.path, maxPages);
+    case 'pdf':
+      return { path: input.path, format: 'pdf', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'pdf-parse' };
+    case 'docx':
+      return { path: input.path, format: 'docx', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'mammoth' };
+    case 'pptx':
+      return { path: input.path, format: 'pptx', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'pptxgenjs' };
+    case 'xlsx':
+      return { path: input.path, format: 'xlsx', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'exceljs' };
+    case 'audio':
+      return { path: input.path, format: 'audio', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'transcribe_audio' };
+    case 'video':
+      return { path: input.path, format: 'video', sections: [], total_pages: 0, total_chars: 0, needs_external_parser: true, external_parser: 'ffmpeg+transcribe_audio' };
     case 'txt':
     default:
       return parseText(content, input.path, maxPages);
   }
+}
+
+function parseHtml(content: string, path: string, maxPages: number): ParseDocumentResult {
+  const text = content
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return parseText(text, path, maxPages);
 }
 
 function parseText(content: string, path: string, maxPages: number): ParseDocumentResult {

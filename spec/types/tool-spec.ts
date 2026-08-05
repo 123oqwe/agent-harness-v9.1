@@ -10,6 +10,14 @@
  */
 export interface ToolSpec {
   name: string;
+  /**
+   * Compact catalog text returned by tool_search before full schemas are loaded
+   */
+  summary: string;
+  /**
+   * Discovery terms; never interpreted as permission grants
+   */
+  tags: string[];
   version: string;
   domains: string[];
   implementation_status:
@@ -41,30 +49,51 @@ export interface ToolSpec {
   sandbox_policy: {
     [k: string]: unknown;
   };
- network_policy: {
-   [k: string]: unknown;
- };
- /**
-  * Reference to EffectRisk.egress_policy binding used by this tool (FG3).
-  */
- egress_policy_ref?: string;
- /**
-  * Screen/desktop operation policy (FG1 Computer Use). Required only by tools whose effect_model involves screen_access.
-  */
- display_policy?: {
-   surface_scope?: "browser_only" | "native_app_approved" | "desktop" | "fullscreen";
-   approved_apps?: string[];
-   screenshot_isolation?: "exclude_self_output" | "full";
-   global_interrupt_consumed?: boolean;
-   single_session_lock?: boolean;
- };
- /**
-  * Which RunPlan phases may invoke this tool (FG2 two-phase runtime).
-  */
- run_phase_binding?: ("setup" | "agent")[];
- credential_requirements: {
-   [k: string]: unknown;
- }[];
+  network_policy: {
+    [k: string]: unknown;
+  };
+  /**
+   * Reference to EffectRisk.egress_policy binding used by this tool (FG3). The authoritative network policy; tool-spec.network_policy is kept as the declarative summary.
+   */
+  egress_policy_ref?: string;
+  /**
+   * Screen/desktop operation policy (FG1 Computer Use). Required only by tools whose effect_model involves screen_access.
+   */
+  display_policy?: {
+    surface_scope?: "browser_only" | "native_app_approved" | "desktop" | "fullscreen";
+    /**
+     * Per-app approval list (bundle IDs / window titles). Sentinel apps (terminals, Finder, system settings) require escalated consent.
+     */
+    approved_apps?: string[];
+    /**
+     * exclude_self_output: agent's own UI/terminal never enters screenshots (prevents prompt-injection feedback). Default exclude_self_output.
+     */
+    screenshot_isolation?: "exclude_self_output" | "full";
+    /**
+     * If true, the global interrupt key is consumed so injected content cannot dismiss dialogs.
+     */
+    global_interrupt_consumed?: boolean;
+    single_session_lock?: boolean;
+  };
+  /**
+   * How the tool is invoked. native = in-process function; cli_wrapper = subprocess (Python/binary helper, JSON stdin/stdout protocol); mcp = JSON-RPC MCP server; http_api = HTTP call to cloud provider via model-api-gateway adapter. Backed by ADR-014.
+   */
+  transport?: "native" | "cli_wrapper" | "mcp" | "http_api";
+  /**
+   * Logical group prefix for the tool-masking state machine (CTRL-TOOL-MASK-001). Examples: fs, web, media_gen, media_edit, doc, voice, shell, screen. Allows decode-time logits masking of a whole group without editing tool definitions (preserves KV-cache).
+   */
+  tool_group?: string;
+  /**
+   * Key into spec/deployment/sandbox-toolchain.yaml declaring the external dependency (python package / binary) this cli_wrapper tool requires. Runtime checks availability before spawn; on missing dep returns structured error instead of crashing. Required when transport=cli_wrapper.
+   */
+  cli_toolchain_ref?: string;
+  /**
+   * Which RunPlan phases may invoke this tool (FG2 two-phase runtime). setup = network-enabled dependency install; agent = offline execution. Tools requiring credentials must bind to agent phase only via broker single-exchange.
+   */
+  run_phase_binding?: ("setup" | "agent")[];
+  credential_requirements: {
+    [k: string]: unknown;
+  }[];
   data_egress_policy: {
     [k: string]: unknown;
   };

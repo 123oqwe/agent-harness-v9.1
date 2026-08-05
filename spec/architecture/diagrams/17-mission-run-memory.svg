@@ -101,7 +101,7 @@
 <text x="60" y="705" fill="#f0f6fc" font-size="9">→ 写 handoff artifact: current goal, completed steps, open tasks, checkpoint refs, next step</text>
 <text x="60" y="720" fill="#f0f6fc" font-size="9">→ 开新 session, 从 handoff 恢复</text>
 <text x="60" y="735" fill="#8b949e" font-size="9">区别于 compaction: compaction 原地摘要; context_reset 清空窗口, 通过 artifact 交接</text>
-<text x="60" y="755" fill="#fbbf24" font-size="9">Smart Zone &lt;40% · Caution 40-70% (compaction) · Dumb &gt;70% (context_reset)</text>
+<text x="60" y="755" fill="#fbbf24" font-size="9">统一阈值: 40% reversible offload · 70% aligned compaction · 85% context_reset/handoff</text>
 <text x="60" y="775" fill="#8b949e" font-size="9">progress.json 每 turn 写 + context_reset 写 handoff = 双保险跨 session 状态保持</text>
 <text x="60" y="795" fill="#8b949e" font-size="9">Phase 2: session spawn-from-handoff 完整实现 (Phase 1 仅 emit 事件)</text>
 </svg>

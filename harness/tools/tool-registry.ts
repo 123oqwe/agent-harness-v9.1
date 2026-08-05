@@ -227,3 +227,17 @@ export function tool_search(
 ): SearchResult[] {
   return registry.search(opts);
 }
+
+/**
+ * Deferred tool loading (P2-08): load the full ToolSpec for a specific tool
+ * by name after discovery via tool_search. Returns undefined if not found.
+ * This enables on-demand tool schema loading instead of injecting all tool
+ * definitions into every prompt.
+ */
+export function tool_load(
+  registry: ToolRegistry,
+  name: string,
+  version?: string,
+): ToolSpec | undefined {
+  return registry.get(name, version);
+}

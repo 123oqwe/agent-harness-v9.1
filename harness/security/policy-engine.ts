@@ -114,6 +114,22 @@ export interface PolicyDecision {
 }
 
 // ---------------------------------------------------------------------------
+// Audit Log (P1-14): every policy evaluation is recorded for security audit
+// ---------------------------------------------------------------------------
+
+export interface AuditLogEntry {
+  timestamp: string;
+  tool_name: string;
+  action_type: RiskOperation;
+  verdict: 'allow' | 'deny';
+  derived_risk_tier: DerivedRiskTier;
+  reasons: string[];
+  tenant_id: string;
+  user_id: string;
+  decided_at: string;
+}
+
+// ---------------------------------------------------------------------------
 // Risk Tier Derivation (step 3)
 // ---------------------------------------------------------------------------
 
@@ -167,6 +183,7 @@ export function deriveRiskTier(
 
 export class PolicyEngine {
   private readonly policy: Policy;
+  private readonly auditLog: AuditLogEntry[] = [];
 
   constructor(policy: Policy) {
     if (policy.default_decision !== 'deny') {
@@ -178,40 +195,40 @@ export class PolicyEngine {
     };
   }
 
-  evaluate(toolName: string, risk: EffectRisk, ctx: PolicyContext): PolicyDecision {
-    const tier = deriveRiskTier(risk, this.policy, ctx);
-    const reasons: string[] = [];
+ evaluate(toolName: string, risk: EffectRisk, ctx: PolicyContext): PolicyDecision {
+   const tier = deriveRiskTier(risk, this.policy, ctx);
+   const reasons: string[] = [];
 
-    const rule = this.policy.rules.find(
-      (r) => r.tool === toolName || r.tool === '*',
-    );
+   const rule = this.policy.rules.find(
+     (r) => r.tool === toolName || r.tool === '*',
+   );
 
-    if (!rule) {
-      reasons.push('No policy rule matches tool "' + toolName + '" - deny by default');
-      return this.deny(tier, reasons, undefined);
-    }
+   if (!rule) {
+     reasons.push('No policy rule matches tool "' + toolName + '" - deny by default');
+      return this.recordAudit(this.deny(tier, reasons, undefined), toolName, risk.operation, ctx);
+   }
 
-    if (!rule.allow) {
-      reasons.push('Rule for "' + rule.tool + '" explicitly denies');
-      return this.deny(tier, reasons, rule);
-    }
+   if (!rule.allow) {
+     reasons.push('Rule for "' + rule.tool + '" explicitly denies');
+      return this.recordAudit(this.deny(tier, reasons, rule), toolName, risk.operation, ctx);
+   }
 
-    if (rule.max_tier !== undefined && tier > rule.max_tier) {
-      reasons.push(
-        'Derived risk tier ' + tier + ' exceeds max_tier ' + rule.max_tier + ' for tool "' + toolName + '"',
-      );
-      return this.deny(tier, reasons, rule);
-    }
+   if (rule.max_tier !== undefined && tier > rule.max_tier) {
+     reasons.push(
+       'Derived risk tier ' + tier + ' exceeds max_tier ' + rule.max_tier + ' for tool "' + toolName + '"',
+     );
+      return this.recordAudit(this.deny(tier, reasons, rule), toolName, risk.operation, ctx);
+   }
 
-    const egress = resolveEgress(risk.egress_policy, rule.egress_override);
+   const egress = resolveEgress(risk.egress_policy, rule.egress_override);
 
-    if (risk.network_access && egress && egress.mode === 'disabled') {
-      reasons.push('Tool "' + toolName + '" requires network but egress_policy is disabled');
-      return this.deny(tier, reasons, rule);
-    }
+   if (risk.network_access && egress && egress.mode === 'disabled') {
+     reasons.push('Tool "' + toolName + '" requires network but egress_policy is disabled');
+      return this.recordAudit(this.deny(tier, reasons, rule), toolName, risk.operation, ctx);
+   }
 
-    reasons.push('Rule for "' + rule.tool + '" allows (tier ' + tier + ' <= ' + (rule.max_tier ?? 5) + ')');
-    return {
+   reasons.push('Rule for "' + rule.tool + '" allows (tier ' + tier + ' <= ' + (rule.max_tier ?? 5) + ')');
+    const decision: PolicyDecision = {
       allowed: true,
       reasons,
       derived_risk_tier: tier,
@@ -219,10 +236,36 @@ export class PolicyEngine {
       evaluated_rule: rule,
       decided_at: ctx.now.toISOString(),
     };
+    return this.recordAudit(decision, toolName, risk.operation, ctx);
   }
 
   get rules(): readonly PolicyRule[] {
     return this.policy.rules;
+  }
+
+  /** Returns an immutable copy of the audit log (P1-14). */
+  getAuditLog(): readonly AuditLogEntry[] {
+    return [...this.auditLog];
+  }
+
+  private recordAudit(
+    decision: PolicyDecision,
+    toolName: string,
+    actionType: RiskOperation,
+    ctx: PolicyContext,
+  ): PolicyDecision {
+    this.auditLog.push({
+      timestamp: new Date().toISOString(),
+      tool_name: toolName,
+      action_type: actionType,
+      verdict: decision.allowed ? 'allow' : 'deny',
+      derived_risk_tier: decision.derived_risk_tier,
+      reasons: [...decision.reasons],
+      tenant_id: ctx.tenant_id,
+      user_id: ctx.user_id,
+      decided_at: decision.decided_at,
+    });
+    return decision;
   }
 
   private deny(

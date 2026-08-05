@@ -46,7 +46,11 @@
         "capability_id": "CAP-A-006",
         "name": "chat",
         "requirement_ids": [
-          "AH-UI-CHAT-001"
+          "AH-TOOL-ASK-001",
+          "AH-UI-CHAT-001",
+          "AH-UX-API-001",
+          "AH-UX-CONTRACT-001",
+          "AH-UX-WEB-001"
         ]
       },
       {
@@ -90,54 +94,60 @@
         "capability_id": "CAP-A-010",
         "name": "coding_workspace",
         "requirement_ids": [
+          "AH-CODING-VERTICAL-001",
           "AH-RUNTIME-LOOP-001",
-          "AH-UI-WRITING-001",
-          "AH-TOOL-READ-001",
-          "AH-UI-RESEARCH-001",
           "AH-TOOL-EDIT-001",
           "AH-TOOL-EXEC-001",
+          "AH-TOOL-READ-001",
           "AH-TOOL-SEARCH-001",
-          "AH-UI-PLANNING-001",
+          "AH-TOOL-WRITE-001",
           "AH-UI-CODING-001",
-          "AH-CODING-VERTICAL-001",
           "AH-UI-DOC-001",
-          "AH-TOOL-WRITE-001"
+          "AH-UI-PLANNING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-UI-TUI-001",
+          "AH-UI-WRITING-001"
         ]
       },
       {
         "capability_id": "CAP-A-011",
         "name": "document_workspace",
         "requirement_ids": [
-          "AH-RAG-CITE-001",
+          "AH-DOC-INGEST-DOCX-001",
           "AH-DOC-INGEST-ENC-001",
           "AH-DOC-INGEST-IMG-001",
-          "AH-DOC-INGEST-DOCX-001",
+          "AH-DOC-INGEST-MD-001",
           "AH-DOC-INGEST-PDF-001",
-          "AH-DOC-INGEST-UNSUPPORTED-001",
-          "AH-DOC-VERTICAL-001",
-          "AH-UI-DOC-001",
-          "AH-DOC-PARSE-HEAD-001",
-          "AH-RAG-CHUNK-001",
-          "AH-RAG-RERANK-001",
-          "AH-RAG-FTS-001",
-          "AH-RAG-EMBED-001",
-          "AH-DOC-PARSE-PROVENANCE-001",
           "AH-DOC-INGEST-PPTX-001",
-          "AH-UI-WRITING-001",
-          "AH-RAG-QUERY-001",
+          "AH-DOC-INGEST-UNSUPPORTED-001",
           "AH-DOC-INGEST-WEB-001",
-          "AH-RAG-GRAPH-001",
-          "AH-UI-RESEARCH-001",
-          "AH-DOC-PARSE-TABLE-001",
-          "AH-DOC-PARSE-IMGREF-001",
-          "AH-UI-CODING-001",
-          "AH-MM-DOC-VISION-001",
-          "AH-RAG-EMBED-MIG-001",
-          "AH-RAG-DELETE-001",
-          "AH-UI-PLANNING-001",
           "AH-DOC-INGEST-XLSX-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-DOC-VERTICAL-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-RAG-CHUNK-001",
+          "AH-RAG-CITE-001",
+          "AH-RAG-DELETE-001",
+          "AH-RAG-EMBED-001",
+          "AH-RAG-EMBED-MIG-001",
+          "AH-RAG-FTS-001",
+          "AH-RAG-GRAPH-001",
           "AH-RAG-META-001",
-          "AH-DOC-INGEST-MD-001"
+          "AH-RAG-QUERY-001",
+          "AH-RAG-RERANK-001",
+          "AH-TOOL-DOCUMENT-001",
+          "AH-TOOL-OCR-001",
+          "AH-TOOL-PARSE-001",
+          "AH-TOOL-PRESENTATION-001",
+          "AH-TOOL-SPREADSHEET-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001",
+          "AH-UI-PLANNING-001",
+          "AH-UI-RESEARCH-001",
+          "AH-UI-WRITING-001"
         ]
       },
       {
@@ -180,28 +190,38 @@
         "capability_id": "CAP-A-015",
         "name": "multimodal_studio",
         "requirement_ids": [
-          "AH-MM-IMAGE-EDIT-001",
-          "AH-UI-MM-001",
           "AH-MM-ARTIFACT-001",
-          "AH-MM-VISION-VERIFY-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-MM-IMAGE-EDIT-001",
           "AH-MM-IMAGE-GEN-001",
           "AH-MM-IMAGE-IN-001",
-          "AH-MM-DOC-VISION-001"
+          "AH-MM-VISION-VERIFY-001",
+          "AH-TOOL-CLONE-VOICE-001",
+          "AH-TOOL-IMAGE-GEN-001",
+          "AH-TOOL-MUSIC-GEN-001",
+          "AH-TOOL-SPEECH-GEN-001",
+          "AH-TOOL-TRANSCRIBE-001",
+          "AH-TOOL-VIDEO-EDIT-001",
+          "AH-TOOL-VIDEO-GEN-001",
+          "AH-TOOL-VOICE-CONVERSE-001",
+          "AH-UI-MM-001"
         ]
       },
       {
         "capability_id": "CAP-A-016",
         "name": "approval_center",
         "requirement_ids": [
-          "AH-STATE-APPROVAL-001",
-          "AH-RELEASE-001",
-          "AH-UI-NOTIFY-001",
-          "AH-UI-APPROVAL-001",
-          "AH-MEM-UI-001",
-          "AH-UI-PRIVACY-001",
-          "AH-UI-MEMORY-001",
           "AH-MEM-APPROVAL-001",
-          "AH-UI-RECONCILE-001"
+          "AH-MEM-UI-001",
+          "AH-RELEASE-001",
+          "AH-STATE-APPROVAL-001",
+          "AH-TOOL-ESCALATE-001",
+          "AH-UI-APPROVAL-001",
+          "AH-UI-MEMORY-001",
+          "AH-UI-NOTIFY-001",
+          "AH-UI-PRIVACY-001",
+          "AH-UI-RECONCILE-001",
+          "AH-VERIFIER-AUTOREVIEW-001"
         ]
       },
       {
@@ -230,10 +250,11 @@
         "capability_id": "CAP-A-018",
         "name": "evidence_viewer",
         "requirement_ids": [
-          "AH-UI-EVIDENCE-001",
-          "AH-SPEC-REPAIR-001",
+          "AH-EVIDENCE-001",
           "AH-RESEARCH-VERTICAL-001",
-          "AH-EVIDENCE-001"
+          "AH-SPEC-REPAIR-001",
+          "AH-TOOL-ARTIFACT-001",
+          "AH-UI-EVIDENCE-001"
         ]
       },
       {
@@ -312,26 +333,26 @@
       {
         "capability_id": "CAP-A-024",
         "name": "mobile_surface",
-        "requirement_ids": [],
-        "framework_gap": "mobile",
-        "description": "Mobile delivery surface (iOS/Android): push notifications, remote steer, cross-device session continuation",
-        "requirement_pending": "Phase 6"
+        "requirement_ids": [
+          "AH-TOOL-PUSH-001"
+        ],
+        "description": "Mobile delivery surface (iOS/Android): push notifications, remote steer, cross-device session continuation"
       },
       {
         "capability_id": "CAP-A-025",
         "name": "remote_control",
-        "requirement_ids": [],
-        "framework_gap": "mobile",
-        "description": "Remote control: continue local session from another device, bidirectional state sync",
-        "requirement_pending": "Phase 6"
+        "requirement_ids": [
+          "AH-TOOL-REMOTE-STEER-001"
+        ],
+        "description": "Remote control: continue local session from another device, bidirectional state sync"
       },
       {
         "capability_id": "CAP-A-026",
         "name": "channels",
-        "requirement_ids": [],
-        "framework_gap": "mobile",
-        "description": "External channel injection: Telegram/Discord/iMessage/webhook messages pushed into session, 2-way steer",
-        "requirement_pending": "Phase 6"
+        "requirement_ids": [
+          "AH-TOOL-CHANNEL-001"
+        ],
+        "description": "External channel injection: Telegram/Discord/iMessage/webhook messages pushed into session, 2-way steer"
       }
     ],
     "B_core_harness": [
@@ -348,6 +369,7 @@
         "name": "task_profiling",
         "requirement_ids": [
           "AH-PA-VERTICAL-001",
+          "AH-ROUTER-FOUNDATION-001",
           "AH-UI-TASK-001"
         ]
       },
@@ -355,7 +377,10 @@
         "capability_id": "CAP-B-003",
         "name": "routing_dag",
         "requirement_ids": [
-          "AH-ROUTER-DAG-001"
+          "AH-ROUTER-DAG-001",
+          "AH-ROUTER-DAG-FAILURE-001",
+          "AH-ROUTER-FOUNDATION-001",
+          "AH-ROUTER-SKILL-CHAIN-001"
         ]
       },
       {
@@ -373,9 +398,11 @@
         "capability_id": "CAP-B-005",
         "name": "agent_graph",
         "requirement_ids": [
-          "AH-SUBAGENT-001",
+          "AH-AGENT-AUTHORING-001",
+          "AH-MULTIAGENT-DAG-001",
+          "AH-MULTIAGENT-MERGE-001",
           "AH-RAG-GRAPH-001",
-          "AH-MULTIAGENT-MERGE-001"
+          "AH-SUBAGENT-001"
         ]
       },
       {
@@ -383,8 +410,9 @@
         "name": "context_graph",
         "requirement_ids": [
           "AH-CONTEXT-COMPILER-001",
-          "AH-SCHED-FRESHCTX-001",
-          "AH-RAG-GRAPH-001"
+          "AH-RAG-GRAPH-001",
+          "AH-ROUTER-CONTEXT-TOPOLOGY-001",
+          "AH-SCHED-FRESHCTX-001"
         ]
       },
       {
@@ -401,14 +429,16 @@
         "capability_id": "CAP-B-008",
         "name": "model_gateway",
         "requirement_ids": [
-          "AH-THREAT-001",
           "AH-ENT-MODEL-ALLOW-001",
+          "AH-ENT-ORG-001",
+          "AH-GATEWAY-PROVIDER-001",
+          "AH-GATEWAY-TESTPROVIDER-001",
           "AH-RAG-EMBED-MIG-001",
-          "AH-STATE-OPERATION-001",
           "AH-RUNTIME-MODELFALLBACK-001",
-          "AH-STATE-RUN-001",
           "AH-SPEC-MODELCHECK-001",
-          "AH-ENT-ORG-001"
+          "AH-STATE-OPERATION-001",
+          "AH-STATE-RUN-001",
+          "AH-THREAT-001"
         ]
       },
       {
@@ -471,6 +501,7 @@
         "name": "fallback",
         "requirement_ids": [
           "AH-DOC-INGEST-IMG-001",
+          "AH-ROUTER-FALLBACK-11-001",
           "AH-RUNTIME-MODELFALLBACK-001"
         ]
       },
@@ -478,9 +509,10 @@
         "capability_id": "CAP-B-015",
         "name": "budget_ledger",
         "requirement_ids": [
-          "AH-MISSION-BUDGET-001",
           "AH-CONTEXT-COMPILER-001",
           "AH-ENT-BUDGET-POLICY-001",
+          "AH-MISSION-BUDGET-001",
+          "AH-ROUTER-BUDGET-DYNAMIC-001",
           "AH-RUNTIME-BUDGET-002"
         ]
       },
@@ -488,17 +520,25 @@
         "capability_id": "CAP-B-016",
         "name": "tool_execution_pipeline",
         "requirement_ids": [
-          "AH-TOOL-READ-001",
+          "AH-CONTRACT-TOOLSPEC-001",
           "AH-CROSSDOMAIN-MISSION-001",
+          "AH-ENT-SUPPORT-TOOL-001",
           "AH-ENT-TOOL-ALLOW-001",
+          "AH-ROUTER-DAG-001",
           "AH-SCHED-REAUTH-001",
+          "AH-SPIKE-001",
+          "AH-TOOL-BEHAVIOR-VERIFY-001",
+          "AH-TOOL-BROWSER-001",
+          "AH-TOOL-COMPUTER-001",
           "AH-TOOL-EDIT-001",
           "AH-TOOL-EXEC-001",
+          "AH-TOOL-LIST-001",
+          "AH-TOOL-READ-001",
+          "AH-TOOL-REGISTRY-001",
+          "AH-TOOL-SCHEDULE-001",
           "AH-TOOL-SEARCH-001",
-          "AH-ROUTER-DAG-001",
-          "AH-CONTRACT-TOOLSPEC-001",
-          "AH-SPIKE-001",
-          "AH-ENT-SUPPORT-TOOL-001",
+          "AH-TOOL-WEB-FETCH-001",
+          "AH-TOOL-WEB-SEARCH-001",
           "AH-TOOL-WRITE-001"
         ]
       },
@@ -506,7 +546,9 @@
         "capability_id": "CAP-B-017",
         "name": "skills",
         "requirement_ids": [
-          "AH-CAPMAP-017"
+          "AH-AGENT-AUTHORING-001",
+          "AH-CAPMAP-017",
+          "AH-ROUTER-SKILL-CHAIN-001"
         ]
       },
       {
@@ -520,26 +562,28 @@
         "capability_id": "CAP-B-019",
         "name": "sandbox",
         "requirement_ids": [
-          "AH-TOOL-EXEC-001",
-          "AH-SANDBOX-001"
+          "AH-SANDBOX-001",
+          "AH-SANDBOX-OCI-001",
+          "AH-TOOL-EXEC-001"
         ]
       },
       {
         "capability_id": "CAP-B-020",
         "name": "memory_consolidation",
         "requirement_ids": [
-          "AH-MEM-DELETE-001",
-          "AH-EVOL-NEGATIVE-001",
-          "AH-MEM-TRUST-001",
-          "AH-MEM-UI-001",
-          "AH-UI-MEMORY-001",
-          "AH-MEM-CREATE-001",
-          "AH-SANDBOX-001",
-          "AH-MEM-APPROVAL-001",
-          "AH-MEM-LOCAL-001",
-          "AH-MEM-TTL-001",
           "AH-EVOL-FAIL-001",
-          "AH-MEM-CONFLICT-001"
+          "AH-EVOL-NEGATIVE-001",
+          "AH-MEM-APPROVAL-001",
+          "AH-MEM-CONFLICT-001",
+          "AH-MEM-CREATE-001",
+          "AH-MEM-DELETE-001",
+          "AH-MEM-LOCAL-001",
+          "AH-MEM-TRUST-001",
+          "AH-MEM-TTL-001",
+          "AH-MEM-UI-001",
+          "AH-PERSONALIZATION-001",
+          "AH-SANDBOX-001",
+          "AH-UI-MEMORY-001"
         ]
       },
       {
@@ -594,8 +638,10 @@
         "name": "evaluation_harness",
         "requirement_ids": [
           "AH-EVAL-HARNESS-001",
+          "AH-EVAL-RUNNER-001",
           "AH-EVOL-OFFLINE-001",
-          "AH-ROUTER-EVAL-001"
+          "AH-ROUTER-EVAL-001",
+          "AH-TOOL-BEHAVIOR-VERIFY-001"
         ]
       },
       {
@@ -603,58 +649,67 @@
         "name": "evolution_shadow",
         "requirement_ids": [
           "AH-EVOL-CANDIDATE-001",
-          "AH-EVOL-ROLLBACK-001",
+          "AH-EVOL-DEDUP-001",
+          "AH-EVOL-DOCCLEAN-001",
+          "AH-EVOL-EVALDRIFT-001",
           "AH-EVOL-OFFLINE-001",
-          "AH-EVOL-SHADOW-001"
+          "AH-EVOL-ROLLBACK-001",
+          "AH-EVOL-SHADOW-001",
+          "AH-EVOL-TECHDEBT-001"
         ]
       },
       {
         "capability_id": "CAP-B-026",
         "name": "virtual_filesystem",
-        "requirement_ids": [],
-        "framework_gap": "FG4",
-        "description": "Single file-access authority with backend routing, OverlayBackend transactions (architecture/virtual-filesystem.md)",
-        "requirement_pending": "Phase 1"
+        "requirement_ids": [
+          "AH-VFS-001"
+        ],
+        "description": "Single file-access authority with backend routing, OverlayBackend transactions (architecture/virtual-filesystem.md)"
       },
       {
         "capability_id": "CAP-B-027",
         "name": "routing_slip_choreography",
-        "requirement_ids": [],
-        "framework_gap": "FG7",
-        "description": "Decentralized choreography: itinerary travels with message, agents insert steps up to insert_limit, no central orchestrator (architecture/routing-system.md Mode B)",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-CROSSDOMAIN-MISSION-001",
+          "AH-ROUTER-DAG-001"
+        ],
+        "description": "Decentralized choreography: itinerary travels with message, agents insert steps up to insert_limit, no central orchestrator (architecture/routing-system.md Mode B)"
       },
       {
         "capability_id": "CAP-B-028",
         "name": "workflow_script_orchestration",
-        "requirement_ids": [],
-        "framework_gap": "FG9",
-        "description": "Orchestration as executable script: intermediate results in script variables not agent context, resumable, adversarial cross-check pattern (architecture/routing-system.md Mode C)",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-MULTIAGENT-DAG-001",
+          "AH-ROUTER-DAG-001"
+        ],
+        "description": "Orchestration as executable script: intermediate results in script variables not agent context, resumable, adversarial cross-check pattern (architecture/routing-system.md Mode C)"
       },
       {
         "capability_id": "CAP-B-029",
         "name": "context_offloading",
-        "requirement_ids": [],
-        "framework_gap": "FG10",
-        "description": "Mechanical offloading: tool I/O exceeding offload_token_threshold written to VFS, context keeps pointer + preview, reversible (architecture/context-memory-rag.md)",
-        "requirement_pending": "Phase 2"
+        "requirement_ids": [
+          "AH-CONTEXT-COMPILER-001"
+        ],
+        "description": "Mechanical offloading: tool I/O exceeding offload_token_threshold written to VFS, context keeps pointer + preview, reversible (architecture/context-memory-rag.md)"
       },
       {
         "capability_id": "CAP-B-030",
         "name": "long_session_hibernation",
-        "requirement_ids": [],
-        "framework_gap": "microvm",
-        "description": "Sandbox sleep/wake: long-running sessions hibernate (state persisted to VFS), wake rebuilds context, files preserved across sleep (architecture/runtime-core.md)",
-        "requirement_pending": "Phase 7"
+        "requirement_ids": [
+          "AH-ROUTINE-SCHED-001",
+          "AH-SCHED-MISSED-001",
+          "AH-SCHED-TZ-001",
+          "AH-TOOL-SCHEDULE-001"
+        ],
+        "description": "Sandbox sleep/wake: long-running sessions hibernate (state persisted to VFS), wake rebuilds context, files preserved across sleep (architecture/runtime-core.md)"
       },
       {
         "capability_id": "CAP-B-031",
         "name": "mass_fan_out",
-        "requirement_ids": [],
-        "framework_gap": "fanout",
-        "description": "Large-scale clone fan-out: N homogeneous clones (default max 6 bounded by AH-SUBAGENT-001, configurable to ~100 with elevated concurrency grant), each independent context+sandbox, results aggregated and deduplicated (architecture/routing-system.md Mode D)",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-MULTIAGENT-DAG-001"
+        ],
+        "description": "Large-scale clone fan-out: N homogeneous clones (default max 6 bounded by AH-SUBAGENT-001, configurable to ~100 with elevated concurrency grant), each independent context+sandbox, results aggregated and deduplicated (architecture/routing-system.md Mode D)"
       }
     ],
     "C_safety_governance": [
@@ -784,58 +839,66 @@
       {
         "capability_id": "CAP-C-016",
         "name": "computer_use",
-        "requirement_ids": [],
-        "framework_gap": "FG1",
-        "description": "Screen/desktop operation surface with per-app approval and screenshot isolation",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-TOOL-BROWSER-001",
+          "AH-TOOL-COMPUTER-001"
+        ],
+        "description": "Screen/desktop operation surface with per-app approval and screenshot isolation"
       },
       {
         "capability_id": "CAP-C-017",
         "name": "screen_injection_isolation",
-        "requirement_ids": [],
-        "framework_gap": "FG6",
-        "description": "Screenshot self-output exclusion and global interrupt consumption",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-TOOL-BROWSER-001",
+          "AH-TOOL-COMPUTER-001"
+        ],
+        "description": "Screenshot self-output exclusion and global interrupt consumption"
       },
       {
         "capability_id": "CAP-C-018",
         "name": "two_phase_runtime",
-        "requirement_ids": [],
-        "framework_gap": "FG2",
-        "description": "Setup(network) -> agent(offline) with credential stripping",
-        "requirement_pending": "Phase 1"
+        "requirement_ids": [
+          "AH-RUNTIME-LOOP-001",
+          "AH-SANDBOX-001"
+        ],
+        "description": "Setup(network) -> agent(offline) with credential stripping"
       },
       {
         "capability_id": "CAP-C-019",
         "name": "credential_reach_isolation",
-        "requirement_ids": [],
-        "framework_gap": "FG2",
-        "description": "Credentials absent from agent env; single-exchange at dispatch",
-        "requirement_pending": "Phase 1"
+        "requirement_ids": [
+          "AH-CAPABILITY-001",
+          "AH-CAPMAP-006"
+        ],
+        "description": "Credentials absent from agent env; single-exchange at dispatch"
       },
       {
         "capability_id": "CAP-C-020",
         "name": "network_policy_engine",
-        "requirement_ids": [],
-        "framework_gap": "FG3",
-        "description": "Domain allow/deny, unix socket, local binding, SOCKS5",
-        "requirement_pending": "Phase 1"
+        "requirement_ids": [
+          "AH-SANDBOX-001",
+          "AH-TOOL-WEB-FETCH-001",
+          "AH-TOOL-WEB-SEARCH-001"
+        ],
+        "description": "Domain allow/deny, unix socket, local binding, SOCKS5"
       },
       {
         "capability_id": "CAP-C-021",
         "name": "tool_masking_state_machine",
-        "requirement_ids": [],
-        "framework_gap": "FG5",
-        "description": "Stable tool defs + decode-time logits mask to preserve KV-cache",
-        "requirement_pending": "Phase 2"
+        "requirement_ids": [
+          "AH-GATEWAY-PROVIDER-001",
+          "AH-TOOL-REGISTRY-001"
+        ],
+        "description": "Stable tool defs + decode-time logits mask to preserve KV-cache"
       },
       {
         "capability_id": "CAP-C-022",
         "name": "cross_process_msg_integrity",
-        "requirement_ids": [],
-        "framework_gap": "FG8",
-        "description": "JWS signature + OBO delegation token for cross-process agent messages",
-        "requirement_pending": "Phase 3"
+        "requirement_ids": [
+          "AH-MULTIAGENT-DAG-001",
+          "AH-SUBAGENT-001"
+        ],
+        "description": "JWS signature + OBO delegation token for cross-process agent messages"
       }
     ],
     "D_domains": [
@@ -953,9 +1016,11 @@
         "name": "research_retrieval",
         "requirement_ids": [
           "AH-RAG-QUERY-001",
+          "AH-RAG-RERANK-001",
           "AH-RESEARCH-VERTICAL-001",
-          "AH-UI-RESEARCH-001",
-          "AH-RAG-RERANK-001"
+          "AH-TOOL-WEB-FETCH-001",
+          "AH-TOOL-WEB-SEARCH-001",
+          "AH-UI-RESEARCH-001"
         ]
       },
       {
@@ -1073,34 +1138,38 @@
         "capability_id": "CAP-D-013",
         "name": "pa_reminders",
         "requirement_ids": [
-          "AH-RAG-CITE-001",
-          "AH-SPEC-VERIFIER-001",
-          "AH-DOC-INGEST-PDF-001",
-          "AH-UI-DOC-001",
-          "AH-RUNTIME-COMPACTION-001",
-          "AH-DOC-PARSE-HEAD-001",
-          "AH-PROD-STATUS-001",
-          "AH-EVIDENCE-001",
-          "AH-MISSION-CANCEL-001",
-          "AH-DOC-PARSE-PROVENANCE-001",
-          "AH-CONTRACT-CAPABILITY-001",
-          "AH-MEM-DELETE-001",
-          "AH-PA-VERTICAL-001",
-          "AH-DOC-INGEST-WEB-001",
-          "AH-UI-WRITING-001",
-          "AH-UI-RESEARCH-001",
-          "AH-DOC-PARSE-TABLE-001",
-          "AH-DOC-PARSE-IMGREF-001",
-          "AH-SPEC-REPAIR-001",
-          "AH-RUNTIME-MODELFALLBACK-001",
-          "AH-UI-CODING-001",
-          "AH-MM-DOC-VISION-001",
-          "AH-SPEC-PROTECTION-001",
-          "AH-PAUSE-RESUME-001",
-          "AH-RAG-DELETE-001",
           "AH-CAPABILITY-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-EVIDENCE-001",
+          "AH-MEM-DELETE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-PA-VERTICAL-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-PROD-STATUS-001",
+          "AH-RAG-CITE-001",
+          "AH-RAG-DELETE-001",
+          "AH-ROUTINE-SCHED-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-SCHED-MISSED-001",
+          "AH-SCHED-TZ-001",
+          "AH-SPEC-CAPINV-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-TOOL-SCHEDULE-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001",
           "AH-UI-PLANNING-001",
-          "AH-SPEC-CAPINV-001"
+          "AH-UI-RESEARCH-001",
+          "AH-UI-WRITING-001"
         ]
       },
       {
@@ -1143,35 +1212,36 @@
         "capability_id": "CAP-D-015",
         "name": "pa_relationships",
         "requirement_ids": [
-          "AH-RAG-CITE-001",
-          "AH-SPEC-VERIFIER-001",
-          "AH-DOC-INGEST-PDF-001",
-          "AH-UI-DOC-001",
-          "AH-RUNTIME-COMPACTION-001",
-          "AH-DOC-PARSE-HEAD-001",
-          "AH-PROD-STATUS-001",
-          "AH-EVIDENCE-001",
-          "AH-MISSION-CANCEL-001",
-          "AH-DOC-PARSE-PROVENANCE-001",
-          "AH-CONTRACT-CAPABILITY-001",
-          "AH-MEM-DELETE-001",
-          "AH-PA-VERTICAL-001",
-          "AH-DOC-INGEST-WEB-001",
-          "AH-UI-WRITING-001",
-          "AH-RAG-GRAPH-001",
-          "AH-UI-RESEARCH-001",
-          "AH-DOC-PARSE-TABLE-001",
-          "AH-DOC-PARSE-IMGREF-001",
-          "AH-SPEC-REPAIR-001",
-          "AH-RUNTIME-MODELFALLBACK-001",
-          "AH-UI-CODING-001",
-          "AH-SPEC-PROTECTION-001",
-          "AH-PAUSE-RESUME-001",
-          "AH-MM-DOC-VISION-001",
-          "AH-RAG-DELETE-001",
           "AH-CAPABILITY-001",
+          "AH-CONTRACT-CAPABILITY-001",
+          "AH-DOC-INGEST-PDF-001",
+          "AH-DOC-INGEST-WEB-001",
+          "AH-DOC-PARSE-HEAD-001",
+          "AH-DOC-PARSE-IMGREF-001",
+          "AH-DOC-PARSE-PROVENANCE-001",
+          "AH-DOC-PARSE-TABLE-001",
+          "AH-EVIDENCE-001",
+          "AH-MEM-DELETE-001",
+          "AH-MISSION-CANCEL-001",
+          "AH-MM-DOC-VISION-001",
+          "AH-PA-VERTICAL-001",
+          "AH-PAUSE-RESUME-001",
+          "AH-PROD-STATUS-001",
+          "AH-RAG-CITE-001",
+          "AH-RAG-DELETE-001",
+          "AH-RAG-GRAPH-001",
+          "AH-RELATION-FOLLOW-001",
+          "AH-RUNTIME-COMPACTION-001",
+          "AH-RUNTIME-MODELFALLBACK-001",
+          "AH-SPEC-CAPINV-001",
+          "AH-SPEC-PROTECTION-001",
+          "AH-SPEC-REPAIR-001",
+          "AH-SPEC-VERIFIER-001",
+          "AH-UI-CODING-001",
+          "AH-UI-DOC-001",
           "AH-UI-PLANNING-001",
-          "AH-SPEC-CAPINV-001"
+          "AH-UI-RESEARCH-001",
+          "AH-UI-WRITING-001"
         ]
       },
       {

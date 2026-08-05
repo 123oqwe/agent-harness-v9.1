@@ -205,6 +205,12 @@ export class ScriptedTestProvider implements ProviderAdapter {
     };
   }
 
+  // ScriptedTestProvider doesn't make real HTTP calls.
+  // executeRequest is a no-op: resolve() handles everything synchronously.
+  async executeRequest(_normalizedReq: unknown, _apiKey: string, _opts?: { timeoutMs?: number; signal?: AbortSignal }): Promise<unknown> {
+    return _normalizedReq; // pass-through; complete() uses resolve() directly
+  }
+
   parseResponse(raw: unknown): ParsedResponse {
     if (typeof raw !== 'object' || raw === null) {
       throw new TypeError('parseResponse expects an object');

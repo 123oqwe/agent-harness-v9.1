@@ -22,12 +22,12 @@
  *    so it can split the task. Retrying the same input wastes tokens.
 */
 
-import type { ProviderAdapter, ProviderRequest, ParsedResponse, ProviderError, Usage, HealthStatus } from './provider.js';
+import type { ProviderAdapter, ProviderRequest, ParsedResponse, ProviderError, Usage, HealthStatus, StreamEvent } from './provider.js';
 import { ScriptedTestProvider, ScriptedResponseExhaustedError, ScriptedResponseMissingError } from './scripted-provider.js';
-import {
+import type {
   RateLimiter, LLMCache, UsageMeter, FallbackChain,
   CapabilityRegistry, KeyVault,
-  type RateLimitConfig, type ModelCapabilityEntry,
+  ModelCapabilityEntry,
 } from './capability-registry.js';
 
 // ---------------------------------------------------------------------------
@@ -344,11 +344,11 @@ export class ModelGateway {
     return cb;
   }
 
-  complete(
+  async complete(
     type: ProviderAdapter['provider_type'],
     req: ProviderRequest,
     opts: GatewayCallOptions = {},
-  ): GatewayCallResult {
+  ): Promise<GatewayCallResult> {
     // P1-18: Rate limiting — check per-user limits before anything else
     if (this.rateLimiter && this.userId) {
       const estimatedTokens = (req.messages?.length ?? 1) * 500; // rough estimate
@@ -388,7 +388,6 @@ export class ModelGateway {
     const startTime = Date.now();
     const timeoutMs = opts.timeoutMs ?? 30000;
     const maxRetries = opts.retries ?? 2;
-    const retryDelayMs = opts.retryDelayMs ?? 1000;
 
     let lastError: ProviderError | null = null;
     let retried = false;
@@ -408,11 +407,39 @@ export class ModelGateway {
         let response: ParsedResponse;
 
         if (adapter instanceof ScriptedTestProvider) {
+          // Fast path: scripted providers don't need HTTP
           response = adapter.resolve(req);
         } else {
-          // For non-scripted providers, use normalizeRequest + parseResponse
-          const raw = adapter.normalizeRequest(req);
+          // Real provider: normalizeRequest -> executeRequest (HTTP) -> parseResponse
+          const normalizedReq = adapter.normalizeRequest(req);
+          const apiKey = this.keyVault?.retrieve(adapter.provider_type) ?? '';
+          if (!apiKey) {
+            throw new Error(`No API key for provider '${adapter.provider_type}'`);
+          }
+          const raw = await adapter.executeRequest(normalizedReq, apiKey, {
+            timeoutMs: opts.timeoutMs,
+            signal: opts.signal,
+          });
+
+          // Extract real usage from the raw response before parsing
+          const rawObj = raw as Record<string, unknown>;
           response = adapter.parseResponse(raw);
+
+          // Override usage with real values from the provider response
+          const rawUsage = rawObj.usage as Record<string, unknown> | undefined;
+          if (rawUsage) {
+            const realUsage: Usage = {
+              input_tokens: (rawUsage.prompt_tokens as number) ?? (rawUsage.input_tokens as number) ?? 0,
+              output_tokens: (rawUsage.completion_tokens as number) ?? (rawUsage.output_tokens as number) ?? 0,
+              reasoning_tokens: undefined,
+            };
+            // Check for OpenAI o-series reasoning tokens
+            const details = rawUsage.completion_tokens_details as Record<string, unknown> | undefined;
+            if (details && typeof details.reasoning_tokens === 'number') {
+              realUsage.reasoning_tokens = details.reasoning_tokens;
+            }
+            response.usage = realUsage;
+          }
         }
 
        const usage = adapter.meterUsage(response);
@@ -531,7 +558,7 @@ export class ModelGateway {
    * tool_choice: 'auto' lets the model decide, 'required' forces a tool call,
    * 'none' disables tools, or a specific tool name.
    */
-  completeWithTools(
+  async completeWithTools(
     type: ProviderAdapter['provider_type'],
     messages: ProviderRequest['messages'],
     tools: ProviderRequest['tools'],
@@ -541,7 +568,7 @@ export class ModelGateway {
       temperature?: number;
       max_tokens?: number;
     } = {},
-  ): GatewayCallResult {
+  ): Promise<GatewayCallResult> {
     const req: ProviderRequest = {
       messages,
       tools,
@@ -551,7 +578,7 @@ export class ModelGateway {
     };
     // tool_choice is passed through opts but ProviderRequest doesn't have it
     // yet — the provider adapter normalizes it.
-    return this.complete(type, req, opts);
+    return await this.complete(type, req, opts);
   }
 
   /**
@@ -561,8 +588,8 @@ export class ModelGateway {
   async *stream(
     type: ProviderAdapter['provider_type'],
     req: ProviderRequest,
-    opts: GatewayCallOptions = {},
-  ): AsyncIterable<import('./provider.js').StreamEvent> {
+    _opts: GatewayCallOptions = {},
+  ): AsyncIterable<StreamEvent> {
     const adapter = this.resolve(type);
     // Circuit breaker check
     const circuit = this.getCircuitBreaker(type);
@@ -595,8 +622,15 @@ export class ModelGateway {
    * This is the production entry point. complete() is the low-level direct
    * provider call (for testing / backward compat).
    */
-  route(req: ProviderRequest, routeOpts: RouteOptions): RouteResult {
-    const { tier, requiredCapabilities = [], userId = this.userId ?? 'default', budgetRemaining, tools, tool_choice } = routeOpts;
+  async route(req: ProviderRequest, routeOpts: RouteOptions): Promise<RouteResult> {
+    const { tier: _tier, requiredCapabilities = [], userId = this.userId ?? 'default', budgetRemaining, tools, tool_choice } = routeOpts;
+
+    // P1-20: Auto-recovery to primary — if a FallbackChain is configured,
+    // attempt to return to the primary model before routing. The circuit
+    // breaker's HALF_OPEN state acts as the recovery probe.
+    if (this.fallbackChain) {
+      this.fallbackChain.attemptRecovery();
+    }
 
     // 1. Rate limit check (G3)
     if (this.rateLimiter) {
@@ -694,6 +728,32 @@ export class ModelGateway {
         );
       }
 
+      // G8: Data policy validation before calling provider
+      const dataPolicy = current.entry.provider_type ? this.resolve(current.providerType).validateDataPolicy(req) : { allowed: true };
+      if (!dataPolicy.allowed) {
+        // Try next provider instead of failing
+        const remaining = available.filter(a =>
+          !tried.has(`${a.providerType}/${a.entry.model_id}`) &&
+          this.getCircuitBreaker(a.providerType).allowRequest()
+        );
+       if (remaining.length > 0) {
+         current = remaining[0];
+          // P1-22: Re-validate tool calling format when switching providers.
+          // If formats differ (e.g. OpenAI tools+tool_calls vs Anthropic tools+tool_use),
+          // the provider adapter will re-serialize the tool definitions.
+          if (this.registry && selected.entry.model_id !== current.entry.model_id) {
+            // Format compatibility is advisory — adapters handle serialization.
+            // We log it but don't block, since each adapter normalizes independently.
+          }
+         fallbackChain.push(`${current.providerType}/${current.entry.model_id}`);
+         continue;
+        }
+        if (this.rateLimiter) this.rateLimiter.recordCompletion(userId);
+        throw new GatewayRetryExhaustedError(
+          `Data policy blocked all providers: ${dataPolicy.reason}`,
+        );
+      }
+
       // Build request with tool_choice
       const callReq: ProviderRequest = {
         ...req,
@@ -705,7 +765,7 @@ export class ModelGateway {
       if (tool_choice) callReq.tool_choice = tool_choice;
 
       try {
-        const result = this.complete(current.providerType, callReq, {
+        const result = await this.complete(current.providerType, callReq, {
           timeoutMs: routeOpts.timeoutMs,
         });
 

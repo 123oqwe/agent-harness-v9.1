@@ -3,7 +3,11 @@
   "title": "SkillSpec",
   "required": [
     "name",
+    "summary",
+    "tags",
     "version",
+    "instructions_ref",
+    "precedence_scope",
     "supported_experience_profiles",
     "input_schema_ref",
     "output_schema_ref",
@@ -20,8 +24,30 @@
     "name": {
       "type": "string"
     },
+    "summary": {
+      "type": "string",
+      "description": "Compact catalog text returned by skill_search before full instructions are loaded"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "version": {
       "type": "string"
+    },
+    "instructions_ref": {
+      "type": "string",
+      "description": "Content-addressed instructions loaded only after Router selects this skill"
+    },
+    "precedence_scope": {
+      "enum": [
+        "builtin",
+        "global",
+        "project",
+        "enterprise"
+      ]
     },
     "supported_experience_profiles": {
       "type": "array"

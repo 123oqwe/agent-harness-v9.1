@@ -19,6 +19,7 @@
 import { execFile, execFileSync, type ChildProcess } from 'node:child_process';
 import { resolve, normalize, isAbsolute } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
+import { isHostAllowed, type EgressPolicy } from '../security/policy-engine.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,7 @@ export interface SandboxConfig {
   timeoutMs: number;
   maxOutputBytes: number;
   networkDenied?: boolean;
+  egressPolicy?: EgressPolicy;
 }
 
 export interface SandboxExecuteRequest {
@@ -39,6 +41,7 @@ export interface SandboxExecuteRequest {
   env?: Record<string, string>;
   requiresNetwork?: boolean;
   cwd?: string;
+  networkTarget?: string;
 }
 
 export interface SandboxResult {
@@ -57,11 +60,125 @@ export interface SandboxResult {
 // Sandbox
 // ---------------------------------------------------------------------------
 
+export type Platform = 'darwin' | 'linux' | 'win32' | 'other';
+
+export interface SandboxProfile {
+  platform: Platform;
+  /** Seatbelt profile text (macOS) or bwrap args (Linux) */
+  profile: string;
+  /** The wrapper command to prepend to the executable */
+  wrapperCommand?: string[];
+}
+
+/**
+ * Generates a platform-native sandbox profile.
+ *
+ * macOS: Seatbelt (sandbox-exec) profile — workspace-write, network deny-by-default.
+ * Linux: bubblewrap (bwrap) args — unshare-net, bind workspace rw, ro-bind /.
+ * Windows/other: no native sandbox available; falls back to process-level checks.
+ */
+export function generateSandboxProfile(config: SandboxConfig): SandboxProfile {
+  const platform = detectPlatform();
+  const workspace = normalize(config.workingDirectory);
+
+  if (platform === 'darwin') {
+    // Seatbelt profile: workspace-write + network deny-by-default
+    const profile = [
+      '(version 1)',
+     '(deny default)',
+     `(allow process-fork)`,
+     `(allow process-exec*)`,
+     `(allow signal (target self))`,
+      `(allow sysctl-read)`,
+      `(allow file-read*)`,
+      `(allow file-write* (subpath "${workspace}"))`,
+      `(allow file-write* (subpath "/tmp"))`,
+      `(allow file-write* (subpath "/var/tmp"))`,
+    ];
+    if (!config.networkDenied) {
+      profile.push('(allow network-outbound)');
+      profile.push('(allow network-inbound)');
+    }
+    return {
+      platform,
+      profile: profile.join('\n'),
+      wrapperCommand: ['sandbox-exec', '-p', profile.join('\n')],
+    };
+  }
+
+  if (platform === 'linux') {
+    // bubblewrap: unshare-net (if networkDenied), bind workspace rw, ro-bind /
+    const args = [
+      'bwrap',
+      '--ro-bind', '/', '/',
+      '--bind', workspace, workspace,
+      '--dev', '/dev',
+      '--proc', '/proc',
+      '--unshare-all',
+    ];
+    if (!config.networkDenied) {
+      // --share-net allows network access
+      args.splice(args.indexOf('--unshare-all'), 0, '--share-net');
+    }
+    return {
+      platform,
+      profile: args.join(' '),
+      wrapperCommand: args,
+    };
+  }
+
+  // Windows/other: no native sandbox; rely on process-level checks
+  return {
+    platform,
+    profile: 'no-native-sandbox',
+  };
+}
+
+export function detectPlatform(): Platform {
+  const platform = process.platform;
+  if (platform === 'darwin' || platform === 'linux' || platform === 'win32') {
+    return platform;
+  }
+  return 'other';
+}
+
+/**
+ * Checks whether a native sandboxing tool is available on the current platform.
+ * Returns true if sandbox-exec (macOS) or bwrap (Linux) is in PATH.
+ */
+export function isNativeSandboxAvailable(): boolean {
+  const platform = detectPlatform();
+  if (platform === 'darwin') {
+    try {
+      execFileSync('which', ['sandbox-exec'], { encoding: 'utf8', stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (platform === 'linux') {
+    try {
+      execFileSync('which', ['bwrap'], { encoding: 'utf8', stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 export class Sandbox {
   private readonly config: SandboxConfig;
+  private readonly profile: SandboxProfile;
 
   constructor(config: SandboxConfig) {
     this.config = { networkDenied: true, ...config };
+    // P1-03: Generate the platform-native sandbox profile once.
+    // On macOS this is a Seatbelt (sandbox-exec) profile; on Linux this is
+    // bubblewrap (bwrap) args. The profile is applied to every execute()
+    // call so the child process runs inside the OS-level sandbox, not just
+    // with process-level allowlist checks.
+    this.profile = generateSandboxProfile(this.config);
   }
 
   execute(req: SandboxExecuteRequest): SandboxResult {
@@ -74,8 +191,36 @@ export class Sandbox {
     this.validateArgs(req.args);
 
     // 3. Check network requirement
-    if (req.requiresNetwork && this.config.networkDenied) {
+   if (req.requiresNetwork && this.config.networkDenied) {
       throw new Error('Sandbox: network access denied (networkDenied is true)');
+    }
+
+    // Egress policy check: if a network target is specified, validate it
+    // against the egress policy (domain allow/deny, SSRF protection).
+    if (req.networkTarget && this.config.egressPolicy) {
+      if (!isHostAllowed(req.networkTarget, this.config.egressPolicy)) {
+        throw new Error(
+          `Sandbox: egress policy denied access to '${req.networkTarget}' ` +
+          `(mode: ${this.config.egressPolicy.mode})`,
+        );
+      }
+    }
+
+    // SSRF protection: deny common internal/private addresses when egress
+    // policy is not explicitly open. This prevents the agent from accessing
+    // internal services via fetch_url or run_command.
+    if (req.networkTarget && this.isPrivateAddress(req.networkTarget)) {
+      // Private addresses are always blocked unless there is an explicit
+      // allow rule for the exact address. Even 'open' mode does not permit
+      // SSRF — the agent must never reach internal services.
+      const explicitlyAllowed = this.config.egressPolicy?.domain_rules?.some(
+        (r) => r.action === 'allow' && r.host === req.networkTarget,
+      ) ?? false;
+      if (!explicitlyAllowed) {
+        throw new Error(
+          `Sandbox: SSRF protection denied access to private/internal address '${req.networkTarget}'`,
+        );
+      }
     }
 
     // 4. Validate environment variables
@@ -91,23 +236,43 @@ export class Sandbox {
       try {
         this.validateExecutable(req.executable);
         this.validateArgs(req.args);
-        if (req.requiresNetwork && this.config.networkDenied) {
-          throw new Error('Sandbox: network access denied');
+       if (req.requiresNetwork && this.config.networkDenied) {
+         throw new Error('Sandbox: network access denied');
+       }
+        // Egress policy + SSRF protection for async path
+        if (req.networkTarget && this.config.egressPolicy) {
+          if (!isHostAllowed(req.networkTarget, this.config.egressPolicy)) {
+            throw new Error(
+              `Sandbox: egress policy denied access to '${req.networkTarget}' ` +
+              `(mode: ${this.config.egressPolicy.mode})`,
+            );
+          }
         }
-        const env = this.validateEnv(req.env);
-        const startTime = Date.now();
-        const cwd = req.cwd ?? this.config.workingDirectory;
-        if (!existsSync(cwd)) {
-          mkdirSync(cwd, { recursive: true });
+        if (req.networkTarget && this.isPrivateAddress(req.networkTarget)) {
+          const explicitlyAllowed = this.config.egressPolicy?.domain_rules?.some(
+            (r) => r.action === 'allow' && r.host === req.networkTarget,
+          ) ?? false;
+          if (!explicitlyAllowed) {
+            throw new Error(
+              `Sandbox: SSRF protection denied access to private/internal address '${req.networkTarget}'`,
+            );
+          }
         }
+       const env = this.validateEnv(req.env);
+       const startTime = Date.now();
+       const cwd = req.cwd ?? this.config.workingDirectory;
+       if (!existsSync(cwd)) {
+         mkdirSync(cwd, { recursive: true });
+       }
 
-        const child = execFile(req.executable, req.args, {
-          cwd,
-          env: { ...process.env, ...env },
-          timeout: this.config.timeoutMs,
-          maxBuffer: this.config.maxOutputBytes,
-          shell: false,
-        }, (err, stdout, stderr) => {
+        const cmd = this.buildSandboxedCommand(req);
+        const child = execFile(cmd.executable, cmd.args, {
+         cwd,
+         env: { ...process.env, ...env },
+         timeout: this.config.timeoutMs,
+         maxBuffer: this.config.maxOutputBytes,
+         shell: false,
+       }, (err, stdout, stderr) => {
           const durationMs = Date.now() - startTime;
           if (err) {
             const errExt = err as NodeJS.ErrnoException & { killed?: boolean; signal?: NodeJS.Signals | null; code?: string | number };
@@ -159,6 +324,39 @@ export class Sandbox {
   // ---------------------------------------------------------------------------
 
   private currentChild: ChildProcess | null = null;
+
+  /**
+   * SSRF protection: detect private/internal IP ranges and hostnames.
+   * Blocks access to 10.x, 172.16-31.x, 192.168.x, 169.254.x (link-local),
+   * 127.x (loopback), ::1, fc00::/7 (IPv6 ULA), and localhost.
+   * Checks the hostname as-is (DNS rebinding protection happens at the
+   * network layer — here we only check the literal target).
+   */
+  private isPrivateAddress(target: string): boolean {
+    const lower = target.toLowerCase().trim();
+
+    // localhost
+    if (lower === 'localhost' || lower.endsWith('.localhost')) return true;
+
+    // IPv4 literal
+    const ipv4Match = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number) as unknown as number[];
+      if (a === 10) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 127) return true;
+      if (a === 169 && b === 254) return true; // link-local
+      if (a === 0) return true; // 0.0.0.0
+    }
+
+    // IPv6 loopback and link-local
+    if (lower === '::1' || lower === '::' || lower.startsWith('fe80:') || lower.startsWith('fc') || lower.startsWith('fd')) {
+      return true;
+    }
+
+    return false;
+  }
 
   private validateExecutable(executable: string): void {
     if (!executable || executable.length === 0) {
@@ -213,10 +411,27 @@ export class Sandbox {
         throw new Error(`Sandbox: environment variable '${key}' not in allowlist`);
       }
     }
-    return env;
+   return env;
+ }
+
+  /**
+   * P1-03: Build the command array for execution, wrapping the executable
+   * in the platform-native sandbox (sandbox-exec on macOS, bwrap on Linux)
+   * when the wrapper is available. If no native sandbox is available, the
+   * executable runs directly with process-level checks only.
+   */
+  private buildSandboxedCommand(req: SandboxExecuteRequest): { executable: string; args: string[] } {
+    const wrapper = this.profile.wrapperCommand;
+    if (wrapper && wrapper.length > 0) {
+      return {
+        executable: wrapper[0],
+        args: [...wrapper.slice(1), req.executable, ...req.args],
+      };
+    }
+    return { executable: req.executable, args: req.args };
   }
 
-  private execSync(
+ private execSync(
     req: SandboxExecuteRequest,
     env: Record<string, string>,
     startTime: number,
@@ -226,15 +441,16 @@ export class Sandbox {
       mkdirSync(cwd, { recursive: true });
     }
 
-    try {
-      const rawStdout = execFileSync(req.executable, req.args, {
-        cwd,
-        env: { ...process.env, ...env },
-        timeout: this.config.timeoutMs,
-        maxBuffer: this.config.maxOutputBytes * 2, // Allow slightly more to detect truncation
-        shell: false,
-        encoding: 'utf8',
-      });
+   try {
+      const cmd = this.buildSandboxedCommand(req);
+      const rawStdout = execFileSync(cmd.executable, cmd.args, {
+       cwd,
+       env: { ...process.env, ...env },
+       timeout: this.config.timeoutMs,
+       maxBuffer: this.config.maxOutputBytes * 2, // Allow slightly more to detect truncation
+       shell: false,
+       encoding: 'utf8',
+     });
 
       const durationMs = Date.now() - startTime;
       const truncated = rawStdout.length > this.config.maxOutputBytes;

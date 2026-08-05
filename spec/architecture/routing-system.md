@@ -3,9 +3,17 @@
 
 ![03-routing-dag.svg](diagrams/03-routing-dag.svg)
 
-## v9 Correction: NOT 8 parallel independent routers
+## v9 Correction: one Router, not parallel independent routers
 
 v8 used Promise.all for 8 independent routers. v9 replaces with sequential dependency-aware DAG.
+
+The product exposes one Router authority. Model selection, tool discovery, skill discovery, RAG retrieval, environment selection, AgentGraph planning, and verification planning are typed resolvers inside that Router pipeline. Security is not a router: immutable Policy constrains inputs and PEP can veto every action. This avoids contradictory decisions and gives each RunPlan one auditable routing record.
+
+### Phase composition
+
+- Phase 1 implements `StaticRouter`: typed intent profiling, deterministic hard-constraint filtering, and selection of direct, ReAct, or plan_execute for one agent. It binds a frozen provider/tool/skill/environment/eval registry snapshot.
+- Phase 2 adds Context/RAG resolvers and progressive disclosure, but remains single-agent.
+- Phase 3 replaces fixed scoring with the complete dependency-aware DAG, joint optimizer, AgentGraph planning, adaptive fallback, and router eval. It extends the Phase 1 interface rather than creating another router.
 
 ## Router DAG Pipeline
 
@@ -85,6 +93,14 @@ interface RouterCandidate {
 
 ### Scoring Function
 The global optimizer uses a weighted sum. Default weights (agent-tunable):
+
+**Phase 1 simplified (P1-23):** No scoring. Use hard constraint filtering only:
+1. Filter by capability (model must support required tools/vision/streaming)
+2. Filter by budget (model cost must fit remaining budget)
+3. Filter by availability (circuit breaker must be closed)
+4. Select cheapest remaining model (sort by price_input + price_output)
+
+**Phase 3+:** Introduce eval-calibrated scoring with the weights below.
 - success_probability: 1.0
 - quality: 0.8
 - cost: 0.3 (USD per 1000 tokens)
@@ -108,7 +124,7 @@ If no candidate meets hard constraints, Router returns `RoutingAbstainedError` w
 
 ## Execution Modes (FG7 / FG9)
 
-AgentGraph supports three execution modes, declared in `agent-graph.schema.json` field `execution_mode` (enum: `static_dag` | `routing_slip` | `workflow_script`). The Router selects based on task profile; they are NOT mutually exclusive (a mission may use a static DAG for known sub-tasks and a routing slip for the open-ended trunk).
+AgentGraph supports three declared execution modes (`static_dag` | `routing_slip` | `workflow_script`); bounded mass fan-out is a `workflow_script` pattern, not a fourth schema value. The Router selects based on task profile; a mission may compose modes across explicit graph boundaries.
 
 ### Mode A: Static DAG (existing)
 RunPlan Freeze produces a fixed AgentGraph. Used when the task is well-structured and the plan is predictable. Result merge conflict resolution applies (AH-MULTIAGENT-MERGE-001).

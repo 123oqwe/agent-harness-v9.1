@@ -5,6 +5,8 @@
   "type": "object",
   "required": [
     "name",
+    "summary",
+    "tags",
     "version",
     "domains",
     "implementation_status",
@@ -29,6 +31,17 @@
   "properties": {
     "name": {
       "type": "string"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Compact catalog text returned by tool_search before full schemas are loaded"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Discovery terms; never interpreted as permission grants"
     },
     "version": {
       "type": "string"
@@ -130,11 +143,25 @@
           "type": "boolean"
         }
       },
-      "additionalProperties": false
-    },
-    "run_phase_binding": {
-      "type": "array",
-      "description": "Which RunPlan phases may invoke this tool (FG2 two-phase runtime). setup = network-enabled dependency install; agent = offline execution. Tools requiring credentials must bind to agent phase only via broker single-exchange.",
+    "additionalProperties": false
+  },
+  "transport": {
+    "type": "string",
+    "enum": ["native", "cli_wrapper", "mcp", "http_api"],
+    "description": "How the tool is invoked. native = in-process function; cli_wrapper = subprocess (Python/binary helper, JSON stdin/stdout protocol); mcp = JSON-RPC MCP server; http_api = HTTP call to cloud provider via model-api-gateway adapter. Backed by ADR-014."
+  },
+  "tool_group": {
+    "type": "string",
+    "pattern": "^[a-z_]+$",
+    "description": "Logical group prefix for the tool-masking state machine (CTRL-TOOL-MASK-001). Examples: fs, web, media_gen, media_edit, doc, voice, shell, screen. Allows decode-time logits masking of a whole group without editing tool definitions (preserves KV-cache)."
+  },
+  "cli_toolchain_ref": {
+    "type": "string",
+    "description": "Key into spec/deployment/sandbox-toolchain.yaml declaring the external dependency (python package / binary) this cli_wrapper tool requires. Runtime checks availability before spawn; on missing dep returns structured error instead of crashing. Required when transport=cli_wrapper."
+  },
+  "run_phase_binding": {
+    "type": "array",
+    "description": "Which RunPlan phases may invoke this tool (FG2 two-phase runtime). setup = network-enabled dependency install; agent = offline execution. Tools requiring credentials must bind to agent phase only via broker single-exchange.",
       "items": {
         "enum": [
           "setup",

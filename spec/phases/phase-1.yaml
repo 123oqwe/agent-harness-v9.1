@@ -1,7 +1,15 @@
 phase: 1
 name: "Single-Agent Multi-Domain Foundation"
-status: READY
+status: VERIFIED
 objective: "Single-Agent Multi-Domain Foundation"
+
+delivers:
+  - "TaskContract intent normalization and a static Router selecting direct, ReAct, or plan_execute"
+  - "One durable single-agent loop with event log, snapshots, crash restore, budgets, retries, streaming, and progress handoff"
+  - "ModelGateway plus deterministic ScriptedTestProvider"
+  - "One Tool Registry with tool_search and 9 local tools; one Skill Registry with skill_search and 8 base skills"
+  - "Policy, consent, authorization, capability, PEP, secrets, two-phase credentials, VFS, OS sandbox, egress, audit, evidence, and local eval runner"
+  - "Six local no-external-effect product verticals"
 
 dependencies:
   - phase-0
@@ -21,36 +29,45 @@ disabled_capabilities:
 
 requirements:
   - AH-GATEWAY-TESTPROVIDER-001  # MUST be first — all verticals depend on it
+  - AH-POLICY-ENGINE-001
   - AH-CAPABILITY-001
   - AH-CAPMAP-002
   - AH-CAPMAP-006
-  - AH-CAPMAP-013
+  - AH-VFS-001
+  - AH-SANDBOX-001
   - AH-CAPMAP-017
+  - AH-TOOL-REGISTRY-001
+  - AH-GATEWAY-PROVIDER-001
+  - AH-ROUTER-FOUNDATION-001
+  - AH-RUNTIME-SESSION-001
+  - AH-RUNTIME-LOOP-001
+  - AH-CAPMAP-013
+  - AH-EVIDENCE-001
+  - AH-EVAL-RUNNER-001
+  - AH-TOOL-ARTIFACT-001
+  - AH-TOOL-ASK-001
+  - AH-TOOL-LIST-001
+  - AH-TOOL-PARSE-001
+  - AH-TOOL-READ-001
+  - AH-TOOL-WRITE-001
+  - AH-TOOL-EDIT-001
+  - AH-TOOL-SEARCH-001
+  - AH-TOOL-EXEC-001
   - AH-CAPMAP-020
   - AH-CODING-VERTICAL-001
   - AH-DOC-VERTICAL-001
-  - AH-EVIDENCE-001
   - AH-PA-VERTICAL-001
   - AH-PLANNING-VERTICAL-001
-  - AH-POLICY-ENGINE-001
   - AH-RESEARCH-VERTICAL-001
-  - AH-RUNTIME-LOOP-001
-  - AH-RUNTIME-SESSION-001
-  - AH-SANDBOX-001
-  - AH-TOOL-EDIT-001
-  - AH-TOOL-EXEC-001
-  - AH-TOOL-READ-001
-  - AH-TOOL-SEARCH-001
-  - AH-TOOL-WRITE-001
+  - AH-WRITING-VERTICAL-001
+  - AH-UI-ONBOARDING-001
+  - AH-UI-SETTINGS-001
   - AH-UI-APPROVAL-001
   - AH-UI-CHAT-001
   - AH-UI-CODING-001
   - AH-UI-EVIDENCE-001
-  - AH-UI-ONBOARDING-001
   - AH-UI-PRIVACY-001
-  - AH-UI-SETTINGS-001
   - AH-UI-TASK-001
-  - AH-WRITING-VERTICAL-001
 
 fixtures:
   - fixtures/phase-1/valid/
@@ -86,6 +103,7 @@ deployment_target:
   phase_8: "production"
 
 gate_command: "python3 factory/phase-gates/gate_runner.py phase1"
+independent_acceptance: "After the local gate passes, a read-only GLM-5.2 xhigh run must evaluate source, tests, evidence, security invariants, and the six vertical tasks; it cannot edit the repository."
 rollback: "auto-rollback if gate fails"
 evidence: "artifacts/phase-1/"
 
@@ -106,6 +124,7 @@ exit_criteria:
   - active_stub_count: 0
   - mutation_score: ">= 0.7"
   - crash_restore_no_duplicate: PASS
+  - independent_glm_5_2_xhigh: PASS
 
 blocked_conditions:
   - "Previous phase gate not passed"

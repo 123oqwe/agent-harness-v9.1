@@ -129,3 +129,25 @@
   test_fixture: tests/security/msg-tamper.test.ts
   expected_result: JWS signature mismatch detected, tampered message rejected; OBO token prevents permission escalation
   residual_risk: low
+- threat_id: THREAT-MEDIA-EGRESS
+  threat: Generation tool data egress to unapproved provider
+  asset: ASSET-006
+  trust_boundary: TB-002
+  attack_preconditions: [Agent can call generate_image/generate_video/generate_speech/generate_music]
+  attack_steps: [Agent sends generation prompt to unapproved provider, Provider logs prompt/content, Content leaks]
+  control_ids: [CTRL-MEDIA-EGRESS-001]
+  implementation_location: harness/security/media-egress-filter.ts
+  test_fixture: tests/security/media-egress.test.ts
+  expected_result: Egress to unapproved provider blocked; prompt not logged externally
+  residual_risk: low
+- threat_id: THREAT-VOICE-BIOMETRIC
+  threat: Voice cloning without biometric consent
+  asset: ASSET-007
+  trust_boundary: TB-006
+  attack_preconditions: [Agent can call clone_voice, biometric consent not verified]
+  attack_steps: [Attacker provides voice sample without consent, Voice is cloned, Cloned voice used for impersonation]
+  control_ids: [CTRL-VOICE-BIOMETRIC-001]
+  implementation_location: harness/security/voice-biometric.ts
+  test_fixture: tests/security/voice-biometric.test.ts
+  expected_result: Clone rejected without verified biometric consent proof; biometric template not persisted
+  residual_risk: low

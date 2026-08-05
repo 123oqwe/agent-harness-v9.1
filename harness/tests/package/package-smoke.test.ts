@@ -76,12 +76,12 @@ describe('package smoke: public API import', () => {
     const provider = new mod.ScriptedTestProvider({
       queue: [{ content: 'gw-test', stop_reason: 'stop' }],
     });
-    const gateway = new mod.ModelGateway([provider]);
-    expect(gateway.list()).toContain('scripted_test');
-    const res = gateway.complete('scripted_test', {
-      messages: [{ role: 'user', content: 'test' }],
-    });
-    expect(res.content).toBe('gw-test');
+   const gateway = new mod.ModelGateway([provider]);
+   expect(gateway.list()).toContain('scripted_test');
+    const result = await gateway.complete('scripted_test', {
+     messages: [{ role: 'user', content: 'test' }],
+   });
+    expect(result.response.content).toBe('gw-test');
   });
 
   it('Can instantiate PolicyEngine with deny-by-default policy', async () => {

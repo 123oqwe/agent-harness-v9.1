@@ -9,6 +9,8 @@ v8 had Policy Validator as step 7, after Router already decided. v9 puts immutab
 
 ## Pipeline (v9 normative)
 
+Phase 1 uses the same pipeline with a singleton AgentGraph/ContextGraph/VerificationGraph and StaticRouter. Phase 2 activates Context/RAG resolution. Phase 3 activates adaptive candidate generation and the joint solver. The staged implementation changes resolver depth, not pipeline ownership or security order.
+
 ```
 User Input
   -> Input Normalization
