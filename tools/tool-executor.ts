@@ -256,6 +256,7 @@ export class ToolExecutor {
   private readonly pep: PolicyEnforcementPoint;
   private readonly stateStore: CapabilityStateStore;
   private readonly injectedNow: () => string;
+  private readonly idempotencyLocks = new Set<string>();
 
  constructor(private deps: ToolExecutorDeps, injected: ToolExecutorInjectedDeps) {
    this.authz = injected.authz;
@@ -284,6 +285,13 @@ export class ToolExecutor {
   const stepId = ctx.step_id;
   const thumbprint = ctx.confirmation_key_thumbprint;
   const idempotencyKey = ctx.idempotency_key;
+
+  // In-process idempotency lock: prevents TOCTOU race where two concurrent
+  // calls with the same key both pass the existing-effect check.
+  if (this.injected.effectJournal && this.idempotencyLocks.has(idempotencyKey)) {
+    throw new ToolExecutorError(`concurrent idempotency key collision: ${idempotencyKey}`);
+  }
+  if (this.injected.effectJournal) this.idempotencyLocks.add(idempotencyKey);
 
    const existingEffect =
      this.injected.effectJournal?.getOperationByIdempotencyKey(idempotencyKey);
@@ -535,9 +543,10 @@ export class ToolExecutor {
           receipt_json: null,
         });
       }
-      this.deps.session.append('error', { tool: toolName, error, token_id: tokenId });
-      throw e;
-    }
+     this.deps.session.append('error', { tool: toolName, error, token_id: tokenId });
+     this.idempotencyLocks.delete(idempotencyKey);
+     throw e;
+   }
 
     // 7. Receipt
     const receipt: ToolReceipt = Object.freeze({
@@ -578,6 +587,7 @@ export class ToolExecutor {
       });
     }
 
+    this.idempotencyLocks.delete(idempotencyKey);
     return { result, receipt };
   }
 }

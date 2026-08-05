@@ -423,24 +423,33 @@ export class SqliteSessionStore {
       this.db.close();
       throw error;
     }
-    this._insertRun = this.db.prepare('INSERT OR IGNORE INTO runs (run_id, goal, strategy, status, created_at) VALUES (?, ?, ?, ?, ?)');
-    this._getRun = this.db.prepare('SELECT * FROM runs WHERE run_id = ?');
-    this._updateRunStatus = this.db.prepare('UPDATE runs SET status = ? WHERE run_id = ?');
-    this._getEvent = this.db.prepare('SELECT seq, type, timestamp, data_json, hash, prev_hash FROM events WHERE run_id = ? AND seq = ?');
-    this._insertSnapshot = this.db.prepare('INSERT OR REPLACE INTO snapshots (run_id, version, last_seq, last_hash, created_at, summary_json) VALUES (?, ?, ?, ?, ?, ?)');
-    this._getLatestSnapshot = this.db.prepare(
-      'SELECT run_id AS session_id, version, last_seq, last_hash, created_at, summary_json FROM snapshots WHERE run_id = ? ORDER BY version DESC LIMIT 1',
-    );
-    this._upsertOperation = this.db.prepare(`INSERT INTO operations (operation_id, run_id, step_id, attempt_id, tool_name, idempotency_key, effect_state, receipt_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    this._insertReceipt = this.db.prepare('INSERT INTO receipts (receipt_id, operation_id, tool_name, success, input_hash, output_hash, duration_ms, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    this._getReceiptByOperation = this.db.prepare('SELECT * FROM receipts WHERE operation_id = ? ORDER BY timestamp DESC LIMIT 1');
-    this._getEvents = this.db.prepare('SELECT seq, type, timestamp, data_json, hash, prev_hash FROM events WHERE run_id = ? ORDER BY seq ASC');
-    this._getOperation = this.db.prepare('SELECT * FROM operations WHERE operation_id = ?');
-    this._getOperationByIdem = this.db.prepare('SELECT * FROM operations WHERE idempotency_key = ?');
-    this._listOperations = this.db.prepare(
-      'SELECT * FROM operations WHERE run_id = ? ORDER BY created_at, operation_id',
-    );
-    this._updateOperation = this.db.prepare("UPDATE operations SET attempt_id = ?, effect_state = ?, receipt_json = ?, updated_at = ? WHERE operation_id = ?");
+    try {
+      this._insertRun = this.db.prepare('INSERT OR IGNORE INTO runs (run_id, goal, strategy, status, created_at) VALUES (?, ?, ?, ?, ?)');
+      this._getRun = this.db.prepare('SELECT * FROM runs WHERE run_id = ?');
+      this._updateRunStatus = this.db.prepare('UPDATE runs SET status = ? WHERE run_id = ?');
+      this._getEvent = this.db.prepare('SELECT seq, type, timestamp, data_json, hash, prev_hash FROM events WHERE run_id = ? AND seq = ?');
+      this._insertSnapshot = this.db.prepare('INSERT OR REPLACE INTO snapshots (run_id, version, last_seq, last_hash, created_at, summary_json) VALUES (?, ?, ?, ?, ?, ?)');
+      this._getLatestSnapshot = this.db.prepare(
+        'SELECT run_id AS session_id, version, last_seq, last_hash, created_at, summary_json FROM snapshots WHERE run_id = ? ORDER BY version DESC LIMIT 1',
+      );
+      this._upsertOperation = this.db.prepare(`INSERT INTO operations (operation_id, run_id, step_id, attempt_id, tool_name, idempotency_key, effect_state, receipt_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      this._insertReceipt = this.db.prepare('INSERT INTO receipts (receipt_id, operation_id, tool_name, success, input_hash, output_hash, duration_ms, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      this._getReceiptByOperation = this.db.prepare('SELECT * FROM receipts WHERE operation_id = ? ORDER BY timestamp DESC LIMIT 1');
+      this._getEvents = this.db.prepare('SELECT seq, type, timestamp, data_json, hash, prev_hash FROM events WHERE run_id = ? ORDER BY seq ASC');
+      this._getOperation = this.db.prepare('SELECT * FROM operations WHERE operation_id = ?');
+      this._getOperationByIdem = this.db.prepare('SELECT * FROM operations WHERE idempotency_key = ?');
+      this._listOperations = this.db.prepare(
+        'SELECT * FROM operations WHERE run_id = ? ORDER BY created_at, operation_id',
+      );
+      this._updateOperation = this.db.prepare("UPDATE operations SET attempt_id = ?, effect_state = ?, receipt_json = ?, updated_at = ? WHERE operation_id = ?");
+    } catch (prepareError) {
+      // Clean up resources if any prepare statement fails
+      if (this.recordKey) {
+        this.recordKey.fill(0);
+      }
+      this.db.close();
+      throw prepareError;
+    }
   }
 
   private readonly _getMetadata: Database.Statement;

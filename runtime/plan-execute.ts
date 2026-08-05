@@ -485,6 +485,8 @@ function restoredPendingCalls(
           name: data.tool,
           arguments: data.arguments,
         });
+        // A new tool_call for this step means a retry; un-complete it
+        completed.delete(data.step);
       }
     } else if (event.type === 'tool_result') {
       const data = event.data as { step?: string };

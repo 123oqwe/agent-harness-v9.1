@@ -108,7 +108,12 @@ export class LocalBackend implements Backend {
     writeFileSync(os, data);
     if (mode !== undefined) chmodSync(os, mode);
   }
-  delete(path: string): void { rmSync(this.osPath(path), { recursive: true, force: true }); }
+  delete(path: string): void {
+    const os = this.osPath(path);
+    // Validate against symlink escape BEFORE deleting
+    this.safe(os);
+    rmSync(os, { recursive: true, force: true });
+  }
   exists(path: string): boolean { try { this.safe(this.osPath(path)); return existsSync(this.osPath(path)); } catch { return false; } }
   mode(path: string): number | undefined {
     try { return statSync(this.safe(this.osPath(path))).mode & 0o777; } catch { return undefined; }
@@ -359,21 +364,23 @@ export class VirtualFilesystem {
       overlay.markCommitted();
       for (const receipt of receipts) this.record(receipt);
     } catch (e) {
+      const rollbackErrors: string[] = [];
       // Rollback: restore original content for overwritten files, restore deleted files, delete new files
       for (const [path, original] of originals) {
         if (original !== null) {
-          try { target.write(path, original.data, original.mode); } catch { /* best effort */ }
+          try { target.write(path, original.data, original.mode); } catch (rbErr) { rollbackErrors.push(`restore ${path}: ${(rbErr as Error).message}`); }
         } else {
           // File was new — delete it
-          try { target.delete(path); } catch { /* best effort */ }
+          try { target.delete(path); } catch (rbErr) { rollbackErrors.push(`delete ${path}: ${(rbErr as Error).message}`); }
         }
       }
       for (const [path, original] of deletedFiles) {
-        try { target.write(path, original.data, original.mode); } catch { /* best effort */ }
+        try { target.write(path, original.data, original.mode); } catch (rbErr) { rollbackErrors.push(`restore deleted ${path}: ${(rbErr as Error).message}`); }
       }
       overlay.markDiscarded();
       this.record({ path: overlay.prefix, backend: target.kind, operation: 'discard', timestamp: now() });
-      throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}`);
+      const rollbackMsg = rollbackErrors.length > 0 ? ` (rollback errors: ${rollbackErrors.join('; ')})` : '';
+      throw new VfsError(`overlay commit failed, rolled back ${writtenPaths.length} writes: ${(e as Error).message}${rollbackMsg}`);
     }
   }
   discardOverlay(overlay: OverlayBackend): void {

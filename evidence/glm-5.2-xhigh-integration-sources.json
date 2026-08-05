@@ -1,0 +1,778 @@
+{
+  "commit": "02775776",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "results": [
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Credential expiry TOCTOU race condition: credentials are validated in prepareProvider() but used later in dispatchToProvider(). For short-lived credentials, the lease may expire between validation and use, causing auth failures. The resulting auth error is correctly non-retryable, but the operation fails unnecessarily.",
+          "location": "prepareProvider / dispatchToProvider"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "No default deadline or upper bound on total dispatch time. The dispatch() retry loop tries each provider (3 attempts each with exponential backoff) and switches providers on retryable failures. Without a caller-provided deadline or abort signal, total dispatch time is O(3N \u00d7 provider_timeout) for N providers, which could be excessive.",
+          "location": "dispatch"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "When context.attempt_id is provided by the caller, it is reused across all retries and provider switches within a single dispatch() call. This means the same attempt_id is used for multiple provider attempts, which could cause metering/tracing confusion.",
+          "location": "dispatchToProvider"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "canonicalJson() does not handle undefined values in arrays. If the ProviderSelectionRequest or its nested data contains undefined in an array, contentHash() will throw ProviderConfigurationError instead of producing a hash. Objects filter out undefined values, but arrays do not.",
+          "location": "canonicalJson"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "bindingFor() throws ProviderDispatchError('provider_no_longer_compatible') even when called from resolution contexts (describeResolved, resolveExcluding). In these contexts, a ProviderResolutionError would be more appropriate. This should not occur in practice since the registry is frozen, but the error type mismatch could confuse callers.",
+          "location": "bindingFor / describeResolved / resolveExcluding"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "raceWithAbort() does not cancel the underlying operation promise when the abort signal fires. The provider's resolve() call continues running in the background until it completes or the provider respects the abort signal. While the signal is passed to the provider, a misbehaving provider could continue consuming resources.",
+          "location": "raceWithAbort"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "In stream(), if the provider's message_stop event does not include usage data, metering defaults to {input_tokens: 0, output_tokens: 0}. This could result in under-billing or incorrect usage tracking for providers that don't report usage in terminal events.",
+          "location": "stream"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "prepareProvider() does not check the abort signal between its async operations (checkHealth, egressPolicy.authorize, secretsBroker.exchangeCredential). If the signal fires during preparation, the gateway continues preparing the provider, wasting resources before the abort is detected in the subsequent dispatch/stream loop.",
+          "location": "prepareProvider"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "The credential secret field is not validated when credentials are required. The EphemeralCredentialLease.secret is optional in the interface, but when a provider requires credentials, a missing or empty secret could cause provider authentication failures that are difficult to diagnose.",
+          "location": "prepareProvider"
+        }
+      ],
+      "file": "gateway/model-gateway.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "Hook payloads are trusted via unchecked type assertions without runtime validation. The 'before_provider_request' decision hook result is cast directly with `beforeProvider.payload as typeof req`, allowing a buggy or compromised hook to modify the provider request including selectedTools, potentially expanding the tool set beyond what policy filtering allowed. This violates the stated design principle that hooks 'can restrict a request but never authorize one.' Similarly, the 'pre_turn' hook replaces all conversation messages via `messages.splice(0, messages.length, ...candidate.messages)` with only an `Array.isArray` check \u2014 no content validation. The 'pre_tool_use' hook payload is cast as `preTool.payload as Record<string, unknown>` and used as tool arguments without schema validation.",
+          "location": "runOnce() \u2014 beforeProvider handling (~line with `effectiveRequest`), pre_turn turnHook, executeTool() \u2014 preTool handling"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "runId is not sanitized for path traversal or special characters. It is only checked for non-empty/whitespace (`runId.trim().length === 0`). The runId flows into openRunSession({ runId }) and TransactionalWorkspace.open({ runId, stateRoot: dataDir }), which likely construct file paths or database keys. A caller-provided runId containing `../` or path separators could cause path traversal, and unsanitized characters could cause issues in SQLite operations.",
+          "location": "run() \u2014 runId validation and runOnce() \u2014 actualRunId usage"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Only the first skill binding is activated. The code checks `skillBindings[0]!.skill_name` and activates only that one skill. If the RunPlan contains multiple skill bindings, the remaining skills are silently ignored, leading to incomplete skill instructions being injected into the goal.",
+          "location": "runOnce() \u2014 skill activation section: `if (skillBindings.length > 0 && skillBindings[0]!.skill_name)`"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "In the catch block, `await this.observationalHook('stop', ...)` is called before `throw error`. If the observational hook throws, the original error is lost and never propagated to the caller. The original error should be preserved and re-thrown even if the hook fails.",
+          "location": "runOnce() \u2014 catch block: `} catch (error) { await this.observationalHook(...); throw error; }`"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "session.acquireWriter() is called without try/finally in multiple locations. If session.append() or session.snapshot_() throws after acquireWriter(), releaseWriter() is never called, potentially causing a deadlock or writer lock leak that blocks future session writes.",
+          "location": "runOnce() \u2014 verification error handling, workspace finalize error handling, and run_finalized section"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The `args` parameter is mutated in place: `for (const key of Object.keys(args)) delete args[key]; Object.assign(args, normalizedArgs)`. This modifies the caller's object, which could cause unexpected behavior if the caller retains a reference to the original arguments or expects them to be immutable.",
+          "location": "executeTool() \u2014 after preTool hook processing"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Multiple type assertions are used without runtime validation: `(this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools`, `(runPlan.budget_allocation as { max_iterations: number }).max_iterations`, and `(runPlan.skill_bindings ?? []) as Array<{ skill_name?: string }>`. If these assertions don't hold at runtime, undefined values will silently propagate, potentially causing failures deep in downstream components.",
+          "location": "runOnce() \u2014 skill activation and loop engine construction"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "session.getEvents() is called twice in the verification section: once for `sessionEvents` and once for `toolReceipts: extractToolReceipts(session.getEvents())`. For long-running sessions with many events, this duplicates a potentially large array in memory.",
+          "location": "runOnce() \u2014 verification.verify() call"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "In executeTool's HookRestrictionError handler, `session.append('tool_result', ...)` is called without acquireWriter()/releaseWriter(), inconsistent with the explicit writer management pattern used elsewhere in runOnce(). If append() requires writer ownership, this could cause concurrency issues; if it doesn't, the pattern is misleading.",
+          "location": "executeTool() \u2014 HookRestrictionError catch block"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "In the finally block, if `observationalHook('session_end', ...)` throws, `finalizeOverlay(false)` is skipped (though sqliteStore?.close() still runs via nested finally). This could leave the TransactionalWorkspace un-finalized, potentially leaking file descriptors or temporary overlay state.",
+          "location": "runOnce() \u2014 finally block"
+        }
+      ],
+      "file": "harness.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "The route() method calls skillRegistry.skill_search(), skillRegistry.loadFull(), and toolRegistry.search() outside any try-catch block. If any of these throw, the router crashes instead of returning a graceful 'abstain' RoutingResult. The provider resolution block has a try-catch, but it mislabels all non-ProviderResolutionError exceptions as 'provider policy veto' with policy_post_route_vetoed=true, which is semantically incorrect for tool/skill loading failures.",
+          "location": "route() \u2014 steps 5-6 (skill_search, loadFull, toolRegistry.search calls)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "workflowTools() extracts every file path from the user-supplied goal via matchAll and creates a 'read_file' workflow node pair (propose + tool) for each source path. A goal containing N file paths produces 2N+2 workflow nodes and max_iterations=(N+1)*2. A malicious or large goal with hundreds of paths causes unbounded RunPlan growth, high memory consumption, and excessive iteration limits.",
+          "location": "workflowTools() \u2014 sourcePaths.map(() => 'read_file') and buildRunPlan() \u2014 max_iterations calculation"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "derived_risk_assessment is hardcoded to egress:'none' even when 'execute_command' is included in requiredTools. Command execution can potentially initiate network egress, making this risk assessment inaccurate.",
+          "location": "buildRunPlan() \u2014 derived_risk_assessment"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "runIdOverride is accepted as a string parameter and used directly as run_id without any format validation (UUID pattern, length, character whitelist). An empty string or a string with special characters could cause issues downstream if run_id is used in file paths, logs, or URLs.",
+          "location": "buildRunPlan() \u2014 run_id assignment"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "The agent budget ceiling is hardcoded to token_limit:'1000000' and usd_micros:'5000000' ($5,000 USD). This is an extremely high ceiling that could allow runaway costs if the agent enters a loop, especially combined with the unbounded max_iterations from many workflow tools.",
+          "location": "buildRunPlan() \u2014 agent_nodes budget_ceiling"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "For non-local tasks, data_policy.max_retention_days is set to 365, allowing provider-side data retention for up to a year. This may conflict with data minimization principles, especially for tasks involving sensitive user data or source code.",
+          "location": "providerSelection() \u2014 data_policy.max_retention_days"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "model_bindings sets model_id to provider.provider_id. Provider ID and model ID are typically distinct identifiers; using the provider ID as the model ID could cause incorrect model selection or errors at execution time if the gateway expects a specific model identifier.",
+          "location": "buildRunPlan() \u2014 model_bindings"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The affirmativeGoal prohibition-stripping regex uses non-greedy .*? to remove 'do not/don't/never/without' clauses, but can produce false positives (e.g., 'Don't forget to handle errors' is stripped as a prohibition) or false negatives (prohibition and path in separate sentences won't match forbiddenPaths). This affects intent classification accuracy.",
+          "location": "profileIntent() \u2014 affirmativeGoal regex replacements; workflowTools() \u2014 forbiddenPaths regex"
+        }
+      ],
+      "file": "router/static-router.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "cloneJson uses JSON.stringify which omits undefined-valued properties, while canonicalJson manually constructs strings and preserves undefined keys (producing invalid JSON like {\"a\":undefined}). This inconsistency causes sameJson to return false when comparing a cloneJson'd payload (undefined removed) against a raw port result that still has undefined-valued properties. This triggers unnecessary attenuation checks and can produce false denials of valid hook results. The same mismatch affects sameKeys which uses Object.keys (includes undefined-valued keys) on objects where one side was cloneJson'd and the other was not.",
+          "location": "cloneJson, canonicalJson, sameJson, sameKeys; dispatchHookBoundary where sameJson(result.value.payload, originalPayload) is evaluated"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "When a timeout or cancellation occurs, controller.abort() is called but the underlying port.dispatch promise ('called') continues running in the background if the port implementation does not respect the abort signal. The result is silently discarded since Promise.race has already resolved. For external hook executions (subprocess), this could leave child processes running indefinitely, causing resource leaks or FD leaks.",
+          "location": "dispatchHookBoundary - 'called' promise and Promise.race([called, boundary])"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "validPortResult uses String(value.action) for the includes() check rather than verifying typeof value.action === 'string' first. An object with a custom toString() returning 'continue' would pass the action validation, but then value.action === 'continue' in the reason_code check would be false, causing inconsistent validation behavior. Additionally, if such a non-string action passes validation, the final deepFreeze(cloneJson(result.value)) could fail or produce unexpected types downstream.",
+          "location": "validPortResult - ['continue','deny','skip','force_prompt'].includes(String(value.action))"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "At the entry of dispatchHookBoundary, deepFreeze(cloneJson(request.payload)) is called without a try-catch. If request.payload contains circular references or non-serializable values (functions, BigInt), JSON.stringify throws an uncaught TypeError that propagates to the caller. While the caller could handle this, there is no documented contract or graceful degradation (e.g., returning a deny outcome).",
+          "location": "dispatchHookBoundary - const originalPayload = deepFreeze(cloneJson(request.payload))"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "There are no size limits on payload or follow_ups. validPortResult only checks JSON-serializability via cloneJson but does not bound the size. A port returning a multi-megabyte payload or follow_ups array would cause cloneJson to create deep copies (doubling memory), and canonicalJson to build large strings for comparison. In a multi-hook pipeline this could create OOM pressure. Since cloneJson is called multiple times per dispatch (validation, outcome construction, final return), memory amplification is significant.",
+          "location": "validPortResult (cloneJson of payload and follow_ups), outcome(), final return deepFreeze(cloneJson(result.value))"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The portRequest object is frozen with Object.freeze but scope is passed by reference without cloning. If port.dispatch mutates portRequest.scope.tenant_id or other scope fields, it would mutate the original request.scope since Object.freeze is shallow. While scope fields are readonly in the TypeScript interface, this is not enforced at runtime, and a misbehaving port could corrupt the caller's scope object.",
+          "location": "dispatchHookBoundary - const portRequest = Object.freeze({...request, payload: originalPayload, signal: controller.signal})"
+        }
+      ],
+      "file": "runtime/hook-port.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "stableJson uses a WeakSet that never removes entries, causing shared (non-circular) references to be incorrectly replaced with '[circular]'. Additionally, non-plain objects (Map, Set, Date, RegExp) are serialized as empty objects via Object.fromEntries/Object.entries, silently losing data in tool observations and hash computations.",
+          "location": "stableJson function, lines ~58-76"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "stripCredentialsFromEnv() irreversibly deletes environment variables from the global process.env. This is racy and dangerous in concurrent environments \u2014 any concurrent process or request relying on those credentials will break. The function cannot undo its effects, creating a denial-of-service risk if called at the wrong time.",
+          "location": "stripCredentialsFromEnv function, lines ~169-178"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "When the model provider omits turn.usage, recordTurn skips token accounting entirely (input/output tokens stay at 0) and budgetGuard.afterModelCall is never invoked. This causes budgetExceeded() and preflight() to never trigger budget_exhausted, allowing unbounded token consumption and cost.",
+          "location": "recordTurn method, lines ~311-313; callProvider in createContext, lines ~226-237"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "classifyUnhandled maps every LoopError instance to 'malformed_response', regardless of the actual error cause. Configuration errors, invalid usage errors, clock failures, and other internal errors are all misclassified, producing misleading termination reasons and potentially incorrect retry/recovery behavior.",
+          "location": "classifyUnhandled method, lines ~397-405"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The turns array, decisionSummariesValue, and messages array grow without any explicit memory bound. While max_iterations provides a nominal cap on iteration count, there is no limit on total memory consumption. Large model outputs, large tool observations (before truncation), and high iteration counts can cause OOM. The turns array is also returned directly in LoopResult, keeping all data in memory for the caller's lifetime.",
+          "location": "turns/decisionSummariesValue fields; messages array in run()"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "In multiple catch blocks (run() catch, finally flushPendingTurnHook catch, writeProgressSafely catch), session.append is called before terminate(). If session.append throws, terminate() is never reached, leaving the loop in an inconsistent state where terminatedValue is false but execution has stopped. This can cause writeProgressSafely to write misleading progress data.",
+          "location": "run() catch block ~line 152; finally block ~line 165; writeProgressSafely catch ~line 470"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Observation truncation uses Buffer.subarray(0, maxBytes).toString('utf8'), which can split a multi-byte UTF-8 character at the boundary, producing invalid or corrupted text in the preview field.",
+          "location": "recordObservation method, preview computation ~line 351"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "data_dir is not validated for path traversal characters. If data_dir originates from user-controlled input (e.g., an API parameter), join(data_dir, 'progress.json') and writeProgressAtomic could write to arbitrary filesystem locations.",
+          "location": "run() progress_path computation ~line 188; writeProgressSafely ~line 455"
+        }
+      ],
+      "file": "runtime/loop.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "restoredPendingCalls has a bug where retried tool calls are incorrectly marked as completed. If events contain: tool_call(step A) \u2192 tool_result(step A) \u2192 tool_call(step A, retry), the 'completed' set records step A from the first tool_result, and the final cleanup `for (const step of completed) calls.delete(step)` deletes the retry call even though it hasn't completed. This causes silent loss of pending tool calls during session recovery, leading to 'matching pending tool call missing' failures.",
+          "location": "restoredPendingCalls function, lines ~165-185"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "comparableWorkspacePath does not normalize '..' path segments. Paths like 'foo/../bar.txt' and 'bar.txt' (which refer to the same file) would not compare as equal, causing false rejections of valid model proposals. Conversely, crafted paths with '..' could potentially bypass path matching expectations. Only leading './' is stripped.",
+          "location": "comparableWorkspacePath function"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "runPlanExecute has no top-level try-catch. If context.deps.modelCall or other async operations throw unexpectedly, the error propagates uncaught, leaving the current step in 'executing' state without being marked as 'failed'. While the recovery mechanism may re-execute such steps, the unhandled rejection could crash the caller if not properly caught.",
+          "location": "runPlanExecute function, model call section"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "planActionBinding silently returns an empty binding when targetStep is not found in toolNodes. findIndex returns -1, Math.max(0, -1) yields 0, and the function proceeds with sameToolIndex=0 instead of reporting an error. This could cause incorrect path/command bindings for read_file and execute_command steps.",
+          "location": "planActionBinding function, currentIndex/sameToolIndex logic"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "When planningTasks returns undefined (no 'for X so' pattern in goal), planToolArgumentError skips all content validation for write_file, even though planningJsonInstruction tells the model to use a specific JSON format. The model could write arbitrary content to .json files without enforcement. Additionally, the instruction says 'top-level array of task objects, or an object with a tasks array' but the validation (when active) only accepts objects with a tasks property, not top-level arrays.",
+          "location": "planToolArgumentError write_file validation block and planningJsonInstruction"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "restoredStepStates casts event.data.status to RuntimeStepState without validating it's a valid status value. Malformed or corrupted session events could introduce invalid states that cause unexpected behavior in the step execution logic.",
+          "location": "restoredStepStates function"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "Inconsistent handling of missing 'recorded' turn: the success path throws LoopError('restored tool call has no observation turn') but the error path silently skips recording the observation when recorded is undefined, losing error details.",
+          "location": "runPlanExecute tool execution catch block"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "planningTasks allows arbitrary task IDs to be injected into the dependency map via 'X after Y' relations in the goal text, even if X or Y were not in the original 'for X, Y, and Z so' list. This could produce unexpected task objects in the frozen dependency structure.",
+          "location": "planningTasks function, dependency relation parsing loop"
+        }
+      ],
+      "file": "runtime/plan-execute.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "The `await context.deps.modelCall(...)` call is not wrapped in try-catch. If it throws (network error, API error, etc.), the error propagates up, leaving the context in an inconsistent state: `context.iterations` has been incremented but no turn is recorded and `context.terminated` remains false. This could cause issues if the caller expects the context to always be terminated after `runReact` returns.",
+          "location": "runReact, modelCall invocation"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The `canonical` function's recursive `normalize` helper does not limit recursion depth or detect circular references. A deeply nested object in `call.arguments` (e.g., 5000+ levels, which can fit within a typical token budget as compact JSON) could cause a stack overflow, crashing the process. This is a potential DoS vector if an attacker can influence model output to produce deeply nested tool call arguments.",
+          "location": "canonical function, normalize helper"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "If `context.config.run_plan` is defined but `tool_grants` is undefined (e.g., from malformed deserialized config), `undefined.map(...)` will throw a TypeError. The `??` operator only protects against `run_plan` being nullish, not `tool_grants` being undefined when `run_plan` exists.",
+          "location": "runReact, allowedTools initialization"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "The `callCounts` map grows with each unique `name:canonical(arguments)` pair across all iterations. While bounded by `max_iterations * tool_calls_per_turn`, this could consume significant memory if the model generates many unique tool calls over a long run.",
+          "location": "runReact, callCounts map"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "The `messages` array grows unboundedly with each iteration (assistant message plus tool messages). Over many iterations, this increases memory usage and model call costs, as the entire history is re-sent to the model each iteration with no summarization or truncation.",
+          "location": "runReact, messages array"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "`call.id` is used directly without validation. If it is undefined or not a string, duplicate ID detection via `Set.has()` may not work correctly, and `tool_call_id` in tool messages pushed to `messages` would be undefined, potentially causing issues with the model API.",
+          "location": "runReact, tool call loop"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "In the tool execution error handler, `context.deps.session.append(...)` is called without a try-catch. If `session.append` throws, it would mask the original tool execution error, making debugging difficult and potentially leaving the context in an inconsistent state.",
+          "location": "runReact, catch block for toolExecute"
+        }
+      ],
+      "file": "runtime/react.ts"
+    },
+    {
+      "verdict": "pass",
+      "severity": "none",
+      "findings": [],
+      "file": "runtime/steering-port.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "TOCTOU race condition in appendEvent: existsSync(logPath) is checked before openSync(logPath, 'a'). If another process creates the file between the check and the open, isNew is still true and the header is written again, producing a duplicate header that corrupts the log file. loadSession would then try to decrypt the second header line as an event record, causing a decryption failure.",
+          "location": "appendEvent function: const isNew = !existsSync(logPath); const descriptor = openSync(logPath, 'a', 0o600);"
+        },
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "No cross-process file locking for file-based persistence. The in-memory writerOwner lock only protects within a single process. The code comment explicitly states 'cross-process durable log', but appendEvent uses no file locks (flock or similar). Concurrent appendEvent calls from different processes can interleave writes (especially the header + event pair when isNew is true), corrupting the log. Additionally, two processes could compute the same sequence number, breaking the hash chain.",
+          "location": "appendEvent function; DurableSession.acquireWriter (in-memory only)"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "In DurableSession.append, this.persistence?.appendEvent is called after the file-based appendEvent succeeds but before this.events.push(ev). If the persistence call throws synchronously, the file already contains the event but the in-memory state (events array, last_hash) does not advance. On the next append call, the same sequence number is computed, producing a duplicate event in the file and breaking the hash chain. This violates the stated principle 'Durable append must succeed before the in-memory authority advances.'",
+          "location": "DurableSession.append method: this.persistence?.appendEvent(...) positioned before this.events.push(ev)"
+        },
+        {
+          "severity": "high",
+          "category": "error_handling",
+          "description": "SessionPersistencePort.appendEvent and saveSnapshot return void. TypeScript allows assigning async functions (returning Promise<void>) to void return types. If an implementation is async, the returned Promise is discarded, silently swallowing errors. This means persistence failures (e.g., database write errors) would not propagate, and the in-memory state would advance without durable persistence succeeding.",
+          "location": "SessionPersistencePort interface; DurableSession.append and DurableSession.snapshot_ call sites"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "The events array grows without bound. The 'compaction' event type suggests compaction is intended, but no compaction logic is implemented. Long-running sessions will accumulate events indefinitely, risking out-of-memory conditions.",
+          "location": "DurableSession.events array; no compaction implementation"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "loadSession reads the entire log file into memory with readFileSync, and persistSession builds the entire file content in memory before writing. For large session logs, this can cause OOM. There is no streaming or size limit.",
+          "location": "loadSession: const content = readFileSync(logPath, 'utf8'); persistSession: durableReplace(logPath, ...joined content...)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "persistSession does not delete the snapshot file when data.snapshot is null. If a previous run created a snapshot file and the current session has no snapshot, the stale snapshot file persists. On load, loadSession would find the stale snapshot and import_ would throw due to mismatch with the current event log, making the session unloadable.",
+          "location": "persistSession function: only writes snapshot file if data.snapshot is truthy, never deletes stale .snapshot.json"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "Snapshot validation in import_ has gaps: last_seq is not checked for being an integer (NaN passes both < 0 and > length checks since NaN comparisons return false). last_hash is not checked for being a string. If last_seq is NaN and last_hash is undefined, snapshotHash becomes undefined, and undefined !== undefined is false, so the invalid snapshot is accepted.",
+          "location": "DurableSession.import_: if (data.snapshot.last_seq < 0 || data.snapshot.last_seq > s.events.length)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "appendEvent does not fsync the parent directory when creating a new file. On crash, the file data may be fsynced but the directory entry may not be persisted, meaning the file could be lost. durableReplace correctly fsyncs the directory, but appendEvent does not.",
+          "location": "appendEvent function: no directory fsync after creating new file"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "persistSession writes the event log and snapshot file in separate durableReplace calls without atomicity. If the process crashes between the two writes, the snapshot could be stale relative to the event log. While import_ would detect the mismatch and throw, the session would be unloadable until the stale snapshot is manually deleted.",
+          "location": "persistSession function: two separate durableReplace calls"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "The fileEncryptionKey Buffer stored in DurableSession.fileEncryptionKey is never zeroed. While the key copies in persistSession, loadSession, and appendEvent are zeroed in finally blocks, the instance-level key persists for the lifetime of the DurableSession object and survives until garbage collection.",
+          "location": "DurableSession.setLogPath: this.fileEncryptionKey = validatedFileKey(options); no corresponding cleanup"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Event data is cloned twice in append: once by cloneJsonValue(data, 'event data') to produce eventData, and again by immutableEvent which calls cloneJsonValue(event.data, 'event data'). This is a performance issue for large event payloads.",
+          "location": "DurableSession.append: const eventData = cloneJsonValue(data, ...); then immutableEvent({ ..., data: eventData }) which clones again"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "releaseWriter silently returns when no lock is held (writerOwner === null). This could mask bugs where code releases a lock it never acquired, potentially hiding logic errors in lock management.",
+          "location": "DurableSession.releaseWriter: if (this.writerOwner === null) return;"
+        }
+      ],
+      "file": "session/durable-session.ts"
+    },
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "Non-atomic database reads: loadEvents, getLatestSnapshot, and getRun are executed as separate queries without a shared transaction. Under concurrent access (e.g., multiple processes sharing the same SQLite database), these queries could observe different database states, leading to inconsistent session restoration. The snapshot validation logic (last_seq/last_hash check) partially mitigates event/snapshot mismatch, but persistedRun consistency is unprotected \u2014 another process could complete the run between loadEvents and getRun, causing isTerminalRun to return an incorrect result.",
+          "location": "openRunSession, lines 37-47"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "All existing events are loaded into memory via store.loadEvents() and then copied again via Object.freeze([...existingEvents]). For sessions with a large number of events, this doubles memory usage temporarily and could contribute to OOM risk. There is no pagination or cap on the number of events loaded.",
+          "location": "openRunSession, lines 37 and 56"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "runId and goal are passed directly to store.createRun() without any validation for format, length, or content. If runId contains special characters or is excessively long, it could cause issues in downstream SQLite queries or file operations. dataDir is also used directly in join() and createTrustedSessionStateRoot() without path traversal validation, though it is likely system-controlled.",
+          "location": "openRunSession, lines 30-33"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Object.freeze([...existingEvents]) performs a shallow freeze \u2014 the array itself is frozen but individual SessionEvent objects within it remain mutable. Callers could inadvertently mutate event objects, potentially corrupting session state if those objects are shared references with the store's internal cache.",
+          "location": "openRunSession, line 56"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "store.createRun() is called unconditionally before checking whether the run already exists or is terminal. This assumes createRun is idempotent (e.g., INSERT OR IGNORE). If createRun resets the status of an existing run (e.g., INSERT OR REPLACE), isTerminalRun would never return true for a re-opened completed run, potentially leading to unintended re-execution of completed sessions.",
+          "location": "openRunSession, line 33"
+        }
+      ],
+      "file": "session/run-session.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "Constructor leaks the derived recordKey and database handle if any this.db.prepare() call after the try/catch block throws. The recordKey Buffer is not zeroed and the database is not closed. Since the constructor throws, the caller never receives a reference to the SqliteSessionStore instance and cannot call close() to clean up. This leaves secret key material in memory until GC and leaks a file descriptor.",
+          "location": "SqliteSessionStore constructor \u2014 all this.db.prepare() calls after the try/catch block (lines following `this.recordKey = derivedRecordKey; derivedRecordKey = undefined;`)"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "recordOperation, appendEvent, recordReceipt, and createRun all use non-atomic check-then-act patterns without wrapping the check and write in a transaction. In multi-process WAL scenarios (which this code explicitly enables), a concurrent writer can insert a matching key between the existence check and the insert, causing either a raw SQLite constraint violation (bypassing the friendly error messages) or a duplicate-effect race that the idempotency check was designed to prevent.",
+          "location": "recordOperation, appendEvent, recordReceipt, createRun methods"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "The strategy field is stored in plaintext while goal is encrypted, creating an inconsistency in the protection of run metadata. If strategy contains sensitive information, it would be readable by anyone with database file access.",
+          "location": "createRun \u2014 `strategy ?? null` passed directly to _insertRun.run() without encryption"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "updateRunStatus accepts any arbitrary string for the status parameter without validating it against an allowed set of values (e.g., 'running', 'completed', 'failed'). Invalid status strings are persisted directly.",
+          "location": "updateRunStatus(runId, status)"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "recordReceipt does not validate receipt fields: tool_name is not passed through validateDurableIdentifier (unlike in recordOperation), duration_ms is not validated as non-negative, and timestamp is not validated as a well-formed ISO string.",
+          "location": "recordReceipt(opId, receipt)"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "In close(), if this.db.close() throws, the finally block sets this.closed = true and zeroes the key, but the database may remain open. Subsequent calls to close() are no-ops due to the closed flag, leaving the database handle leaked with no recovery path.",
+          "location": "close() method"
+        },
+        {
+          "severity": "low",
+          "category": "validation",
+          "description": "appendEvent does not validate ev.seq (could be negative or non-integer), ev.type, ev.timestamp, ev.hash, or ev.prev_hash before persisting. Invalid sequence numbers could corrupt the event chain integrity.",
+          "location": "appendEvent(runId, ev)"
+        }
+      ],
+      "file": "session/sqlite-session-store.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "error_handling",
+          "description": "JSON.stringify(req.input) in the failure() method can throw on circular references or BigInt values. Since failure() is called from within the catch block in dispatch(), this throw escapes the catch and propagates as an uncaught error, violating the implied contract that dispatch() always returns a DispatchResult. This also masks the original error that triggered the failure path.",
+          "location": "failure() method, input_hash computation line"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "Schema compilation (validatorsFor) and input validation (validators.input(req.input)) are outside the try-catch block in dispatch(). If either throws (e.g., malformed schema with strict:false, or AJV internal error), the error propagates uncaught instead of being returned as a structured DispatchResult failure.",
+          "location": "dispatch() method, steps 2 and validatorsFor call, before the try block"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "No size limit on req.input. A very large input object can cause excessive memory consumption during AJV schema validation (especially with allErrors:true collecting all errors), JSON.stringify for input_hash computation, and postcondition observer invocation. This is a potential DoS vector for model-originated inputs.",
+          "location": "dispatch() method, input handling throughout"
+        },
+        {
+          "severity": "low",
+          "category": "concurrency",
+          "description": "Validator compilation race condition: concurrent dispatch() calls for the same tool_name may both invoke validatorsFor() and compile schemas simultaneously before either caches the result. This is benign (both produce equivalent validators) but wastes CPU and memory temporarily.",
+          "location": "validatorsFor() method, cache check-and-set pattern"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "AJV is configured with strict:false, which disables strict schema validation. If tool schemas are not fully trusted or could be tampered with, this allows unexpected schema behaviors (e.g., unknown keywords, non-standard types) that could weaken input validation.",
+          "location": "validatorsFor() method, new Ajv({ allErrors: true, strict: false })"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Object.freeze is shallow on both the DispatchResult and the ToolReceipt in the success path. Nested objects within result and receipt (which comes from executor and may not be frozen) can be mutated by callers, undermining immutability guarantees.",
+          "location": "dispatch() success return and failure() receipt construction"
+        }
+      ],
+      "file": "tools/tool-dispatcher.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "TOCTOU race condition in idempotency check: getOperationByIdempotencyKey and recordOperation are separate non-atomic operations. Two concurrent calls with the same idempotency key can both pass the check (both see null or DEFINITELY_FAILED_NO_EFFECT) and proceed to execute, defeating idempotency guarantees for potentially irreversible effects. The EffectJournalPort interface provides no atomic check-and-insert or compare-and-swap primitive.",
+          "location": "execute() \u2014 existingEffect check and subsequent recordOperation calls"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Unvalidated replay result: JSON.parse of stored receipt_json casts result as T without any runtime validation. A tampered or corrupted journal entry could return arbitrary data as the tool result. Additionally, JSON serialization/deserialization alters types (Date\u2192string, undefined omitted, Map\u2192{}), causing type mismatches that could trigger runtime errors in callers expecting the original type.",
+          "location": "execute() \u2014 existingEffect EFFECT_CONFIRMED replay block, JSON.parse(existingEffect.receipt_json)"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "extractRisk uses TypeScript 'as' casts on effect_model fields without validating enum values. Invalid values (e.g., operation='foo', locality='bar') pass through unchecked, potentially bypassing isWrite/hasExternalEffect logic in buildManifest and leading to incorrect risk classification, wrong side_effect_class assignment, and incorrect policy decisions.",
+          "location": "extractRisk() \u2014 all field casts from em.locality, em.operation, etc."
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "effectStarted is set to true before credential broker exchange. If credential exchange fails or throws, the error handler records EFFECT_UNKNOWN even though the tool function (fn) never executed. This triggers unnecessary reconciliation for an effect that never began, potentially blocking retries.",
+          "location": "execute() \u2014 PEP callback: effectStarted = true set before credentialBroker.exchange()"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "verifyResult failure after successful tool execution marks effect as EFFECT_UNKNOWN. The tool's side effect already occurred (e.g., file written, API called), but the state suggests uncertainty, potentially causing dangerous retries of non-idempotent operations. The postcondition verifier and verifyResult should be evaluated before committing the effect state.",
+          "location": "execute() \u2014 await verifyResult?.(result) inside try block, error handler sets EFFECT_UNKNOWN"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Idempotency replay check occurs after policy evaluation and consent request. If policy has changed to deny the tool since the original execution, or consent is now denied, the confirmed effect cannot be replayed \u2014 creating inconsistent state where the effect already happened but the caller receives a denial error. The idempotency check should happen before policy/consent gates.",
+          "location": "execute() \u2014 existingEffect EFFECT_CONFIRMED check inside try block, after policyEngine.evaluate and consent.request"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "hash() uses JSON.stringify which throws TypeError on circular references or BigInt values. This is called from buildManifest (outside any try-catch block) and in idempotency validation. An uncaught throw from hash() bypasses all effect journal state tracking, leaving operations in PRE_DISPATCH or unrecorded states.",
+          "location": "hash() function; callers in buildManifest() and execute()"
+        },
+        {
+          "severity": "medium",
+          "category": "error_handling",
+          "description": "Effect journal operations (recordOperation, recordReceipt) are not wrapped in try-catch. If the journal implementation throws (e.g., storage failure), it masks the actual tool result or error, and may leave the effect state unrecorded \u2014 defeating the journal's purpose for crash recovery and idempotency.",
+          "location": "execute() \u2014 all effectJournal.recordOperation() and recordReceipt() calls"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Full tool results are serialized and stored in the effect journal (receipt_json: JSON.stringify({ result, receipt })). Results may contain sensitive data (file contents, API responses with tokens, credential material) that could leak if the journal storage is not encrypted or is accessible to unauthorized parties. No redaction or filtering is applied before persistence.",
+          "location": "execute() \u2014 effectJournal.recordOperation with receipt_json: JSON.stringify({ result, receipt })"
+        },
+        {
+          "severity": "medium",
+          "category": "validation",
+          "description": "buildManifest casts input to Record<string, unknown> without validating it is a non-null object. If input is null, undefined, or a primitive, Object.keys() throws TypeError or returns unexpected results, and extractResourceIds may silently miss resource identifiers, leading to incomplete capability scopes.",
+          "location": "buildManifest() \u2014 const canonicalArgs = input as Record<string, unknown>"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Receipt timestamp uses new Date().toISOString() instead of the injected now() function, creating inconsistency with other timestamps (issueTime, token not_before/expires_at) that use injectedNow(). This breaks time-mocking in tests and may cause timestamp ordering anomalies in audit logs.",
+          "location": "execute() \u2014 receipt.timestamp = new Date().toISOString()"
+        }
+      ],
+      "file": "tools/tool-executor.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "critical",
+      "findings": [
+        {
+          "severity": "critical",
+          "category": "security",
+          "description": "LocalBackend.delete() does not call this.safe() to validate against symlink escape. While osPath() checks for '..' in the relative path, it does not resolve symlinks. If a symlink exists inside the root pointing outside (e.g., /workspace/evil -> /etc), calling delete('/workspace/evil/passwd') will resolve through the symlink and rmSync will delete /etc/passwd. The safe() method exists specifically to prevent this but is bypassed on delete.",
+          "location": "LocalBackend.delete (line ~102)"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "TOCTOU race condition in LocalBackend.write(): safe() is called to check for symlink escape, then mkdirSync and writeFileSync follow. Between the safe() check and writeFileSync(), an attacker could create a symlink at the target path pointing outside the root, causing the write to follow the symlink and write data to an arbitrary location outside the backend root.",
+          "location": "LocalBackend.write (lines ~94-100)"
+        },
+        {
+          "severity": "high",
+          "category": "error_handling",
+          "description": "commitOverlay rollback silently swallows all errors with empty catch blocks ('/* best effort */'). If rollback fails (e.g., disk full, permission error), the target backend is left in a partially-written inconsistent state with no record that rollback failed. The original commit error is thrown but the rollback failure is completely hidden.",
+          "location": "commitOverlay catch block (lines ~230-245)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "edit() calls write() then modifies this.log[this.log.length - 1].operation = 'edit'. If write() throws before recording (e.g., permission denied, backend error), the log entry doesn't exist and this either modifies the wrong previous log entry or throws a TypeError on undefined. The non-null assertion (!) masks this.",
+          "location": "VirtualFilesystem.edit (line ~210)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "VirtualFilesystem.log grows unboundedly. Every read, write, list, search, commit, and discard operation pushes a VfsReceipt with no rotation, eviction, or size limit. Long-running processes will accumulate unbounded memory.",
+          "location": "VirtualFilesystem.record / this.log (line ~178)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "search() reads entire file contents into memory via this.readText(e.path).toLowerCase().includes(lower) for every file under the search root. There is no file size limit, so searching a directory with large files can cause OOM. Additionally, there is no recursion depth limit or cycle detection, so circular symlinks or very deep directory trees can cause stack overflow or infinite loops.",
+          "location": "VirtualFilesystem.search (lines ~213-224)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "OverlayBackend.read(), list(), and exists() do not call checkTx(). After markDiscarded(), staged data remains accessible via read/list/exists, violating the semantic contract that discarded overlays should not be readable. Similarly, after markCommitted(), the staged data is still served instead of falling through to the base backend.",
+          "location": "OverlayBackend.read/list/exists (lines ~130-155)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "OverlayBackend.delete() only tombstones the exact path string. If a directory is deleted (tombstoned), files within that directory (e.g., /scratch/dir/file) are not tombstoned and will still appear in list() and exists() via base backend read-through. The overlay does not implement hierarchical tombstoning.",
+          "location": "OverlayBackend.delete (line ~159)"
+        },
+        {
+          "severity": "medium",
+          "category": "concurrency",
+          "description": "OverlayBackend has no synchronization on its staged/tombstones Maps. Concurrent async operations (e.g., multiple writes, or write during stagedEntries() iteration) can cause race conditions. The Map could be modified during iteration in stagedEntries() or list(), leading to inconsistent state.",
+          "location": "OverlayBackend (entire class)"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "commitOverlay() with no explicit target calls this.route(overlay.prefix). If called on a forked VFS where the overlay is mounted at its own prefix, this routes to the overlay itself, causing the commit to write back into the overlay rather than the real target backend. This is a silent logic error.",
+          "location": "commitOverlay (line ~197)"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "search() catches all errors silently with '/* permission */' comment, not just permission errors. Disk failures, encoding errors, and other real errors are hidden, potentially causing search to return incomplete results with no indication of failure.",
+          "location": "VirtualFilesystem.search (line ~221)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "list() in StoreBackend, EvidenceBackend, and OverlayBackend uses 'path + /' as prefix for non-root paths. If path has a trailing slash (e.g., '/memories/'), the check becomes k.startsWith('/memories//') which never matches, returning empty results. assertSafeVfsPath does not reject trailing slashes.",
+          "location": "StoreBackend.list, EvidenceBackend.list, OverlayBackend.list"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "LocalBackend.write() creates files with default permissions (umask-based) via writeFileSync, then applies the requested mode via chmodSync afterward. There is a window where the file exists with potentially permissive default permissions before chmod is applied. Should use writeFileSync(os, data, { mode }) for atomic mode setting on creation.",
+          "location": "LocalBackend.write (lines ~98-100)"
+        }
+      ],
+      "file": "vfs/virtual-filesystem.ts"
+    }
+  ],
+  "summary": {
+    "total": 14,
+    "pass": 1,
+    "passWithNotes": 6,
+    "fail": 7,
+    "errors": 0
+  },
+  "timestamp": "2026-08-05T13:34:19.000Z"
+}

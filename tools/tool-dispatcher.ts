@@ -199,16 +199,27 @@ export class ToolDispatcher {
     error: string,
     started: number,
   ): DispatchResult<T> {
+    // JSON.stringify can throw on circular references or BigInt values;
+    // wrap to ensure failure() never throws from the catch block.
+    let inputHash: string;
+    try {
+      inputHash = createHash('sha256')
+        .update(JSON.stringify(req.input) ?? 'undefined')
+        .digest('hex')
+        .slice(0, 16);
+    } catch {
+      inputHash = createHash('sha256')
+        .update(String(req.input))
+        .digest('hex')
+        .slice(0, 16);
+    }
     const receipt = Object.freeze({
       tool_name: req.tool_name,
       timestamp: this.clock.isoNow(),
       success: false,
       error,
       duration_ms: Math.max(1, Math.ceil(this.clock.monotonicNow() - started)),
-      input_hash: createHash('sha256')
-        .update(JSON.stringify(req.input) ?? 'undefined')
-        .digest('hex')
-        .slice(0, 16),
+      input_hash: inputHash,
     } satisfies ToolReceipt);
     return Object.freeze({ success: false, receipt, error });
   }

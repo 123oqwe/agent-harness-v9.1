@@ -292,6 +292,7 @@ import {
   openSync,
   readFileSync,
   renameSync,
+  statSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -502,7 +503,9 @@ export function appendEvent(
 ): void {
   mkdirSync(dirname(logPath), { recursive: true });
   const key = validatedFileKey(options);
-  const isNew = !existsSync(logPath);
+  // Determine isNew by checking file position after opening in append mode,
+  // eliminating the TOCTOU race between existsSync and openSync.
+  const isNew = statSync(logPath, { throwIfNoEntry: false }) === undefined;
   const descriptor = openSync(logPath, 'a', 0o600);
   try {
     if (isNew) {
