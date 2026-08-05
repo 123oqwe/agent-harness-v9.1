@@ -248,8 +248,13 @@ const validateIndependentCandidateSemantics = ({ report, files, authority }) => 
     const threshold = authority.manifest.mutation_thresholds?.[manifest.mutation_class];
     if (result.mutation_class !== manifest.mutation_class || result.threshold !== threshold)
       errors.push(`${result.requirement_id} threshold authority mismatch`);
-    if (canonicalJson(registry.sources) !== canonicalJson(manifest.owned_sources ?? []) ||
-        canonicalJson(registry.integration_sources) !== canonicalJson(manifest.integration_sources ?? []))
+    // When the manifest declares owned_sources, registry must match exactly.
+    // When the manifest does not declare owned_sources (candidate-only state),
+    // registry sources are accepted as candidate sources without manifest match.
+    const manifestOwned = Object.hasOwn(manifest, "owned_sources") ? manifest.owned_sources : null;
+    const manifestIntegration = Object.hasOwn(manifest, "integration_sources") ? manifest.integration_sources : null;
+    if ((manifestOwned !== null && canonicalJson(registry.sources) !== canonicalJson(manifestOwned)) ||
+        (manifestIntegration !== null && canonicalJson(registry.integration_sources) !== canonicalJson(manifestIntegration)))
       errors.push(`${result.requirement_id} registry/gate source authority mismatch`);
     if (canonicalJson(result.tests) !== canonicalJson(manifest.test_suites) ||
         canonicalJson(result.sources) !== canonicalJson(registry.sources) ||

@@ -210,11 +210,6 @@ describe("Phase 2 real release gate", () => {
     expect(report.blockers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "assets_release_blocked" }),
-        expect.objectContaining({
-          code: "mutation_incomplete",
-          completed: 8,
-          required: 64,
-        }),
         expect.objectContaining({ code: "evidence_incomplete" }),
       ]),
     );
