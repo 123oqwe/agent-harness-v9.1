@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ModelGateway } from '../../gateway/model-gateway.js';
+import {
+  ModelGateway,
+  GatewayTruncationError,
+  GatewayRateLimitedError,
+  isBackoffRetryable,
+} from '../../gateway/model-gateway.js';
 import { ScriptedTestProvider, ScriptedResponseExhaustedError } from '../../gateway/scripted-provider.js';
 
 describe('AH-GATEWAY-001: ModelGateway', () => {
@@ -96,5 +101,53 @@ describe('AH-GATEWAY-001: ModelGateway', () => {
     });
     expect(result.response.content).toBe('hello');
     expect(provider.callCount).toBe(1);
+  });
+});
+
+describe('AH-GATEWAY-001: Error Classification (P1-09)', () => {
+  let provider: ScriptedTestProvider;
+  let gateway: ModelGateway;
+
+  it('throws GatewayTruncationError when stop_reason is "length"', () => {
+    provider = new ScriptedTestProvider({
+      queue: [{ content: 'partial', stop_reason: 'length', usage: { input_tokens: 5, output_tokens: 3 } }],
+    });
+    gateway = new ModelGateway([provider]);
+    expect(() => gateway.complete('scripted_test', {
+      messages: [{ role: 'user', content: 'long task' }],
+    })).toThrow(GatewayTruncationError);
+  });
+
+  it('does NOT retry truncation errors', () => {
+   // Only one response queued — if retried, queue would exhaust and throw
+   // ScriptedResponseExhaustedError instead of GatewayTruncationError.
+    provider = new ScriptedTestProvider({
+      queue: [{ content: 'partial', stop_reason: 'length' }],
+    });
+    gateway = new ModelGateway([provider]);
+    expect(() => gateway.complete('scripted_test', {
+      messages: [{ role: 'user', content: 'x' }],
+    }, { retries: 3 })).toThrow(GatewayTruncationError);
+    expect(provider.callCount).toBe(1); // not retried
+  });
+
+  it('rate_limited errors are NOT retryable with backoff', () => {
+    expect(isBackoffRetryable({ kind: 'rate_limited', retryable: false, detail: '429' })).toBe(false);
+  });
+
+  it('server errors ARE retryable with backoff', () => {
+    expect(isBackoffRetryable({ kind: 'server', retryable: true, detail: '500' })).toBe(true);
+  });
+
+  it('timeout errors ARE retryable with backoff', () => {
+    expect(isBackoffRetryable({ kind: 'timeout', retryable: true, detail: 'timeout' })).toBe(true);
+  });
+
+  it('auth errors are NOT retryable with backoff', () => {
+    expect(isBackoffRetryable({ kind: 'auth', retryable: false, detail: '401' })).toBe(false);
+  });
+
+  it('invalid_request errors are NOT retryable with backoff', () => {
+    expect(isBackoffRetryable({ kind: 'invalid_request', retryable: false, detail: '400' })).toBe(false);
   });
 });

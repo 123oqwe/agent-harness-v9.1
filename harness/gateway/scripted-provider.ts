@@ -250,7 +250,9 @@ export class ScriptedTestProvider implements ProviderAdapter {
       return { kind: 'invalid_request', retryable: false, detail: msg };
     }
     const lower = msg.toLowerCase();
-    if (lower.includes('rate')) return { kind: 'rate_limited', retryable: true, detail: msg };
+  // 429 must NOT be auto-retried with backoff — retrying aggravates the
+  // throttle. Caller should respect retry-after and re-queue.
+  if (lower.includes('rate')) return { kind: 'rate_limited', retryable: false, detail: msg };
     if (lower.includes('auth') || lower.includes('401') || lower.includes('key')) {
       return { kind: 'auth', retryable: false, detail: msg };
     }
@@ -289,38 +291,8 @@ export class ScriptedTestProvider implements ProviderAdapter {
   }
 }
 
-/**
- * Registry-based gateway. ScriptedTestProvider is injectable here exactly like
- * a real provider, so tests construct the gateway once and resolve by type.
- */
-export class ModelGateway {
-  private readonly adapters = new Map<ProviderAdapter['provider_type'], ProviderAdapter>();
-
-  constructor(initial: ProviderAdapter[] = []) {
-    for (const a of initial) this.register(a);
-  }
-
-  register(adapter: ProviderAdapter): void {
-    this.adapters.set(adapter.provider_type, adapter);
-  }
-
-  resolve(type: ProviderAdapter['provider_type']): ProviderAdapter {
-    const a = this.adapters.get(type);
-    if (!a) throw new Error(`No provider registered for type: ${type}`);
-    return a;
-  }
-
-  complete(type: ProviderAdapter['provider_type'], req: ProviderRequest): ParsedResponse {
-    const adapter = this.resolve(type);
-    if (adapter instanceof ScriptedTestProvider) {
-      return adapter.resolve(req);
-    }
-    throw new Error('ModelGateway.complete only supports scripted_test providers in Phase 1');
-  }
-
-  list(): ProviderAdapter['provider_type'][] {
-    return [...this.adapters.keys()];
-  }
-}
+// ModelGateway has been consolidated into model-gateway.ts.
+// This file only exports the ScriptedTestProvider and helpers.
+// Tests should import ModelGateway from '../../gateway/model-gateway.js'.
 
 export const __hashMessages = hashMessages;

@@ -66,12 +66,12 @@ import {
   ScriptedTestProvider,
   ScriptedResponseExhaustedError,
   ScriptedResponseMissingError,
-  ModelGateway,
   __hashMessages,
   type ParsedResponse,
   type ProviderRequest,
   type Message,
 } from '../../gateway/scripted-provider';
+import { ModelGateway } from '../../gateway/model-gateway';
 
 function msg(role: Message['role'], content: string): Message {
   return { role, content };
@@ -249,7 +249,7 @@ describe('ScriptedTestProvider: ModelGateway injection', () => {
     const gw = new ModelGateway([new ScriptedTestProvider({ queue: [res('via-gw')] })]);
     const adapter = gw.resolve('scripted_test');
     expect(adapter).toBeInstanceOf(ScriptedTestProvider);
-    expect(gw.complete('scripted_test', req([msg('user', 'hi')])).content).toBe('via-gw');
+    expect(gw.complete('scripted_test', req([msg('user', 'hi')])).response.content).toBe('via-gw');
   });
 
   it('ModelGateway.resolve throws for an unregistered provider type', () => {

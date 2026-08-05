@@ -37,6 +37,8 @@ export interface ProviderRequest {
   model?: string;
   temperature?: number;
   max_tokens?: number;
+  /** Controls tool calling behavior: 'auto' (default), 'required', 'none', or a specific tool name. */
+  tool_choice?: 'auto' | 'required' | 'none' | string;
 }
 
 export type HealthStatus = 'healthy' | 'degraded' | 'down';
