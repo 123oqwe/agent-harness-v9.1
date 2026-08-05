@@ -1,0 +1,131 @@
+{
+  "commit": "51265c02",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "results": [
+    {
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "DoS / resource management",
+          "description": "The parser uses inflateRawSync (synchronous decompression) inside an async method. A 50MB compressed XLSX can block the event loop for seconds. Should use async zlib.inflateRaw or offload to a worker thread.",
+          "location": "extractZipEntries, line 38"
+        },
+        {
+          "severity": "medium",
+          "category": "Correctness \u2014 XML entity decoding",
+          "description": "Extracted text from <t> and <v> elements is not XML-unescaped. Entities like &lt;, &gt;, &amp;, &quot;, &apos; and numeric character references are passed through verbatim, corrupting cell values.",
+          "location": "parseSharedStrings, line 56; parseSheet, line 76"
+        },
+        {
+          "severity": "medium",
+          "category": "Correctness \u2014 cell positioning",
+          "description": "The r attribute (e.g. r=\"C1\") is never parsed. Empty or missing cells cause column shifting \u2014 cells are packed contiguously instead of being placed at their correct column index.",
+          "location": "parseSheet, line 70-80"
+        },
+        {
+          "severity": "medium",
+          "category": "Correctness \u2014 inline strings",
+          "description": "Cells with t=\"inlineStr\" contain <is><t>...</t></is> instead of <v>. The cell regex only captures <v> content, so inline string cells produce empty values.",
+          "location": "parseSheet, line 72"
+        },
+        {
+          "severity": "medium",
+          "category": "Correctness \u2014 data descriptor scan",
+          "description": "When general purpose flag bit 3 is set, the parser scans byte-by-byte for the next signature (0x04034b50 or 0x02014b50). Compressed data can legitimately contain these byte sequences, causing premature truncation of entry data and corrupted output.",
+          "location": "extractZipEntries, lines 30-36"
+        },
+        {
+          "severity": "medium",
+          "category": "Security \u2014 ZIP parsing",
+          "description": "The parser only reads local file headers and never validates against the central directory (End of Central Directory record). A malicious file can craft local headers that differ from the central directory, causing the parser to read unintended data. Standard ZIP readers use the central directory as authoritative.",
+          "location": "extractZipEntries, entire function"
+        },
+        {
+          "severity": "low",
+          "category": "Correctness \u2014 self-closing cells",
+          "description": "The cell regex <c\\s+([^>]*)>(?:<v>...)?</c> requires a closing </c> tag. Self-closing empty cells like <c r=\"A1\" s=\"0\"/> are not matched and silently skipped.",
+          "location": "parseSheet, line 72"
+        },
+        {
+          "severity": "low",
+          "category": "Security \u2014 duplicate entries",
+          "description": "Entries are stored in a Map keyed by name with last-wins semantics. A malicious XLSX could include a duplicate xl/sharedStrings.xml after the legitimate one, causing the parser to use attacker-controlled shared strings.",
+          "location": "extractZipEntries, line 44"
+        },
+        {
+          "severity": "low",
+          "category": "Correctness \u2014 namespace handling",
+          "description": "Regexes for <si>, <t>, <row>, <c>, <v> do not account for XML namespace prefixes (e.g., <x:si>). While most XLSX files omit prefixes in the body, namespace-qualified files would fail to parse.",
+          "location": "parseSharedStrings, line 51; parseSheet, lines 68-72"
+        }
+      ],
+      "file": "packages/documents/src/parsers/xlsx-parser.ts"
+    },
+    {
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "DNS rebinding TOCTOU: validateNotPrivate() resolves DNS and validates IPs, but fetch() re-resolves DNS independently using the hostname. An attacker controlling a DNS server can return a public IP on the validation lookup and a private IP (e.g., 127.0.0.1, 169.254.169.254) on the fetch lookup, bypassing SSRF protection entirely. The resolved IP is never pinned to the actual fetch connection. While documented as a known limitation, this is an exploitable SSRF bypass that allows access to internal services and cloud metadata endpoints.",
+          "location": "webFetchInternal - fetch(url.toString(), ...) call; validateNotPrivate function"
+        },
+        {
+          "severity": "medium",
+          "category": "resource_management",
+          "description": "max_bytes input parameter is not validated. A caller can pass an extremely large value (e.g., Number.MAX_SAFE_INTEGER) causing the response body reading loop to consume excessive memory, potentially leading to OOM. No upper bound is enforced beyond the caller-provided value.",
+          "location": "webFetchInternal - const maxBytes = input.max_bytes ?? 1024 * 1024"
+        },
+        {
+          "severity": "medium",
+          "category": "input_validation",
+          "description": "timeout_ms input parameter is not validated. A value of 0 causes setTimeout to fire immediately, aborting the request before it starts. Negative values cause setTimeout to fire immediately in Node.js. No bounds checking is performed.",
+          "location": "webFetchInternal - const timeoutMs = input.timeout_ms ?? 30000"
+        },
+        {
+          "severity": "low",
+          "category": "error_handling",
+          "description": "If context.signal is already aborted before addEventListener is called, the abort event has already fired and the listener will never trigger. The fetch will proceed without cancellation. Should check context.signal.aborted before registering the listener.",
+          "location": "webFetchInternal - context.signal.addEventListener('abort', onAbort, { once: true })"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "On 3xx redirect responses, the response body is not consumed or cancelled before returning. This may leave the underlying TCP connection open until garbage collection, causing resource leaks especially during redirect chains.",
+          "location": "webFetchInternal - redirect handling block (response.status >= 300 && < 400)"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "If reader.read() throws an error during body consumption, the reader is not explicitly cancelled before the error propagates. The connection may remain open. Should cancel the reader in a finally block or catch within the reading loop.",
+          "location": "webFetchInternal - for (;;) { const { done, value } = await reader.read(); }"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "Several private/reserved IP ranges are missing from PRIVATE_IP_PATTERNS: 192.0.0.0/24 (IETF protocol assignments), 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2), 203.0.113.0/24 (TEST-NET-3), 240.0.0.0/4 (reserved), and IPv6 multicast ff00::/8. While these are lower risk for SSRF than RFC 1918 ranges, they should be blocked for completeness.",
+          "location": "PRIVATE_IP_PATTERNS array"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The comment states 'Block obfuscated IP formats (decimal, hex, octal)' but only decimal format (/^\\d+$/) is implemented. The WHATWG URL parser normalizes most obfuscated IPv4 formats (hex, octal, mixed) to dotted-decimal before hostname is accessed, making this check largely redundant. However, the code comment is misleading and the decimal check itself is likely dead code since the URL parser normalizes pure decimal IPs to dotted-decimal notation.",
+          "location": "parseAndValidateUrl - obfuscated IP check block"
+        }
+      ],
+      "file": "packages/tools/src/web-fetch.ts"
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "pass": 0,
+    "passWithNotes": 1,
+    "fail": 1,
+    "errors": 0
+  },
+  "timestamp": "2026-08-05T11:40:48.000Z"
+}

@@ -4,17 +4,17 @@
  * SSRF protection:
  * - Private IP ranges blocked by hostname check
  * - DNS resolution validated before fetch; DNS failures block the request
+ * - DNS pinning: resolved IP is pinned via custom agent lookup to prevent
+ *   DNS rebinding TOCTOU attacks
  * - Redirects handled manually with re-validation of each destination
  * - Redirect depth limited to prevent loops
  * - Response body read in chunks to enforce max_bytes
- *
- * Known limitation: fetch() re-resolves DNS independently, creating a TOCTOU
- * window for DNS rebinding attacks. Production deployments should use a custom
- * HTTP agent that pins the resolved IP address. This implementation provides
- * defense-in-depth but is not a complete DNS rebinding mitigation.
  */
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
+import { request } from 'node:https';
+import { request as httpRequest } from 'node:http';
+import type { IncomingMessage } from 'node:http';
 import type { ToolResult, ToolContext } from './types.js';
 
 const PRIVATE_IP_PATTERNS = [
@@ -81,15 +81,30 @@ async function webFetchInternal(
   }
 
   try {
-    const response = await fetch(url.toString(), {
-      signal: controller.signal,
-      redirect: 'manual',
-      headers: { 'User-Agent': 'Agent-Harness/1.0' },
+    // Pin the resolved IP to prevent DNS rebinding TOCTOU: connect to the
+    // pre-validated IP directly instead of letting fetch re-resolve DNS.
+    const pinnedIp = resolvedIps[0]!;
+    const isHttps = url.protocol === 'https:';
+    const response = await new Promise<IncomingMessage>((resolve, reject) => {
+      const reqFn = isHttps ? request : httpRequest;
+      const req = reqFn({
+        method: 'GET',
+        hostname: pinnedIp,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname + url.search,
+        headers: {
+          Host: url.hostname,
+          'User-Agent': 'Agent-Harness/1.0',
+        },
+        signal: controller.signal,
+      }, (res: IncomingMessage) => resolve(res));
+      req.on('error', reject);
+      req.end();
     });
 
     // Handle redirects manually to re-validate each destination
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
+    if ((response.statusCode ?? 0) >= 300 && (response.statusCode ?? 0) < 400) {
+      const location = response.headers.location;
       if (!location) {
         return { success: false, output: null, error: 'redirect without location header' };
       }
@@ -101,49 +116,48 @@ async function webFetchInternal(
       }
     }
 
-    if (!response.ok) {
-      return { success: false, output: null, error: `HTTP ${response.status}` };
+    if (response.statusCode === undefined || response.statusCode < 200 || response.statusCode >= 300) {
+      return { success: false, output: null, error: `HTTP ${response.statusCode}` };
     }
 
-    const contentType = response.headers.get('content-type') ?? 'unknown';
+    const contentType = response.headers['content-type'] ?? 'unknown';
 
-    // Read response in chunks to enforce max_bytes without loading entire body
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return { success: false, output: null, error: 'no response body' };
-    }
-    const chunks: Uint8Array[] = [];
+    // Read response stream in chunks to enforce max_bytes
+    const chunks: Buffer[] = [];
     let totalBytes = 0;
     let truncated = false;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (totalBytes + value.length > maxBytes) {
-        chunks.push(value.slice(0, maxBytes - totalBytes));
-        totalBytes = maxBytes;
-        truncated = true;
-        break;
-      }
-      chunks.push(value);
-      totalBytes += value.length;
-    }
-    // Cancel the reader if we stopped early
+    await new Promise<void>((resolve, reject) => {
+      response.on('data', (chunk: Buffer) => {
+        if (totalBytes + chunk.length > maxBytes) {
+          chunks.push(chunk.slice(0, maxBytes - totalBytes));
+          totalBytes = maxBytes;
+          truncated = true;
+          response.destroy();
+          resolve();
+        } else {
+          chunks.push(chunk);
+          totalBytes += chunk.length;
+        }
+      });
+      response.on('end', resolve);
+      response.on('error', reject);
+    });
     if (truncated) {
-      await reader.cancel().catch(() => {});
+      response.destroy();
     }
     const content = Buffer.concat(chunks).toString('utf8');
 
     return {
       success: true,
       output: {
-        url: response.url,
+        url: url.toString(),
         content_type: contentType,
         content,
         truncated,
         content_hash: createHash('sha256').update(content).digest('hex'),
         resolved_ips: resolvedIps,
       },
-      metadata: { status: response.status, bytes: totalBytes, redirect_depth: redirectDepth },
+      metadata: { status: response.statusCode ?? 0, bytes: totalBytes, redirect_depth: redirectDepth },
     };
   } catch (e) {
     return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
