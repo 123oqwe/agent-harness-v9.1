@@ -47,7 +47,7 @@
     "check:cycles": "node scripts/check-cycles.mjs",
     "check:workspaces": "node scripts/check-workspace-boundaries.mjs",
     "build": "npm run build:root --silent && npm run build:workspaces --silent",
-    "build:root": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "build:root": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/clean-dist.mjs --post-build && node scripts/copy-runtime-assets.mjs",
     "build:workspaces": "turbo run build --filter=@agent-harness/*",
     "lint": "eslint gateway security runtime router sandbox session skills tools ui verification vfs domains ingestion harness.ts index.ts scripts benchmarks packages apps tests/phase-2/architecture",
     "test": "vitest run",
