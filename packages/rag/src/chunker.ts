@@ -56,7 +56,9 @@ export function chunkDocument(
         end_offset: end,
         content_hash: sha256Hex(chunkText),
         page,
-        metadata: { tenant_id: acl.tenant_id, ...result.metadata },
+      // Ensure tenant_id from acl is not overwritten by result.metadata
+      // This prevents cross-tenant data leakage via malicious metadata
+      metadata: { ...result.metadata, tenant_id: acl.tenant_id },
       });
       chunkIndex++;
     }

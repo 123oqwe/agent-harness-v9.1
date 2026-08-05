@@ -21,6 +21,17 @@ const SANITIZE_PATTERNS: Array<[RegExp, string]> = [
   [/on\w+\s*=\s*["'][^"']*["']/gi, '[REMOVED:event-handler]'],
 ];
 
+// Prompt injection patterns that must be neutralized in retrieved text
+const INJECTION_SANITIZE_PATTERNS: Array<[RegExp, string]> = [
+  [/ignore\s+(all\s+)?previous\s+instructions?/gi, '[NEUTRALIZED:injection]'],
+  [/disregard\s+(all\s+)?prior\s+(instructions|context)/gi, '[NEUTRALIZED:injection]'],
+  [/you\s+are\s+now\s+(a|an)\s+/gi, '[NEUTRALIZED:role-override] '],
+  [/system\s*:\s*/gi, '[NEUTRALIZED:system-prefix]'],
+  [/\bexec\s*\(/gi, '[NEUTRALIZED:exec]('],
+  [/\beval\s*\(/gi, '[NEUTRALIZED:eval]('],
+  [/data:text\/html/gi, '[NEUTRALIZED:data-uri]'],
+];
+
 export function detectInjection(text: string): string[] {
   const matches: string[] = [];
   for (const pattern of INJECTION_PATTERNS) {
@@ -34,6 +45,11 @@ export function detectInjection(text: string): string[] {
 
 export function sanitizeChunkText(text: string): string {
   let sanitized = text;
+  // First neutralize prompt injection patterns
+  for (const [pattern, replacement] of INJECTION_SANITIZE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+  // Then strip HTML/JS patterns
   for (const [pattern, replacement] of SANITIZE_PATTERNS) {
     sanitized = sanitized.replace(pattern, replacement);
   }

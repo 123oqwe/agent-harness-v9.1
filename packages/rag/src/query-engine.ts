@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { RagChunk, RagQuery, RagRetrievalResult, RagAclEntry } from './types.js';
 import { RagError } from './types.js';
 import { FtsIndex } from './fts-index.js';
@@ -28,12 +29,36 @@ export function createIndexStore(): RagIndexStore {
   };
 }
 
+function generatePseudoEmbedding(text: string, dimensions = 64): number[] {
+  // Simple hash-based pseudo-embedding: maps text to a fixed-size vector
+  // using character frequency analysis. Not semantically meaningful but
+  // provides consistent vector representations for testing.
+  const vector = new Array(dimensions).fill(0);
+  const tokens = text.toLowerCase().split(/[\s\p{P}]+/u).filter(t => t.length > 0);
+  for (const token of tokens) {
+    const hash = createHash('sha256').update(token).digest();
+    for (let i = 0; i < dimensions; i++) {
+      vector[i]! += hash[i % hash.length]! / 255;
+    }
+  }
+  // Normalize
+  const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0));
+  return norm > 0 ? vector.map(v => v / norm) : vector;
+}
+
 export function addChunkToStore(store: RagIndexStore, chunk: RagChunk, acl: RagAclEntry): void {
   store.chunks.set(chunk.chunk_id, chunk);
   store.acl.set(chunk.chunk_id, acl);
   store.fts.addChunk(chunk);
   store.metadata.addChunk(chunk);
   store.graph.addChunk(chunk, [...store.chunks.values()]);
+  // Generate a simple hash-based pseudo-embedding so vector search works
+  // without an external embedding provider. This is a placeholder; real
+  // embeddings should be added via store.vector.addEmbedding().
+  const pseudoVector = generatePseudoEmbedding(chunk.text);
+  const model = { model_id: 'pseudo-hash-v1', version: '1.0', dimensions: pseudoVector.length };
+  store.vector.setModel(model);
+  store.vector.addEmbedding({ chunk_id: chunk.chunk_id, model, vector: pseudoVector });
 }
 
 export function removeChunkFromStore(store: RagIndexStore, chunkId: string): boolean {
@@ -93,6 +118,21 @@ export function queryStore(
         citation: generateCitation(chunk),
       });
     }
+  } else {
+    // Use pseudo-embedding for vector search when no external query vector
+    const pseudoQueryVector = generatePseudoEmbedding(query.text);
+    const vecResults = store.vector.search(pseudoQueryVector, topK * 2);
+    for (const { chunk_id, score } of vecResults) {
+      if (!aclFiltered.has(chunk_id)) continue;
+      const chunk = store.chunks.get(chunk_id);
+      if (!chunk) continue;
+      results.push({
+        chunk: safeChunkForRetrieval(chunk),
+        score: score * 0.7, // lower weight for pseudo-embedding
+        source: 'vector',
+        citation: generateCitation(chunk),
+      });
+    }
   }
 
   // Metadata filtering
@@ -104,10 +144,30 @@ export function queryStore(
       if (!chunk) continue;
       results.push({
         chunk: safeChunkForRetrieval(chunk),
-        score: 0.5,
+        score: 0.3, // lower weight than FTS/vector
         source: 'metadata',
         citation: generateCitation(chunk),
       });
+    }
+  }
+
+  // Graph expansion: boost chunks that are neighbors of top results
+  if (results.length > 0 && store.graph.getNodeCount() > 0) {
+    const boosted = new Set<string>();
+    for (const r of results.slice(0, 5)) {
+      const neighbors = store.graph.getNeighbors(r.chunk.chunk_id, 1);
+      for (const neighborId of neighbors) {
+        if (!aclFiltered.has(neighborId) || boosted.has(neighborId)) continue;
+        const chunk = store.chunks.get(neighborId);
+        if (!chunk) continue;
+        boosted.add(neighborId);
+        results.push({
+          chunk: safeChunkForRetrieval(chunk),
+          score: r.score * 0.3, // graph boost weight
+          source: 'graph',
+          citation: generateCitation(chunk),
+        });
+      }
     }
   }
 

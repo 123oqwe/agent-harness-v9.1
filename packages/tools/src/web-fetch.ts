@@ -27,35 +27,73 @@ export async function webFetch(input: WebFetchInput, context: ToolContext): Prom
   } catch (e) {
     return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
   }
-  
+
   const maxBytes = input.max_bytes ?? 1024 * 1024;
   const timeoutMs = input.timeout_ms ?? 30000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   if (context.signal) context.signal.addEventListener('abort', () => controller.abort());
-  
+
   try {
     const response = await fetch(url.toString(), {
       signal: controller.signal,
-      redirect: 'follow',
+      redirect: 'manual',
       headers: { 'User-Agent': 'Agent-Harness/1.0' },
     });
+
+    // Handle redirects manually to re-validate each destination
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) {
+        return { success: false, output: null, error: 'redirect without location header' };
+      }
+      try {
+        const redirectUrl = new URL(location, url.toString());
+        await validateNotPrivate(redirectUrl.hostname);
+        return webFetch({ ...input, url: redirectUrl.toString() }, context);
+      } catch (e) {
+        return { success: false, output: null, error: `redirect blocked: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    }
+
     if (!response.ok) {
       return { success: false, output: null, error: `HTTP ${response.status}` };
     }
+
     const contentType = response.headers.get('content-type') ?? 'unknown';
-    const content = await response.text();
-    const truncated = content.length > maxBytes ? content.slice(0, maxBytes) : content;
+
+    // Read response in chunks to enforce max_bytes without loading entire body
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return { success: false, output: null, error: 'no response body' };
+    }
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    let truncated = false;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (totalBytes + value.length > maxBytes) {
+        chunks.push(value.slice(0, maxBytes - totalBytes));
+        totalBytes = maxBytes;
+        truncated = true;
+        break;
+      }
+      chunks.push(value);
+      totalBytes += value.length;
+    }
+    const content = Buffer.concat(chunks).toString('utf8');
+
     return {
       success: true,
       output: {
         url: response.url,
         content_type: contentType,
-        content: truncated,
-        truncated: content.length > maxBytes,
-        content_hash: createHash('sha256').update(truncated).digest('hex'),
+        content,
+        truncated,
+        content_hash: createHash('sha256').update(content).digest('hex'),
       },
-      metadata: { status: response.status, bytes: truncated.length },
+      metadata: { status: response.status, bytes: totalBytes },
     };
   } catch (e) {
     return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
@@ -86,6 +124,5 @@ async function validateNotPrivate(hostname: string): Promise<void> {
     }
   } catch (e) {
     if (e instanceof Error && e.message.includes('SSRF')) throw e;
-    // DNS failure is not necessarily an error for validation
   }
 }

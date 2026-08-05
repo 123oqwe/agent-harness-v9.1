@@ -16,20 +16,33 @@ interface EscalationRecord {
   readonly timestamp: string;
   readonly reason: string;
   readonly urgency: string;
+  readonly context: Record<string, unknown> | undefined;
+  readonly requested_action: string | undefined;
   readonly status: 'pending' | 'acknowledged' | 'resolved' | 'timeout';
   readonly audit_hash: string;
 }
 
 const auditTrail: EscalationRecord[] = [];
+const MAX_AUDIT_TRAIL_SIZE = 10000;
 
 export async function escalateToHuman(input: EscalateInput): Promise<ToolResult> {
-  const id = createHash('sha256').update(`${Date.now()}-${input.reason}`).digest('hex').slice(0, 16);
+  const id = createHash('sha256')
+    .update(`${Date.now()}-${Math.random()}-${input.reason}-${input.urgency}`)
+    .digest('hex').slice(0, 16);
   const timestamp = new Date().toISOString();
   const record: EscalationRecord = {
     id, timestamp, reason: input.reason, urgency: input.urgency,
+    context: input.context,
+    requested_action: input.requested_action,
     status: 'pending',
-    audit_hash: createHash('sha256').update(JSON.stringify({ id, timestamp, reason: input.reason, urgency: input.urgency })).digest('hex'),
+    audit_hash: createHash('sha256').update(JSON.stringify({
+      id, timestamp, reason: input.reason, urgency: input.urgency,
+      context: input.context, requested_action: input.requested_action,
+    })).digest('hex'),
   };
+  if (auditTrail.length >= MAX_AUDIT_TRAIL_SIZE) {
+    auditTrail.shift();
+  }
   auditTrail.push(record);
   return {
     success: true,
