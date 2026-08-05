@@ -70,7 +70,7 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "@agent-harness/tools",
     ["@agent-harness/runtime-core", "@agent-harness/security"],
     "package",
-    ["node:child_process", "node:crypto", "node:dns", "node:dns/promises", "node:fs", "node:path"],
+    ["node:child_process", "node:crypto", "node:dns", "node:dns/promises", "node:fs", "node:http", "node:https", "node:path"],
   ),
   workspace(
     "packages/ui",
