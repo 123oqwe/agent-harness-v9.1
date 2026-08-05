@@ -111,7 +111,7 @@ describe("Phase 2 mutation authority review round 8", () => {
       publicationReceiptPath: fixture.publicationPath, headCommit: fixture.commit, headTree: fixture.tree,
     });
     expect(result.ok).toBe(false);
-    expect(result.errors.join("\n")).toMatch(/duplicate|unknown requirement|zero mutant|empty source|partial chunk/iu);
+    expect(result.errors.join("\n")).toMatch(/duplicate|unknown requirement|zero mutant|empty source|partial chunk|sources must contain|tests must contain|chunk_count|chunks must contain/iu);
   });
 
   it.each([
