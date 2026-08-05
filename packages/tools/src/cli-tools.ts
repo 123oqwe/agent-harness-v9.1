@@ -5,6 +5,24 @@
  */
 import { spawn } from 'node:child_process';
 import type { ToolResult } from './types.js';
+import { resolve, isAbsolute } from 'node:path';
+
+const ALLOWED_DIRS = ['workspace', 'output', 'tmp', 'artifacts'];
+
+function validatePath(path: string, field: string): void {
+  if (typeof path !== 'string' || !path.trim()) {
+    throw new Error(`${field} is required`);
+  }
+  // Reject absolute paths and path traversal
+  if (isAbsolute(path) || path.includes('..')) {
+    throw new Error(`${field} must be a relative path without traversal`);
+  }
+  // Must be within an allowed directory
+  const resolved = resolve(path);
+  if (!ALLOWED_DIRS.some(dir => resolved.startsWith(dir + '/') || resolved === dir)) {
+    throw new Error(`${field} must be within an allowed directory (${ALLOWED_DIRS.join(', ')})`);
+  }
+}
 
 function runCli(command: string, args: string[], stdin: string, timeoutMs = 30000): Promise<ToolResult> {
   return new Promise((resolve) => {
@@ -45,6 +63,7 @@ export async function manipulateSpreadsheet(input: {
   file_path: string;
   data?: unknown;
 }): Promise<ToolResult> {
+  validatePath(input.file_path, 'file_path');
   return runCli('python3', ['-c', `
 import sys, json
 try:
@@ -75,6 +94,7 @@ export async function generatePresentation(input: {
   output_path: string;
   slides: Array<{ title: string; content?: string[] }>;
 }): Promise<ToolResult> {
+  validatePath(input.output_path, 'output_path');
   return runCli('python3', ['-c', `
 import sys, json
 try:
@@ -101,6 +121,7 @@ export async function generateDocument(input: {
   paragraphs?: string[];
   headings?: Array<{ text: string; level: number }>;
 }): Promise<ToolResult> {
+  validatePath(input.output_path, 'output_path');
   return runCli('python3', ['-c', `
 import sys, json
 try:
@@ -126,6 +147,7 @@ export async function ocrDocument(input: {
   image_path: string;
   language?: string;
 }): Promise<ToolResult> {
+  validatePath(input.image_path, 'image_path');
   return runCli('python3', ['-c', `
 import sys, json
 try:

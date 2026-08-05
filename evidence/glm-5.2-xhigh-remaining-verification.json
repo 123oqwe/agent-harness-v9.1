@@ -1,0 +1,940 @@
+{
+  "timestamp": "2026-08-05T08:24:24.507Z",
+  "model": "glm-5.2",
+  "reasoning_effort": "xhigh",
+  "commit": "0f19182",
+  "batch": "remaining source files",
+  "summary": {
+    "total": 19,
+    "pass": 2,
+    "passWithNotes": 13,
+    "fail": 4,
+    "errors": 0
+  },
+  "results": [
+    {
+      "file": "packages/documents/src/parsers/html-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Regex-based HTML parsing is fundamentally unreliable. HTML comments (e.g., <!-- <h1>heading</h1> -->) are not stripped before heading/table extraction, causing commented-out content to be parsed as real headings and tables. This produces false positives in extracted structured data.",
+          "location": "stripTags function; headingRe/tableRe execution on raw html"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The src attribute regex /src=[\"']([^\"']+)[\"']/i will match 'data-src' before 'src' in tags like <img data-src=\"foo\" src=\"bar\">, extracting the wrong URL. Same issue applies to the alt attribute regex. Should use a word boundary or leading whitespace anchor: /\\bsrc=/ or /(?:^|\\s)src=/.",
+          "location": "imgRe loop, srcMatch and altMatch regexes"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Nested tables are not handled correctly. The lazy [\\s\\S]*? in /<table[^>]*>([\\s\\S]*?)<\\/table>/gi matches the first closing </table> tag, which for nested tables belongs to the inner table. This truncates outer table content and misattributes inner table rows.",
+          "location": "tableRe regex and nested table parsing"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "For a 50MB input (default max_bytes), content.toString('utf8') creates a full string copy (~100MB as UTF-16), then stripTags creates additional copies via chained replace calls, and multiple regex exec loops scan the full string. Peak memory could reach 3-4x the input size per concurrent parse.",
+          "location": "parse method, content.toString('utf8') and stripTags calls"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "Extracted image src URLs are passed through without sanitization. Values like javascript:alert(1) or data:text/html,... are stored as-is in ImageReference.ref and source_path. If downstream code fetches or renders these URLs, it could enable SSRF or XSS. Consider validating URL schemes.",
+          "location": "images.push({ ref: srcMatch[1]!, ... })"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Entity decoding in stripTags only handles 6 entities (&amp;, &lt;, &gt;, &quot;, &#39;, &nbsp;). Numeric hex entities (&#x27;), other named entities (&copy;, &mdash;, etc.), and malformed entities are left undecoded in extracted text.",
+          "location": "stripTags function, entity replacement chain"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Unquoted attribute values (e.g., <img src=foo.png>) are not matched by the src regex which requires quotes. Additionally, <img/> without preceding whitespace is not matched by imgRe which requires \\s+ after 'img'.",
+          "location": "imgRe regex /<img\\s+[^>]*>/gi and srcMatch regex"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "No concurrency issues. All regex objects (headingRe, tableRe, imgRe, rowRe, cellRe) are created as local variables inside parse or inside loops, so lastIndex state is not shared across concurrent invocations. stripTags regex literals are also recreated per call.",
+          "location": "parse method"
+        }
+      ],
+      "summary": "Functional for simple HTML but regex-based parsing causes multiple correctness issues (comment leakage, data-src mismatch, nested table truncation) with moderate memory overhead on large inputs.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 6431,
+        "completion_tokens_details": {
+          "reasoning_tokens": 5654
+        },
+        "prompt_tokens": 1107,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 7538
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/image-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "detectImageWidth and detectImageHeight only check the first 2 bytes (0x89 0x50) of the 8-byte PNG signature (89 50 4E 47 0D 0A 1A 0A). A non-PNG file that coincidentally starts with these bytes will have arbitrary bytes at offsets 16-23 interpreted as width/height, producing misleading metadata. The functions also do not consult detectMimeType, so width/height may be returned for files classified as application/octet-stream.",
+          "location": "detectImageWidth, detectImageHeight (lines 62-72)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The ocr_fallback option is never inspected. The docstring states behavior depends on ocr_fallback being false or no provider being available, but the code unconditionally sets ocr_available=false regardless of the option value. A caller passing ocr_fallback=true receives a silent 'unavailable' status rather than an error, which may violate the expected contract.",
+          "location": "parse method, lines 33-36"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "options.max_bytes is not validated. If the value is NaN (e.g., from untrusted configuration parsing), the comparison content.byteLength > NaN evaluates to false, silently bypassing the size limit. A value of 0 (falsy but not nullish) is not caught by the ?? operator and would reject all non-empty content.",
+          "location": "parse method, line 26"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "GIF detection checks only the first 3 bytes ('GIF') rather than the full 6-byte signature ('GIF87a' or 'GIF89a'). A file starting with 'GIF' followed by non-standard bytes would be misidentified.",
+          "location": "detectMimeType, line 57"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "buf.slice(0, 4).toString('ascii') and buf.slice(8, 12).toString('ascii') allocate intermediate Buffer copies. Using buf.toString('ascii', 0, 4) and buf.toString('ascii', 8, 12) avoids the extra allocation.",
+          "location": "detectMimeType, line 58"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "The max_bytes check executes after content is fully loaded into memory as a Buffer. For the default 50 MB limit, the caller has already allocated the full buffer. Size enforcement should also occur at the streaming/upload boundary to prevent memory exhaustion before this function is called.",
+          "location": "parse method, lines 26-29"
+        }
+      ],
+      "summary": "Simple stateless image parser with no critical vulnerabilities; main issues are incomplete magic-byte validation for PNG dimensions, an ignored ocr_fallback option, and unvalidated max_bytes that could be NaN-bypassed.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 3186,
+        "completion_tokens_details": {
+          "reasoning_tokens": 2576
+        },
+        "prompt_tokens": 934,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 4120
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/pptx-parser.ts",
+      "verdict": "fail",
+      "severity": "critical",
+      "findings": [
+        {
+          "severity": "critical",
+          "category": "correctness",
+          "description": "unzipSync is used for ZIP DEFLATE (method 8) decompression, but ZIP stores raw DEFLATE data (RFC 1951) without zlib/gzip wrappers. unzipSync expects a zlib or gzip header and will throw Z_DATA_ERROR on virtually all real-world compressed PPTX entries. The correct function is inflateRawSync.",
+          "location": "extractZipEntries, line 27"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "Zip bomb vulnerability: no limit on decompressed output size. A small compressed entry can decompress to gigabytes, causing memory exhaustion. inflateRawSync supports a maxOutputLength option that should be used.",
+          "location": "extractZipEntries, line 27 (unzipSync call)"
+        },
+        {
+          "severity": "medium",
+          "category": "security",
+          "description": "Insufficient bounds checking in ZIP header parsing. The loop condition only guarantees 4 bytes remain (for the signature), but the code reads up to offset+29 (extraLen). Crafted input with a valid signature near the buffer end could cause an unhandled RangeError crash (DoS).",
+          "location": "extractZipEntries, lines 17-24"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No handling of data descriptors (general purpose bit flag bit 3). When set, compSize in the local file header is zero and the actual size follows the data in a descriptor. The parser would read compSize=0, produce empty entries, and misalign subsequent offset calculations, silently dropping slides.",
+          "location": "extractZipEntries, missing GP flag check at offset+6"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "All decompression and parsing is synchronous despite the async parse() signature. unzipSync/inflateRawSync and the full ZIP extraction block the event loop, degrading concurrency for all other operations.",
+          "location": "parse method, lines 39-60"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No XML entity decoding. Extracted text retains raw entities like &amp;, &lt;, &#60; instead of decoding them to &, <, <. This produces incorrect text content.",
+          "location": "extractTextFromSlideXml, line 35"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Page start_offset for slides after the first includes the slide break delimiter (\\n\\n--- Slide Break ---\\n\\n) in the page range, making offsets slightly inaccurate for consumers that use them to extract per-slide text.",
+          "location": "parse method, lines 52-56"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Buffer.subarray creates views into the original ZIP buffer rather than copies. The entire content buffer remains pinned in memory as long as any entry Buffer is referenced, preventing garbage collection of large input buffers.",
+          "location": "extractZipEntries, lines 23-25"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "No ZIP64 extension support. Files larger than 4GB use 0xFFFFFFFF sentinel values in size fields with actual sizes in extra fields; the parser would read incorrect sizes and fail silently.",
+          "location": "extractZipEntries, compSize read at offset+18"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Only local file headers are parsed, not the central directory. If local headers are inconsistent with the central directory (possible with some ZIP tools), entries may be missed or stale data read.",
+          "location": "extractZipEntries, overall approach"
+        }
+      ],
+      "summary": "Critical: unzipSync is wrong for ZIP DEFLATE (should be inflateRawSync), making the parser non-functional for real PPTX files; additionally vulnerable to zip bombs and insufficient bounds checking.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 10102,
+        "completion_tokens_details": {
+          "reasoning_tokens": 9334
+        },
+        "prompt_tokens": 1163,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 11265
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/xlsx-parser.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "unzipSync is used to decompress ZIP entries, but ZIP compression method 8 stores raw deflate data (no zlib/gzip header). unzipSync expects a zlib or gzip stream and will throw Z_DATA_ERROR on raw deflate. Should use inflateRawSync instead. This causes the parser to fail on virtually all real-world XLSX files that use deflate compression.",
+          "location": "extractZipEntries, line 33"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "Zip bomb vulnerability: no limit on decompression ratio or total decompressed size. A small compressed payload can decompress to an arbitrarily large buffer, causing memory exhaustion. unzipSync will happily decompress to gigabytes from a tiny compressed input.",
+          "location": "extractZipEntries, line 33"
+        },
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "No bounds checking when reading ZIP local file header fields. nameLen, extraLen, compSize are read from the buffer without validating that offset + 30 + nameLen + extraLen or dataOffset + compSize are within buffer bounds. A malicious file can craft header values causing out-of-bounds reads via subarray (which silently clamps) or cause the parser to read garbage data.",
+          "location": "extractZipEntries, lines 27-35"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Cell regex requires the t attribute immediately after r, but XLSX files commonly have other attributes (e.g., s for style) between them. This causes shared string references (t=\"s\") to be missed, returning numeric indices instead of actual text. Also fails on self-closing cells (<c r=\"A1\"/>), inline strings (t=\"inlineStr\"), and cells with formula elements.",
+          "location": "parseSheet, cellRe regex, line 52"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "No XML entity decoding. Captured text from <t> and <v> elements retains raw XML entities (&amp;, &lt;, &gt;, &quot;, &#NN;). Cell values containing these entities will be incorrect.",
+          "location": "parseSharedStrings and parseSheet, regex captures"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "Entire parsing pipeline is synchronous (unzipSync, regex execution, string concatenation). For files up to the 100MB default limit, this blocks the event loop for extended periods, degrading server responsiveness.",
+          "location": "parse method and extractZipEntries"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Sheet files are sorted lexicographically, so sheet10.xml sorts before sheet2.xml. For workbooks with more than 9 sheets, sheet order will be incorrect. Should sort by numeric suffix or read xl/workbook.xml for canonical order.",
+          "location": "parse, line 73"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "No limit on number of ZIP entries or total decompressed size across all entries. A malicious file with thousands of entries each decompressing to moderate size can exhaust memory.",
+          "location": "extractZipEntries"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "ZIP data descriptors are not handled. When bit 3 of the general purpose flag is set, compSize in the local header is 0 and actual sizes follow the compressed data in a data descriptor record. The parser would read compSize=0 and skip the entry's data.",
+          "location": "extractZipEntries"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Duplicate ZIP entry names silently overwrite earlier entries. While rare, this can cause data loss if a legitimate XLSX has duplicate internal paths.",
+          "location": "extractZipEntries, entries.set(name, data)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "Regex-based XML parsing is inherently fragile: does not handle CDATA sections, XML comments within elements, or namespace-prefixed elements. While most XLSX generators use default namespaces, some may use prefixed namespaces causing all regexes to fail.",
+          "location": "parseSharedStrings and parseSheet"
+        }
+      ],
+      "summary": "Custom ZIP parser uses wrong decompression function (unzipSync instead of inflateRawSync), lacks zip bomb protection and bounds checking, and regex-based XML parsing has multiple correctness failures including attribute order sensitivity and missing entity decoding.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 4134,
+        "completion_tokens_details": {
+          "reasoning_tokens": 3244
+        },
+        "prompt_tokens": 1405,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 5539
+      }
+    },
+    {
+      "file": "packages/documents/src/parsers/unsupported-parser.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "Error message interpolates source_path directly. If errors are surfaced to end users or aggregated logs, this could disclose internal filesystem structure or sensitive path segments. Consider sanitizing or truncating the path, or using a correlation ID instead.",
+          "location": "parse() - error message construction"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Function is declared async but throws synchronously. This is valid TypeScript/JavaScript behavior (the throw becomes a rejected promise), but for consistency with async error-handling patterns, using `throw` inside async is acceptable here. No action required.",
+          "location": "parse()"
+        }
+      ],
+      "summary": "Simple, stateless unsupported-format handler with no real vulnerabilities; only minor info-level notes on path disclosure in error messages.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 721,
+        "completion_tokens_details": {
+          "reasoning_tokens": 547
+        },
+        "prompt_tokens": 354,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1075
+      }
+    },
+    {
+      "file": "packages/rag/src/fts-index.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Re-adding a chunk with the same chunk_id corrupts totalChunks (incremented without decrement) while chunkLengths is overwritten and postings are replaced. This skews N in the BM25 IDF formula, producing incorrect search scores. addChunk should check for an existing chunk_id and either update in place or remove first.",
+          "location": "addChunk"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "The readonly field avgDocLength is initialized to 0 and never updated; the actual average is recomputed on every search via getAvgDocLength(). This is dead/misleading code that suggests a cached value exists.",
+          "location": "class field: avgDocLength"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "Positions array is rebuilt with spread ([...existing.positions, i]) on every token occurrence, making addChunk O(n²) in the worst case for high-frequency tokens within a single chunk. A mutable accumulator (e.g., number[] push) would be O(n).",
+          "location": "addChunk"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "getAvgDocLength() iterates all chunkLengths values on every search call (O(N) per query). Maintaining a running totalChunksLength field would make this O(1).",
+          "location": "getAvgDocLength"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "All public methods are synchronous, so they are safe under JavaScript's single-threaded event loop. However, there is no documentation or guard against misuse if the class were ever adapted to a shared/worker context.",
+          "location": "class FtsIndex"
+        }
+      ],
+      "summary": "Functional BM25 FTS index with a correctness bug on duplicate chunk_id insertion (corrupts totalChunks/IDF) and minor performance concerns around positions array rebuilding and per-query average recomputation.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1694,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1302
+        },
+        "prompt_tokens": 954,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2648
+      }
+    },
+    {
+      "file": "packages/rag/src/graph-index.ts",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Sequential edge construction hardcodes an ID format `${source_hash}-${chunk_index - 1}` that is assumed to match how chunk_id is generated elsewhere. If chunk_id uses a different format (e.g., UUID, hash), sequential edges will silently never be created, degrading graph quality without any error.",
+          "location": "addChunk, prevId construction"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No deduplication guard: calling addChunk multiple times for the same chunk_id creates duplicate edges and re-adds the node. There is no check whether the chunk already exists in chunkNodes before adding edges.",
+          "location": "addChunk"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "getNeighbors performs a full O(edges) scan for every node in the frontier at every depth level, resulting in O(maxDepth * frontierSize * edgeCount) complexity. For dense or large graphs this is prohibitively slow. An adjacency list (Map<string, Set<string>>) would reduce this to O(edges) per traversal.",
+          "location": "getNeighbors, inner edge loop"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "addChunk is O(n) per call due to allChunks.some() and the allChunks loop for same_page edges. Bulk indexing all chunks yields O(n²) time complexity. Additionally, same_page edges are created bidirectionally when both chunks are added, producing redundant edges.",
+          "location": "addChunk, allChunks iteration"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "removeChunk allocates a new filtered array and then clears and re-pushes all elements, temporarily doubling memory usage for the edge list. For large graphs this causes transient memory spikes.",
+          "location": "removeChunk"
+        },
+        {
+          "severity": "low",
+          "category": "security",
+          "description": "No input validation on chunk_id, source_hash, or relation strings, and no bounds on graph size. A caller could inject arbitrarily large or malformed data, potentially causing memory exhaustion or downstream issues if edge data is persisted or serialized.",
+          "location": "class-level, all public methods"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "The class uses mutable shared state (edges array, chunkNodes set) with no synchronization. While JavaScript is single-threaded in the event loop, this class is unsafe if shared across Worker threads or if methods are interleaved with async operations that mutate state.",
+          "location": "class-level"
+        }
+      ],
+      "summary": "Graph index has a fragile ID-format assumption that can silently break sequential linking, O(n²) bulk indexing performance, and inefficient neighbor traversal due to full edge scans instead of an adjacency list.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2201,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1661
+        },
+        "prompt_tokens": 662,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2863
+      }
+    },
+    {
+      "file": "packages/rag/src/metadata-index.ts",
+      "verdict": "pass_with_notes",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "removeChunk only cleans up entries from chunk.metadata but does not remove the 'source_hash' and 'page' entries that were indexed via indexField() in addChunk(). This leaves orphaned chunk IDs in the fieldIndex for those fields, causing filter() to return stale/incorrect results (IDs of already-removed chunks) when filtering by source_hash or page.",
+          "location": "removeChunk (lines 24-38) vs addChunk (lines 8-20)"
+        },
+        {
+          "severity": "medium",
+          "category": "resource",
+          "description": "When all values are deleted from a fieldMap during removeChunk, the empty fieldMap is not removed from fieldIndex. Over time with many add/remove cycles across different fields, this causes a slow memory leak of empty Map objects.",
+          "location": "removeChunk, after fieldMap.delete(String(value))"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "getChunk returns a direct reference to the internal RagChunk object rather than a copy or read-only view. Callers could mutate the stored chunk, corrupting index consistency (e.g., changing metadata without re-indexing).",
+          "location": "getChunk (line 51)"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "No bounds or limits on index size. A malicious or unbounded input stream of chunks with unique metadata values could cause unbounded memory growth leading to OOM.",
+          "location": "addChunk, entire class"
+        }
+      ],
+      "summary": "removeChunk fails to clean up source_hash and page index entries, causing stale filter results and memory leaks; minor encapsulation and unbounded-growth concerns.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2058,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1711
+        },
+        "prompt_tokens": 698,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2756
+      }
+    },
+    {
+      "file": "packages/rag/src/citation.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "String.prototype.slice operates on UTF-16 code units. Slicing chunk.text at an arbitrary boundary (200) or content_hash at 8 can split surrogate pairs (e.g., emoji or astral-plane characters), producing malformed excerpts or hashes. Consider using Array.from(text).slice(0, 200).join('') or a grapheme-aware library for the excerpt.",
+          "location": "generateCitation, line 5; formatCitation, line 16"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "content_hash.slice(0, 8) assumes content_hash is a non-empty string. If the field is undefined or null at runtime (e.g., from unvalidated external data), this throws a TypeError. No defensive guard exists.",
+          "location": "formatCitation, line 16"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "source_path and page are interpolated directly into the output string without sanitization. If the returned string is later rendered in HTML, URL, or log contexts by a consumer, this could enable injection (e.g., path traversal display, log injection, XSS). The function does not declare an output encoding context, so consumers must be aware.",
+          "location": "formatCitation, line 15"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "When the excerpt is truncated (text longer than 200 chars), no ellipsis or truncation marker is appended, making it impossible for downstream consumers to distinguish a full excerpt from a truncated one.",
+          "location": "generateCitation, lines 4-6"
+        }
+      ],
+      "summary": "Clean, pure-function module with no resource or concurrency concerns; minor correctness issues around UTF-16 slicing and missing runtime guards on content_hash.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1280,
+        "completion_tokens_details": {
+          "reasoning_tokens": 906
+        },
+        "prompt_tokens": 305,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1585
+      }
+    },
+    {
+      "file": "packages/rag/src/reranker.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "String.split(/\\s+/) on empty or whitespace-padded strings produces empty-string tokens. For example, ''.split(/\\s+/) returns [''] rather than [], and '  hello  '.split(/\\s+/) returns ['', 'hello', '']. These empty tokens become members of the Set, inflating token counts and skewing Jaccard similarity (union and intersection) for chunks with empty or whitespace-heavy text. Filter out empty tokens after splitting.",
+          "location": "textSimilarity, lines ~38-39"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "No validation of options.top_k or options.diversity_lambda. A negative top_k silently returns an empty array; NaN/Infinity lambda or top_k produce undefined MMR behavior (e.g., NaN scores cause bestIdx to remain 0, selecting items in original order). Consider clamping/validating these inputs.",
+          "location": "rerankResults, lines ~10-11"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "O(topK * n * textLength) complexity with repeated re-tokenization inside the inner loop. For large result sets or long chunks, this is wasteful. Precompute token sets once per candidate to avoid re-tokenizing the same text on every comparison.",
+          "location": "rerankResults inner loop / textSimilarity"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Non-null assertions (remaining[bestIdx]!, candidate!) are safe given the loop invariants, but rely on manual reasoning. Prefer guarded access or Array.prototype.at() with explicit checks for robustness against future refactors.",
+          "location": "rerankResults, lines ~18, 30"
+        }
+      ],
+      "summary": "Functional MMR reranker with no security issues, but tokenization handles empty/whitespace strings incorrectly and input parameters are unvalidated.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1109,
+        "completion_tokens_details": {
+          "reasoning_tokens": 713
+        },
+        "prompt_tokens": 551,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1660
+      }
+    },
+    {
+      "file": "packages/rag/src/embedding-migrator.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "resource",
+          "description": "All re-embedding promises are created and awaited concurrently via Promise.all with no batching or concurrency limit. For large embedding sets this can exhaust memory, connection pools, or trigger API rate limits.",
+          "location": "migrate() - promises.push / Promise.all"
+        },
+        {
+          "severity": "high",
+          "category": "correctness",
+          "description": "Object.assign(emb, newEmb) mutates the input embedding objects in place, violating the readonly contract implied by 'readonly RagEmbedding[]'. Callers may not expect their data to be modified, and if the same objects are referenced elsewhere this causes silent data corruption.",
+          "location": "migrate() - Object.assign(emb, newEmb)"
+        },
+        {
+          "severity": "high",
+          "category": "concurrency",
+          "description": "The migrate method has no guard against concurrent invocation on the same instance. Two concurrent migrate calls targeting overlapping embeddings would race on Object.assign mutations of the same objects, producing unpredictable state.",
+          "location": "migrate() - no mutex/lock"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The .catch(() => { failed++; }) handler silently swallows all errors with no logging or diagnostic information. Systematic failures (e.g., invalid API key, network outage) produce no actionable feedback beyond an incrementing counter.",
+          "location": "migrate() - .catch(() => { failed++; })"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "rollback_available is set to this.history.length > 1 after pushing the current migration record, but no rollback mechanism exists. The flag misleads callers into believing rollback is possible when it is not implemented.",
+          "location": "migrate() - rollback_available: this.history.length > 1"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The vector returned by reembedFn is not validated. An empty array, null, or wrong-dimensionality vector would be silently assigned to the embedding, producing corrupt data.",
+          "location": "migrate() - const newEmb = { ... vector }"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "No timeout is applied to reembedFn calls. A hanging embedding API call would cause Promise.all to never resolve, leaking resources indefinitely.",
+          "location": "migrate() - reembedFn(emb.chunk_id, text)"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "getHistory() returns a shallow copy of the array but the history entry objects are shared by reference. Callers could mutate the internal history records by modifying returned objects.",
+          "location": "getHistory() - return [...this.history]"
+        }
+      ],
+      "summary": "Unbounded concurrent re-embedding, mutation of readonly inputs, silent error swallowing, and a misleading rollback_available flag make this implementation unsafe for production use.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2073,
+        "completion_tokens_details": {
+          "reasoning_tokens": 1515
+        },
+        "prompt_tokens": 633,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2706
+      }
+    },
+    {
+      "file": "packages/multimodal/src/image-edit.ts",
+      "verdict": "pass",
+      "severity": "none",
+      "findings": [],
+      "summary": "Stub implementation correctly throws an unavailable error without processing inputs.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 742,
+        "completion_tokens_details": {
+          "reasoning_tokens": 712
+        },
+        "prompt_tokens": 267,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1009
+      }
+    },
+    {
+      "file": "packages/multimodal/src/image-gen.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "Docstring references 'data-egress checks' (AH-MM-IMAGE-GEN-001) but no egress validation is implemented. Since the function is currently a stub that always throws, this is not exploitable, but any future provider implementation must enforce prompt/content egress filtering before calling an external API.",
+          "location": "generateImage, file header comment"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Input fields (prompt, width, height, style) are not validated. width/height should be bounded to sane positive ranges and prompt length should be capped to prevent abuse. Moot while the function unconditionally throws, but required before a real provider is wired in.",
+          "location": "ImageGenInput, generateImage"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "Error message leaks provider configuration hints ('set OPENAI_API_KEY or equivalent'). Low impact, but consider generic messaging in production paths to avoid signaling which secrets are expected.",
+          "location": "generateImage throw site"
+        }
+      ],
+      "summary": "Stub-only file with no exploitable issues; future provider implementation must add input validation and the advertised data-egress checks.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 834,
+        "completion_tokens_details": {
+          "reasoning_tokens": 582
+        },
+        "prompt_tokens": 312,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1146
+      }
+    },
+    {
+      "file": "packages/multimodal/src/speech.ts",
+      "verdict": "pass_with_notes",
+      "severity": "none",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "Both functions are stubs that unconditionally throw MultimodalUnavailableError. No input validation is performed (e.g., text length limits, audio_data size bounds, language/voice allowlists). When a real provider is wired in, add explicit validation to prevent resource exhaustion and injection via provider parameters.",
+          "location": "generateSpeech, transcribeAudio"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Parameters are prefixed with underscore (_input) indicating intentional non-use, which is consistent with the always-throw behavior. Type signatures correctly declare return types that are never produced at runtime; consumers must handle the rejection. This is acceptable for a placeholder but should be tracked so the stub is not accidentally shipped as final.",
+          "location": "generateSpeech(_input), transcribeAudio(_input)"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "No resources are acquired, so there is no leak risk in the current stub. Future implementations that open streams, sockets, or temp files for audio handling must ensure cleanup in finally blocks to avoid descriptor leaks on error paths.",
+          "location": "generateSpeech, transcribeAudio"
+        },
+        {
+          "severity": "info",
+          "category": "concurrency",
+          "description": "No shared mutable state or async coordination exists in the stub, so there are no concurrency hazards. If provider state or connection pools are introduced later, ensure they are safe under concurrent invocations.",
+          "location": "module scope"
+        }
+      ],
+      "summary": "Stub-only module that always throws unavailable errors; no current vulnerabilities, but future provider integration will require input validation, resource lifecycle, and concurrency care.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 680,
+        "completion_tokens_details": {
+          "reasoning_tokens": 347
+        },
+        "prompt_tokens": 358,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1038
+      }
+    },
+    {
+      "file": "packages/multimodal/src/vision.ts",
+      "verdict": "pass_with_notes",
+      "severity": "none",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Both functions are stub implementations that always throw MultimodalUnavailableError. This is intentional per the docstring ('Returns typed unavailable when no vision provider is configured'), but callers must handle this error path or the feature is non-functional.",
+          "location": "understandImage, verifyGeneratedContent"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "VisionInput.image_data and the _imageData Buffer parameter are accepted but never consumed. If callers load large images into memory before calling these stubs, that memory is wasted since the call immediately throws. Not a vulnerability in this file, but a consideration for callers.",
+          "location": "VisionInput.image_data, verifyGeneratedContent(_imageData)"
+        },
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Unused parameters are prefixed with underscore (_input, _imageData, _expectedDescription), which is the correct convention and avoids lint warnings. No action needed.",
+          "location": "function signatures"
+        }
+      ],
+      "summary": "Clean stub module that throws typed unavailable errors; no security, concurrency, or resource issues, but feature is non-functional until a provider is implemented.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 356,
+        "completion_tokens_details": {
+          "reasoning_tokens": 114
+        },
+        "prompt_tokens": 377,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "total_tokens": 733
+      }
+    },
+    {
+      "file": "packages/tools/src/behavior-verify.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "JSDoc states the function 'Returns typed unavailable when Playwright is not configured', but the implementation throws a ToolUnavailableError instead of returning a ToolResult. This is a documentation/behavior mismatch — callers expecting a returned 'unavailable' result will instead need to handle an exception.",
+          "location": "JSDoc comment vs. behaviorVerify function body"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "No resource management concerns since the function is a stub that never allocates Playwright resources (browser, context, page). If/when implemented, ensure browsers/contexts/pages are closed in finally blocks to avoid leaks on assertion failures.",
+          "location": "behaviorVerify (future implementation)"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "No input validation is performed on url, steps, or assertions. While currently moot (function always throws), a future implementation should validate the URL scheme, restrict navigation targets, sanitize selectors, and bound step/assertion counts to prevent SSRF, injection via selectors, or resource exhaustion.",
+          "location": "BehaviorVerifyInput handling (future implementation)"
+        }
+      ],
+      "summary": "Stub implementation that always throws ToolUnavailableError; only minor doc/behavior mismatch noted, with forward-looking guidance for future implementation.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 402,
+        "completion_tokens_details": {
+          "reasoning_tokens": 132
+        },
+        "prompt_tokens": 297,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 699
+      }
+    },
+    {
+      "file": "packages/tools/src/cli-tools.ts",
+      "verdict": "fail",
+      "severity": "high",
+      "findings": [
+        {
+          "severity": "high",
+          "category": "security",
+          "description": "All four functions accept user-controlled file paths (file_path, output_path, image_path) and pass them directly to Python without any validation or sandboxing. An attacker (e.g., via prompt injection) can write spreadsheets/presentations/documents to arbitrary filesystem locations (e.g., ~/.ssh/authorized_keys, /etc/cron.d/) or read arbitrary files via the 'read' action or OCR. This enables arbitrary file write/read and potential RCE.",
+          "location": "manipulateSpreadsheet, generatePresentation, generateDocument, ocrDocument - path parameters passed through to Python save/open calls"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "Python error messages are printed to stdout via print(json.dumps(...)) before sys.exit(1). On non-zero exit, the close handler returns stderr || 'exit code N', discarding the stdout error message entirely. Users see 'exit code 1' instead of the actual error (e.g., 'openpyxl not installed').",
+          "location": "runCli - close handler: `error: stderr || \\`exit code ${code}\\``"
+        },
+        {
+          "severity": "medium",
+          "category": "correctness",
+          "description": "The manipulateSpreadsheet type signature declares action: 'create' | 'read' | 'modify', but the Python code only handles 'create' and 'read'. The 'modify' action falls through to the else branch returning 'unknown action', violating the API contract.",
+          "location": "manipulateSpreadsheet - Python script action handling"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "stdout and stderr are accumulated as unbounded strings with no size limit. A malicious or buggy Python process could produce gigabytes of output, causing memory exhaustion (DoS).",
+          "location": "runCli - `stdout += d` and `stderr += d`"
+        },
+        {
+          "severity": "low",
+          "category": "resource",
+          "description": "proc.stdin?.write(stdin) does not handle backpressure (return value false) or write errors (EPIPE). For large stdin payloads, data may be silently truncated or cause an unhandled error event.",
+          "location": "runCli - `proc.stdin?.write(stdin)`"
+        },
+        {
+          "severity": "low",
+          "category": "correctness",
+          "description": "When spawn's timeout fires, the process is killed with SIGTERM and the 'close' event fires with code=null. The handler produces error message 'exit code null' instead of a meaningful timeout indication. The 'error' event is not emitted for timeout kills, so the timeout is not clearly reported.",
+          "location": "runCli - close handler and timeout handling"
+        },
+        {
+          "severity": "info",
+          "category": "security",
+          "description": "The language parameter in ocrDocument is passed directly to pytesseract.image_to_string without validation. While pytesseract uses subprocess with argument lists (not shell), unexpected values could cause errors or unexpected behavior.",
+          "location": "ocrDocument - lang parameter"
+        }
+      ],
+      "summary": "Path traversal vulnerability in all file path parameters, lost error messages from Python stdout, and unimplemented 'modify' action make this unsafe for production use.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 3439,
+        "completion_tokens_details": {
+          "reasoning_tokens": 2809
+        },
+        "prompt_tokens": 1307,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 4746
+      }
+    },
+    {
+      "file": "packages/tools/src/oci-sandbox.ts",
+      "verdict": "pass_with_notes",
+      "severity": "low",
+      "findings": [
+        {
+          "severity": "info",
+          "category": "correctness",
+          "description": "Runtime detection uses hardcoded paths (/usr/bin, /usr/local/bin) instead of checking the system PATH environment variable. This may fail to detect runtimes installed in non-standard locations.",
+          "location": "detectOciRuntime"
+        },
+        {
+          "severity": "info",
+          "category": "resource",
+          "description": "Uses synchronous file system access (existsSync) within an asynchronous function. While acceptable for a quick startup check, using fs.promises.access would be more consistent with async patterns and prevent blocking the event loop.",
+          "location": "detectOciRuntime"
+        }
+      ],
+      "summary": "Stub implementation is safe and contains no vulnerabilities, but runtime detection relies on hardcoded paths and synchronous FS calls.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 1119,
+        "completion_tokens_details": {
+          "reasoning_tokens": 965
+        },
+        "prompt_tokens": 434,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 1553
+      }
+    },
+    {
+      "file": "packages/tools/src/web-search.ts",
+      "verdict": "pass",
+      "severity": "none",
+      "findings": [],
+      "summary": "The file is a simple stub that correctly throws a ToolUnavailableError; no security, correctness, resource, or concurrency issues found.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 698,
+        "completion_tokens_details": {
+          "reasoning_tokens": 652
+        },
+        "prompt_tokens": 261,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 959
+      }
+    }
+  ]
+}

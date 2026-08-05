@@ -10,15 +10,17 @@ import type {
 } from '../types.js';
 import { DocumentIngestError } from '../types.js';
 import { sha256Hex } from './markdown-parser.js';
-import { unzipSync } from 'node:zlib';
+import { inflateRawSync } from 'node:zlib';
 
 const PARSER_VERSION = '1.0.0';
 const PARSER_NAME = 'xlsx-native-zip';
+const MAX_DECOMPRESSED_SIZE = 100 * 1024 * 1024;
 
 function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
   const entries = new Map<string, Buffer>();
   let offset = 0;
   while (offset < zipBuf.length - 4) {
+    if (offset + 30 > zipBuf.length) break;
     const sig = zipBuf.readUInt32LE(offset);
     if (sig !== 0x04034b50) break;
     const nameLen = zipBuf.readUInt16LE(offset + 26);
@@ -27,10 +29,17 @@ function extractZipEntries(zipBuf: Buffer): Map<string, Buffer> {
     const compSize = zipBuf.readUInt32LE(offset + 18);
     const name = zipBuf.subarray(offset + 30, offset + 30 + nameLen).toString('utf8');
     const dataOffset = offset + 30 + nameLen + extraLen;
+    if (dataOffset + compSize > zipBuf.length) break;
     const compData = zipBuf.subarray(dataOffset, dataOffset + compSize);
     let data: Buffer;
-    if (compMethod === 0) data = compData;
-    else if (compMethod === 8) data = unzipSync(compData);
+    if (compMethod === 0) {
+      if (compSize > MAX_DECOMPRESSED_SIZE) throw new DocumentIngestError('xlsx entry exceeds size limit', 'too_large');
+      data = compData;
+    }
+    else if (compMethod === 8) {
+      try { data = inflateRawSync(compData, { maxOutputLength: MAX_DECOMPRESSED_SIZE }); }
+      catch { throw new DocumentIngestError('xlsx zip decompression failed', 'corrupted'); }
+    }
     else { offset = dataOffset + compSize; continue; }
     entries.set(name, data);
     offset = dataOffset + compSize;
