@@ -1,5 +1,5 @@
 {
-  "commit": "51265c02",
+  "commit": "6741b515",
   "model": "glm-5.2",
   "reasoning_effort": "xhigh",
   "results": [
@@ -65,56 +65,44 @@
       "file": "packages/documents/src/parsers/xlsx-parser.ts"
     },
     {
-      "verdict": "fail",
-      "severity": "high",
+      "verdict": "pass_with_notes",
+      "severity": "medium",
       "findings": [
         {
-          "severity": "high",
-          "category": "security",
-          "description": "DNS rebinding TOCTOU: validateNotPrivate() resolves DNS and validates IPs, but fetch() re-resolves DNS independently using the hostname. An attacker controlling a DNS server can return a public IP on the validation lookup and a private IP (e.g., 127.0.0.1, 169.254.169.254) on the fetch lookup, bypassing SSRF protection entirely. The resolved IP is never pinned to the actual fetch connection. While documented as a known limitation, this is an exploitable SSRF bypass that allows access to internal services and cloud metadata endpoints.",
-          "location": "webFetchInternal - fetch(url.toString(), ...) call; validateNotPrivate function"
-        },
-        {
           "severity": "medium",
-          "category": "resource_management",
-          "description": "max_bytes input parameter is not validated. A caller can pass an extremely large value (e.g., Number.MAX_SAFE_INTEGER) causing the response body reading loop to consume excessive memory, potentially leading to OOM. No upper bound is enforced beyond the caller-provided value.",
-          "location": "webFetchInternal - const maxBytes = input.max_bytes ?? 1024 * 1024"
-        },
-        {
-          "severity": "medium",
-          "category": "input_validation",
-          "description": "timeout_ms input parameter is not validated. A value of 0 causes setTimeout to fire immediately, aborting the request before it starts. Negative values cause setTimeout to fire immediately in Node.js. No bounds checking is performed.",
-          "location": "webFetchInternal - const timeoutMs = input.timeout_ms ?? 30000"
-        },
-        {
-          "severity": "low",
-          "category": "error_handling",
-          "description": "If context.signal is already aborted before addEventListener is called, the abort event has already fired and the listener will never trigger. The fetch will proceed without cancellation. Should check context.signal.aborted before registering the listener.",
-          "location": "webFetchInternal - context.signal.addEventListener('abort', onAbort, { once: true })"
-        },
-        {
-          "severity": "low",
-          "category": "resource_management",
-          "description": "On 3xx redirect responses, the response body is not consumed or cancelled before returning. This may leave the underlying TCP connection open until garbage collection, causing resource leaks especially during redirect chains.",
-          "location": "webFetchInternal - redirect handling block (response.status >= 300 && < 400)"
-        },
-        {
-          "severity": "low",
-          "category": "resource_management",
-          "description": "If reader.read() throws an error during body consumption, the reader is not explicitly cancelled before the error propagates. The connection may remain open. Should cancel the reader in a finally block or catch within the reading loop.",
-          "location": "webFetchInternal - for (;;) { const { done, value } = await reader.read(); }"
-        },
-        {
-          "severity": "low",
-          "category": "security",
-          "description": "Several private/reserved IP ranges are missing from PRIVATE_IP_PATTERNS: 192.0.0.0/24 (IETF protocol assignments), 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2), 203.0.113.0/24 (TEST-NET-3), 240.0.0.0/4 (reserved), and IPv6 multicast ff00::/8. While these are lower risk for SSRF than RFC 1918 ranges, they should be blocked for completeness.",
+          "category": "SSRF",
+          "description": "IPv6 unspecified address '::' (equivalent to 0.0.0.0) is not covered by PRIVATE_IP_PATTERNS. On some OS configurations, connecting to '::' may reach localhost or local services, bypassing SSRF protection. The pattern /^0\\./ catches 0.0.0.0 but there is no equivalent for '::'.",
           "location": "PRIVATE_IP_PATTERNS array"
         },
         {
+          "severity": "medium",
+          "category": "resource_management",
+          "description": "On 3xx redirect responses, the response stream is never consumed or destroyed before recursing. This leaves the underlying socket unconsumed, potentially causing socket pool exhaustion under repeated redirects with bodies. The response object should be destroyed (response.destroy() or response.resume()) before following the redirect.",
+          "location": "Redirect handling block (response.statusCode >= 300 && < 400)"
+        },
+        {
+          "severity": "medium",
+          "category": "SSRF",
+          "description": "HTTPS requests use hostname: pinnedIp without setting the 'servername' TLS option. This causes TLS SNI and certificate validation to be performed against the IP address rather than the original hostname. Most HTTPS servers will reject the connection or fail certificate validation, effectively breaking HTTPS. This functional deficiency may pressure developers to disable certificate validation (rejectUnauthorized: false) as a workaround, which would eliminate MITM protection. Fix by adding servername: url.hostname to the request options.",
+          "location": "https.request options object (hostname: pinnedIp)"
+        },
+        {
           "severity": "low",
-          "category": "correctness",
-          "description": "The comment states 'Block obfuscated IP formats (decimal, hex, octal)' but only decimal format (/^\\d+$/) is implemented. The WHATWG URL parser normalizes most obfuscated IPv4 formats (hex, octal, mixed) to dotted-decimal before hostname is accessed, making this check largely redundant. However, the code comment is misleading and the decimal check itself is likely dead code since the URL parser normalizes pure decimal IPs to dotted-decimal notation.",
-          "location": "parseAndValidateUrl - obfuscated IP check block"
+          "category": "SSRF",
+          "description": "extractIPv4FromMapped only handles dotted-decimal IPv4-mapped IPv6 format (::ffff:a.b.c.d). If dns.lookup returns mapped addresses in hex format (e.g., ::ffff:7f00:1 for 127.0.0.1), the extraction fails and isPrivateIp returns false, potentially allowing connections to private IPs. Consider also parsing hex-form mapped addresses or normalizing all IPs before checking.",
+          "location": "extractIPv4FromMapped function"
+        },
+        {
+          "severity": "low",
+          "category": "input_validation",
+          "description": "max_bytes and timeout_ms are not validated. A negative max_bytes would cause chunk slicing with negative length (producing empty buffer), and a zero or negative timeout_ms would immediately abort the request. Extremely large max_bytes values could cause excessive memory consumption. These should be clamped to reasonable bounds.",
+          "location": "webFetchInternal - maxBytes/timeoutMs assignment"
+        },
+        {
+          "severity": "low",
+          "category": "resource_management",
+          "description": "When multiple IPs are resolved, only resolvedIps[0] is used for the connection. If that IP is unreachable, the request fails without trying other resolved IPs. While not a security issue, it affects reliability. Additionally, IPv6 pinned IPs are passed directly as hostname without bracketing, which may cause connection failures for IPv6 targets.",
+          "location": "const pinnedIp = resolvedIps[0]!"
         }
       ],
       "file": "packages/tools/src/web-fetch.ts"
@@ -123,9 +111,9 @@
   "summary": {
     "total": 2,
     "pass": 0,
-    "passWithNotes": 1,
-    "fail": 1,
+    "passWithNotes": 2,
+    "fail": 0,
     "errors": 0
   },
-  "timestamp": "2026-08-05T11:40:48.000Z"
+  "timestamp": "2026-08-05T11:47:31.000Z"
 }
