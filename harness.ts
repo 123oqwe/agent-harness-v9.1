@@ -83,7 +83,21 @@ import {
   openRunSession,
 } from './session/run-session.js';
 import type { RuntimeSteeringFactoryPort } from './runtime/steering-port.js';
-import type { RuntimeBudgetFactoryPort } from './runtime/budget-port.js';
+import {
+  BudgetLedgerRuntimeAdapter,
+  type RuntimeBudgetFactoryPort,
+  type RuntimeBudgetPricing,
+} from './runtime/budget-port.js';
+
+// Phase 2 runtime-core package integration
+import type { SessionTreeAuthorityPort } from './packages/runtime-core/src/session-tree.js';
+import type { HookSystem } from './packages/runtime-core/src/hook-system.js';
+import type { BudgetLedger as RuntimeCoreBudgetLedger } from './packages/runtime-core/src/budget-ledger.js';
+import type { SteeringController } from './packages/runtime-core/src/steering.js';
+import type { ContextCompactor } from './packages/runtime-core/src/compaction.js';
+import type { ContextCompiler } from './packages/runtime-core/src/context-compiler.js';
+import type { ModelFallbackController } from './packages/runtime-core/src/model-fallback.js';
+import type { PauseResumeController } from './packages/runtime-core/src/pause-resume.js';
 
 export {
   createDefaultExecutionContext,
@@ -149,6 +163,24 @@ export interface HarnessConfig {
   steering?: RuntimeSteeringFactoryPort;
   /** Binds the single runtime-core BudgetLedger authority to the routed run. */
   budget?: RuntimeBudgetFactoryPort;
+  /** Phase 2: SessionTree authority for branch/fork/rewind validation. */
+  sessionTreeAuthority?: SessionTreeAuthorityPort;
+  /** Phase 2: HookSystem as hook dispatch implementation. */
+  hookSystem?: HookSystem;
+  /** Phase 2: BudgetLedger for sophisticated budget tracking. */
+  budgetLedger?: RuntimeCoreBudgetLedger;
+  /** Phase 2: Pricing required when budgetLedger is provided. */
+  budgetLedgerPricing?: RuntimeBudgetPricing;
+  /** Phase 2: SteeringController for runtime steering. */
+  steeringController?: SteeringController;
+  /** Phase 2: ContextCompactor for context compaction. */
+  contextCompactor?: ContextCompactor;
+  /** Phase 2: ContextCompiler for context building. */
+  contextCompiler?: ContextCompiler;
+  /** Phase 2: ModelFallbackController for provider fallback. */
+  modelFallback?: ModelFallbackController;
+  /** Phase 2: PauseResumeController for session pause/resume. */
+  pauseResume?: PauseResumeController;
 }
 
 export class Harness {
@@ -161,6 +193,15 @@ export class Harness {
   private execCtx: ExecutionContext | null = null;
   private _modelCallCount = 0;
   private activeRun = false;
+  private readonly hookPort: HookRuntimePort | undefined;
+  private readonly sessionTreeAuthority: SessionTreeAuthorityPort | undefined;
+  private readonly steeringController: SteeringController | undefined;
+  private readonly contextCompactor: ContextCompactor | undefined;
+  private readonly contextCompiler: ContextCompiler | undefined;
+  private readonly modelFallback: ModelFallbackController | undefined;
+  private readonly pauseResume: PauseResumeController | undefined;
+  private readonly budgetLedger: RuntimeCoreBudgetLedger | undefined;
+  private readonly budgetLedgerPricing: RuntimeBudgetPricing | undefined;
 
   constructor(config: HarnessConfig) {
     if (
@@ -193,6 +234,22 @@ export class Harness {
       transaction: this.currentWorkspace!.transaction,
       sandbox: this.currentWorkspace!.sandbox,
     }));
+    // Phase 2: wire runtime-core packages into the composition root.
+    this.sessionTreeAuthority = config.sessionTreeAuthority;
+    this.steeringController = config.steeringController;
+    this.contextCompactor = config.contextCompactor;
+    this.contextCompiler = config.contextCompiler;
+    this.modelFallback = config.modelFallback;
+    this.pauseResume = config.pauseResume;
+    this.budgetLedger = config.budgetLedger;
+    this.budgetLedgerPricing = config.budgetLedgerPricing;
+    // When HookSystem is provided, wrap it as a HookRuntimePort so that
+    // dispatchHookBoundary dispatches through the Phase 2 authority.
+    this.hookPort = config.hookSystem === undefined
+      ? undefined
+      : {
+          dispatch: (request) => config.hookSystem!.dispatch(request),
+        };
   }
 
   private now(): string {
@@ -429,6 +486,19 @@ export class Harness {
         session_id: actualRunId,
       },
     });
+    // Phase 2: when a BudgetLedger is provided, wrap it in the runtime
+    // adapter so the loop's budget guard goes through the ledger authority.
+    const ledgerAdapter =
+      this.budgetLedger !== undefined && this.budgetLedgerPricing !== undefined
+        ? new BudgetLedgerRuntimeAdapter({
+            ledger: this.budgetLedger,
+            pricing: this.budgetLedgerPricing,
+          })
+        : undefined;
+    const effectiveBudgetGuard = ledgerAdapter ?? budgetGuard;
+    // Phase 2: when a SteeringController is provided, expose it as the
+    // RuntimeSteeringPort for the loop.
+    const effectiveSteering = this.steeringController ?? steering;
     this.currentWorkspace = TransactionalWorkspace.open({
       runId: actualRunId,
       baseVfs: this.config.vfs,
@@ -530,8 +600,8 @@ export class Harness {
       },
       {
         session,
-        ...(steering === undefined ? {} : { steering }),
-        ...(budgetGuard === undefined ? {} : { budgetGuard }),
+        ...(effectiveSteering === undefined ? {} : { steering: effectiveSteering }),
+        ...(effectiveBudgetGuard === undefined ? {} : { budgetGuard: effectiveBudgetGuard }),
         modelCall: async (
           messages: unknown[],
           _attempt: number,
@@ -978,7 +1048,7 @@ private async executeTool(
    };
    const key = canonicalHash({ event, identity, scope }, 32);
    return dispatchHookBoundary(
-     this.config.hooks,
+     this.hookPort ?? this.config.hooks,
      {
        event,
        invocation_id: `hook-${key}`,
