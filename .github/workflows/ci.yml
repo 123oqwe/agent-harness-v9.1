@@ -31,6 +31,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run build:workspaces
       - run: npm run typecheck
       - run: npm run check:cycles
       - run: npm run build
