@@ -40,4 +40,25 @@ describe('AH-RAG-CITE-001: Generate citations with page references', () => {
     expect(formatted).toContain('report.pdf');
     expect(formatted).toContain('page 5');
   });
+
+  it('formats citation without page reference', () => {
+    const chunk = makeChunk(undefined);
+    const citation = generateCitation(chunk);
+    const formatted = formatCitation(citation);
+    expect(formatted).toContain('report.pdf');
+    expect(formatted).not.toContain('page');
+    expect(formatted).toContain('chunk');
+  });
+
+  it('includes chunk_index in citation', () => {
+    const chunk = makeChunk(2);
+    const citation = generateCitation(chunk);
+    expect(citation.chunk_index).toBe(3);
+  });
+
+  it('includes source_hash from chunk provenance', () => {
+    const chunk = makeChunk(1);
+    const citation = generateCitation(chunk);
+    expect(citation.source_hash).toBe('abc123');
+  });
 });
