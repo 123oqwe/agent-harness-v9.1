@@ -51,6 +51,9 @@ import { CacheManager } from './gateway/cache-manager.js';
 
 // Lazy-loaded Phase 2 package modules — dynamic imports prevent the packed
 // root tarball from needing packages/ at module-load time.
+// Lazy-loaded Phase 2 package modules — dynamic imports for RAG and documents.
+// In dev: imports resolve via workspace symlinks in node_modules.
+// In packed root: imports resolve via @agent-harness/* package resolution.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports

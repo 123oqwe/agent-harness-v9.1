@@ -24,7 +24,55 @@ import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 // N32 fix: import Phase 2 components for injection into HarnessConfig
-import { ContextCompiler, ContextCompactor, SteeringController, BudgetLedger, HookSystem } from '@agent-harness/runtime-core';
+import { ContextCompiler } from '@agent-harness/runtime-core';
+import { HookSystem } from '@agent-harness/runtime-core';
+import { ContextCompactor } from '@agent-harness/runtime-core';
+import { SteeringController } from '@agent-harness/runtime-core';
+import { BudgetLedger } from '@agent-harness/runtime-core';
+import { ModelFallbackController } from '@agent-harness/runtime-core';
+import { PauseResumeController } from '@agent-harness/runtime-core';
+import type { BudgetJournalPort, BudgetEvent } from '@agent-harness/runtime-core';
+import type { SteeringJournalPort, SteeringEvent } from '@agent-harness/runtime-core';
+import type { CompactionVfsPort, BeforeCompactPort, FreshSessionPort } from '@agent-harness/runtime-core';
+import type { PauseResumeJournalPort, PauseResumeEffectRecord, EffectReadBackPort, EffectResolution, EffectReconciliationPort } from '@agent-harness/runtime-core';
+import { ModelFallbackGatewayAdapter } from '../runtime/model-fallback-port.js';
+import { InMemoryPauseResumeJournal, DefaultEffectReadBack, DefaultEffectReconciliation } from '../runtime/pause-resume-port.js';
+import { CompactionHookRuntimeAdapter } from '../runtime/compaction-port.js';
+import type { RuntimeBudgetPricing } from '../runtime/budget-port.js';
+
+/** In-memory BudgetJournal for local server usage. */
+class InMemoryBudgetJournal implements BudgetJournalPort {
+  private readonly events: BudgetEvent[] = [];
+  read(): readonly BudgetEvent[] { return [...this.events]; }
+  append(event: BudgetEvent): void { this.events.push({ ...event }); }
+}
+
+/** In-memory SteeringJournal for local server usage. */
+class InMemorySteeringJournal implements SteeringJournalPort {
+  private readonly events: SteeringEvent[] = [];
+  read(): readonly SteeringEvent[] { return [...this.events]; }
+  append(event: SteeringEvent): void { this.events.push({ ...event }); }
+}
+
+/** No-op CompactionVfsPort for local server usage. */
+const noopCompactionVfs: CompactionVfsPort = {
+  write: () => {},
+};
+
+/** No-op FreshSessionPort for local server usage. */
+const noopFreshSession: FreshSessionPort = {
+  prepare: (input) => ({
+    session_id: `fresh-${input.previous_session_id}-${input.context_generation}`,
+    commit: () => {},
+  }),
+};
+
+/** Default budget pricing (USD micros per million tokens, conservative). */
+const DEFAULT_BUDGET_PRICING: RuntimeBudgetPricing = {
+  cached_input_micros_per_million: 0,
+  uncached_input_micros_per_million: 70,
+  output_micros_per_million: 70,
+};
 
 export interface ServerOptions {
   port?: number;
@@ -139,6 +187,55 @@ export function createHarnessForTask(
   // N32 fix: instantiate Phase 2 components for injection into HarnessConfig
   const contextCompiler = new ContextCompiler();
   const hookSystem = new HookSystem([], {});
+  // N30: PauseResumeController with in-memory journal ports
+  const pauseResumeJournal = new InMemoryPauseResumeJournal();
+  const pauseResume = new PauseResumeController({
+    journal: pauseResumeJournal,
+    readBack: new DefaultEffectReadBack(),
+    reconciliation: new DefaultEffectReconciliation(),
+  });
+  // N32: BudgetLedger with in-memory journal
+  const budgetScope = {
+    tenant_id: executionContext.tenant_id,
+    run_id: taskId,
+    session_id: taskId,
+  };
+  const budgetLedger = new BudgetLedger({
+    scope: budgetScope,
+    ceiling: { usd_micros: 1_000_000 }, // $1 budget
+    journal: new InMemoryBudgetJournal(),
+    degradation_matrix: [
+      { remaining_ratio_at_or_below: 0.2, action: 'reduce_output', max_output_tokens: 1024 },
+    ],
+  });
+  // N32: SteeringController with in-memory journal
+  const steeringController = new SteeringController({
+    scope: budgetScope,
+    journal: new InMemorySteeringJournal(),
+  });
+  // N32: ContextCompactor with no-op VFS + hook adapter
+  const contextCompactor = new ContextCompactor({
+    vfs: noopCompactionVfs,
+    beforeCompact: new CompactionHookRuntimeAdapter({}),
+    freshSession: noopFreshSession,
+  });
+  // N32: ModelFallbackController wrapping the ManagedGateway's ModelGateway
+  const modelFallback = new ModelFallbackController({
+    gateway: new ModelFallbackGatewayAdapter(managedGateway.modelGatewayRef),
+    cache: { invalidate: () => {} },
+    context: {
+      recompile: async (input: {
+        readonly provider_id: string;
+        readonly context_generation: number;
+        readonly full_recompute: true;
+        readonly validation_dimensions: readonly string[];
+      }) => ({
+        provider_id: input.provider_id,
+        context_generation: input.context_generation,
+        manifest_hash: 'noop',
+      }),
+    },
+  });
 
   const config: HarnessConfig = {
     toolRegistry,
@@ -153,6 +250,17 @@ export function createHarnessForTask(
     // N32 fix: Phase 2 components now injected and active in execution path
     contextCompiler,
     hookSystem,
+    // N30: PauseResumeController wired into harness run() for approval_required
+    pauseResume,
+    // N32: BudgetLedger + pricing for sophisticated budget tracking
+    budgetLedger,
+    budgetLedgerPricing: DEFAULT_BUDGET_PRICING,
+    // N32: SteeringController for runtime steering
+    steeringController,
+    // N32: ContextCompactor for context compaction
+    contextCompactor,
+    // N32: ModelFallbackController for provider fallback
+    modelFallback,
   };
 
   return new Harness(config);
