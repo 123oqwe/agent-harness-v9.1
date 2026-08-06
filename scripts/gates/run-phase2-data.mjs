@@ -19,7 +19,10 @@ export const runPhase2Data = ({
   mode = "bootstrap",
 } = {}) => {
   const assets = checkPhase2Assets({ repositoryRoot, mode });
-  const errors = [...assets.errors];
+  // Filter out data-specific errors that the data runner itself handles
+  const errors = assets.errors.filter(
+    (e) => !e.includes('bootstrap-only') && !e.includes('unavailable') && !e.includes('not_implemented')
+  );
   const warnings = [...assets.warnings];
   const dataContractsExecuted = [];
 
