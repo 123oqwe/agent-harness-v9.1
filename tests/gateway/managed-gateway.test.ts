@@ -5,6 +5,8 @@ import { EconomicKernel } from '../../gateway/economic-kernel.js';
 import { CapabilityRegistry } from '../../gateway/capability-registry.js';
 import { CircuitBreaker } from '../../gateway/circuit-breaker.js';
 import { RateLimiter } from '../../gateway/rate-limiter.js';
+import { ToolMaskStateMachine } from '../../gateway/tool-mask.js';
+import { DagExecutor } from '../../gateway/dag-executor.js';
 
 describe('ManagedGateway', () => {
   it('KeyVault loads keys from env', () => {
@@ -92,13 +94,86 @@ describe('ManagedGateway', () => {
 
   it('ManagedGateway uses ModelGateway dispatch chain (no direct fetch)', () => {
     const gw = new ManagedGateway();
-    // The gateway should have a modelGateway property that it delegates to
-    // We verify by checking that complete() goes through resolve+dispatch
-    // by confirming the gateway has registered providers in FrozenProviderRegistry
     const models = gw.getAvailableModels();
     expect(models.length).toBeGreaterThan(0);
-    // Usage summary should show 0 calls initially
     const summary = gw.getUsageSummary();
     expect(summary.total_calls).toBe(0);
+  });
+});
+
+describe('ToolMaskStateMachine', () => {
+  it('classifies tools by group prefix', () => {
+    const tsm = new ToolMaskStateMachine({ enabled: true });
+    expect(tsm.classifyTool('read_file')).toBe('fs_read');
+    expect(tsm.classifyTool('write_file')).toBe('fs_write');
+    expect(tsm.classifyTool('web_search')).toBe('web');
+    expect(tsm.classifyTool('browser_navigate')).toBe('browser');
+    expect(tsm.classifyTool('execute_command')).toBe('system');
+    expect(tsm.classifyTool('unknown_tool')).toBeNull();
+  });
+
+  it('masks tools by execution state', () => {
+    const tsm = new ToolMaskStateMachine({ enabled: true });
+    tsm.transition('executing');
+    expect(tsm.isToolAllowed('read_file').allowed).toBe(true);
+    expect(tsm.isToolAllowed('browser_navigate').allowed).toBe(true);
+    tsm.transition('verifying');
+    expect(tsm.isToolAllowed('read_file').allowed).toBe(true);
+    expect(tsm.isToolAllowed('browser_navigate').allowed).toBe(false);
+    expect(tsm.isToolAllowed('write_file').allowed).toBe(false);
+  });
+
+  it('returns full tool set for prompt when enabled (preserves cache)', () => {
+    const tsm = new ToolMaskStateMachine({ enabled: true });
+    tsm.transition('verifying');
+    const allTools = ['read_file', 'write_file', 'browser_navigate', 'execute_command'];
+    const promptTools = tsm.getPromptToolSet(allTools);
+    expect(promptTools).toEqual(allTools);
+  });
+
+  it('generates mask hint for masked tools', () => {
+    const tsm = new ToolMaskStateMachine({ enabled: true });
+    tsm.transition('verifying');
+    const allTools = ['read_file', 'write_file', 'browser_navigate'];
+    const hint = tsm.getMaskHint(allTools);
+    expect(hint).toContain('write_file');
+    expect(hint).toContain('browser_navigate');
+    expect(hint).not.toContain('read_file');
+  });
+
+  it('allows all tools when disabled', () => {
+    const tsm = new ToolMaskStateMachine({ enabled: false });
+    tsm.transition('verifying');
+    expect(tsm.isToolAllowed('write_file').allowed).toBe(true);
+    expect(tsm.isToolAllowed('browser_navigate').allowed).toBe(true);
+  });
+});
+
+describe('DagExecutor', () => {
+  it('builds a linear workflow DAG', () => {
+    const dag = DagExecutor.buildWorkflow({
+      name: 'pdf-research',
+      steps: [
+        { type: 'document', tier: 'work', capabilities: ['pdf_document_understanding'], prompt: 'Extract text from PDF' },
+        { type: 'reasoning', tier: 'work', capabilities: ['reasoning'], prompt: 'Analyze the extracted text' },
+        { type: 'writing', tier: 'work', capabilities: ['reasoning'], prompt: 'Write a summary' },
+      ],
+    });
+    expect(dag.nodes.length).toBe(3);
+    expect(dag.edges.length).toBe(2);
+    expect(dag.nodes[0]!.step_id).toBe('pdf-research-step-1');
+    expect(dag.nodes[1]!.depends_on).toEqual(['pdf-research-step-1']);
+  });
+
+  it('detects cycles in DAG', async () => {
+    const gw = new ManagedGateway();
+    const executor = new DagExecutor(gw);
+    await expect(executor.execute({
+      nodes: [
+        { step_id: 'a', node_type: 'reasoning', tier: 'work', required_capabilities: ['reasoning'], prompt: 'A', depends_on: ['b'] },
+        { step_id: 'b', node_type: 'reasoning', tier: 'work', required_capabilities: ['reasoning'], prompt: 'B', depends_on: ['a'] },
+      ],
+      edges: [ { from: 'a', to: 'b' }, { from: 'b', to: 'a' } ],
+    }, { userId: 'test', taskId: 'test' })).rejects.toThrow('cycle');
   });
 });

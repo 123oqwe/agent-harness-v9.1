@@ -11,6 +11,8 @@ import {
 } from './model-gateway.js';
 import { createProviderAdapter, getProviderRegions } from './provider-adapters.js';
 import { CacheManager } from './cache-manager.js';
+import { ToolMaskStateMachine, type ExecutionState } from './tool-mask.js';
+import { DagExecutor, type DagDefinition, type DagExecutionResult } from './dag-executor.js';
 import type { ModelTurn } from '../runtime/loop.js';
 import type { Message } from './scripted-provider.js';
 import type { ProviderType } from '../contracts/index.js';
@@ -49,6 +51,8 @@ export class ManagedGateway {
   private readonly frozenRegistry: FrozenProviderRegistry;
   private readonly bindingMap = new Map<string, ModelBinding>();
   private readonly cacheManager = new CacheManager();
+  private readonly toolMask = new ToolMaskStateMachine({ cacheManager: this.cacheManager });
+  private readonly dagExecutor = new DagExecutor(this);
 
   constructor(opts: ManagedGatewayOptions = {}) {
     this.keyVault = opts.keyVault ?? new KeyVault();
@@ -361,7 +365,33 @@ export class ManagedGateway {
     finally { this.rateLimiter.release(ctx.userId); }
   }
 
-  getCacheMetrics(): Record<string, unknown> { return this.cacheManager.getMetrics() as unknown as Record<string, unknown>; }
+
+getCacheMetrics(): Record<string, unknown> { return this.cacheManager.getMetrics() as unknown as Record<string, unknown>; }
+ getToolMaskState(): ExecutionState { return this.toolMask.currentState; }
+
+ setToolMaskState(state: ExecutionState): void { this.toolMask.transition(state); }
+
+  isToolMaskEnabled(): boolean { return this.toolMask.isEnabled; }
+
+  enableToolMask(enabled: boolean): void {
+    if (enabled && !this.toolMask.isEnabled) {
+      this.toolMask.onToolDefinitionsChanged('tool_masking enabled');
+    }
+    // Toggle by recreating with enabled flag
+    (this.toolMask as unknown as { config: { enabled: boolean } }).config.enabled = enabled;
+  }
+
+  checkToolAllowed(toolName: string): { allowed: boolean; reason?: string } {
+    return this.toolMask.isToolAllowed(toolName);
+  }
+
+  getToolMaskHint(allTools: string[]): string | null {
+    return this.toolMask.getMaskHint(allTools);
+  }
+
+  async executeDag(dag: DagDefinition, ctx: { userId: string; taskId: string }): Promise<DagExecutionResult> {
+    return this.dagExecutor.execute(dag, ctx);
+  }
 
   getUsageSummary(): Record<string, unknown> {
     const totalCost = this.usageLog.reduce((s, r) => s + r.cost_usd, 0);
