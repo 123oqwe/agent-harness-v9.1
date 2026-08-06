@@ -17,13 +17,13 @@ export interface WebClient {
 }
 
 export function createWebClient(config: WebClientConfig): WebClient {
-  let currentScreen: string | null = null;
+
 
   return {
     navigate(screenId: string) {
       const screen = getScreen(screenId);
       if (!screen) throw new Error(`unknown screen: ${screenId}`);
-      currentScreen = screenId;
+  
     },
     getApiBaseUrl() {
       return config.apiBaseUrl;

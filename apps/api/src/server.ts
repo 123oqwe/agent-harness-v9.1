@@ -3,7 +3,7 @@
  * Provides real HTTP endpoints for Phase 2 UI.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { type ApiEndpoint, PHASE2_API_ENDPOINTS, loadingState, errorState, offlineState, successState } from './index.js';
+import { PHASE2_API_ENDPOINTS, errorState, successState } from './index.js';
 
 export interface ApiServerConfig {
   port?: number;
