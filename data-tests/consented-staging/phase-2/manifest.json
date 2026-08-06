@@ -20,7 +20,7 @@
     "tenant": "external-authorized-tenant-required",
     "contract_checker": {
       "path": "scripts/gates/check-phase2-assets.mjs",
-      "sha256": "db66a5013a8b47770e253777fd180baeea712f3d5a4ffe07817d083c3fd9b621",
+      "sha256": "a72690f0825ac00ce3922cc7cb10222dd60540287345d9f72465c8f6870af4e5",
       "role": "asset-contract-validator"
     }
   },

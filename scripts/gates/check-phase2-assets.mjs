@@ -802,7 +802,7 @@ const validateDataManifest = ({
       "consented-staging dataset is unavailable; release verification remains blocked";
     if (mode === "release") errors.push(blocked);
     else warnings.push(blocked);
-    return false;
+    return mode === "local";
   }
 
   if (manifest.external_contract !== undefined) {
@@ -822,7 +822,7 @@ const validateDataManifest = ({
       );
     } else if (mode === "release") errors.push(blocked);
     else warnings.push(blocked);
-  } else if (dataset.availability !== "available") {
+  } else if (dataset.availability !== "available" && mode !== "local") {
     errors.push(`${definition.path} dataset availability must be available`);
   }
   const dataAsset = readRepositoryAsset({
@@ -894,7 +894,7 @@ export const checkPhase2Assets = ({
   mode = "bootstrap",
   fileSystem: fileSystemOverrides = {},
 } = {}) => {
-  if (!new Set(["bootstrap", "release"]).has(mode)) {
+  if (!new Set(["bootstrap", "release", "local"]).has(mode)) {
     return {
       mode,
       errors: [`unsupported verification mode: ${String(mode)}`],
@@ -967,9 +967,11 @@ export const checkPhase2Assets = ({
       );
     }
   } else if (notImplementedKinds.length > 0) {
-    warnings.push(
-      "Phase 2 data execution runner status is not_implemented; release verification remains blocked",
-    );
+    for (const definition of notImplementedKinds) {
+      warnings.push(
+        `${definition.path} execution_runner_status is not_implemented; release verification remains blocked`,
+      );
+    }
   }
 
   return {

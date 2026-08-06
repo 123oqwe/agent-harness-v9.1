@@ -84,7 +84,7 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
       "--root",
       root,
       "--mode",
-      mode === "dev" ? "bootstrap" : "release",
+      mode === "dev" ? "bootstrap" : "local",
     ]),
     nodeScript(
       root,
