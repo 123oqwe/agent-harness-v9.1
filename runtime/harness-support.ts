@@ -305,8 +305,8 @@ export function buildProviderSelectionRequest(
   );
   const requiredCapabilities =
     input.runPlan.reasoning_strategy === 'direct'
-      ? ['text_reasoning']
-      : ['text_reasoning', 'tool_calling'];
+      ? ['reasoning']
+      : ['reasoning', 'tool_calling'];
   const providerId = input.runPlan.model_bindings[0]?.provider;
   if (providerId === undefined) {
     throw new Error('RunPlan must bind a model provider');

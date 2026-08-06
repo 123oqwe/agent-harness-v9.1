@@ -735,7 +735,10 @@ export class Harness {
               );
             }
           }
-          const resolved = this.config.gateway.resolve(effectiveRequest);
+          let resolved;
+          try { resolved = this.config.gateway.resolve(effectiveRequest); }
+          catch (resolveErr) { console.error('[DEBUG] resolve failed:', resolveErr instanceof Error ? resolveErr.message : String(resolveErr)); throw resolveErr; }
+          console.error('[DEBUG] resolved provider:', resolved.provider_id);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
           const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
          // P2-12: track LLM cache key for prompt cache management
@@ -801,7 +804,8 @@ export class Harness {
                initial_failure: dispatchError,
              });
              result = fallbackResult.dispatch_result as GatewayDispatchResult;
-           } catch {
+              } catch (fbErr) {
+                console.error('[DEBUG] fallback failed:', fbErr instanceof Error ? fbErr.message : String(fbErr));
              // Fallback also failed — throw original error
              throw dispatchError;
            }
