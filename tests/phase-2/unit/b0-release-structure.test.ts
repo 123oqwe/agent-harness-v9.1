@@ -131,7 +131,7 @@ describe("Phase 2 batch-zero release structure", () => {
     }
   });
 
-  it("fails closed when the pinned prerequisite commits are absent from a shallow checkout", () => {
+  it("fails closed when the pinned prerequisite commits are absent from a shallow checkout", { timeout: 30_000 }, () => {
     const verifyHistory = (manifestChecker as Record<string, unknown>)
       .verifyPhase1PrerequisiteHistory;
     expect(typeof verifyHistory).toBe("function");

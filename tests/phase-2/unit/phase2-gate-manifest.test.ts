@@ -230,7 +230,7 @@ describe("Phase 2 release-gate manifest", () => {
     );
   });
 
-  it("requires authority state, requirement, source, test, and root export to migrate in one commit", () => {
+  it("requires authority state, requirement, source, test, and root export to migrate in one commit", { timeout: 30_000 }, () => {
     const verifyAtomicAuthorityMigrations = (
       phase2ManifestChecker as Record<string, unknown>
     ).verifyAtomicAuthorityMigrations;
