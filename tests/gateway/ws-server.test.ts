@@ -4,20 +4,30 @@ import { ManagedGateway } from '../../gateway/managed-gateway.js';
 import { EconomicKernel } from '../../gateway/economic-kernel.js';
 import { WebSocket } from 'ws';
 
-function connect(port: number, user = 'test-user'): Promise<WebSocket> {
-  return new Promise((resolve) => {
+function connectAndWaitConnected(port: number, user = 'test-user'): Promise<{ ws: WebSocket; connected: Record<string, unknown> }> {
+  return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}?user=${user}`);
-    ws.on('open', () => resolve(ws));
+    const timer = setTimeout(() => reject(new Error('timeout waiting for connected')), 3000);
+    ws.on('message', (data) => {
+      try {
+        const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (parsed['type'] === 'connected') { clearTimeout(timer); resolve({ ws, connected: parsed }); }
+      } catch { /* ignore */ }
+    });
+    ws.on('error', (err) => { clearTimeout(timer); reject(err); });
   });
 }
 
-function waitForMsg(ws: WebSocket, type: string, timeout = 2000): Promise<Record<string, unknown>> {
+function waitForMsg(ws: WebSocket, type: string, timeout = 3000): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${type}`)), timeout);
-    ws.on('message', (data) => {
-      const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
-      if (parsed['type'] === type) { clearTimeout(timer); resolve(parsed); }
-    });
+    const handler = (data: Buffer) => {
+      try {
+        const parsed = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (parsed['type'] === type) { clearTimeout(timer); ws.off('message', handler); resolve(parsed); }
+      } catch { /* ignore parse errors */ }
+    };
+    ws.on('message', handler);
   });
 }
 

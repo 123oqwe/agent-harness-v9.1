@@ -131,7 +131,16 @@ const ROOT_PUBLICATION = Object.freeze({
   exports: {
     ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
   },
-  files: ["dist"],
+  files: [
+    "dist",
+    "packages/rag/dist",
+    "packages/documents/dist",
+    "packages/multimodal/dist",
+    "packages/tools/dist",
+    "packages/ui/dist",
+    "packages/api/dist",
+    "packages/runtime-core/dist",
+  ],
 });
 const EXPECTED_WORKSPACE_GLOBS = ["packages/*", "apps/*"];
 const EXPECTED_PACKAGE_MANAGER = "npm@10.8.2";
