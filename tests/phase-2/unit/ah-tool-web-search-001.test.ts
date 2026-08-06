@@ -35,9 +35,9 @@ describe('AH-TOOL-WEB-SEARCH-001: Web search tool returning ranked results', () 
     expect(result.success).toBe(true);
     const output = result.output as { results: Array<{ url: string; title: string; snippet: string }> };
     expect(output.results).toHaveLength(3);
-    expect(output.results[0].url).toContain('example.com');
-    expect(output.results[0].title).toContain('TypeScript testing');
-    expect(output.results[0].snippet).toContain('TypeScript testing');
+    expect(output.results[0]!.url).toContain('example.com');
+    expect(output.results[0]!.title).toContain('TypeScript testing');
+    expect(output.results[0]!.snippet).toContain('TypeScript testing');
   });
 
   it('respects max_results option', async () => {

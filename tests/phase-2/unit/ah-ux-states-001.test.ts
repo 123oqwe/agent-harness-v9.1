@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PHASE2_SCREENS, checkAccessibility, type ScreenState } from '../../../packages/ui/src/index.js';
+import { PHASE2_SCREENS, checkAccessibility } from '../../../packages/ui/src/index.js';
 
 describe('AH-UX-STATES-001: All screens have loading/error/offline/accessibility states', () => {
   it('all screens include loading state', () => {

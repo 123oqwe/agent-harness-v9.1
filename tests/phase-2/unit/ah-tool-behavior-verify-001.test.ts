@@ -7,12 +7,13 @@ import { Buffer } from 'node:buffer';
 const mockProvider: BehaviorVerifyProviderPort = {
   async verify(url, steps, assertions) {
     const passed = steps.length > 0 && assertions.length > 0;
-    return {
+    const result: { passed: boolean; screenshot?: Buffer; failures: Array<{ assertion: string; actual: string }>; duration_ms: number } = {
       passed,
-      screenshot: passed ? Buffer.from('screenshot-png-data') : undefined,
       failures: passed ? [] : [{ assertion: 'element visible', actual: 'not found' }],
       duration_ms: 150,
     };
+    if (passed) result.screenshot = Buffer.from('screenshot-png-data');
+    return result;
   },
 };
 
