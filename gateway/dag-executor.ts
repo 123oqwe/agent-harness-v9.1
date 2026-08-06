@@ -1,5 +1,5 @@
 import type { ManagedGateway } from './managed-gateway.js';
-import type { ModelTier, RouteResult } from './capability-registry.js';
+import type { ModelTier } from './capability-registry.js';
 
 export type DagNodeType = 'reasoning' | 'document' | 'reranking' | 'writing' | 'verification' | 'image_gen' | 'vision_verify' | 'code' | 'custom';
 

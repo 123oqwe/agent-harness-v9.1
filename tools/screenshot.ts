@@ -8,7 +8,7 @@ import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 export interface ScreenshotInput { display?: number }
 export interface ScreenshotOutput { path: string; width: number; height: number; bytes: number }
 
-export async function screenshot(vfs: VirtualFilesystem, input: ScreenshotInput): Promise<ScreenshotOutput> {
+export async function screenshot(vfs: VirtualFilesystem, _input: ScreenshotInput): Promise<ScreenshotOutput> {
   const timestamp = Date.now();
   const path = `/workspace/.screenshots/screenshot-${timestamp}.png`;
   const platform = process.platform;

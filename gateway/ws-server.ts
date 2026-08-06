@@ -3,6 +3,8 @@ import type { ManagedGateway } from './managed-gateway.js';
 import type { EconomicKernel } from './economic-kernel.js';
 import type { Harness } from '../harness.js';
 import type { TaskContract } from '../contracts/index.js';
+import type { IncomingMessage } from 'node:http';
+import type { RawData } from 'ws';
 
 export interface WsServerOptions {
   port: number;
@@ -42,7 +44,7 @@ export class GatewayWsServer {
     console.log('  Or stream: {"type":"task_stream","goal":"...","budget_usd":0.5}');
   }
 
-  private onConnection(ws: WebSocket, req: import('http').IncomingMessage): void {
+  private onConnection(ws: WebSocket, req: IncomingMessage): void {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     const userId = url.searchParams.get('user') ?? `user-${Date.now()}`;
     const session: ClientSession = { ws, userId, taskId: null };
@@ -53,7 +55,7 @@ export class GatewayWsServer {
     ws.on('error', () => { this.sessions.delete(ws); });
   }
 
-  private async onMessage(ws: WebSocket, session: ClientSession, data: import('ws').RawData): Promise<void> {
+  private async onMessage(ws: WebSocket, session: ClientSession, data: RawData): Promise<void> {
     let msg: Record<string, unknown>;
     try { msg = JSON.parse(data.toString()) as Record<string, unknown>; }
     catch { this.send(ws, { type: 'error', error: 'Invalid JSON' }); return; }

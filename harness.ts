@@ -50,17 +50,17 @@ import { CacheManager } from './gateway/cache-manager.js';
 
 // Lazy-loaded Phase 2 package modules — dynamic imports prevent the packed
 // root tarball from needing packages/ at module-load time.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type RagModule = typeof import('./packages/rag/src/index.js');
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type DocModule = typeof import('./packages/documents/src/index.js');
-let ragModulePromise: Promise<RagModule> | undefined;
-let docModulePromise: Promise<DocModule> | undefined;
-const lazyRag = (): Promise<RagModule> => {
-  if (!ragModulePromise) ragModulePromise = import('./packages/rag/src/index.js');
-  return ragModulePromise;
+let _ragModulePromise: Promise<RagModule> | undefined;
+const _lazyDoc = (): Promise<DocModule> => {
+  return import('./packages/documents/src/index.js');
 };
-const lazyDoc = (): Promise<DocModule> => {
-  if (!docModulePromise) docModulePromise = import('./packages/documents/src/index.js');
-  return docModulePromise;
+const lazyRag = (): Promise<RagModule> => {
+  if (!_ragModulePromise) _ragModulePromise = import('./packages/rag/src/index.js');
+  return _ragModulePromise;
 };
 import { SkillLoader } from './skills/skill-loader.js';
 import type { SqliteSessionStore } from './session/sqlite-session-store.js';
@@ -712,7 +712,6 @@ export class Harness {
            let contentBuffer = '';
            let usage: { input_tokens: number; output_tokens: number } | undefined;
            const toolCalls: Array<{ id: string; name: string; arguments: Readonly<Record<string, unknown>> }> = [];
-           let stopReason: GatewayDispatchResult['response']['stop_reason'] | undefined;
            for await (const ev of this.config.gateway.dispatchStream(resolved, effectiveRequest, {
              operation_id: opId,
              attempt_id: attId,
@@ -729,8 +728,7 @@ export class Harness {
              response: {
                content: contentBuffer,
                ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-               ...(stopReason !== undefined ? { stop_reason: stopReason } : {}),
-               ...(usage !== undefined ? { usage } : {}),
+                ...(usage !== undefined ? { usage } : {}),
              },
              usage: usage ?? { input_tokens: 0, output_tokens: 0 },
            };

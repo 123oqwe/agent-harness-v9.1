@@ -16,7 +16,8 @@ import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
 import { HookRestrictionError } from './hook-port.js';
-import { EventBus, createEvent, type BusEvent } from './event-bus.js';
+import type { EventBus, BusEvent } from './event-bus.js';
+import { createEvent } from './event-bus.js';
 import type {
   RuntimeSteeringCommand,
   RuntimeSteeringPort,
