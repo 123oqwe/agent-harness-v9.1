@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import * as mod from '../../../packages/multimodal/src/image-edit.js';
 import { editImage, setImageEditProvider, type ImageEditProviderPort, type ImageEditInput } from '../../../packages/multimodal/src/image-edit.js';
 import { MultimodalUnavailableError } from '../../../packages/multimodal/src/types.js';
 import { Buffer } from 'node:buffer';
@@ -17,13 +16,7 @@ const mockEditProvider: ImageEditProviderPort = {
 describe('AH-MM-IMAGE-EDIT-001: Image editing with identity preservation', () => {
   afterEach(() => setImageEditProvider(undefined));
 
-  it('module is importable', () => {
-    expect(mod).toBeDefined();
-  });
 
-  it('exports at least one symbol', () => {
-    expect(Object.keys(mod).length).toBeGreaterThan(0);
-  });
 
   it('throws unavailable when no provider is configured', async () => {
     const input: ImageEditInput = {

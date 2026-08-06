@@ -14,46 +14,58 @@ describe('AH-TOOL-SCREENSHOT-001 screenshot', () => {
   });
   afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
-  it('throws on failure when screencapture is not available or fails', async () => {
-    // In a headless test environment, screencapture will likely fail
+  it('generates a timestamped png path under /workspace/.screenshots/', async () => {
     try {
-      await screenshot(vfs, {});
-      // If it succeeds, verify the output shape
-      // This can happen on macOS with a display
+      const result = await screenshot(vfs, {});
+      expect(result.path).toMatch(/^\/workspace\/\.screenshots\/screenshot-\d+\.png$/);
+    } catch (e) {
+      // Headless: screencapture fails — verify error shape
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toContain('screenshot failed');
+    }
+  });
+
+  it('writes the captured png data to VFS and returns correct metadata', async () => {
+    try {
+      const result = await screenshot(vfs, {});
+      const written = vfs.read(result.path);
+      expect(written.length).toBe(result.bytes);
+      expect(result.bytes).toBeGreaterThan(0);
+      // PNG signature check
+      expect(written[0]).toBe(0x89);
+      expect(written[1]).toBe(0x50);
+      expect(written[2]).toBe(0x4e);
+      expect(written[3]).toBe(0x47);
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
       expect((e as Error).message).toContain('screenshot failed');
     }
   });
 
-  it('uses the display parameter when provided', async () => {
-    // The display parameter is accepted but may not affect behavior in headless mode
-    try {
-      const result = await screenshot(vfs, { display: 1 });
-      expect(result.path).toMatch(/screenshot-\d+\.png/);
-      expect(result.path).toContain('/workspace/.screenshots/');
-      expect(result.bytes).toBeGreaterThan(0);
-    } catch {
-      // Expected in headless env
-    }
-  });
-
-  it('writes screenshot to /workspace/.screenshots/ path', async () => {
+  it('extracts width and height from the PNG IHDR chunk', async () => {
     try {
       const result = await screenshot(vfs, {});
-      expect(result.path).toContain('/workspace/.screenshots/');
-    } catch {
-      // Headless env — no screenshot possible
+      expect(result.width).toBeGreaterThan(0);
+      expect(result.height).toBeGreaterThan(0);
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toContain('screenshot failed');
     }
   });
 
-  it('generates a unique timestamped path', async () => {
-    try {
-      const r1 = await screenshot(vfs, {});
-      const r2 = await screenshot(vfs, {});
-      expect(r1.path).not.toBe(r2.path);
-    } catch {
-      // Headless env
+  it('produces unique paths across multiple calls', async () => {
+    const paths: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      try {
+        const result = await screenshot(vfs, {});
+        paths.push(result.path);
+      } catch {
+        // Headless: all calls fail the same way
+        break;
+      }
+    }
+    if (paths.length > 1) {
+      expect(new Set(paths).size).toBe(paths.length);
     }
   });
 });

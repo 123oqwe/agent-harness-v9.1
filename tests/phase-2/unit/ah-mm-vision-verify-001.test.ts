@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import * as mod from '../../../packages/multimodal/src/vision.js';
 import { verifyGeneratedContent, setVisionProvider, type VisionProviderPort } from '../../../packages/multimodal/src/vision.js';
 import { MultimodalUnavailableError } from '../../../packages/multimodal/src/types.js';
 import { Buffer } from 'node:buffer';
@@ -17,13 +16,7 @@ const mockVisionProvider: VisionProviderPort = {
 describe('AH-MM-VISION-VERIFY-001: Vision verification of generated content', () => {
   afterEach(() => setVisionProvider(undefined));
 
-  it('module is importable', () => {
-    expect(mod).toBeDefined();
-  });
 
-  it('exports at least one symbol', () => {
-    expect(Object.keys(mod).length).toBeGreaterThan(0);
-  });
 
   it('throws unavailable when no provider is configured', async () => {
     await expect(verifyGeneratedContent(Buffer.from('img'), 'red square')).rejects.toThrow(MultimodalUnavailableError);

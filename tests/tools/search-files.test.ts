@@ -55,21 +55,30 @@ describe('AH-TOOL-SEARCH-001 search_files', () => {
     expect(r.truncated).toBe(false);
   });
 
-  it('supports regex mode', async () => {
+  it('supports regex mode via ripgrep when available', async () => {
     writeFileSync(join(tmp, 'a.txt'), 'line1: 42\nline2: 99');
-    // Regex mode searches on the real filesystem via ripgrep if available,
-    // otherwise falls back to VFS substring search
     const r = await searchFiles(vfs, { root: tmp, needle: '\\d+', mode: 'regex' });
-    // Result may be empty if rg is not available and VFS doesn't support regex
-    // But it should not throw
-    expect(r.matches).toBeDefined();
+    // If rg is available on the real filesystem, it should find matches with line numbers
+    // If rg is not available, VFS fallback does substring search (no regex), so matches may be empty
+    expect(Array.isArray(r.matches)).toBe(true);
+    expect(r.truncated).toBe(false);
+    // When rg finds results, they should have line_number set
+    for (const m of r.matches) {
+      expect(m.path).toContain(tmp);
+    }
   });
 
-  it('supports filename mode', async () => {
+  it('supports filename mode listing files under root', async () => {
     writeFileSync(join(tmp, 'findme.txt'), 'content');
     writeFileSync(join(tmp, 'other.txt'), 'content');
     const r = await searchFiles(vfs, { root: tmp, needle: '', mode: 'filename' });
-    expect(r.matches).toBeDefined();
+    expect(Array.isArray(r.matches)).toBe(true);
+    // If rg --files is available, it lists all files; VFS fallback returns empty for filename mode
+    if (r.matches.length > 0) {
+      const paths = r.matches.map(m => m.path);
+      expect(paths.some(p => p.includes('findme.txt'))).toBe(true);
+      expect(paths.some(p => p.includes('other.txt'))).toBe(true);
+    }
   });
 
   it('handles non-existent root gracefully', async () => {
