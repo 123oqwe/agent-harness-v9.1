@@ -103,7 +103,10 @@ describe("Phase 2 executable asset contracts", { timeout: 30_000 }, () => {
       "public-benchmarks dataset is bootstrap-only; release verification remains blocked",
     );
     expect(result.errors).toContain(
-      "Phase 2 data execution runner status is not_implemented; release verification remains blocked",
+      "data-tests/public-benchmarks/phase-2/manifest.json execution_runner_status is not_implemented; release verification remains blocked",
+    );
+    expect(result.errors).toContain(
+      "data-tests/consented-staging/phase-2/manifest.json execution_runner_status is not_implemented; release verification remains blocked",
     );
   });
 
@@ -117,7 +120,10 @@ describe("Phase 2 executable asset contracts", { timeout: 30_000 }, () => {
       const manifest = readJson(
         resolve(`data-tests/${kind}/phase-2/manifest.json`),
       );
-      expect(manifest.execution_runner_status).toBe("not_implemented");
+      // Synthetic dataset has an implemented runner; external datasets remain not_implemented
+      expect(manifest.execution_runner_status).toBe(
+        kind === "synthetic" ? "implemented" : "not_implemented",
+      );
       expect(
         (manifest.dataset as Record<string, unknown>).contract_checker,
       ).toEqual({
