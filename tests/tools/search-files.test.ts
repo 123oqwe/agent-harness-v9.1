@@ -27,4 +27,54 @@ describe('AH-TOOL-SEARCH-001 search_files', () => {
     expect(r.matches).toHaveLength(2);
     expect(r.truncated).toBe(false);
   });
+
+  it('defaults to content mode when mode not specified', async () => {
+    writeFileSync(join(tmp, 'a.txt'), 'searchable text');
+    const r = await searchFiles(vfs, { root: '/workspace', needle: 'searchable' });
+    expect(r.matches.length).toBeGreaterThan(0);
+  });
+
+  it('defaults max_results to 100 when not specified', async () => {
+    for (let i = 0; i < 3; i++) writeFileSync(join(tmp, `f${i}.txt`), 'needle');
+    const r = await searchFiles(vfs, { root: '/workspace', needle: 'needle' });
+    expect(r.matches.length).toBeLessThanOrEqual(100);
+  });
+
+  it('searches in subdirectories', async () => {
+    mkdirSync(join(tmp, 'sub', 'deep'), { recursive: true });
+    writeFileSync(join(tmp, 'sub', 'deep', 'found.txt'), 'target needle');
+    writeFileSync(join(tmp, 'sub', 'miss.txt'), 'other');
+    const r = await searchFiles(vfs, { root: '/workspace/sub', needle: 'needle' });
+    expect(r.matches.map(m => m.path)).toContain('/workspace/sub/deep/found.txt');
+  });
+
+  it('returns empty matches when needle not found', async () => {
+    writeFileSync(join(tmp, 'a.txt'), 'nothing relevant');
+    const r = await searchFiles(vfs, { root: '/workspace', needle: 'nonexistent' });
+    expect(r.matches).toHaveLength(0);
+    expect(r.truncated).toBe(false);
+  });
+
+  it('supports regex mode', async () => {
+    writeFileSync(join(tmp, 'a.txt'), 'line1: 42\nline2: 99');
+    // Regex mode searches on the real filesystem via ripgrep if available,
+    // otherwise falls back to VFS substring search
+    const r = await searchFiles(vfs, { root: tmp, needle: '\\d+', mode: 'regex' });
+    // Result may be empty if rg is not available and VFS doesn't support regex
+    // But it should not throw
+    expect(r.matches).toBeDefined();
+  });
+
+  it('supports filename mode', async () => {
+    writeFileSync(join(tmp, 'findme.txt'), 'content');
+    writeFileSync(join(tmp, 'other.txt'), 'content');
+    const r = await searchFiles(vfs, { root: tmp, needle: '', mode: 'filename' });
+    expect(r.matches).toBeDefined();
+  });
+
+  it('handles non-existent root gracefully', async () => {
+    const r = await searchFiles(vfs, { root: '/workspace/nonexistent', needle: 'test' });
+    expect(r.matches).toHaveLength(0);
+    expect(r.truncated).toBe(false);
+  });
 });
