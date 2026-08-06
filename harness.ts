@@ -799,7 +799,7 @@ export class Harness {
                initial_failure: dispatchError,
              });
              result = fallbackResult.dispatch_result as GatewayDispatchResult;
-           } catch (fallbackError) {
+          } catch {
              // Fallback also failed — throw original error
              throw dispatchError;
            }
