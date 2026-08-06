@@ -40,4 +40,34 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     const store = createIndexStore();
     expect(removeChunkFromStore(store, 'nonexistent')).toBe(false);
   });
+
+  it('deleted chunk no longer appears in FTS search results', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('unique searchable keyword here', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(store.fts.search('keyword').length).toBeGreaterThan(0);
+    removeChunkFromStore(store, chunks[0]!.chunk_id);
+    expect(store.fts.search('keyword').length).toBe(0);
+  });
+
+  it('deleting from non-existent source returns 0', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('test content', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(deleteFromStore(store, 'nonexistent')).toBe(0);
+  });
+
+  it('preserves other chunks when deleting by source hash', async () => {
+    const store = createIndexStore();
+    const doc1 = makeDoc('first document content with keyword', 'src1');
+    const doc2 = makeDoc('second document content with keyword', 'src2');
+    const chunks1 = chunkDocument(doc1, { tenant_id: 't1', principal_ids: ['p1'] });
+    const chunks2 = chunkDocument(doc2, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of [...chunks1, ...chunks2]) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    deleteFromStore(store, 'src1');
+    const results = store.fts.search('keyword');
+    expect(results.length).toBeGreaterThan(0);
+  });
 });
