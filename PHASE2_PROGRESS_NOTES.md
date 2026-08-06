@@ -251,3 +251,12 @@ Added tests for previously untested tool files (0% mutation score):
 - Rebound equivalent mutant waivers to HEAD 3f94675
 - Started fresh mutation run on current HEAD
 - Gateway was FAIL at 84.68% on old commit — new tool tests + GLM fixes should improve
+
+### Fix 16 Fake/Filler Tests (commit 588bf11)
+Replaced all fake/filler tests with real behavioral assertions:
+- screenshot: 4 empty-catch no-ops → PNG path format, VFS write, PNG signature, IHDR dimensions
+- sandbox-oci: 4 duplicate unavailable assertions → distinct tests (error shape, empty image, empty command, config passthrough)
+- mm-doc-vision/image-edit/vision-verify/tool-image-gen: removed 8 "module is importable" filler tests
+- search-files: 2 weak toBeDefined → real path content + rg match shape assertions
+
+Test count: 766 → 758 (removed 8 filler, rest unchanged). All 758 pass.
