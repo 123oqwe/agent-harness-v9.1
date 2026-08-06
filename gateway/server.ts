@@ -34,6 +34,7 @@ export interface ServerOptions {
 const ALLOWED_TOOLS = [
   'read_file', 'write_file', 'edit_file', 'execute_command',
   'list_directory', 'search_files', 'create_artifact', 'parse_document',
+  'apply_patch', 'undo', 'web_fetch', 'web_search', 'screenshot',
 ];
 
 export function createManagedGateway(): ManagedGateway {
