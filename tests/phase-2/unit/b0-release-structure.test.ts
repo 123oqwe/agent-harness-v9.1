@@ -171,6 +171,7 @@ describe("Phase 2 batch-zero release structure", () => {
       "packages/documents",
       "packages/rag",
       "packages/multimodal",
+      "packages/api",
       "apps/api",
       "apps/web",
       "apps/desktop",

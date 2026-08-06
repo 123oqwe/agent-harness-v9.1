@@ -11,22 +11,449 @@
     "core": 85
   },
   "source_authorities": [
-    {"id":"Harness","migration_requirement":null,"root":{"state":"active","paths":["harness.ts"],"exports":["Harness"],"tests":["tests/runtime/harness-authority.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Gateway","migration_requirement":null,"root":{"state":"active","paths":["gateway/model-gateway.ts"],"exports":["ModelGateway"],"tests":["tests/gateway/model-gateway.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Router","migration_requirement":null,"root":{"state":"active","paths":["router/static-router.ts"],"exports":["StaticRouter"],"tests":["tests/router/static-router.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/router","paths":["packages/router/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Runtime","migration_requirement":null,"root":{"state":"active","paths":["runtime/loop.ts"],"exports":["LoopEngine"],"tests":["tests/runtime/loop-authority.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Strategies","migration_requirement":null,"root":{"state":"active","paths":["runtime/direct.ts","runtime/react.ts","runtime/plan-execute.ts"],"exports":["runDirect","runReact","runPlanExecute"],"tests":["tests/runtime/reasoning-strategies.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Tools","migration_requirement":null,"root":{"state":"active","paths":["tools/tool-registry.ts","tools/tool-dispatcher.ts"],"exports":["ToolRegistry","ToolDispatcher"],"tests":["tests/tools/tool-registry.test.ts","tests/tools/tool-dispatcher.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/tools","paths":["packages/tools/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Skills","migration_requirement":null,"root":{"state":"active","paths":["skills/skill-registry.ts","skills/skill-loader.ts"],"exports":["SkillRegistry","SkillLoader"],"tests":["tests/skills/skill-loader.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/tools","paths":["packages/tools/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Policy","migration_requirement":null,"root":{"state":"active","paths":["security/policy-engine.ts"],"exports":["PolicyEngine"],"tests":["tests/policy/policy-boundaries.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/security","paths":["packages/security/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"PEP","migration_requirement":null,"root":{"state":"active","paths":["security/pep.ts"],"exports":["PolicyEnforcementPoint"],"tests":["tests/policy/pep.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/security","paths":["packages/security/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Capability","migration_requirement":null,"root":{"state":"active","paths":["security/capability.ts"],"exports":["signCapabilityClaims","verifyCapabilityClaims"],"tests":["tests/security/capability-issue.test.ts","tests/security/capability-replay.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/security","paths":["packages/security/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Auth","migration_requirement":null,"root":{"state":"active","paths":["security/auth.ts"],"exports":["AuthService"],"tests":["tests/security/auth-store-boundaries.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/security","paths":["packages/security/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Secrets","migration_requirement":null,"root":{"state":"active","paths":["security/secrets-broker.ts"],"exports":["SecretsBroker"],"tests":["tests/security/secrets-broker-boundaries.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/security","paths":["packages/security/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"VFS","migration_requirement":null,"root":{"state":"active","paths":["vfs/virtual-filesystem.ts"],"exports":["VirtualFilesystem"],"tests":["tests/vfs/authority-boundaries.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/tools","paths":["packages/tools/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Sandbox","migration_requirement":null,"root":{"state":"active","paths":["sandbox/process-sandbox.ts"],"exports":["execSandboxed"],"tests":["tests/sandbox/sandbox-boundaries.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/tools","paths":["packages/tools/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Session","migration_requirement":null,"root":{"state":"active","paths":["session/durable-session.ts"],"exports":["DurableSession"],"tests":["tests/session/durable-authority.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}},
-    {"id":"Verification","migration_requirement":null,"root":{"state":"active","paths":["verification/verification-engine.ts"],"exports":["VerificationEngine"],"tests":["tests/verification/verification-engine.test.ts"]},"workspace":{"state":"scaffold","owner":"packages/runtime-core","paths":["packages/runtime-core/src/index.ts"],"exports":["workspaceIdentity"],"tests":[]}}
+    {
+      "id": "Harness",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "harness.ts"
+        ],
+        "exports": [
+          "Harness"
+        ],
+        "tests": [
+          "tests/runtime/harness-authority.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Gateway",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "gateway/model-gateway.ts"
+        ],
+        "exports": [
+          "ModelGateway"
+        ],
+        "tests": [
+          "tests/gateway/model-gateway.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Router",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "router/static-router.ts"
+        ],
+        "exports": [
+          "StaticRouter"
+        ],
+        "tests": [
+          "tests/router/static-router.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/router",
+        "paths": [
+          "packages/router/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Runtime",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "runtime/loop.ts"
+        ],
+        "exports": [
+          "LoopEngine"
+        ],
+        "tests": [
+          "tests/runtime/loop-authority.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Strategies",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "runtime/direct.ts",
+          "runtime/react.ts",
+          "runtime/plan-execute.ts"
+        ],
+        "exports": [
+          "runDirect",
+          "runReact",
+          "runPlanExecute"
+        ],
+        "tests": [
+          "tests/runtime/reasoning-strategies.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Tools",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "tools/tool-registry.ts",
+          "tools/tool-dispatcher.ts"
+        ],
+        "exports": [
+          "ToolRegistry",
+          "ToolDispatcher"
+        ],
+        "tests": [
+          "tests/tools/tool-registry.test.ts",
+          "tests/tools/tool-dispatcher.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/tools",
+        "paths": [
+          "packages/tools/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Skills",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "skills/skill-registry.ts",
+          "skills/skill-loader.ts"
+        ],
+        "exports": [
+          "SkillRegistry",
+          "SkillLoader"
+        ],
+        "tests": [
+          "tests/skills/skill-loader.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/tools",
+        "paths": [
+          "packages/tools/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Policy",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "security/policy-engine.ts"
+        ],
+        "exports": [
+          "PolicyEngine"
+        ],
+        "tests": [
+          "tests/policy/policy-boundaries.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/security",
+        "paths": [
+          "packages/security/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "PEP",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "security/pep.ts"
+        ],
+        "exports": [
+          "PolicyEnforcementPoint"
+        ],
+        "tests": [
+          "tests/policy/pep.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/security",
+        "paths": [
+          "packages/security/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Capability",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "security/capability.ts"
+        ],
+        "exports": [
+          "signCapabilityClaims",
+          "verifyCapabilityClaims"
+        ],
+        "tests": [
+          "tests/security/capability-issue.test.ts",
+          "tests/security/capability-replay.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/security",
+        "paths": [
+          "packages/security/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Auth",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "security/auth.ts"
+        ],
+        "exports": [
+          "AuthService"
+        ],
+        "tests": [
+          "tests/security/auth-store-boundaries.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/security",
+        "paths": [
+          "packages/security/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Secrets",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "security/secrets-broker.ts"
+        ],
+        "exports": [
+          "SecretsBroker"
+        ],
+        "tests": [
+          "tests/security/secrets-broker-boundaries.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/security",
+        "paths": [
+          "packages/security/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "VFS",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "vfs/virtual-filesystem.ts"
+        ],
+        "exports": [
+          "VirtualFilesystem"
+        ],
+        "tests": [
+          "tests/vfs/authority-boundaries.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/tools",
+        "paths": [
+          "packages/tools/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Sandbox",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "sandbox/process-sandbox.ts"
+        ],
+        "exports": [
+          "execSandboxed"
+        ],
+        "tests": [
+          "tests/sandbox/sandbox-boundaries.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/tools",
+        "paths": [
+          "packages/tools/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Session",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "session/durable-session.ts"
+        ],
+        "exports": [
+          "DurableSession"
+        ],
+        "tests": [
+          "tests/session/durable-authority.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    },
+    {
+      "id": "Verification",
+      "migration_requirement": null,
+      "root": {
+        "state": "active",
+        "paths": [
+          "verification/verification-engine.ts"
+        ],
+        "exports": [
+          "VerificationEngine"
+        ],
+        "tests": [
+          "tests/verification/verification-engine.test.ts"
+        ]
+      },
+      "workspace": {
+        "state": "scaffold",
+        "owner": "packages/runtime-core",
+        "paths": [
+          "packages/runtime-core/src/index.ts"
+        ],
+        "exports": [
+          "workspaceIdentity"
+        ],
+        "tests": []
+      }
+    }
   ],
   "phase1_prerequisites": [
     "AH-CAPMAP-020",
@@ -51,7 +478,9 @@
     {
       "id": "AH-CONTEXT-COMPILER-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-COMPACTION-001"],
+      "dependencies": [
+        "AH-RUNTIME-COMPACTION-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-context-compiler-001.test.ts",
@@ -60,15 +489,23 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-CONTEXT-COMPILER-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
-      "source_files": ["packages/runtime-core/src/context-compiler.ts"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/runtime-core/src/context-compiler.ts"
+      ],
       "test_files": [
         "tests/phase-2/unit/ah-context-compiler-001.test.ts",
         "tests/phase-2/integration/ah-context-compiler-001-vfs.test.ts",
         "tests/phase-2/security/ah-context-compiler-001-security.test.ts"
       ],
-      "owned_sources": ["packages/runtime-core/src/context-compiler.ts"],
-      "integration_sources": ["vfs/virtual-filesystem.ts"],
+      "owned_sources": [
+        "packages/runtime-core/src/context-compiler.ts"
+      ],
+      "integration_sources": [
+        "vfs/virtual-filesystem.ts"
+      ],
       "runtime_assets": [
         "packages/runtime-core/src/index.ts",
         "packages/runtime-core/package.json",
@@ -78,145 +515,229 @@
         "tests/phase-2/unit/ah-context-compiler-001.test.ts",
         "tests/phase-2/integration/ah-context-compiler-001-vfs.test.ts"
       ],
-      "security_tests": ["tests/phase-2/security/ah-context-compiler-001-security.test.ts"],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "security_tests": [
+        "tests/phase-2/security/ah-context-compiler-001-security.test.ts"
+      ],
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-DOCX-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-docx-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-docx-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-DOCX-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-ENC-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-enc-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-enc-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-ENC-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-IMG-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-img-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-img-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-IMG-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-MD-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-md-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-md-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-MD-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-PDF-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-pdf-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-pdf-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PDF-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-PPTX-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-pptx-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-pptx-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-PPTX-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-UNSUPPORTED-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
       "test_suites": [
         "tests/phase-2/unit/ah-doc-ingest-unsupported-001.test.ts"
       ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-UNSUPPORTED-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-WEB-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001", "AH-TOOL-WEB-FETCH-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001",
+        "AH-TOOL-WEB-FETCH-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-web-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-web-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-WEB-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-INGEST-XLSX-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-ingest-xlsx-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-ingest-xlsx-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-INGEST-XLSX-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-PARSE-HEAD-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-MD-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-parse-head-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-parse-head-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-HEAD-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-PARSE-IMGREF-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-PDF-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-PDF-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-parse-imgref-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-parse-imgref-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-IMGREF-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-PARSE-PROVENANCE-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-MD-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-parse-provenance-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-parse-provenance-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-PROVENANCE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-DOC-PARSE-TABLE-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-XLSX-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-XLSX-001"
+      ],
       "owner": "packages/documents",
-      "test_suites": ["tests/phase-2/unit/ah-doc-parse-table-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-doc-parse-table-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-DOC-PARSE-TABLE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-HOOK-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-LOOP-001", "AH-CONTEXT-COMPILER-001"],
+      "dependencies": [
+        "AH-RUNTIME-LOOP-001",
+        "AH-CONTEXT-COMPILER-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-hook-001.test.ts",
@@ -228,7 +749,9 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-HOOK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
       "source_files": [
         "packages/runtime-core/src/hook-system.ts",
         "packages/runtime-core/src/sqlite-hook-journal.ts"
@@ -271,82 +794,129 @@
         "tests/phase-2/security/ah-hook-001-external-execution.test.ts",
         "tests/phase-2/security/ah-hook-001-sqlite-journal.test.ts"
       ],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-MCP-STDIO-001",
       "priority": "P0",
-      "dependencies": ["AH-HOOK-001"],
+      "dependencies": [
+        "AH-HOOK-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-mcp-stdio-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mcp-stdio-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MCP-STDIO-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-ARTIFACT-001",
       "priority": "P0",
-      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "dependencies": [
+        "AH-MM-IMAGE-GEN-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-artifact-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-artifact-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-ARTIFACT-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-DOC-VISION-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-PDF-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-PDF-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-doc-vision-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-doc-vision-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-DOC-VISION-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-IMAGE-EDIT-001",
       "priority": "P0",
-      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "dependencies": [
+        "AH-MM-IMAGE-GEN-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-image-edit-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-image-edit-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-EDIT-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-IMAGE-GEN-001",
       "priority": "P0",
-      "dependencies": ["AH-POLICY-ENGINE-001"],
+      "dependencies": [
+        "AH-POLICY-ENGINE-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-image-gen-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-image-gen-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-GEN-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-IMAGE-IN-001",
       "priority": "P0",
-      "dependencies": ["AH-TOOL-READ-001"],
+      "dependencies": [
+        "AH-TOOL-READ-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-image-in-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-image-in-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-IMAGE-IN-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-MM-VISION-VERIFY-001",
       "priority": "P0",
-      "dependencies": ["AH-MM-IMAGE-GEN-001"],
+      "dependencies": [
+        "AH-MM-IMAGE-GEN-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-mm-vision-verify-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-mm-vision-verify-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-MM-VISION-VERIFY-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-PAUSE-RESUME-001",
       "priority": "P0",
-      "dependencies": ["AH-STATE-EXTERNAL-001", "AH-RUNTIME-SESSION-001"],
+      "dependencies": [
+        "AH-STATE-EXTERNAL-001",
+        "AH-RUNTIME-SESSION-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-pause-resume-001.test.ts",
@@ -354,13 +924,19 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-PAUSE-RESUME-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/personal-assistant/phase-2.yaml"],
-      "source_files": ["packages/runtime-core/src/pause-resume.ts"],
+      "eval_suites": [
+        "evals/personal-assistant/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/runtime-core/src/pause-resume.ts"
+      ],
       "test_files": [
         "tests/phase-2/unit/ah-pause-resume-001.test.ts",
         "tests/phase-2/integration/ah-pause-resume-001-store.test.ts"
       ],
-      "owned_sources": ["packages/runtime-core/src/pause-resume.ts"],
+      "owned_sources": [
+        "packages/runtime-core/src/pause-resume.ts"
+      ],
       "integration_sources": [
         "session/sqlite-session-store.ts",
         "tools/tool-executor.ts"
@@ -373,38 +949,61 @@
         "tests/phase-2/unit/ah-pause-resume-001.test.ts",
         "tests/phase-2/integration/ah-pause-resume-001-store.test.ts"
       ],
-      "security_tests": ["tests/tools/tool-executor-effects.test.ts"],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "security_tests": [
+        "tests/tools/tool-executor-effects.test.ts"
+      ],
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-SANDBOX-OCI-001",
       "priority": "P0",
-      "dependencies": ["AH-SANDBOX-001", "AH-VFS-001"],
+      "dependencies": [
+        "AH-SANDBOX-001",
+        "AH-VFS-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/security/ah-sandbox-oci-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/security/ah-sandbox-oci-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-SANDBOX-OCI-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-CHUNK-001",
       "priority": "P0",
-      "dependencies": ["AH-DOC-INGEST-MD-001"],
+      "dependencies": [
+        "AH-DOC-INGEST-MD-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-chunk-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-chunk-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-CHUNK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-CITE-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-RERANK-001"],
+      "dependencies": [
+        "AH-RAG-RERANK-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-cite-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-cite-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-CITE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-DELETE-001",
@@ -416,95 +1015,151 @@
         "AH-RAG-GRAPH-001"
       ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-delete-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-delete-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-DELETE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-EMBED-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-CHUNK-001"],
+      "dependencies": [
+        "AH-RAG-CHUNK-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-embed-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-embed-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-EMBED-MIG-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-EMBED-001"],
+      "dependencies": [
+        "AH-RAG-EMBED-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-embed-mig-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-embed-mig-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-EMBED-MIG-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-FTS-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-CHUNK-001"],
+      "dependencies": [
+        "AH-RAG-CHUNK-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-fts-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-fts-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-FTS-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-GRAPH-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-CHUNK-001"],
+      "dependencies": [
+        "AH-RAG-CHUNK-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-graph-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-graph-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-GRAPH-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-INJECTION-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-QUERY-001"],
+      "dependencies": [
+        "AH-RAG-QUERY-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/security/ah-rag-injection-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/security/ah-rag-injection-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-INJECTION-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-META-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-CHUNK-001"],
+      "dependencies": [
+        "AH-RAG-CHUNK-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-meta-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-meta-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-META-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-QUERY-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-FTS-001", "AH-RAG-EMBED-001", "AH-RAG-META-001"],
+      "dependencies": [
+        "AH-RAG-FTS-001",
+        "AH-RAG-EMBED-001",
+        "AH-RAG-META-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-query-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-query-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-QUERY-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RAG-RERANK-001",
       "priority": "P0",
-      "dependencies": ["AH-RAG-QUERY-001"],
+      "dependencies": [
+        "AH-RAG-QUERY-001"
+      ],
       "owner": "packages/rag",
-      "test_suites": ["tests/phase-2/unit/ah-rag-rerank-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-rag-rerank-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-RAG-RERANK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-RUNTIME-BUDGET-002",
       "priority": "P0",
-      "dependencies": ["AH-POLICY-ENGINE-001"],
+      "dependencies": [
+        "AH-POLICY-ENGINE-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-budget-002.test.ts",
@@ -513,7 +1168,9 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-BUDGET-002.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
       "source_files": [
         "packages/runtime-core/src/budget-ledger.ts",
         "packages/runtime-core/src/sqlite-budget-journal.ts"
@@ -528,7 +1185,10 @@
         "packages/runtime-core/src/sqlite-budget-journal.ts",
         "runtime/budget-port.ts"
       ],
-      "integration_sources": ["harness.ts", "runtime/loop.ts"],
+      "integration_sources": [
+        "harness.ts",
+        "runtime/loop.ts"
+      ],
       "runtime_assets": [
         "packages/runtime-core/src/index.ts",
         "packages/runtime-core/package.json",
@@ -541,12 +1201,17 @@
       "security_tests": [
         "tests/phase-2/security/ah-runtime-budget-002-sqlite.test.ts"
       ],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-RUNTIME-COMPACTION-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-SESSION-001", "AH-HOOK-001"],
+      "dependencies": [
+        "AH-RUNTIME-SESSION-001",
+        "AH-HOOK-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-compaction-001.test.ts",
@@ -556,8 +1221,12 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-COMPACTION-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
-      "source_files": ["packages/runtime-core/src/compaction.ts"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/runtime-core/src/compaction.ts"
+      ],
       "test_files": [
         "tests/phase-2/unit/ah-runtime-compaction-001.test.ts",
         "tests/phase-2/integration/ah-runtime-compaction-001-vfs.test.ts",
@@ -568,7 +1237,9 @@
         "packages/runtime-core/src/compaction.ts",
         "runtime/compaction-port.ts"
       ],
-      "integration_sources": ["runtime/hook-port.ts"],
+      "integration_sources": [
+        "runtime/hook-port.ts"
+      ],
       "runtime_assets": [
         "packages/runtime-core/src/index.ts",
         "packages/runtime-core/package.json",
@@ -583,12 +1254,16 @@
       "security_tests": [
         "tests/phase-2/security/ah-runtime-compaction-001-security.test.ts"
       ],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-RUNTIME-MODELFALLBACK-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-LOOP-001"],
+      "dependencies": [
+        "AH-RUNTIME-LOOP-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
@@ -598,8 +1273,12 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-MODELFALLBACK-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
-      "source_files": ["packages/runtime-core/src/model-fallback.ts"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/runtime-core/src/model-fallback.ts"
+      ],
       "test_files": [
         "tests/phase-2/unit/ah-runtime-modelfallback-001.test.ts",
         "tests/phase-2/unit/ah-runtime-modelfallback-001-adapter.test.ts",
@@ -610,7 +1289,9 @@
         "packages/runtime-core/src/model-fallback.ts",
         "runtime/model-fallback-port.ts"
       ],
-      "integration_sources": ["gateway/model-gateway.ts"],
+      "integration_sources": [
+        "gateway/model-gateway.ts"
+      ],
       "runtime_assets": [
         "packages/runtime-core/src/index.ts",
         "packages/runtime-core/package.json"
@@ -623,12 +1304,16 @@
       "security_tests": [
         "tests/phase-2/security/ah-runtime-modelfallback-001-security.test.ts"
       ],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-RUNTIME-SESSIONTREE-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-SESSION-001"],
+      "dependencies": [
+        "AH-RUNTIME-SESSION-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-sessiontree-001.test.ts",
@@ -639,7 +1324,9 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-SESSIONTREE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
       "source_files": [
         "packages/runtime-core/src/session-tree.ts"
       ],
@@ -694,7 +1381,9 @@
     {
       "id": "AH-RUNTIME-STEERING-001",
       "priority": "P0",
-      "dependencies": ["AH-RUNTIME-LOOP-001"],
+      "dependencies": [
+        "AH-RUNTIME-LOOP-001"
+      ],
       "owner": "packages/runtime-core",
       "test_suites": [
         "tests/phase-2/unit/ah-runtime-steering-001.test.ts",
@@ -704,8 +1393,12 @@
       ],
       "evidence_path": "artifacts/phase-2/AH-RUNTIME-STEERING-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"],
-      "source_files": ["packages/runtime-core/src/steering.ts"],
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/runtime-core/src/steering.ts"
+      ],
       "test_files": [
         "tests/phase-2/unit/ah-runtime-steering-001.test.ts",
         "tests/phase-2/integration/ah-runtime-steering-001-loop.test.ts",
@@ -733,17 +1426,26 @@
       "security_tests": [
         "tests/phase-2/security/ah-runtime-steering-001-security.test.ts"
       ],
-      "mutation_configs": ["vitest.mutation.config.ts"]
+      "mutation_configs": [
+        "vitest.mutation.config.ts"
+      ]
     },
     {
       "id": "AH-TOOL-BEHAVIOR-VERIFY-001",
       "priority": "P2",
-      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-behavior-verify-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-behavior-verify-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-BEHAVIOR-VERIFY-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-IMAGE-GEN-001",
@@ -754,40 +1456,65 @@
         "AH-MM-IMAGE-GEN-001"
       ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-tool-image-gen-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-image-gen-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-IMAGE-GEN-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-SPEECH-GEN-001",
       "priority": "P0",
-      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-POLICY-ENGINE-001"],
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-tool-speech-gen-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-speech-gen-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-SPEECH-GEN-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-TRANSCRIBE-001",
       "priority": "P0",
-      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-POLICY-ENGINE-001"],
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001"
+      ],
       "owner": "packages/multimodal",
-      "test_suites": ["tests/phase-2/unit/ah-tool-transcribe-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-transcribe-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-TRANSCRIBE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-SPREADSHEET-001",
       "priority": "P0",
-      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-spreadsheet-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-spreadsheet-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-SPREADSHEET-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-PRESENTATION-001",
@@ -798,10 +1525,14 @@
         "AH-TOOL-IMAGE-GEN-001"
       ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-presentation-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-presentation-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-PRESENTATION-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-DOCUMENT-001",
@@ -812,20 +1543,31 @@
         "AH-TOOL-IMAGE-GEN-001"
       ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-document-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-document-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-DOCUMENT-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-OCR-001",
       "priority": "P0",
-      "dependencies": ["AH-CONTRACT-TOOLSPEC-001", "AH-SANDBOX-001"],
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-ocr-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-ocr-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-OCR-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-ESCALATE-001",
@@ -837,20 +1579,30 @@
         "AH-PAUSE-RESUME-001"
       ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-escalate-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-escalate-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-ESCALATE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
+      "eval_suites": [
+        "evals/personal-assistant/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-WEB-FETCH-001",
       "priority": "P1",
-      "dependencies": ["AH-TOOL-WEB-SEARCH-001"],
+      "dependencies": [
+        "AH-TOOL-WEB-SEARCH-001"
+      ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-web-fetch-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-web-fetch-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-WEB-FETCH-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/research/phase-2.yaml"]
+      "eval_suites": [
+        "evals/research/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-TOOL-WEB-SEARCH-001",
@@ -861,10 +1613,14 @@
         "AH-POLICY-ENGINE-001"
       ],
       "owner": "packages/tools",
-      "test_suites": ["tests/phase-2/unit/ah-tool-web-search-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/unit/ah-tool-web-search-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-TOOL-WEB-SEARCH-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/research/phase-2.yaml"]
+      "eval_suites": [
+        "evals/research/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-DOC-001",
@@ -875,10 +1631,14 @@
         "AH-DOC-VERTICAL-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-doc-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-doc-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-DOC-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/documents/phase-2.yaml"]
+      "eval_suites": [
+        "evals/documents/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-MM-001",
@@ -889,10 +1649,14 @@
         "AH-MM-ARTIFACT-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-mm-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-mm-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-MM-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/multimodal/phase-2.yaml"]
+      "eval_suites": [
+        "evals/multimodal/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-NOTIFY-001",
@@ -904,10 +1668,14 @@
         "AH-TOOL-ESCALATE-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-notify-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-notify-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-NOTIFY-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
+      "eval_suites": [
+        "evals/personal-assistant/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-PLANNING-001",
@@ -919,7 +1687,9 @@
         "AH-PA-VERTICAL-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-planning-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-planning-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-PLANNING-001.json",
       "mutation_class": "critical",
       "eval_suites": [
@@ -936,10 +1706,14 @@
         "AH-PAUSE-RESUME-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-reconcile-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-reconcile-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-RECONCILE-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/personal-assistant/phase-2.yaml"]
+      "eval_suites": [
+        "evals/personal-assistant/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-RESEARCH-001",
@@ -950,10 +1724,14 @@
         "AH-RESEARCH-VERTICAL-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-research-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-research-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-RESEARCH-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/research/phase-2.yaml"]
+      "eval_suites": [
+        "evals/research/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-TUI-001",
@@ -965,10 +1743,14 @@
         "AH-RUNTIME-STEERING-001"
       ],
       "owner": "apps/tui",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-tui-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-tui-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-TUI-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UI-WRITING-001",
@@ -979,40 +1761,68 @@
         "AH-WRITING-VERTICAL-001"
       ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ui-writing-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ui-writing-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UI-WRITING-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/writing/phase-2.yaml"]
+      "eval_suites": [
+        "evals/writing/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UX-API-001",
       "priority": "P0",
-      "dependencies": ["AH-EVIDENCE-001"],
+      "dependencies": [
+        "AH-EVIDENCE-001"
+      ],
       "owner": "apps/api",
-      "test_suites": ["tests/phase-2/e2e/ah-ux-api-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ux-api-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UX-API-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UX-CONTRACT-001",
       "priority": "P0",
-      "dependencies": ["AH-UX-API-001"],
+      "dependencies": [
+        "AH-UX-API-001"
+      ],
       "owner": "packages/api",
-      "test_suites": ["tests/phase-2/e2e/ah-ux-contract-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ux-contract-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UX-CONTRACT-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ],
+      "source_files": [
+        "packages/api/src/index.ts"
+      ],
+      "test_files": [
+        "tests/phase-2/e2e/ah-ux-contract-001.test.ts"
+      ]
     },
     {
       "id": "AH-UX-DESKTOP-001",
       "priority": "P0",
-      "dependencies": ["AH-UX-API-001"],
+      "dependencies": [
+        "AH-UX-API-001"
+      ],
       "owner": "apps/desktop",
-      "test_suites": ["tests/phase-2/e2e/ah-ux-desktop-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ux-desktop-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UX-DESKTOP-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UX-STATES-001",
@@ -1029,20 +1839,30 @@
         "AH-UI-TUI-001"
       ],
       "owner": "packages/ui",
-      "test_suites": ["tests/phase-2/e2e/ah-ux-states-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ux-states-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UX-STATES-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     },
     {
       "id": "AH-UX-WEB-001",
       "priority": "P0",
-      "dependencies": ["AH-UX-API-001"],
+      "dependencies": [
+        "AH-UX-API-001"
+      ],
       "owner": "apps/web",
-      "test_suites": ["tests/phase-2/e2e/ah-ux-web-001.test.ts"],
+      "test_suites": [
+        "tests/phase-2/e2e/ah-ux-web-001.test.ts"
+      ],
       "evidence_path": "artifacts/phase-2/AH-UX-WEB-001.json",
       "mutation_class": "critical",
-      "eval_suites": ["evals/coding/phase-2.yaml"]
+      "eval_suites": [
+        "evals/coding/phase-2.yaml"
+      ]
     }
   ]
 }

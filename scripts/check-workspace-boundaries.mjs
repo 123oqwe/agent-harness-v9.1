@@ -87,6 +87,13 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     ["node:buffer", "node:crypto"],
   ),
   workspace(
+    "packages/api",
+    "@agent-harness/api",
+    [],
+    "package",
+    [],
+  ),
+  workspace(
     "apps/api",
     "@agent-harness/app-api",
     [],
