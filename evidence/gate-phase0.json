@@ -7,6 +7,24 @@
       "detail": "All 31 requirements have criteria"
     },
     {
+      "name": "phase_architecture_consistent",
+      "passed": false,
+      "detail": "FAIL: Phase architecture consistency errors:\n  - current-state registry_summary.phases does not match requirements.ndjson",
+      "stdout_hash": "a745956207f4f7bf"
+    },
+    {
+      "name": "requirement_views_current",
+      "passed": false,
+      "detail": "FAIL: stale requirement-derived views: traceability-matrix.json",
+      "stdout_hash": "8cd36175ea51f02a"
+    },
+    {
+      "name": "capability_coverage_bidirectional",
+      "passed": true,
+      "detail": "PASS: 124 capabilities and 223 actionable requirements are mapped bidirectionally",
+      "stdout_hash": "ef57ab50df2a615d"
+    },
+    {
       "name": "requirements_have_tests",
       "passed": true,
       "detail": "All 31 requirements have test files on disk"
@@ -34,7 +52,7 @@
     {
       "name": "factory_exists",
       "passed": true,
-      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/../factory/controller/controller.py"
+      "detail": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/factory/controller/controller.py"
     },
     {
       "name": "all_requirements_verified",
@@ -42,7 +60,7 @@
       "detail": "All 31 requirements verified"
     }
   ],
-  "result": "PASS",
-  "timestamp": "2026-07-18T19:05:07.140913",
+  "result": "FAIL",
+  "timestamp": "2026-08-06T06:58:05.986920",
   "note": "This gate runs REAL commands. Registry status is NOT evidence."
 }

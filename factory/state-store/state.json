@@ -3,8 +3,254 @@
   "current_phase": 1,
   "current_requirement": null,
   "active_worktrees": {},
-  "worker_leases": {},
-  "requirement_status": {},
+  "worker_leases": {
+    "AH-POLICY-ENGINE-001": {
+      "adapter": "factory/worker-adapters/claude",
+      "provider": "claude",
+      "started_at": "2026-07-20T01:30:43.685587",
+      "heartbeat": "2026-07-20T01:30:43.685587",
+      "lease_expiry": "2026-07-20T02:30:43.685599",
+      "status": "failed",
+      "session_id": "claude-AH-POLICY-ENGINE-001-1784482243",
+      "end_time": "2026-07-20T03:40:00"
+    },
+    "AH-GATEWAY-TESTPROVIDER-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T01:53:21.257830",
+      "heartbeat": "2026-07-20T01:53:21.257830",
+      "lease_expiry": "2026-07-20T02:53:21.257874",
+      "status": "failed",
+      "session_id": "codex-AH-GATEWAY-TESTPROVIDER-001-1784483601",
+      "end_time": "2026-07-20T03:40:00",
+      "exit_reason": "controller_killed_by_external_timeout"
+    },
+    "AH-EVIDENCE-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T01:54:06.522802",
+      "heartbeat": "2026-07-20T01:54:06.522802",
+      "lease_expiry": "2026-07-20T02:54:06.522822",
+      "status": "failed",
+      "session_id": "codex-AH-EVIDENCE-001-1784483646",
+      "end_time": "2026-07-20T03:40:00",
+      "exit_reason": "controller_killed_by_external_timeout"
+    },
+    "AH-SANDBOX-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T02:18:16.270520",
+      "heartbeat": "2026-07-20T02:18:16.270520",
+      "lease_expiry": "2026-07-20T03:18:16.270545",
+      "status": "failed",
+      "session_id": "codex-AH-SANDBOX-001-1784485096",
+      "end_time": "2026-07-20T03:40:00",
+      "exit_reason": "cleaned_stale_lock"
+    },
+    "AH-UI-CHAT-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T03:14:14.707864",
+      "heartbeat": "2026-07-20T03:14:14.707864",
+      "lease_expiry": "2026-07-20T04:14:14.707920",
+      "status": "failed",
+      "session_id": "codex-AH-UI-CHAT-001-1784488454",
+      "end_time": "2026-07-20T03:40:00"
+    },
+    "AH-CAPMAP-013": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T03:19:12.085281",
+      "heartbeat": "2026-07-20T03:19:12.085281",
+      "lease_expiry": "2026-07-20T04:19:12.085340",
+      "status": "failed",
+      "session_id": "codex-AH-CAPMAP-013-1784488752",
+      "end_time": "2026-07-20T03:40:00"
+    },
+    "AH-CAPMAP-017": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T03:23:02.255471",
+      "heartbeat": "2026-07-20T03:23:02.255471",
+      "lease_expiry": "2026-07-20T04:23:02.255533",
+      "status": "failed",
+      "session_id": "codex-AH-CAPMAP-017-1784488982",
+      "end_time": "2026-07-20T03:40:00"
+    },
+    "AH-UI-CODING-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T03:24:21.997264",
+      "heartbeat": "2026-07-20T03:24:21.997264",
+      "lease_expiry": "2026-07-20T04:24:21.997312",
+      "status": "failed",
+      "session_id": "codex-AH-UI-CODING-001-1784489061",
+      "end_time": "2026-07-20T03:40:00"
+    },
+    "AH-UI-EVIDENCE-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T03:47:12.050700",
+      "heartbeat": "2026-07-20T03:47:12.050700",
+      "lease_expiry": "2026-07-20T04:47:12.050739",
+      "status": "completed",
+      "session_id": "codex-AH-UI-EVIDENCE-001-1784490432",
+      "end_time": "2026-07-20T03:57:55.459734"
+    },
+    "AH-UI-ONBOARDING-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T04:06:25.571946",
+      "heartbeat": "2026-07-20T04:06:25.571946",
+      "lease_expiry": "2026-07-20T05:06:25.572088",
+      "status": "completed",
+      "session_id": "codex-AH-UI-ONBOARDING-001-1784491585",
+      "end_time": "2026-07-20T04:21:03.700619"
+    },
+    "AH-UI-PRIVACY-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T04:26:42.276178",
+      "heartbeat": "2026-07-20T04:26:42.276178",
+      "lease_expiry": "2026-07-20T05:26:42.276216",
+      "status": "completed",
+      "session_id": "codex-AH-UI-PRIVACY-001-1784492802",
+      "end_time": "2026-07-20T04:34:54.392716"
+    },
+    "AH-UI-SETTINGS-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T04:35:49.726612",
+      "heartbeat": "2026-07-20T04:35:49.726612",
+      "lease_expiry": "2026-07-20T05:35:49.726679",
+      "status": "completed",
+      "session_id": "codex-AH-UI-SETTINGS-001-1784493349",
+      "end_time": "2026-07-20T04:46:10.523503"
+    },
+    "AH-RUNTIME-LOOP-001": {
+      "adapter": "factory/worker-adapters/codex",
+      "provider": "codex",
+      "started_at": "2026-07-20T04:47:09.737624",
+      "heartbeat": "2026-07-20T04:47:09.737624",
+      "lease_expiry": "2026-07-20T05:47:09.737680",
+      "status": "active",
+      "session_id": "codex-AH-RUNTIME-LOOP-001-1784494029"
+    }
+  },
+  "requirement_status": {
+    "AH-POLICY-ENGINE-001": {
+      "status": "verification_failed",
+      "updated_at": "2026-07-20T01:40:45.543460",
+      "verification_id": "VER-AH-POLICY-ENGINE-001-1784482845",
+      "verifier_result": "FAIL",
+      "retry_count": 1,
+      "failure_reason": "git commit failed: no files changed by worker. Worker produced no output."
+    },
+    "AH-GATEWAY-TESTPROVIDER-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T01:53:20.077770",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-EVIDENCE-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T01:54:06.221949",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-SANDBOX-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T02:18:15.905711",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-UI-CHAT-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T03:14:14.260157",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-CAPMAP-013": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T03:19:11.699778",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-CAPMAP-017": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T03:23:01.146749",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-UI-APPROVAL-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T03:24:10.475782",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-UI-CODING-001": {
+      "status": "verification_failed",
+      "updated_at": "2026-07-20T03:35:04.035692",
+      "verification_id": "VER-AH-UI-CODING-001-1784489680",
+      "verifier_result": "FAIL",
+      "retry_count": 1,
+      "failure_reason": "Failed checks: ['test_rerun', 'acceptance_criteria_coverage']. test_rerun: No package.json in checkout; acceptance_criteria_coverage: 9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Diff viewer shows all file changes (no hidden modifications)']"
+    },
+    "AH-UI-EVIDENCE-001": {
+      "status": "verified",
+      "updated_at": "2026-07-20T03:58:39.280246",
+      "verification_id": "VER-AH-UI-EVIDENCE-001-1784491086",
+      "verifier_result": "PASS",
+      "retry_count": 0,
+      "failure_reason": ""
+    },
+    "AH-UI-ONBOARDING-001": {
+      "status": "verification_failed",
+      "updated_at": "2026-07-20T04:22:04.119103",
+      "verification_id": "VER-AH-UI-ONBOARDING-001-1784492469",
+      "verifier_result": "FAIL",
+      "retry_count": 1,
+      "failure_reason": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 7/10 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: step_wizard, vault_setup, provider_setup, connector_setup, privacy_setup', 'Privacy setup allows opt-out of telemetry', 'Screen has accessibility assertions']"
+    },
+    "AH-UI-PRIVACY-001": {
+      "status": "verification_failed",
+      "updated_at": "2026-07-20T04:35:47.387481",
+      "verification_id": "VER-AH-UI-PRIVACY-001-1784493298",
+      "verifier_result": "FAIL",
+      "retry_count": 1,
+      "failure_reason": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 6/11 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: data_classifier, retention_list, delete_button, export_button, provider_polic', 'Data deletion is irreversible (requires typed confirmation)', 'Retention list shows expiry for each data type']"
+    },
+    "AH-UI-SETTINGS-001": {
+      "status": "verification_failed",
+      "updated_at": "2026-07-20T04:47:07.334785",
+      "verification_id": "VER-AH-UI-SETTINGS-001-1784493974",
+      "verifier_result": "FAIL",
+      "retry_count": 1,
+      "failure_reason": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Tool permission changes require re-confirmation']"
+    },
+    "AH-RUNTIME-LOOP-001": {
+      "status": "retry_required",
+      "updated_at": "2026-07-20T04:47:09.472889",
+      "verification_id": null,
+      "verifier_result": null,
+      "retry_count": 0,
+      "failure_reason": ""
+    }
+  },
   "phase_status": {
     "0R": "VERIFIED",
     "0": "VERIFIED",
@@ -77,14 +323,651 @@
       "timestamp": "2026-07-16T16:12:18.007605",
       "level": "INFO",
       "message": "Selected requirement: AH-EVIDENCE-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.007195",
+      "level": "INFO",
+      "message": "=== Factory Loop Started (max=3, sleep=10s) ==="
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.008358",
+      "level": "INFO",
+      "message": "=== Factory Controller Cycle Start ==="
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.017991",
+      "level": "INFO",
+      "message": "Selected requirement: AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.018330",
+      "level": "INFO",
+      "message": "Selected requirement: AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.019687",
+      "level": "INFO",
+      "message": "Lock acquired for AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.024671",
+      "level": "INFO",
+      "message": "Registry updated: AH-UI-PRIVACY-001 -> in_progress"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.031618",
+      "level": "INFO",
+      "message": "Context packet built (hash: b0a5659233b20994)"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.040932",
+      "level": "INFO",
+      "message": "Assigned backend specialist using factory/worker-adapters/codex for AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.273017",
+      "level": "INFO",
+      "message": "Worktree created: /Users/guanjieqiao/agent-runtime-v7/worktrees/AH-UI-PRIVACY-001 (branch=req/AH-UI-PRIVACY-001)"
+    },
+    {
+      "timestamp": "2026-07-20T04:26:42.277209",
+      "level": "INFO",
+      "message": "Worker dispatched for AH-UI-PRIVACY-001 using codex (session=codex-AH-UI-PRIVACY-001-1784492802)"
+    },
+    {
+      "timestamp": "2026-07-20T04:34:54.494992",
+      "level": "INFO",
+      "message": "Worker completed for AH-UI-PRIVACY-001: exit_code=0, stdout=121348 chars"
+    },
+    {
+      "timestamp": "2026-07-20T04:34:55.011410",
+      "level": "INFO",
+      "message": "Committed AH-UI-PRIVACY-001 in worktree"
+    },
+    {
+      "timestamp": "2026-07-20T04:34:58.312199",
+      "level": "INFO",
+      "message": "Evidence collected for AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:47.386199",
+      "level": "INFO",
+      "message": "Verifier result for AH-UI-PRIVACY-001: FAIL (11/12 checks passed)"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:47.389605",
+      "level": "INFO",
+      "message": "Registry updated: AH-UI-PRIVACY-001 -> verification_failed"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:47.389662",
+      "level": "WARN",
+      "message": "Requirement AH-UI-PRIVACY-001 VERIFICATION FAILED"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.472977",
+      "level": "INFO",
+      "message": "Worktree cleanup for AH-UI-PRIVACY-001 (exception/non-merged path)"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.476447",
+      "level": "INFO",
+      "message": "Lock released for AH-UI-PRIVACY-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.480090",
+      "level": "INFO",
+      "message": "Iteration 1: completed AH-UI-PRIVACY-001 -> FAIL"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.483364",
+      "level": "INFO",
+      "message": "=== Factory Controller Cycle Start ==="
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.497704",
+      "level": "INFO",
+      "message": "Selected requirement: AH-UI-SETTINGS-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.498233",
+      "level": "INFO",
+      "message": "Selected requirement: AH-UI-SETTINGS-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.499748",
+      "level": "INFO",
+      "message": "Lock acquired for AH-UI-SETTINGS-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.509388",
+      "level": "INFO",
+      "message": "Registry updated: AH-UI-SETTINGS-001 -> in_progress"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.516472",
+      "level": "INFO",
+      "message": "Context packet built (hash: 3dbf60c10b60db82)"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.524576",
+      "level": "INFO",
+      "message": "Assigned backend specialist using factory/worker-adapters/codex for AH-UI-SETTINGS-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.722882",
+      "level": "INFO",
+      "message": "Worktree created: /Users/guanjieqiao/agent-runtime-v7/worktrees/AH-UI-SETTINGS-001 (branch=req/AH-UI-SETTINGS-001)"
+    },
+    {
+      "timestamp": "2026-07-20T04:35:49.728375",
+      "level": "INFO",
+      "message": "Worker dispatched for AH-UI-SETTINGS-001 using codex (session=codex-AH-UI-SETTINGS-001-1784493349)"
+    },
+    {
+      "timestamp": "2026-07-20T04:46:10.545010",
+      "level": "INFO",
+      "message": "Worker completed for AH-UI-SETTINGS-001: exit_code=0, stdout=163946 chars"
+    },
+    {
+      "timestamp": "2026-07-20T04:46:10.846711",
+      "level": "INFO",
+      "message": "Committed AH-UI-SETTINGS-001 in worktree"
+    },
+    {
+      "timestamp": "2026-07-20T04:46:14.687951",
+      "level": "INFO",
+      "message": "Evidence collected for AH-UI-SETTINGS-001"
+    },
+    {
+      "timestamp": "2026-07-20T04:47:07.333693",
+      "level": "INFO",
+      "message": "Verifier result for AH-UI-SETTINGS-001: FAIL (11/12 checks passed)"
+    },
+    {
+      "timestamp": "2026-07-20T04:47:07.335926",
+      "level": "INFO",
+      "message": "Registry updated: AH-UI-SETTINGS-001 -> verification_failed"
+    },
+    {
+      "timestamp": "2026-07-20T04:47:07.335965",
+      "level": "WARN",
+      "message": "Requirement AH-UI-SETTINGS-001 VERIFICATION FAILED"
+    },
+    {
+      "timestamp": "2026-07-20T04:47:09.437574",
+      "level": "INFO",
+      "message": "Worktree cleanup for AH-UI-SETTINGS-001 (exception/non-merged path)"
+    },
+    {
+      "timestamp": "2026-07-20T04:47:09.442588",
+      "level": "INFO",
+      "message": "Lock released for AH-UI-SETTINGS-001"
     }
   ],
-  "evidence_refs": {},
-  "verifier_results": {},
+  "evidence_refs": {
+    "AH-UI-CODING-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-UI-CODING-001.json",
+    "AH-UI-EVIDENCE-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-UI-EVIDENCE-001.json",
+    "AH-UI-ONBOARDING-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-UI-ONBOARDING-001.json",
+    "AH-UI-PRIVACY-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-UI-PRIVACY-001.json",
+    "AH-UI-SETTINGS-001": "/Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/evidence/AH-UI-SETTINGS-001.json"
+  },
+  "verifier_results": {
+    "AH-POLICY-ENGINE-001": {
+      "verification_id": "VER-AH-POLICY-ENGINE-001-1784482845",
+      "requirement_id": "AH-POLICY-ENGINE-001",
+      "verifier": "controller-precheck",
+      "result": "FAIL",
+      "error": "git commit failed: no files changed by worker. Worker produced no output.",
+      "checks": [
+        {
+          "name": "worker_produced_output",
+          "passed": false,
+          "detail": "No staged changes after worker execution"
+        }
+      ],
+      "started_at": "2026-07-20T01:40:45.541283",
+      "completed_at": "2026-07-20T01:40:45.541298"
+    },
+    "AH-UI-CODING-001": {
+      "verification_id": "VER-AH-UI-CODING-001-1784489680",
+      "requirement_id": "AH-UI-CODING-001",
+      "verifier": "standalone-subprocess",
+      "verifier_pid": 34909,
+      "verifier_ppid": 98656,
+      "process_isolated": true,
+      "read_only": true,
+      "cannot_modify": [
+        "code",
+        "tests",
+        "requirements",
+        "acceptance_criteria",
+        "evidence",
+        "merge",
+        "production_approval"
+      ],
+      "commit_sha": "406abb06411c27cd9b0bd75f11b065d31db542b3",
+      "checks": [
+        {
+          "name": "requirement_exists",
+          "passed": true,
+          "detail": "Found in registry"
+        },
+        {
+          "name": "acceptance_criteria_defined",
+          "passed": true,
+          "detail": "10 criteria"
+        },
+        {
+          "name": "evidence_valid",
+          "passed": true,
+          "detail": "Evidence file valid JSON"
+        },
+        {
+          "name": "exit_code_zero",
+          "passed": true,
+          "detail": "exit_codes=[0]"
+        },
+        {
+          "name": "evidence_hashed",
+          "passed": true,
+          "detail": "stdout_hash=b14005ed19c57494"
+        },
+        {
+          "name": "tests_pass",
+          "passed": true,
+          "detail": "93 passed, 0 failed"
+        },
+        {
+          "name": "evidence_not_refused",
+          "passed": true,
+          "detail": "OK"
+        },
+        {
+          "name": "process_isolation",
+          "passed": true,
+          "detail": "Running in subprocess PID 34909 (parent 98656)"
+        },
+        {
+          "name": "test_rerun",
+          "passed": false,
+          "detail": "No package.json in checkout"
+        },
+        {
+          "name": "declared_tests_ran",
+          "passed": true,
+          "detail": "SKIPPED: stdout does not contain test file names (summary-only output)"
+        },
+        {
+          "name": "acceptance_criteria_coverage",
+          "passed": false,
+          "detail": "9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Diff viewer shows all file changes (no hidden modifications)']"
+        }
+      ],
+      "result": "FAIL",
+      "started_at": "2026-07-20T03:34:40.681624",
+      "mode": "RERUN",
+      "completed_at": "2026-07-20T03:35:03.995758",
+      "error": "Failed checks: ['test_rerun', 'acceptance_criteria_coverage']. test_rerun: No package.json in checkout; acceptance_criteria_coverage: 9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Diff viewer shows all file changes (no hidden modifications)']",
+      "verifier_subprocess_pid": 34909,
+      "verifier_model_family": "standalone"
+    },
+    "AH-UI-EVIDENCE-001": {
+      "verification_id": "VER-AH-UI-EVIDENCE-001-1784491086",
+      "requirement_id": "AH-UI-EVIDENCE-001",
+      "verifier": "standalone-subprocess",
+      "verifier_pid": 18605,
+      "verifier_ppid": 78533,
+      "process_isolated": true,
+      "read_only": true,
+      "cannot_modify": [
+        "code",
+        "tests",
+        "requirements",
+        "acceptance_criteria",
+        "evidence",
+        "merge",
+        "production_approval"
+      ],
+      "commit_sha": "85967c542da3601054dbbab31653fd4a324a9b93",
+      "checks": [
+        {
+          "name": "requirement_exists",
+          "passed": true,
+          "detail": "Found in registry"
+        },
+        {
+          "name": "acceptance_criteria_defined",
+          "passed": true,
+          "detail": "10 criteria"
+        },
+        {
+          "name": "evidence_valid",
+          "passed": true,
+          "detail": "Evidence file valid JSON"
+        },
+        {
+          "name": "exit_code_zero",
+          "passed": true,
+          "detail": "exit_codes=[0]"
+        },
+        {
+          "name": "evidence_hashed",
+          "passed": true,
+          "detail": "stdout_hash=b89dae0249f0cf61"
+        },
+        {
+          "name": "tests_pass",
+          "passed": true,
+          "detail": "99 passed, 0 failed"
+        },
+        {
+          "name": "evidence_not_refused",
+          "passed": true,
+          "detail": "OK"
+        },
+        {
+          "name": "process_isolation",
+          "passed": true,
+          "detail": "Running in subprocess PID 18605 (parent 78533)"
+        },
+        {
+          "name": "test_rerun",
+          "passed": true,
+          "detail": "exit_code=0, rerun={'passed': 115, 'failed': 0}, evidence={'passed': 99, 'failed': 0}, match=False"
+        },
+        {
+          "name": "test_not_tampered",
+          "passed": true,
+          "detail": "rerun_hash=d8ea63b97eec92bf, evidence_hash=b89dae0249f0cf61"
+        },
+        {
+          "name": "declared_tests_ran",
+          "passed": true,
+          "detail": "1/1 declared tests found in output"
+        },
+        {
+          "name": "acceptance_criteria_coverage",
+          "passed": true,
+          "detail": "10/10 criteria covered by test output"
+        }
+      ],
+      "result": "PASS",
+      "started_at": "2026-07-20T03:58:06.119215",
+      "mode": "RERUN",
+      "completed_at": "2026-07-20T03:58:39.232841",
+      "verifier_subprocess_pid": 18605,
+      "verifier_model_family": "standalone"
+    },
+    "AH-UI-ONBOARDING-001": {
+      "verification_id": "VER-AH-UI-ONBOARDING-001-1784492469",
+      "requirement_id": "AH-UI-ONBOARDING-001",
+      "verifier": "standalone-subprocess",
+      "verifier_pid": 96979,
+      "verifier_ppid": 47573,
+      "process_isolated": true,
+      "read_only": true,
+      "cannot_modify": [
+        "code",
+        "tests",
+        "requirements",
+        "acceptance_criteria",
+        "evidence",
+        "merge",
+        "production_approval"
+      ],
+      "commit_sha": "c5d179741fd5c46963464439dc38d3e6d88aacde",
+      "checks": [
+        {
+          "name": "requirement_exists",
+          "passed": true,
+          "detail": "Found in registry"
+        },
+        {
+          "name": "acceptance_criteria_defined",
+          "passed": true,
+          "detail": "10 criteria"
+        },
+        {
+          "name": "evidence_valid",
+          "passed": true,
+          "detail": "Evidence file valid JSON"
+        },
+        {
+          "name": "exit_code_zero",
+          "passed": true,
+          "detail": "exit_codes=[0]"
+        },
+        {
+          "name": "evidence_hashed",
+          "passed": true,
+          "detail": "stdout_hash=29a40577f497993d"
+        },
+        {
+          "name": "tests_pass",
+          "passed": true,
+          "detail": "99 passed, 0 failed"
+        },
+        {
+          "name": "evidence_not_refused",
+          "passed": true,
+          "detail": "OK"
+        },
+        {
+          "name": "process_isolation",
+          "passed": true,
+          "detail": "Running in subprocess PID 96979 (parent 47573)"
+        },
+        {
+          "name": "test_rerun",
+          "passed": true,
+          "detail": "exit_code=0, rerun={'passed': 157, 'failed': 0}, evidence={'passed': 99, 'failed': 0}, match=False"
+        },
+        {
+          "name": "test_not_tampered",
+          "passed": true,
+          "detail": "rerun_hash=afd7722b33db744d, evidence_hash=29a40577f497993d"
+        },
+        {
+          "name": "declared_tests_ran",
+          "passed": true,
+          "detail": "1/1 declared tests found in output"
+        },
+        {
+          "name": "acceptance_criteria_coverage",
+          "passed": false,
+          "detail": "7/10 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: step_wizard, vault_setup, provider_setup, connector_setup, privacy_setup', 'Privacy setup allows opt-out of telemetry', 'Screen has accessibility assertions']"
+        }
+      ],
+      "result": "FAIL",
+      "started_at": "2026-07-20T04:21:09.128693",
+      "mode": "RERUN",
+      "completed_at": "2026-07-20T04:22:04.036236",
+      "error": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 7/10 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: step_wizard, vault_setup, provider_setup, connector_setup, privacy_setup', 'Privacy setup allows opt-out of telemetry', 'Screen has accessibility assertions']",
+      "verifier_subprocess_pid": 96979,
+      "verifier_model_family": "standalone"
+    },
+    "AH-UI-PRIVACY-001": {
+      "verification_id": "VER-AH-UI-PRIVACY-001-1784493298",
+      "requirement_id": "AH-UI-PRIVACY-001",
+      "verifier": "standalone-subprocess",
+      "verifier_pid": 40492,
+      "verifier_ppid": 14209,
+      "process_isolated": true,
+      "read_only": true,
+      "cannot_modify": [
+        "code",
+        "tests",
+        "requirements",
+        "acceptance_criteria",
+        "evidence",
+        "merge",
+        "production_approval"
+      ],
+      "commit_sha": "7297fe0ab573f2bf6f613d03cd528e4242b5e94d",
+      "checks": [
+        {
+          "name": "requirement_exists",
+          "passed": true,
+          "detail": "Found in registry"
+        },
+        {
+          "name": "acceptance_criteria_defined",
+          "passed": true,
+          "detail": "11 criteria"
+        },
+        {
+          "name": "evidence_valid",
+          "passed": true,
+          "detail": "Evidence file valid JSON"
+        },
+        {
+          "name": "exit_code_zero",
+          "passed": true,
+          "detail": "exit_codes=[0]"
+        },
+        {
+          "name": "evidence_hashed",
+          "passed": true,
+          "detail": "stdout_hash=c48612e21dd70e42"
+        },
+        {
+          "name": "tests_pass",
+          "passed": true,
+          "detail": "99 passed, 0 failed"
+        },
+        {
+          "name": "evidence_not_refused",
+          "passed": true,
+          "detail": "OK"
+        },
+        {
+          "name": "process_isolation",
+          "passed": true,
+          "detail": "Running in subprocess PID 40492 (parent 14209)"
+        },
+        {
+          "name": "test_rerun",
+          "passed": true,
+          "detail": "exit_code=0, rerun={'passed': 121, 'failed': 0}, evidence={'passed': 99, 'failed': 0}, match=False"
+        },
+        {
+          "name": "test_not_tampered",
+          "passed": true,
+          "detail": "rerun_hash=de430ffe2ef1117b, evidence_hash=c48612e21dd70e42"
+        },
+        {
+          "name": "declared_tests_ran",
+          "passed": true,
+          "detail": "1/1 declared tests found in output"
+        },
+        {
+          "name": "acceptance_criteria_coverage",
+          "passed": false,
+          "detail": "6/11 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: data_classifier, retention_list, delete_button, export_button, provider_polic', 'Data deletion is irreversible (requires typed confirmation)', 'Retention list shows expiry for each data type']"
+        }
+      ],
+      "result": "FAIL",
+      "started_at": "2026-07-20T04:34:58.423437",
+      "mode": "RERUN",
+      "completed_at": "2026-07-20T04:35:47.332702",
+      "error": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 6/11 criteria covered by test output (LLM unavailable for semantic confirmation), uncovered: ['Screen has components: data_classifier, retention_list, delete_button, export_button, provider_polic', 'Data deletion is irreversible (requires typed confirmation)', 'Retention list shows expiry for each data type']",
+      "verifier_subprocess_pid": 40492,
+      "verifier_model_family": "standalone"
+    },
+    "AH-UI-SETTINGS-001": {
+      "verification_id": "VER-AH-UI-SETTINGS-001-1784493974",
+      "requirement_id": "AH-UI-SETTINGS-001",
+      "verifier": "standalone-subprocess",
+      "verifier_pid": 76524,
+      "verifier_ppid": 14209,
+      "process_isolated": true,
+      "read_only": true,
+      "cannot_modify": [
+        "code",
+        "tests",
+        "requirements",
+        "acceptance_criteria",
+        "evidence",
+        "merge",
+        "production_approval"
+      ],
+      "commit_sha": "b18332349d3de88eedf64e474cdab98368b8d798",
+      "checks": [
+        {
+          "name": "requirement_exists",
+          "passed": true,
+          "detail": "Found in registry"
+        },
+        {
+          "name": "acceptance_criteria_defined",
+          "passed": true,
+          "detail": "10 criteria"
+        },
+        {
+          "name": "evidence_valid",
+          "passed": true,
+          "detail": "Evidence file valid JSON"
+        },
+        {
+          "name": "exit_code_zero",
+          "passed": true,
+          "detail": "exit_codes=[0]"
+        },
+        {
+          "name": "evidence_hashed",
+          "passed": true,
+          "detail": "stdout_hash=bec8d56a204e9f50"
+        },
+        {
+          "name": "tests_pass",
+          "passed": true,
+          "detail": "119 passed, 0 failed"
+        },
+        {
+          "name": "evidence_not_refused",
+          "passed": true,
+          "detail": "OK"
+        },
+        {
+          "name": "process_isolation",
+          "passed": true,
+          "detail": "Running in subprocess PID 76524 (parent 14209)"
+        },
+        {
+          "name": "test_rerun",
+          "passed": true,
+          "detail": "exit_code=0, rerun={'passed': 133, 'failed': 0}, evidence={'passed': 119, 'failed': 0}, match=False"
+        },
+        {
+          "name": "test_not_tampered",
+          "passed": true,
+          "detail": "rerun_hash=deb334945296f51a, evidence_hash=bec8d56a204e9f50"
+        },
+        {
+          "name": "declared_tests_ran",
+          "passed": true,
+          "detail": "1/1 declared tests found in output"
+        },
+        {
+          "name": "acceptance_criteria_coverage",
+          "passed": false,
+          "detail": "9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Tool permission changes require re-confirmation']"
+        }
+      ],
+      "result": "FAIL",
+      "started_at": "2026-07-20T04:46:14.801318",
+      "mode": "RERUN",
+      "completed_at": "2026-07-20T04:47:07.292095",
+      "error": "Failed checks: ['acceptance_criteria_coverage']. acceptance_criteria_coverage: 9/10 heuristically covered, LLM confirmed 0 more, truly uncovered: ['Tool permission changes require re-confirmation']",
+      "verifier_subprocess_pid": 76524,
+      "verifier_model_family": "standalone"
+    }
+  },
   "merge_queue": [],
   "blockers": [],
   "created_at": "2026-07-16T04:30:00.841000",
-  "updated_at": "2026-07-16T16:12:18.007956",
+  "updated_at": "2026-07-20T04:47:09.737740",
   "restart_count": 1,
   "worker_registry": {
     "codex": {
@@ -108,6 +991,111 @@
       ],
       "registered_at": "2026-07-16T05:29:13.303755",
       "status": "registered"
+    }
+  },
+  "budget_ledger": {
+    "AH-POLICY-ENGINE-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 100000
+      },
+      "remaining": 0
+    },
+    "AH-GATEWAY-TESTPROVIDER-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-EVIDENCE-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-SANDBOX-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-UI-CHAT-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-CAPMAP-013": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-CAPMAP-017": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
+    },
+    "AH-UI-CODING-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 500000
+      },
+      "remaining": 0
+    },
+    "AH-UI-EVIDENCE-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 500000
+      },
+      "remaining": 0
+    },
+    "AH-UI-ONBOARDING-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 500000
+      },
+      "remaining": 0
+    },
+    "AH-UI-PRIVACY-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 500000
+      },
+      "remaining": 0
+    },
+    "AH-UI-SETTINGS-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {
+        "model": 500000
+      },
+      "remaining": 0
+    },
+    "AH-RUNTIME-LOOP-001": {
+      "reserved": {
+        "model": 500000
+      },
+      "consumed": {},
+      "remaining": 0
     }
   }
 }

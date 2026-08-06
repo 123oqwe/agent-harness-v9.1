@@ -11,8 +11,8 @@ Follow these steps IN ORDER. Do not skip.
 4. **Read current phase manifest**: `spec/phases/phase-N.yaml` where N = current phase from step 1. This lists in-scope requirements and enabled domains.
 5. **Pick ONE requirement**: from `spec/requirements/requirements.ndjson` with `implementation_maturity: not_started` AND all dependencies `verified`. The phase manifest's `requirements` list defines scope.
 6. **Implement**: follow `spec/AI_EXECUTION_PROTOCOL.md` work loop. Write tests first. Run `cd harness && npm test`. Generate evidence from actual command output.
-7. **Verify**: use a different model family as independent verifier. Update requirement `implementation_maturity` to `verified` in registry.
-8. **Repeat** until all phase requirements are verified, then run the phase gate (`infra/ci-gate-phaseN.sh`).
+7. **Verify the requirement locally**: rerun its tests/evals in a clean worktree, validate Evidence hashes, and only then update `implementation_maturity` to `verified`.
+8. **Close the phase in order**: repeat until all Phase requirements are verified, run `python3 factory/phase-gates/gate_runner.py phaseN`, then run the read-only independent GLM-5.2 xhigh Phase acceptance defined in the manifest. The external model cannot edit source, tests, requirements, or evidence.
 
 If you are stuck, follow the Blocked Protocol in `spec/AI_EXECUTION_PROTOCOL.md`. Do not guess.
 
@@ -29,6 +29,10 @@ CONTROL=control/current-state.json
 FACTORY=factory/
 HARNESS=harness/
 EVIDENCE=evidence/
+ADR=spec/adr/
+ARCHITECTURE=spec/architecture/
+DEPLOYMENT=spec/deployment/
+SANDBOX_TOOLCHAIN=spec/deployment/sandbox-toolchain.yaml
 ```
 
 ## How to Select Current Task
@@ -105,7 +109,8 @@ Everything else in `spec/` (product/, api/, ui/, adr/, deployment/, operations/,
 ## Evidence Requirements
 
 - Generate Evidence Package from actual command output
-- Independent verifier (different model family) must check
+- Requirement verification reruns deterministic tests/evals and validates hashes in a clean worktree
+- Independent GLM-5.2 xhigh semantic/adversarial review runs once after the complete local Phase gate passes, not during ordinary requirement implementation
 - Self-reported PASS without evidence is forbidden
 - Evidence stored in `evidence/` directory
 
@@ -126,16 +131,21 @@ When implementing a specific type of work, read these specs first (in addition t
 | Scenario | Read these |
 |----------|-----------|
 | Implementing a tool | architecture/tool-skill-fabric.md, architecture/action-control.md, contracts/tool-spec.schema.json, contracts/effect-risk.schema.json, contracts/capability-token.schema.json |
+| Implementing Tool Registry or tool_search | architecture/tool-skill-fabric.md (One registry and two distinct searches), contracts/tool-spec.schema.json, architecture/model-api-gateway.md (tool masking/cache), requirements/requirements.ndjson (AH-TOOL-REGISTRY-001) |
+| Implementing Skill Registry or skill_search | architecture/tool-skill-fabric.md (SkillSpec), contracts/skill-spec.schema.json, requirements/requirements.ndjson (AH-CAPMAP-017) |
+| Implementing a generation/media/doc tool (ADR-014) | architecture/tool-skill-fabric.md (Transport Implementation Patterns, Phase 2/3/6 tool tables), adr/ADR-014-tool-expansion-for-vertical-domains.md, deployment/sandbox-toolchain.yaml (cli_wrapper deps), contracts/tool-spec.schema.json (transport, tool_group, cli_toolchain_ref fields) |
 | Implementing Loop Engine | architecture/runtime-core.md, contracts/run-plan.schema.json, state-machines/run.machine.json, state-machines/step.machine.json |
 | Implementing Sandbox | architecture/runtime-core.md, architecture/trust-boundaries.md, threat-model/threats.yaml (SSRF, TOCTOU), architecture/action-control.md (steps 7-9) |
 | Implementing Policy/PEP | architecture/action-control.md, architecture/trust-boundaries.md, contracts/effect-risk.schema.json, contracts/capability-token.schema.json, threat-model/controls.yaml |
-| Implementing Router | architecture/routing-system.md, architecture/request-to-outcome.md, contracts/run-plan.schema.json, contracts/agent-graph.schema.json |
+| Implementing Phase 1 StaticRouter | architecture/routing-system.md (Phase composition), architecture/request-to-outcome.md, contracts/task-contract.schema.json, contracts/run-plan.schema.json, requirements/requirements.ndjson (AH-ROUTER-FOUNDATION-001) |
+| Implementing Phase 3 adaptive Router | architecture/routing-system.md, architecture/request-to-outcome.md, contracts/run-plan.schema.json, contracts/agent-graph.schema.json, evals/routing/ |
 | Implementing Memory | architecture/context-memory-rag.md, contracts/memory-record.schema.json, architecture/evolution.md (cold start safety) |
 | Implementing RAG | architecture/context-memory-rag.md (injection pattern library), contracts/context-graph.schema.json |
 | Implementing VFS | architecture/virtual-filesystem.md, architecture/tool-skill-fabric.md (file tools via VFS), architecture/action-control.md (step 9 VFS dispatch), architecture/context-memory-rag.md (RAG via VFS) |
 | Implementing Computer Use | architecture/tool-skill-fabric.md (computer_operate/browser_operate, screen injection isolation), contracts/effect-risk.schema.json (screen_access), contracts/tool-spec.schema.json (display_policy), threat-model/threats.yaml (THREAT-SCREEN-INJECTION) |
 | Implementing Two-Phase Runtime | architecture/runtime-core.md (RunPhase), architecture/action-control.md (step 8 credential exchange), threat-model/threats.yaml (THREAT-CRED-REACH) |
 | Implementing Network Policy | contracts/effect-risk.schema.json (egress_policy), threat-model/controls.yaml (CTRL-EGRESS-002), architecture/tool-skill-fabric.md (egress_policy_ref) |
+| Implementing schedule_task (loop engineering) | architecture/tool-skill-fabric.md (Phase 6 Voice and Loop Tools, Transport Implementation Patterns), architecture/runtime-core.md (Sandbox Sleep/Wake), contracts/tool-spec.schema.json, requirements/requirements.ndjson (AH-TOOL-SCHEDULE-001) |
 | Implementing Cache Engineering | architecture/model-api-gateway.md (Prompt Cache Engineering, tool-masking), architecture/context-memory-rag.md (offloading, cache-aware compaction) |
 | Implementing real-time UI | architecture/realtime-execution-visualization.md, api/asyncapi.yaml (run_event_stream), ui/screens/chat.yaml (steer endpoint), architecture/runtime-core.md (StreamEvent, steering 3 queues) |
 | Implementing failure recovery | architecture/failure-recovery.md, state-machines/operation.machine.json (37 states), state-machines/external-effect.machine.json (14 states), architecture/runtime-core.md (effect-state-aware resume), architecture/virtual-filesystem.md (OverlayBackend transaction rollback) |
@@ -144,5 +154,6 @@ When implementing a specific type of work, read these specs first (in addition t
 | Implementing external actions (Phase 5) | architecture/runtime-topology.md, architecture/failure-recovery.md (reconciliation), state-machines/external-effect.machine.json, architecture/action-control.md (effect-state-aware resume, credential exchange), contracts/effect-risk.schema.json (egress_policy for connector traffic) |
 | Implementing MCP | architecture/tool-skill-fabric.md (MCP Allowlist), threat-model/threats.yaml (TOOL-POISONING) |
 | Implementing Verification | architecture/assurance.md, contracts/evidence-package.schema.json, contracts/verification-graph.schema.json |
+| Closing a Phase | current Phase manifest (`gate_command`, `independent_acceptance`, `exit_criteria`), architecture/assurance.md (Per-Phase acceptance order), factory/phase-gates/gate_runner.py |
 | Security testing | threat-model/ (all), state-machines/invariants.md, state-machines/model-check-report.txt |
 | Writing tests | AI_EXECUTION_PROTOCOL.md (work loop), current phase manifest (exit_criteria, mutation_score) |

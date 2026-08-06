@@ -1,0 +1,107 @@
+<h2>公司总控台 V2 · 组织、任务、上下文、执行者统一视图</h2>
+<p class="subtitle">总控负责全局调度；点击部门进入部门空间，点击任务进入执行图，点击人或 Agent 进入可接管的岗位控制台。</p>
+
+<div class="mockup">
+  <div class="mockup-header" style="padding:0;background:#111926;color:#eaf0f7">
+    <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #2a3444">
+      <div><b style="letter-spacing:1px">ORBIT</b> <span style="font-size:11px;color:#8fa2ba;margin-left:12px">公司总控 / Control Tower</span></div>
+      <div style="font-size:11px"><span style="color:#73d9a5">● 系统正常</span>　⌘K 全局指令　 CEO ▾</div>
+    </div>
+  </div>
+  <div class="mockup-body" style="padding:0;background:#f3f5f8;display:grid;grid-template-columns:165px 1fr;min-height:650px;color:#1f2937">
+    <div style="background:#162131;color:#c6d1df;padding:14px 10px;font-size:11px;line-height:2.6">
+      <div style="background:#27364a;color:white;border-radius:6px;padding:0 9px">▦ 公司总控</div>
+      <div style="padding:0 9px">◎ 目标与项目</div>
+      <div style="padding:0 9px">☷ 全部任务 <span style="float:right;color:#8fa2ba">38</span></div>
+      <div style="padding:0 9px">⌁ 组织与部门</div>
+      <div style="padding:0 9px">◫ 共享上下文</div>
+      <div style="padding:0 9px">◉ 决策收件箱 <span style="float:right;color:#ffbb72">3</span></div>
+      <div style="padding:0 9px">◇ Agent 与人员</div>
+      <div style="padding:0 9px">△ 风险与审计</div>
+      <div style="margin:16px 8px 7px;border-top:1px solid #334154"></div>
+      <div style="font-size:9px;color:#72859d;padding:0 9px">我的工作空间</div>
+      <div style="padding:0 9px">♙ 我的任务 <span style="float:right">5</span></div>
+      <div style="padding:0 9px">✦ 我的 Agent <span style="float:right">4</span></div>
+      <div style="padding:0 9px">▣ 我的上下文</div>
+      <div style="position:relative;margin-top:65px;background:#202d3e;border-radius:6px;padding:8px;line-height:1.5;color:#aebdce">自动化等级 L2<br><span style="font-size:9px">12 Agent · 5 人类<br>¥286 今日成本</span></div>
+    </div>
+
+    <div style="padding:15px 17px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-size:20px;font-weight:750">公司现在发生什么</div><div style="font-size:10px;color:#667085;margin-top:4px">2026-08-02 10:16 · 实时事件已更新</div></div>
+        <div><button style="background:#4c64d9;color:white;border:0;border-radius:6px;padding:8px 11px">＋ 创建目标 / 任务</button> <button style="background:white;border:1px solid #cdd4de;border-radius:6px;padding:7px 10px">向公司下达指令</button></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:13px">
+        <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:10px"><span style="font-size:9px;color:#667085">90天目标</span><br><b style="font-size:19px">63%</b><span style="font-size:9px;color:#27845a">　↑ 8%</span><div style="height:4px;background:#e5e9ef;margin-top:7px"><div style="height:4px;background:#5576d9;width:63%"></div></div></div>
+        <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:10px"><span style="font-size:9px;color:#667085">运行中任务</span><br><b style="font-size:19px">18</b><span style="font-size:9px;color:#667085"> / 总计 38</span><div style="font-size:9px;color:#b36d18;margin-top:7px">2 个阻塞 · 1 个超时风险</div></div>
+        <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:10px"><span style="font-size:9px;color:#667085">执行者</span><br><b style="font-size:19px">17</b><span style="font-size:9px;color:#667085">　12 AI / 5 人</span><div style="font-size:9px;color:#27845a;margin-top:7px">4 个可立即接管的岗位</div></div>
+        <div style="background:#fff8eb;border:1px solid #edcf96;border-radius:8px;padding:10px"><span style="font-size:9px;color:#8b651b">需要人类</span><br><b style="font-size:19px">3</b><span style="font-size:9px;color:#8b651b"> 个决定</span><div style="font-size:9px;color:#a46118;margin-top:7px">最早 11:30 到期</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:11px;margin-top:11px">
+        <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between"><b>组织与部门</b><span style="font-size:9px;color:#526071">按任务负载排序 · 查看组织图 →</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;font-size:10px">
+            <div style="border:1px solid #ced9ee;border-left:4px solid #4f73ce;border-radius:6px;padding:9px">
+              <div><b>技术部门</b><span style="float:right;color:#b36d18">负载 82%</span></div>
+              <div style="color:#667085;margin-top:5px">负责人：AI Eng Lead　<a href="#">接管</a></div>
+              <div style="margin-top:6px">👤 CTO　🤖 后端-04　🤖 前端-02　🤖 QA-03</div>
+              <div style="margin-top:6px;color:#526071">8 项运行 · 1 阻塞 · 上下文 v18</div>
+            </div>
+            <div style="border:1px solid #d5dfd8;border-left:4px solid #4a9b6a;border-radius:6px;padding:9px">
+              <div><b>产品与研究</b><span style="float:right;color:#27845a">负载 61%</span></div>
+              <div style="color:#667085;margin-top:5px">负责人：AI CPO　<a href="#">接管</a></div>
+              <div style="margin-top:6px">👤 CEO　🤖 研究-05　🤖 数据-02</div>
+              <div style="margin-top:6px;color:#526071">4 项运行 · 0 阻塞 · 上下文 v24</div>
+            </div>
+            <div style="border:1px solid #ead8c6;border-left:4px solid #d38b45;border-radius:6px;padding:9px">
+              <div><b>增长与收入</b><span style="float:right;color:#27845a">负载 54%</span></div>
+              <div style="color:#667085;margin-top:5px">负责人：AI CRO　<a href="#">接管</a></div>
+              <div style="margin-top:6px">👤 CEO　🤖 内容-03　🤖 销售-02</div>
+              <div style="margin-top:6px;color:#526071">3 项运行 · 0 阻塞 · 上下文 v13</div>
+            </div>
+            <div style="border:1px solid #dcd6e9;border-left:4px solid #8267bd;border-radius:6px;padding:9px">
+              <div><b>业务运营</b><span style="float:right;color:#27845a">负载 38%</span></div>
+              <div style="color:#667085;margin-top:5px">负责人：AI COO　<a href="#">接管</a></div>
+              <div style="margin-top:6px">🤖 财务-01　🤖 法务-01　🤖 客户-02</div>
+              <div style="margin-top:6px;color:#526071">3 项运行 · 1 待批 · 上下文 v9</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between"><b>共享上下文状态</b><span style="font-size:9px;color:#526071">权限过滤后可见</span></div>
+          <div style="font-size:10px;margin-top:9px;line-height:1.7">
+            <div style="background:#f1f4fb;border-radius:6px;padding:8px"><b>公司层 / Board Context</b><span style="float:right">v31</span><br><span style="color:#667085">战略、目标、硬约束、决策原则</span><br><span style="color:#27845a">✓ 今日 09:00 已同步到 4 个部门</span></div>
+            <div style="margin-top:6px;padding:7px;border-bottom:1px solid #edf0f4"><b>技术部门</b>　v18 <span style="float:right;color:#b36d18">2 条待确认</span><br><span style="color:#667085">架构、接口、发布状态、事故教训</span></div>
+            <div style="padding:7px;border-bottom:1px solid #edf0f4"><b>产品与研究</b>　v24 <span style="float:right;color:#27845a">已同步</span><br><span style="color:#667085">用户问题、研究证据、路线图</span></div>
+            <div style="padding:7px;border-bottom:1px solid #edf0f4"><b>增长与收入</b>　v13 <span style="float:right;color:#27845a">已同步</span><br><span style="color:#667085">ICP、定位、渠道、销售异议</span></div>
+            <div style="padding:7px"><b>我的私有上下文</b>　v7 <span style="float:right;color:#556fd0">仅你与授权 Agent</span><br><span style="color:#667085">个人偏好、草稿、未发布判断</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:white;border:1px solid #dfe4eb;border-radius:8px;padding:12px;margin-top:11px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b>公司任务清单</b><div style="font-size:9px"><button style="padding:4px 7px;background:#edf2ff;border:1px solid #b8c4ea;border-radius:5px">全部任务</button>　按部门　按目标　只看异常　＋ 分配任务</div></div>
+        <table style="width:100%;border-collapse:collapse;margin-top:9px;font-size:9px;text-align:left">
+          <thead><tr style="color:#667085;border-bottom:1px solid #dfe4eb"><th style="padding:6px">任务</th><th>目标</th><th>部门 / 岗位</th><th>执行者</th><th>状态</th><th>上下文</th><th>风险 / 截止</th></tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #edf0f4"><td style="padding:8px 6px"><b>验证数据库迁移回滚</b><br>WI-041</td><td>团队版订阅</td><td>技术 / Eng Lead</td><td>🤖 eng-04 <a href="#">接管</a></td><td style="color:#337c58">执行中 68%</td><td>公司v31 + 技术v18 + 项目v6</td><td>R1 · 今天</td></tr>
+            <tr style="border-bottom:1px solid #edf0f4;background:#fffaf0"><td style="padding:8px 6px"><b>企业客户报价方案</b><br>WI-038</td><td>20个付费团队</td><td>增长 / CRO</td><td>🤖 cro-01 + 👤 CEO</td><td style="color:#a46516">等待决定</td><td>公司v31 + 增长v13 + 客户v4</td><td>R3 · 11:30</td></tr>
+            <tr style="border-bottom:1px solid #edf0f4"><td style="padding:8px 6px"><b>聚类近30天流失原因</b><br>WI-044</td><td>次月留存70%</td><td>产品 / Research</td><td>🤖 research-05</td><td style="color:#337c58">验证中</td><td>产品v24 + 项目v3</td><td>R0 · 明天</td></tr>
+            <tr><td style="padding:8px 6px"><b>更新客服知识库</b><br>WI-045</td><td>降低首次响应</td><td>运营 / Customer</td><td>👤 CEO 可委托</td><td style="color:#667085">未分配</td><td>运营v9 + 客户反馈v12</td><td>R1 · 周五</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:20px">总控确定后，先下钻哪个空间？</h3>
+<div class="options">
+  <div class="option" data-choice="department-space" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>技术部门空间</h3><p>查看部门人员/Agent、任务看板、共享上下文、依赖和部门负责人接管。</p></div></div>
+  <div class="option" data-choice="task-dispatch" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>任务创建与智能分配</h3><p>从总控输入目标，系统建议部门、岗位、执行者、上下文和审批链。</p></div></div>
+  <div class="option" data-choice="context-layers" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>分层共享上下文</h3><p>展示公司、部门、项目、岗位和个人上下文如何继承、隔离、发布和纠错。</p></div></div>
+  <div class="option" data-choice="personal-workspace" onclick="toggleSelect(this)"><div class="letter">D</div><div class="content"><h3>个人工作空间</h3><p>每个人的任务、私有上下文、自己掌握的 Agent，以及向部门交付成果。</p></div></div>
+</div>

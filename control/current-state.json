@@ -1,11 +1,11 @@
 {
   "version": "9.2.1",
-  "generated_at": "2026-07-16T04:27:35.172648",
-  "generated_by": "manual-audit-correction",
+  "generated_at": "2026-07-20T19:14:43Z",
+  "generated_by": "phase-architecture-normalization",
   "specification": "VERIFIED",
-  "phase": 1,
+  "phase": 2,
   "factory_status": "IMPLEMENTED",
-  "product_status": "NOT_STARTED",
+  "product_status": "PHASE_2_IN_PROGRESS",
   "production_status": "BLOCKED",
   "phases": {
     "0R": {
@@ -19,16 +19,14 @@
       "blockers": []
     },
     "1": {
-      "status": "READY",
+      "status": "VERIFIED",
       "name": "Single-Agent Multi-Domain Foundation",
       "blockers": []
     },
     "2": {
-      "status": "BLOCKED",
+      "status": "IN_PROGRESS",
       "name": "Context, RAG, Multimodal & UX",
-      "blockers": [
-        "Phase 1 not passed"
-      ]
+      "blockers": []
     },
     "3": {
       "status": "BLOCKED",
@@ -39,7 +37,7 @@
     },
     "4": {
       "status": "BLOCKED",
-      "name": "Memory, Assurance & Evolution Shadow",
+      "name": "Memory, Assurance, Observability & Evolution Shadow",
       "blockers": [
         "Phase 3 not passed"
       ]
@@ -73,6 +71,73 @@
       ]
     }
   },
+  "registry_summary": {
+    "total": 254,
+    "capabilities": {
+      "total": 124,
+      "mapped": 124,
+      "unmapped": 0
+    },
+    "phases": {
+      "0": {
+        "total": 31,
+        "maturity": {
+          "not_started": 7,
+          "verified": 24
+        }
+      },
+      "1": {
+        "total": 40,
+        "maturity": {
+          "in_progress": 12,
+          "not_started": 27,
+          "verified": 1
+        }
+      },
+      "2": {
+        "total": 64,
+        "maturity": {
+          "not_started": 64
+        }
+      },
+      "3": {
+        "total": 16,
+        "maturity": {
+          "not_started": 16
+        }
+      },
+      "4": {
+        "total": 23,
+        "maturity": {
+          "not_started": 23
+        }
+      },
+      "5": {
+        "total": 12,
+        "maturity": {
+          "not_started": 12
+        }
+      },
+      "6": {
+        "total": 25,
+        "maturity": {
+          "not_started": 25
+        }
+      },
+      "7": {
+        "total": 27,
+        "maturity": {
+          "not_started": 27
+        }
+      },
+      "8": {
+        "total": 16,
+        "maturity": {
+          "not_started": 16
+        }
+      }
+    }
+  },
   "known_contradictions": [],
   "rules": {
     "status_source": "This file is the ONLY authoritative status source. All README, HTML, dashboards and reports must be generated from this file.",
@@ -80,18 +145,18 @@
     "no_circular_verification": "Registry status cannot be the source of Gate evidence. Gates must run real commands."
   },
   "repository_structure": {
-    "spec/": "Harness 的不可变产品与工程规范",
-    "factory/": "使用 Codex / Claude Code 开发 Harness 的自主工程工厂",
-    "harness/": "真正的 Agent Harness 产品代码",
-    "infra/": "Harness 与 Factory 的 CI/CD、云资源和部署",
-    "evidence/": "Requirement、测试、安全、部署产生的不可伪造证据",
-    "control/": "唯一权威状态来源 (current-state.json)"
+    "spec/": "Harness \u7684\u4e0d\u53ef\u53d8\u4ea7\u54c1\u4e0e\u5de5\u7a0b\u89c4\u8303",
+    "factory/": "\u4f7f\u7528 Codex / Claude Code \u5f00\u53d1 Harness \u7684\u81ea\u4e3b\u5de5\u7a0b\u5de5\u5382",
+    "harness/": "\u771f\u6b63\u7684 Agent Harness \u4ea7\u54c1\u4ee3\u7801",
+    "infra/": "Harness \u4e0e Factory \u7684 CI/CD\u3001\u4e91\u8d44\u6e90\u548c\u90e8\u7f72",
+    "evidence/": "Requirement\u3001\u6d4b\u8bd5\u3001\u5b89\u5168\u3001\u90e8\u7f72\u4ea7\u751f\u7684\u4e0d\u53ef\u4f2a\u9020\u8bc1\u636e",
+    "control/": "\u552f\u4e00\u6743\u5a01\u72b6\u6001\u6765\u6e90 (current-state.json)"
   },
   "next_actions": [
-    "Begin Phase 1: Single-Agent Multi-Domain Foundation (Phase 0 verified, Phase 1 ready)",
-    "Implement AH-GATEWAY-TESTPROVIDER-001 first (all verticals depend on it)",
-    "Switch verifier to RERUN mode when harness/ has code",
-    "Create test files for Phase 1-8 requirements as they are implemented"
+    "Continue Phase 1 only; Phase 2-8 remain blocked by the previous Phase gate",
+    "Complete provider/tool/skill registries, VFS, static Router and permission boundaries before vertical expansion",
+    "Integrate the isolated AH-RUNTIME-LOOP-001 work only through its requirement gate; do not duplicate it on main",
+    "Run GLM-5.2 xhigh independent read-only acceptance only after the complete Phase 1 local gate passes"
   ],
   "factory_test_results": {
     "state_store": "PASS",
@@ -105,22 +170,22 @@
     "merge_queue": "PASS",
     "dashboard": "PASS"
   },
-  "last_updated": "2026-07-16T07:19:05.262793",
+  "last_updated": "2026-07-20T19:30:30Z",
   "verification_evidence": {
     "model_check": "VERIFIED (TLC v2.19, 251 states, 0 errors)",
-    "spec_gate": "PASS (10/10 checks, actual file checks)",
+    "spec_gate": "PASS (13/13 checks, including Phase ownership, derived views, and bidirectional capability consistency)",
     "failure_injection": "PASS (10/10 failures detected)",
     "factory_tests": "PASS (state store, controller, blocker, budget, secret, worktree, merge queue)",
-    "adrs_resolved": "12/12 ACCEPTED (0 NEEDS_VERIFICATION, 0 CONDITIONAL)",
-    "capability_coverage": "100% (108/108 mapped)",
-    "requirements": 221
+    "adrs_resolved": "14/14 ACCEPTED (0 NEEDS_VERIFICATION, 0 CONDITIONAL)",
+    "capability_coverage": "100% (124/124 capabilities; 223/223 actionable requirements mapped)",
+    "requirements": 254
   },
   "cleanup_notes": {
     "scripts_moved": "archive/non-normative/old-scripts/",
     "agents_moved": "spec/.agents/",
     "artifacts_audit_moved": "archive/non-normative/v9.1-audit/",
-    "phase_0R_fixed": "5 NOT DONE → DONE",
-    "bootstrap_fixed": "REPAIR_IN_PROGRESS → VERIFIED"
+    "phase_0R_fixed": "5 NOT DONE \u2192 DONE",
+    "bootstrap_fixed": "REPAIR_IN_PROGRESS \u2192 VERIFIED"
   },
   "factory_repairs": {
     "fix_1_requirement_selection": "FIXED - reads implementation_maturity from requirements.ndjson",
@@ -140,7 +205,7 @@
   },
   "factory_verification": {
     "all_modules_import": "PASS",
-    "spec_gate": "PASS (10/10)",
+    "spec_gate": "PASS (13/13)",
     "check_scripts": "PASS (5/5)",
     "codex_popen_test": "PASS (pid=89115, exit_code=0, 24823 chars stdout)",
     "worktree_test": "PASS (create/list/remove all real)",
@@ -149,12 +214,12 @@
   },
   "factory_manual": "factory/FACTORY_MANUAL.md",
   "control_files": {
-    "AGENTS.md": "根目录 (Codex 入口)",
-    "CLAUDE.md": "根目录 (Claude Code 入口)",
-    "CODEOWNERS": "根目录 (GitHub 保护)",
-    "spec/AI_EXECUTION_PROTOCOL.md": "执行协议",
-    "spec/NORMATIVE_PRECEDENCE.md": "规范优先级",
-    "spec/SPECIFICATION_INDEX.yaml": "主索引",
-    "control/current-state.json": "唯一权威状态"
+    "AGENTS.md": "\u6839\u76ee\u5f55 (Codex \u5165\u53e3)",
+    "CLAUDE.md": "\u6839\u76ee\u5f55 (Claude Code \u5165\u53e3)",
+    "CODEOWNERS": "\u6839\u76ee\u5f55 (GitHub \u4fdd\u62a4)",
+    "spec/AI_EXECUTION_PROTOCOL.md": "\u6267\u884c\u534f\u8bae",
+    "spec/NORMATIVE_PRECEDENCE.md": "\u89c4\u8303\u4f18\u5148\u7ea7",
+    "spec/SPECIFICATION_INDEX.yaml": "\u4e3b\u7d22\u5f15",
+    "control/current-state.json": "\u552f\u4e00\u6743\u5a01\u72b6\u6001"
   }
 }

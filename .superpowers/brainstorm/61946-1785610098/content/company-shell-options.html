@@ -1,0 +1,78 @@
+<h2>AI 公司总控台：先选择整体交互骨架</h2>
+<p class="subtitle">三种方案都保留 CEO / CTO 专属视图、决策收件箱和一键接管。请选择你最想每天打开的结构。</p>
+
+<div class="cards">
+  <div class="card" data-choice="command-center" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:14px;background:#0d1724;color:#dce8f5;min-height:270px">
+      <div style="display:flex;gap:12px;height:240px">
+        <div style="width:24%;background:#142235;border-radius:8px;padding:10px;font-size:11px;line-height:2">
+          <strong>ORBIT</strong><br>总览<br>目标<br>项目<br>决策 <span style="color:#ffb05c">3</span><br>Agent<br>客户<br>财务<br>审计
+        </div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center"><strong>公司态势</strong><span style="font-size:10px;color:#73d9a5">● 自主运行中</span></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px">
+            <div style="background:#182a40;padding:8px;border-radius:6px"><small>90天目标</small><br><b>63%</b></div>
+            <div style="background:#182a40;padding:8px;border-radius:6px"><small>现金跑道</small><br><b>14.2月</b></div>
+            <div style="background:#182a40;padding:8px;border-radius:6px"><small>需你决定</small><br><b style="color:#ffb05c">3</b></div>
+          </div>
+          <div style="background:#182a40;padding:9px;border-radius:6px;margin-top:8px;font-size:10px">
+            <strong>现在发生什么</strong><br><span style="color:#73d9a5">●</span> v1.8 正在 5% 灰度<br><span style="color:#ffb05c">●</span> 企业客户报价等待 CEO<br><span style="color:#7db7ff">●</span> 12 个 Agent 执行 4 个项目
+          </div>
+          <div style="background:#25364b;padding:8px;border-radius:6px;margin-top:8px;font-size:10px">询问公司…　　<span style="float:right">⌘K</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 指挥中心</h3>
+      <p>左侧稳定导航，中间显示公司实时态势和异常。信息最完整，适合每天经营公司。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="decision-first" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:14px;background:#f3f0e9;color:#282720;min-height:270px">
+      <div style="display:flex;justify-content:space-between;border-bottom:1px solid #cbc5b8;padding-bottom:8px"><strong>MONDAY / 董事会桌面</strong><span>搜索　头像</span></div>
+      <div style="margin-top:12px;font-size:11px;color:#777064">早上好。公司正常运行，你今天有 3 个决定。</div>
+      <div style="background:white;border:1px solid #d8d1c4;border-radius:9px;padding:12px;margin-top:10px">
+        <small style="color:#9c5d20">今天 11:30 前 · 生产发布</small>
+        <div style="font-weight:700;margin:6px 0">是否把 v1.8 灰度从 5% 扩大到 25%？</div>
+        <div style="font-size:10px;color:#635f57">任务完成率 +11%，错误率 0.21%。AI 建议扩大，置信度 82%。</div>
+        <div style="margin-top:10px"><button style="background:#222;color:white;border:0;border-radius:5px;padding:6px 10px">批准扩大</button> <button style="padding:5px 9px">继续观察</button> <button style="padding:5px 9px">看证据</button></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;font-size:10px">
+        <div style="background:#e7e2d8;padding:9px;border-radius:7px"><b>AI 已完成</b><br>停止低效广告<br>修复 2 个缺陷</div>
+        <div style="background:#e7e2d8;padding:9px;border-radius:7px"><b>公司脉搏</b><br>收入 ↑ 8%<br>高风险事故 0</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 决策优先</h3>
+      <p>首页只展示需要创始人判断的事项，其余全部压缩。注意力成本最低，适合高度自治。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="conversation-canvas" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:14px;background:#f7f8fb;color:#1f2937;min-height:270px">
+      <div style="display:flex;gap:10px;height:240px">
+        <div style="width:18%;background:#222a38;color:#d8deea;border-radius:8px;padding:9px;font-size:10px;line-height:2.2">新对话<br><br>今日简报<br>增长诊断<br>v1.8 发布<br>企业客户<br><br>所有项目</div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:#667085">探索模式 · 不会执行外部动作</div>
+          <div style="margin-top:18px"><b>你想让公司解决什么？</b></div>
+          <div style="background:#e9edf4;padding:9px;border-radius:8px;margin-top:10px;font-size:10px">最近获客不太行，看看是不是定位有问题。</div>
+          <div style="background:white;border:1px solid #d6dbe4;padding:10px;border-radius:8px;margin-top:7px;font-size:10px">
+            我理解为：诊断近 8 周有效线索下降的原因。<br><br>
+            将读取漏斗、销售异议和竞品信息。预计 ¥35 / 25 分钟。不会修改官网、价格或联系客户。
+            <div style="margin-top:8px"><button style="background:#4c5ee7;color:white;border:0;border-radius:5px;padding:6px 9px">开始研究</button> <button style="padding:5px 8px">调整范围</button></div>
+          </div>
+          <div style="border:1px solid #cbd3df;border-radius:7px;padding:8px;margin-top:8px;color:#8791a2;font-size:10px">告诉公司你的目标…</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 对话画布</h3>
+      <p>以自然语言为入口，目标契约、工作和决策嵌入对话。学习成本最低，但全局态势较弱。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:18px">
+  <p><strong>我的建议：</strong>A 作为固定骨架，B 作为 CEO 默认首页，C 作为随时可呼出的“公司对话层”。这三者也可以组合，而不是只能三选一。</p>
+</div>
