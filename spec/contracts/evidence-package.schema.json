@@ -66,6 +66,20 @@
         "null"
       ],
       "description": "SHA-256 hash of test_output (first 16 chars). Proves test output was not tampered."
+    },
+    "prev_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "P2-17: self_hash of the preceding EvidencePackage in the hash chain, or null for the first package."
+    },
+    "self_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "P2-17: SHA-256 of this package's canonical content (excluding self_hash itself). Makes the chain tamper-evident."
     }
   },
   "type": "object",

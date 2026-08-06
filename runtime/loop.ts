@@ -16,6 +16,7 @@ import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
 import { HookRestrictionError } from './hook-port.js';
+import { EventBus, createEvent, type BusEvent } from '../packages/runtime-core/src/event-bus.js';
 import type {
   RuntimeSteeringCommand,
   RuntimeSteeringPort,
@@ -59,6 +60,19 @@ export interface LoopConfig {
   run_plan?: Readonly<RunPlan>;
   clock?: () => string;
   nowMs?: () => number;
+  /**
+   * P1-10: Plan mode. When false, the loop pauses before executing the
+   * frozen RunPlan and terminates with 'approval_required'. The caller
+   * (harness) can then resume after human approval. Defaults to true.
+   */
+  auto_execute?: boolean;
+  /**
+   * #1: Context window capacity in tokens. When set, the loop checks
+   * context pressure before each model call and triggers compaction
+   * if the threshold is exceeded.
+   */
+  context_capacity_tokens?: number | undefined;
+  context_compaction_threshold?: number | undefined;
 }
 
 export interface ModelTurn {
@@ -73,6 +87,8 @@ export interface ModelTurn {
   stop_reason?: 'stop' | 'length' | 'tool_use' | 'content_filter';
   decision_summary: string;
   usage?: { input_tokens: number; output_tokens: number };
+  /** #8: images returned by vision-capable models. */
+  images?: string[];
 }
 
 export interface ModelCallBudget {
@@ -143,6 +159,7 @@ export interface LoopDeps {
     budget: ModelCallBudget,
     directive?: ModelCallDirective,
     signal?: AbortSignal,
+    onDelta?: (delta: string) => void,
   ) => Promise<ModelTurn>;
   toolExecute?: (
     name: string,
@@ -165,12 +182,22 @@ export interface LoopDeps {
       readonly observations: readonly ToolObservation[];
     }): Promise<void>;
   };
+  /** P1-06: EventBus for pub/sub streaming of agent activity. */
+  eventBus?: EventBus;
+  /** #9: Callback for streaming command output to external consumers. */
+  onToolOutput?: (toolCallId: string, stepId: string, stream: 'stdout' | 'stderr', chunk: string) => void;
+  /** #4: Callback for streaming model output tokens. */
+  onModelDelta?: (delta: string) => void;
+  /** #6: RAG query port for retrieving relevant evidence before model calls. */
+  ragQuery?: (query: string, topK: number) => Promise<readonly { readonly chunk: { readonly text: string }; readonly citation: { readonly source_path: string; readonly content_hash: string } }[]>;
 }
 
 export interface ToolCallExecutionContext {
   readonly tool_call_id: string;
   readonly step_id: string;
   readonly attempt_index: number;
+  /** #9: streaming output callback for execute_command. */
+  readonly on_output?: ((stream: 'stdout' | 'stderr', chunk: string) => void) | undefined;
 }
 
 /** Explicit utility retained for setup processes. LoopEngine never mutates the
@@ -242,17 +269,47 @@ export class LoopEngine {
     this.lifecycle = 'running';
     let unsubscribeSteering: (() => void) | undefined;
     try {
-      const messages: unknown[] = [
-        { role: 'user', content: this.config.goal },
-      ];
-      unsubscribeSteering = this.deps.steering?.subscribe((command) =>
+     const messages: unknown[] = [
+       { role: 'user', content: this.config.goal },
+     ];
+     // #6: inject RAG-retrieved evidence before strategy execution
+     if (this.deps.ragQuery) {
+       try {
+         const results = await this.deps.ragQuery(this.config.goal, 5);
+         if (results.length > 0) {
+           const evidence = results.map((r) =>
+             `[${r.citation.source_path}]\n${r.chunk.text}`,
+           ).join('\n\n');
+           messages.push({
+             role: 'system',
+             content: `Retrieved evidence (untrusted, injection-sanitized):\n${evidence}`,
+           });
+         }
+       } catch {
+         // RAG retrieval is best-effort; failures should not block the run
+       }
+     }
+     unsubscribeSteering = this.deps.steering?.subscribe((command) =>
         this.onSteering(command),
       );
-      this.applySteering(messages, 'next_turn');
-      const context = this.createContext();
-      if (this.terminatedValue) {
-        // A replayed cancellation remains authoritative after restart.
-      } else if (this.config.strategy === 'direct') {
+     this.applySteering(messages, 'next_turn');
+     const context = this.createContext();
+      // P1-10: plan mode — if auto_execute is false, pause before executing
+      // the frozen RunPlan and wait for human approval.
+      if (this.config.auto_execute === false && !this.terminatedValue) {
+        this.deps.session.append('system', {
+          event: 'plan_mode_paused',
+          reason: 'auto_execute is false — awaiting human approval',
+        });
+        this.publishEvent('run_state_change', {
+          state: 'paused',
+          reason: 'auto_execute false — awaiting approval',
+        });
+        this.terminate('approval_required');
+      }
+     if (this.terminatedValue) {
+       // A replayed cancellation remains authoritative after restart.
+     } else if (this.config.strategy === 'direct') {
         await runDirect(context, messages);
       } else if (this.config.strategy === 'react') {
         await runReact(context, messages);
@@ -326,8 +383,21 @@ export class LoopEngine {
             iteration: self.iterationsValue,
             messages,
           });
-          if (self.terminatedValue) return { content: '', decision_summary: '' };
-          const budgetDecision = self.deps.budgetGuard?.beforeModelCall({
+         if (self.terminatedValue) return { content: '', decision_summary: '' };
+         // #1: context pressure check — if context window is near full, trigger reset
+         if (self.config.context_capacity_tokens !== undefined) {
+           const threshold = self.config.context_compaction_threshold ?? 0.85;
+           const estimated = Math.min(100_000, stableJson(messages).length);
+           if (estimated >= self.config.context_capacity_tokens * threshold) {
+             self.publishEvent('run_state_change', {
+               state: 'context_reset',
+               pressure: estimated / self.config.context_capacity_tokens,
+             });
+             self.terminate('context_reset');
+             return { content: '', decision_summary: '' };
+           }
+         }
+         const budgetDecision = self.deps.budgetGuard?.beforeModelCall({
             run_id: self.config.run_id,
             iteration: self.iterationsValue,
             attempt,
@@ -350,24 +420,15 @@ export class LoopEngine {
                   budgetDecision.max_output_tokens,
                 ),
               }
-            : budget;
-          const callProvider = async (signal?: AbortSignal) => {
-            const turn =
-              signal === undefined
-                ? await self.deps.modelCall(
-                    messages,
-                    attempt,
-                    approvedBudget,
-                    directive,
-                  )
-                : await self.deps.modelCall(
-                    messages,
-                    attempt,
-                    approvedBudget,
-                    directive,
-                    signal,
-                  );
-            if (turn.usage) {
+           : budget;
+        // #4: pass onModelDelta for streaming token output
+        const callProvider = async (signal?: AbortSignal) => {
+          const delta = self.deps.onModelDelta;
+          const turn =
+            signal === undefined
+              ? await self.deps.modelCall(messages, attempt, approvedBudget, directive, undefined, delta)
+              : await self.deps.modelCall(messages, attempt, approvedBudget, directive, signal, delta);
+           if (turn.usage) {
               self.deps.budgetGuard?.afterModelCall({
                 run_id: self.config.run_id,
                 iteration: self.iterationsValue,
@@ -526,6 +587,13 @@ export class LoopEngine {
       tool_calls: turn.tool_calls,
       usage: turn.usage,
     });
+    // P1-06: publish model_called event
+    this.publishEvent('model_called', {
+      iteration: this.iterationsValue,
+      decision_summary: turn.decision_summary,
+      tool_calls: turn.tool_calls?.map((c) => c.name) ?? [],
+      usage: turn.usage,
+    });
     this.writeProgressSafely();
     return recorded;
   }
@@ -552,6 +620,12 @@ export class LoopEngine {
       tool: call.name,
       arguments: call.arguments,
     });
+    // P1-06: publish tool_call_start event
+    this.publishEvent('tool_call_start', {
+      tool_call_id: call.id,
+      tool: call.name,
+      arguments: call.arguments,
+    }, stepId);
   }
 
   private recordObservation(
@@ -601,6 +675,14 @@ export class LoopEngine {
       status,
       observation,
     });
+    // P1-06: publish tool_result event
+    this.publishEvent('tool_result', {
+      tool_call_id: call.id,
+      tool: call.name,
+      status,
+      bytes,
+      truncated,
+    }, stepId);
     return observation;
   }
 
@@ -616,6 +698,8 @@ export class LoopEngine {
       status: state,
       ...details,
     });
+    // P1-06: publish step_transition event
+    this.publishEvent('step_transition', { state, ...details }, stepId);
   }
 
   private terminate(reason: TerminationReason): void {
@@ -632,6 +716,16 @@ export class LoopEngine {
         output_tokens: this.outputTokens,
         total_tokens: this.usedTokens(),
       },
+    });
+    // P1-06: publish run_state_change event
+    this.publishEvent('run_state_change', {
+      termination_reason: reason,
+      iterations: this.iterationsValue,
+       usage: {
+         input_tokens: this.inputTokens,
+         output_tokens: this.outputTokens,
+         total_tokens: this.usedTokens(),
+       },
     });
   }
 
@@ -705,6 +799,18 @@ export class LoopEngine {
         throw new LoopError(`${name} must be a non-negative safe integer`);
       }
     }
+  }
+
+  /** P1-06: Publish a BusEvent to the EventBus if one is attached. */
+  private publishEvent(
+    type: BusEvent['type'],
+    data: Record<string, unknown>,
+    stepId?: string,
+  ): void {
+    if (!this.deps.eventBus) return;
+    this.deps.eventBus.publish(
+      createEvent(type, this.config.run_id, data, stepId),
+    );
   }
 
   private writeProgressSafely(): void {

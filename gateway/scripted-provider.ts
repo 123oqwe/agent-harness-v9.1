@@ -19,6 +19,8 @@ export interface Message {
   readonly reasoning_content?: string;
   readonly tool_call_id?: string;
   readonly tool_calls?: readonly ToolCall[];
+  /** #8: base64-encoded images for vision-capable models. */
+  readonly images?: readonly string[];
 }
 
 export interface Usage {

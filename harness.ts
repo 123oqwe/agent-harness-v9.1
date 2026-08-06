@@ -35,7 +35,9 @@ import {
 } from './runtime/loop.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './sandbox/process-sandbox.js';
-import { ActionExecutor } from './security/action-executor.js';
+import { ActionExecutor, OutputFormatValidator } from './security/action-executor.js';
+import { createIndexStore, queryStore, chunkDocument, addChunkToStore, type RagIndexStore } from './packages/rag/src/index.js';
+import { DefaultDocumentIngestor } from './packages/documents/src/index.js';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import { LocalToolHost } from './tools/local-tool-host.js';
 import type { AuthorizationService } from './security/authorization-service.js';
@@ -44,6 +46,7 @@ import type { PolicyEnforcementPoint } from './security/pep.js';
 import type { ConsentService } from './security/consent.js';
 import type { AuditSink } from './security/audit-sink.js';
 import type { PostconditionVerifierPort, ToolCredentialBrokerPort } from './tools/tool-executor.js';
+import { CacheManager } from './gateway/cache-manager.js';
 import { SkillLoader } from './skills/skill-loader.js';
 import type { SqliteSessionStore } from './session/sqlite-session-store.js';
 import type {
@@ -181,6 +184,10 @@ export interface HarnessConfig {
   modelFallback?: ModelFallbackController;
   /** Phase 2: PauseResumeController for session pause/resume. */
   pauseResume?: PauseResumeController;
+  /** #6: RAG index store for evidence retrieval. Defaults to empty store. */
+  ragStore?: RagIndexStore;
+  /** #6: Document ingestor for parse_document → RAG indexing. */
+  documentIngestor?: DefaultDocumentIngestor;
 }
 
 export class Harness {
@@ -202,6 +209,13 @@ export class Harness {
   private readonly pauseResume: PauseResumeController | undefined;
   private readonly budgetLedger: RuntimeCoreBudgetLedger | undefined;
   private readonly budgetLedgerPricing: RuntimeBudgetPricing | undefined;
+  /** P2-12: LLM cache manager for prompt cache tracking. */
+  private readonly cacheManager = new CacheManager();
+  /** #6: RAG store and document ingestor. */
+  private readonly ragStore: RagIndexStore;
+  private readonly documentIngestor: DefaultDocumentIngestor;
+  /** #1: context window capacity from provider metadata. */
+  private readonly contextCapacity: number | undefined = undefined;
 
   constructor(config: HarnessConfig) {
     if (
@@ -248,8 +262,11 @@ export class Harness {
     this.hookPort = config.hookSystem === undefined
       ? undefined
       : {
-          dispatch: (request) => config.hookSystem!.dispatch(request),
-        };
+         dispatch: (request) => config.hookSystem!.dispatch(request),
+       };
+    // #6: initialize RAG store and document ingestor
+    this.ragStore = config.ragStore ?? createIndexStore();
+    this.documentIngestor = config.documentIngestor ?? new DefaultDocumentIngestor();
   }
 
   private now(): string {
@@ -595,20 +612,27 @@ export class Harness {
               max_output_tokens_per_call:
                 this.config.maxOutputTokensPerCall,
             }),
-        run_plan: runPlan,
-        clock: () => this.now(),
-      },
+       run_plan: runPlan,
+       clock: () => this.now(),
+       // P1-10: read auto_execute from cancellation_policy (default true)
+      auto_execute:
+        (runPlan.cancellation_policy as { auto_execute?: boolean }).auto_execute !== false,
+      // #1: pass context capacity from the first model binding's max_context
+      // #1: context capacity from gateway — use undefined if not available
+      ...(this.contextCapacity !== undefined ? { context_capacity_tokens: this.contextCapacity } : {}),
+    },
       {
         session,
         ...(effectiveSteering === undefined ? {} : { steering: effectiveSteering }),
         ...(effectiveBudgetGuard === undefined ? {} : { budgetGuard: effectiveBudgetGuard }),
-        modelCall: async (
-          messages: unknown[],
-          _attempt: number,
-          modelBudget,
-          directive?: ModelCallDirective,
-          modelSignal?: AbortSignal,
-        ) => {
+       modelCall: async (
+         messages: unknown[],
+         _attempt: number,
+         modelBudget,
+         directive?: ModelCallDirective,
+         modelSignal?: AbortSignal,
+         onDelta?: (delta: string) => void,
+       ) => {
           const modelCallCount = (this._modelCallCount++) + 1;
           const plannedToolNames = new Set(
             runPlan.tool_grants.map((grant) => grant.tool),
@@ -660,10 +684,44 @@ export class Harness {
               );
             }
           }
-           const resolved = this.config.gateway.resolve(effectiveRequest);
+          const resolved = this.config.gateway.resolve(effectiveRequest);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
           const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
-        const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, effectiveRequest, {
+         // P2-12: track LLM cache key for prompt cache management
+         this.cacheManager.trackCall(
+           this.cacheManager.computeKey(resolved.provider_id, 'default', false),
+         );
+         // #4: streaming token output via dispatchStream when onDelta is provided
+         if (onDelta) {
+           let contentBuffer = '';
+           let usage: { input_tokens: number; output_tokens: number } | undefined;
+           const toolCalls: Array<{ id: string; name: string; arguments: Readonly<Record<string, unknown>> }> = [];
+           let stopReason: GatewayDispatchResult['response']['stop_reason'] | undefined;
+           for await (const ev of this.config.gateway.dispatchStream(resolved, effectiveRequest, {
+             operation_id: opId,
+             attempt_id: attId,
+             signal: this.config.signal && modelSignal && this.config.signal !== modelSignal
+               ? AbortSignal.any([this.config.signal, modelSignal])
+               : (modelSignal ?? this.config.signal),
+           })) {
+             if (ev.type === 'text_delta' && ev.text) { onDelta(ev.text); contentBuffer += ev.text; }
+             else if (ev.type === 'tool_call' && ev.tool_call) { toolCalls.push(ev.tool_call); }
+             else if (ev.type === 'message_stop' && ev.usage) { usage = ev.usage; }
+           }
+           const streamResult: GatewayDispatchResult = {
+             provider_id: resolved.provider_id,
+             response: {
+               content: contentBuffer,
+               ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+               ...(stopReason !== undefined ? { stop_reason: stopReason } : {}),
+               ...(usage !== undefined ? { usage } : {}),
+             },
+             usage: usage ?? { input_tokens: 0, output_tokens: 0 },
+           };
+           await this.observationalHook('after_response', streamResult, `provider-after:${runPlan.run_id}:${modelCallCount}`);
+           return gatewayResultToModelTurn(streamResult);
+         }
+       const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, effectiveRequest, {
           operation_id: opId,
           attempt_id: attId,
           signal:
@@ -684,10 +742,20 @@ export class Harness {
           name: string,
           args: Record<string, unknown>,
           context: ToolCallExecutionContext,
-        ) => {
-          return this.executeTool(name, args, context, session, sqliteStore);
-        },
-        signal: this.config.signal,
+       ) => {
+         return this.executeTool(name, args, context, session, sqliteStore);
+       },
+       // #6: RAG query for evidence injection
+       ragQuery: async (query, topK) => {
+         const results = queryStore(this.ragStore, {
+           text: query,
+           tenant_id: this.execCtx!.tenant_id,
+           principal_id: this.execCtx!.user_id,
+           top_k: topK,
+         });
+         return results;
+       },
+       signal: this.config.signal,
         turnHooks: {
           beforeTurn: async ({ iteration, messages }) => {
             const before = await this.decisionHook(
@@ -942,6 +1010,7 @@ private async executeTool(
       postconditionVerifier: this.config.security.postconditionVerifier,
       credentialBroker: this.config.security.credentialBroker,
       effectJournal: effectJournal ?? undefined,
+      outputFormatValidator: new OutputFormatValidator(this.config.toolRegistry, this.toolSnapshot),
       execCtx: execCtxForTool,
     },
    );
@@ -1088,6 +1157,11 @@ private async executeTool(
     } finally {
       this.currentWorkspace = null;
     }
+  }
+
+  /** P2-12: Expose LLM cache metrics. */
+  getCacheMetrics(): Record<string, unknown> {
+    return this.cacheManager.getMetrics() as unknown as Record<string, unknown>;
   }
 
 }

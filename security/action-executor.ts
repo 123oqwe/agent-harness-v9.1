@@ -26,12 +26,15 @@ import {
   ToolExecutorError,
   type ToolExecutorDeps,
   type ToolExecutorInjectedDeps,
+  type OutputFormatValidatorPort,
   type ToolReceipt,
 } from '../tools/tool-executor.js';
 import type { ConsentService } from './consent.js';
 import type { AuditSink } from './audit-sink.js';
 import type { ToolSpec } from '../contracts/index.js';
 import type { PostconditionVerifierPort } from '../tools/tool-executor.js';
+import type { ToolRegistry, RegistrySnapshot } from '../tools/tool-registry.js';
+import Ajv from 'ajv/dist/2020.js';
 
 export interface ActionExecutorInjectedDeps extends ToolExecutorInjectedDeps {
   consent: ConsentService;
@@ -70,6 +73,52 @@ export class DeclaredPostconditionVerifier implements PostconditionVerifierPort 
       }
     }
     return { valid: true };
+  }
+}
+
+/**
+ * P1-22: OutputFormatValidator — revalidates tool output against the
+ * tool's output_schema_ref JSON schema after execution.
+ */
+export class OutputFormatValidator implements OutputFormatValidatorPort {
+  private readonly registry: ToolRegistry;
+  private readonly snapshot: RegistrySnapshot;
+  private readonly ajv: Ajv;
+  private readonly schemaCache = new Map<string, (data: unknown) => boolean>();
+
+  constructor(registry: ToolRegistry, snapshot: RegistrySnapshot) {
+    this.registry = registry;
+    this.snapshot = snapshot;
+    this.ajv = new Ajv({ allErrors: true, strict: false });
+  }
+
+  async validateOutput(input: {
+    readonly toolName: string;
+    readonly result: unknown;
+  }): Promise<{ readonly valid: boolean; readonly reason?: string }> {
+    let schema = this.schemaCache.get(input.toolName);
+    if (schema === undefined) {
+      const schemaObj = this.registry.loadOutputSchema(
+        input.toolName,
+        this.snapshot,
+      );
+      if (schemaObj === null) {
+        // No output schema declared — cannot validate, allow.
+        this.schemaCache.set(input.toolName, (_data: unknown) => true);
+        schema = (_data: unknown) => true;
+      } else {
+        const compiled = this.ajv.compile(schemaObj);
+        this.schemaCache.set(input.toolName, compiled as (data: unknown) => boolean);
+        schema = compiled as (data: unknown) => boolean;
+      }
+    }
+    if (schema(input.result)) {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      reason: `output does not match schema for tool "${input.toolName}"`,
+    };
   }
 }
 

@@ -183,6 +183,13 @@ export class ToolRegistry {
     });
   }
 
+  /** Load the selected frozen tool plus its actual packaged output schema. */
+  loadOutputSchema(name: string, snap: RegistrySnapshot): Record<string, unknown> | null {
+    const spec = this.loadFull(name, snap);
+    if (!spec.output_schema_ref) return null;
+    return this.loadJsonResource(spec.output_schema_ref) as Record<string, unknown>;
+  }
+
   listNames(): string[] { return [...this.tools.keys()].sort(); }
 
   /**

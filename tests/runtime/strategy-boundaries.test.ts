@@ -129,6 +129,8 @@ describe('Direct strategy boundaries', () => {
           'preserve the original language, key factual terms, and meaning',
         ),
       }),
+      undefined,
+      undefined,
     );
   });
 
@@ -530,6 +532,8 @@ describe('Plan+Execute execution and recovery', () => {
         allowed_tools: ['read_file'],
         required_tool: 'read_file',
       }),
+      undefined,
+      undefined,
     );
     expect(result.step_states).toEqual({
       propose: 'done',
@@ -1186,6 +1190,8 @@ describe('ReAct action/observation boundaries', () => {
           'at most 12 whitespace-separated words',
         ),
       }),
+      undefined,
+      undefined,
     );
   });
 

@@ -11,9 +11,9 @@ export type { ToolResult, ToolContext, TypedTool } from './types.js';
 export { ToolUnavailableError } from './types.js';
 
 export { webFetch } from './web-fetch.js';
-export { webSearch } from './web-search.js';
+export { webSearch, setWebSearchProvider, type WebSearchProvider } from './web-search.js';
 export { escalateToHuman, getAuditTrail } from './escalate.js';
-export { connectMcpStdio, disconnectMcpStdio, getConnection } from './mcp-stdio.js';
+export { connectMcpStdio, disconnectMcpStdio, getConnection, setMcpAllowlist, getMcpAllowlist } from './mcp-stdio.js';
 export { behaviorVerify } from './behavior-verify.js';
 export { runInOciSandbox } from './oci-sandbox.js';
 export {

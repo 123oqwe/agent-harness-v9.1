@@ -44,6 +44,16 @@ export class TransactionalWorkspace {
     return this.transaction.describeChanges();
   }
 
+  /** #10: Create a named checkpoint for undo support. */
+  checkpoint(label?: string): string {
+    return this.transaction.checkpoint(label);
+  }
+
+  /** #10: Restore workspace to a checkpoint. */
+  restore(checkpointId: string): void {
+    this.transaction.restore(checkpointId);
+  }
+
   finalize(success: boolean): void {
     if (this.finalized) {
       throw new Error('transactional workspace is already finalized');

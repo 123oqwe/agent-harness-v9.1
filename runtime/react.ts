@@ -154,110 +154,78 @@ export async function runReact(
     const duplicateIds = new Set<string>();
     const seenIds = new Set<string>();
     for (const call of turn.tool_calls) {
-      if (seenIds.has(call.id)) duplicateIds.add(call.id);
-      seenIds.add(call.id);
-    }
-    for (const call of turn.tool_calls) {
-      const stepId = `react-${context.iterations}`;
+     if (seenIds.has(call.id)) duplicateIds.add(call.id);
+     seenIds.add(call.id);
+   }
+   // P1-06/#5: Pre-check all calls synchronously, then execute in parallel.
+   const stepId = `react-${context.iterations}`;
+   type ToolCallEntry = NonNullable<typeof turn.tool_calls>[number];
+   const passedCalls: Array<{ call: ToolCallEntry; count: number }> = [];
+   for (const call of turn.tool_calls) {
       context.recordToolCall(recorded, call, stepId);
       if (!allowedToolSet.has(call.name)) {
-        context.recordObservation(
-          recorded,
-          call,
-          'rejected',
-          'tool is not bound by the frozen RunPlan',
-          stepId,
-        );
+        context.recordObservation(recorded, call, 'rejected', 'tool is not bound by the frozen RunPlan', stepId);
         context.terminate('malformed_response');
         return;
       }
       if (duplicateIds.has(call.id)) {
-        context.recordObservation(
-          recorded,
-          call,
-          'rejected',
-          'duplicate tool_call id in one model turn',
-          stepId,
-        );
+        context.recordObservation(recorded, call, 'rejected', 'duplicate tool_call id in one model turn', stepId);
         context.terminate('malformed_response');
         return;
       }
-
       const key = `${call.name}:${canonical(call.arguments)}`;
       const count = (callCounts.get(key) ?? 0) + 1;
       callCounts.set(key, count);
       if (count >= 3) {
-        context.recordObservation(
-          recorded,
-          call,
-          'rejected',
-          'repeated tool call oscillation',
-          stepId,
-        );
+        context.recordObservation(recorded, call, 'rejected', 'repeated tool call oscillation', stepId);
         context.terminate('tool_oscillation');
         return;
       }
       if (!context.deps.toolExecute) {
-        context.recordObservation(
-          recorded,
-          call,
-          'rejected',
-          'tool executor unavailable',
-          stepId,
-        );
+        context.recordObservation(recorded, call, 'rejected', 'tool executor unavailable', stepId);
         context.terminate('malformed_response');
         return;
       }
-      try {
-        const result = await context.deps.toolExecute(
-          call.name,
-          call.arguments,
-          {
-            tool_call_id: call.id,
-            step_id: stepId,
-            attempt_index: count,
-          },
-        );
+      passedCalls.push({ call, count });
+    }
+
+    // Execute all passed calls in parallel
+   const execResults = await Promise.allSettled(
+     passedCalls.map(({ call, count }) =>
+       context.deps.toolExecute!(call.name, call.arguments, {
+         tool_call_id: call.id,
+         step_id: stepId,
+         attempt_index: count,
+         on_output: context.deps.onToolOutput
+           ? (stream, chunk) => context.deps.onToolOutput!(call.id, stepId, stream, chunk)
+           : undefined,
+       }),
+     ),
+   );
+
+    // Record results sequentially to avoid array write races
+    for (let i = 0; i < passedCalls.length; i++) {
+      const { call } = passedCalls[i]!;
+      const settled = execResults[i]!;
+      if (settled.status === 'fulfilled') {
+        const observation = context.recordObservation(recorded, call, 'ok', settled.value, stepId);
+        messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(observation) });
+      } else {
+        const error = settled.reason;
+        const errMsg = error instanceof Error ? error.message : 'tool execution failed';
         const observation = context.recordObservation(
-          recorded,
-          call,
-          'ok',
-          result,
-          stepId,
-        );
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'tool execution failed';
-        const observation = context.recordObservation(
-          recorded,
-          call,
+          recorded, call,
           error instanceof HookRestrictionError ? 'rejected' : 'error',
-          message,
-          stepId,
+          errMsg, stepId,
         );
         context.deps.session.append('error', {
-          tool: call.name,
-          tool_call_id: call.id,
-          error: message,
-          error_type: 'tool_execution',
+          tool: call.name, tool_call_id: call.id, error: errMsg, error_type: 'tool_execution',
         });
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify(observation),
-        });
+        messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(observation) });
         if (error instanceof HookRestrictionError) {
           context.terminate(
-            error.action === 'force_prompt'
-              ? 'approval_required'
-              : error.action === 'skip'
-                ? 'skipped'
-                : 'denied',
+            error.action === 'force_prompt' ? 'approval_required'
+              : error.action === 'skip' ? 'skipped' : 'denied',
           );
           return;
         }

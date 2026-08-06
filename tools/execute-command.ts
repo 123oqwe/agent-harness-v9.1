@@ -10,6 +10,7 @@ export interface ExecCommandInput {
   cwd: string;
   stdin?: string;
   timeout_ms?: number;
+  on_output?: (stream: 'stdout' | 'stderr', chunk: string) => void;
 }
 export interface ExecCommandOutput {
   exit_code: number | null;
@@ -25,13 +26,17 @@ export async function executeCommand(
   input: ExecCommandInput,
 ): Promise<ExecCommandOutput> {
   const limits: Partial<SandboxLimits> = input.timeout_ms ? { timeoutMs: input.timeout_ms } : {};
-  const opts: Parameters<typeof execSandboxed>[0] = {
-    argv: input.argv,
-    cwd: input.cwd,
-    profile,
-    limits,
-    stdin: input.stdin,
-  };
+ const opts: Parameters<typeof execSandboxed>[0] = {
+   argv: input.argv,
+   cwd: input.cwd,
+   profile,
+   limits,
+   stdin: input.stdin,
+   ...(input.on_output ? {
+     onStdout: (c: string) => input.on_output!('stdout', c),
+     onStderr: (c: string) => input.on_output!('stderr', c),
+   } : {}),
+ };
   const r = await execSandboxed(opts);
   return {
     exit_code: r.exitCode, stdout: r.stdout.toString('utf8'), stderr: r.stderr.toString('utf8'),

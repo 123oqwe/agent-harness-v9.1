@@ -77,6 +77,8 @@ export interface SandboxExecOptions {
   limits?: Partial<SandboxLimits>;
   profile: SandboxProfile;
   signal?: AbortSignal;
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
 }
 
 export interface SandboxRuntimeDependencies {
@@ -671,8 +673,11 @@ export function execSandboxed(
       return buf;
     };
 
-    child.stdout.on('data', (c: Buffer) => { stdout = acc(stdout, c); });
-    child.stderr.on('data', (c: Buffer) => { stderr = acc(stderr, c); });
+   child.stdout.on('data', (c: Buffer) => { stdout = acc(stdout, c); });
+   child.stderr.on('data', (c: Buffer) => { stderr = acc(stderr, c); });
+    // #9: stream output chunks to callers that provide callbacks
+    child.stdout.on('data', (c: Buffer) => { opts.onStdout?.(c.toString('utf8')); });
+    child.stderr.on('data', (c: Buffer) => { opts.onStderr?.(c.toString('utf8')); });
 
     const resourceMonitor = setInterval(() => {
             if (settled || child.pid === undefined) return;

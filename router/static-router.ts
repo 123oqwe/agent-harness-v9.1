@@ -315,13 +315,14 @@ export class StaticRouter {
       /\b(?:bug|fix|patch|change|modify|update|refactor)\b|修复|修改|更新|重构/u.test(
         goal,
       );
-    if (codingMutation) {
-      return [
-        'read_file',
-        'edit_file',
-        ...(intent.requires_tests ? ['execute_command'] : []),
-      ];
-    }
+   if (codingMutation) {
+     return [
+       'read_file',
+       'edit_file',
+        'apply_patch',
+       ...(intent.requires_tests ? ['execute_command'] : []),
+     ];
+   }
     if (intent.requires_writes) {
       if (intent.explicit_plan && paths.length === 0) return [];
       const mutationInPlace =
@@ -532,13 +533,13 @@ export class StaticRouter {
             ? 1
             : strategy === 'plan_execute'
               ? (workflowTools.length + 1) * 2
-              : Math.min(
-                  8,
-                  Math.max(4, requiredTools.length + 2),
-                ),
+             : Math.min(
+                50,
+                Math.max(4, requiredTools.length + 2),
+               ),
       },
       persistence_policy: { event_log: true, snapshot: true },
-      cancellation_policy: { abortable: true },
+      cancellation_policy: { abortable: true, auto_execute: true },
       fallback_policy: { on_failure: 'abort' },
       context_strategy: { active_plan_injection: true },
     };

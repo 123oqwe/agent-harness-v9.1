@@ -77,6 +77,18 @@ export interface PostconditionVerifierPort {
   }): Promise<{ readonly valid: boolean; readonly reason?: string }>;
 }
 
+/**
+ * P1-22: Output format revalidation port.
+ * Validates the tool result against the tool's output_schema_ref JSON schema
+ * after execution. Catches tools that return malformed output shapes.
+ */
+export interface OutputFormatValidatorPort {
+  validateOutput(input: {
+    readonly toolName: string;
+    readonly result: unknown;
+  }): Promise<{ readonly valid: boolean; readonly reason?: string }>;
+}
+
 export type EffectState =
   | 'PRE_DISPATCH'
   | 'IN_FLIGHT'
@@ -234,6 +246,8 @@ export interface ToolExecutorInjectedDeps {
   consent?: ConsentService;
   credentialBroker?: ToolCredentialBrokerPort | undefined;
   postconditionVerifier?: PostconditionVerifierPort;
+  /** P1-22: validates tool output against output_schema_ref after execution. */
+  outputFormatValidator?: OutputFormatValidatorPort;
   effectJournal?: EffectJournalPort | undefined;
   /** Execution context providing tenant_id, user_id, run_id, etc. */
   execCtx?: {
@@ -515,18 +529,30 @@ export class ToolExecutor {
           }
         },
       );
-      if (this.injected.postconditionVerifier && toolSpec) {
-        const verification = await this.injected.postconditionVerifier.verify({
-          tool: toolSpec,
-          result,
-        });
-        if (!verification.valid) {
-          throw new ToolExecutorError(
-            `postcondition verification failed: ${verification.reason ?? 'unspecified'}`,
-          );
-        }
-      }
-      await verifyResult?.(result);
+     if (this.injected.postconditionVerifier && toolSpec) {
+       const verification = await this.injected.postconditionVerifier.verify({
+         tool: toolSpec,
+         result,
+       });
+       if (!verification.valid) {
+         throw new ToolExecutorError(
+           `postcondition verification failed: ${verification.reason ?? 'unspecified'}`,
+         );
+       }
+     }
+     // P1-22: revalidate tool output format against the tool's output schema
+     if (this.injected.outputFormatValidator) {
+       const formatCheck = await this.injected.outputFormatValidator.validateOutput({
+         toolName,
+         result,
+       });
+       if (!formatCheck.valid) {
+         throw new ToolExecutorError(
+           `output format revalidation failed: ${formatCheck.reason ?? 'unspecified'}`,
+         );
+       }
+     }
+     await verifyResult?.(result);
     } catch (e) {
       error = (e as Error).message;
       if (this.injected.effectJournal && effectPrepared) {

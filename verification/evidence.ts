@@ -35,6 +35,14 @@ export interface EvidencePackage {
   verifier_model?: string;
   test_output?: string | null;
   test_output_hash?: string | null;
+  /**
+   * P2-17: Hash chain link.
+   * prev_hash is the self_hash of the preceding EvidencePackage in the chain,
+   * or null if this is the first package. self_hash is the SHA-256 of the
+   * canonical content of this package (everything except self_hash itself).
+   */
+  prev_hash?: string | null;
+  self_hash?: string | null;
 }
 
 export class EvidenceError extends Error {
@@ -47,6 +55,33 @@ export class EvidenceError extends Error {
 
 const sha = (s: string | null | undefined): string | null => s ? createHash('sha256').update(s).digest('hex').slice(0, 16) : null;
 const exactCommitSha = /^[0-9a-f]{40}$/u;
+
+/**
+ * P2-17: Compute the self_hash of an EvidencePackage.
+ *
+ * The hash covers the canonical JSON of every field EXCEPT self_hash.
+ * prev_hash is included so the chain is tamper-evident.
+ */
+function computeSelfHash(evidence: Readonly<EvidencePackage>): string {
+  const { self_hash: _omitted, ...rest } = evidence;
+  return createHash('sha256')
+    .update(JSON.stringify(rest))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/**
+ * P2-17: Verify the hash chain of an EvidencePackage.
+ * Returns true if self_hash matches the recomputed hash (or is absent for
+ * legacy packages). Does not throw — callers decide whether to reject.
+ */
+export function verifyHashChain(evidence: Readonly<EvidencePackage>): boolean {
+  if (evidence.self_hash === undefined || evidence.self_hash === null) {
+    // Legacy package without hash chain — accepted but not verified.
+    return true;
+  }
+  return computeSelfHash(evidence) === evidence.self_hash;
+}
 
 export interface CommandSpec {
   argv: readonly string[];
@@ -140,22 +175,25 @@ export function generateEvidence(params: {
   // forbidden: self-reported PASS without real commands
   if (params.commands.length === 0) throw new EvidenceError('self-reported PASS without commands is forbidden');
 
-  const evidence: EvidencePackage = {
-    requirement_id: params.requirement_id,
-    commit_sha,
-    source_files,
-    tests_added,
-    commands_run,
-    exit_codes,
-    test_results: params.test_results,
-    coverage: params.coverage,
-    security_checks: params.security_checks,
-    verifier_result: allPassed ? 'pass' : 'fail',
-    verifier_model: params.verifier_model ?? 'independent rerun at exact implementation SHA',
-    test_output: null,
-    test_output_hash: null,
-  };
-  return evidence;
+ const evidence: EvidencePackage = {
+   requirement_id: params.requirement_id,
+   commit_sha,
+   source_files,
+   tests_added,
+   commands_run,
+   exit_codes,
+   test_results: params.test_results,
+   coverage: params.coverage,
+   security_checks: params.security_checks,
+   verifier_result: allPassed ? 'pass' : 'fail',
+   verifier_model: params.verifier_model ?? 'independent rerun at exact implementation SHA',
+   test_output: null,
+   test_output_hash: null,
+ };
+  // P2-17: hash chain — first package has prev_hash null
+  evidence.prev_hash = null;
+  evidence.self_hash = computeSelfHash(evidence);
+ return evidence;
 }
 
 /** Write an EvidencePackage to disk (immutable once written). */
@@ -172,7 +210,13 @@ export function writeEvidence(evidence: EvidencePackage, path: string): void {
         `evidence is immutable: ${path} may only transition from fail to pass`,
       );
     }
+    // P2-17: chain to the existing package's self_hash
+    evidence.prev_hash = existing.self_hash ?? null;
+  } else {
+    evidence.prev_hash = null;
   }
+  // P2-17: (re)compute self_hash after setting prev_hash
+  evidence.self_hash = computeSelfHash(evidence);
   writeFileSync(path, JSON.stringify(evidence, null, 2));
 }
 
@@ -210,6 +254,14 @@ export function validateEvidence(evidence: unknown, schemaPath: string): boolean
     throw new EvidenceError(
       'verifier_result does not match the recorded command exits',
     );
+  }
+  // P2-17: verify hash chain if self_hash is present
+  if (e.self_hash !== undefined && e.self_hash !== null) {
+    if (!verifyHashChain(e)) {
+      throw new EvidenceError(
+        'hash chain verification failed: self_hash does not match recomputed hash',
+      );
+    }
   }
   return true;
 }

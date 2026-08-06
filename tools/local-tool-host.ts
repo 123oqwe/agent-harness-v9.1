@@ -1,4 +1,7 @@
 import { parseDocument } from '../ingestion/parse-document.js';
+import { applyPatch } from './apply-patch.js';
+import { undo } from './undo.js';
+import { screenshot } from './screenshot.js';
 import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import type { VirtualFilesystem } from '../vfs/virtual-filesystem.js';
 import type { WorkspaceTransaction } from '../vfs/workspace-transaction.js';
@@ -74,11 +77,20 @@ export class LocalToolHost {
         return searchFiles(vfs, args as never);
       case 'execute_command':
         return this.executeWorkspaceCommand(args);
-      case 'create_artifact':
-        return createArtifact(vfs, args as never);
-      case 'parse_document':
-        return parseDocument(vfs, args as never);
-      case 'ask_user':
+     case 'create_artifact':
+       return createArtifact(vfs, args as never);
+     case 'apply_patch':
+       return applyPatch(vfs, args as never);
+      case 'undo': {
+        const ws = this.workspace();
+        if (!ws.transaction) throw new Error('workspace transaction is not active');
+        return undo((id) => ws.transaction!.restore(id), args as never);
+      }
+     case 'parse_document':
+       return parseDocument(vfs, args as never);
+      case 'screenshot':
+        return screenshot(vfs, args as never);
+     case 'ask_user':
         throw new Error(
           'ask_user must be handled by the caller, not dispatched',
         );

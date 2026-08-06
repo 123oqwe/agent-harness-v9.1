@@ -89,12 +89,13 @@ describe('LocalToolHost', () => {
       read({ vfs: setup.vfs, sandbox: setup.sandbox } as never, {
         path: '/workspace/a.txt',
       }),
-    ).resolves.toEqual({
-      path: '/workspace/a.txt',
-      content: 'hello',
-      bytes: 5,
-      truncated: false,
-    });
+   ).resolves.toEqual({
+     path: '/workspace/a.txt',
+     content: 'hello',
+     bytes: 5,
+     truncated: false,
+     encoding: 'utf8',
+   });
   });
 
   it('routes read, write, edit, list, search, artifact, and document parsing through VFS', async () => {

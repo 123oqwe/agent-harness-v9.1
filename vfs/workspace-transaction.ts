@@ -28,6 +28,7 @@ import {
   join,
   relative,
   resolve,
+  dirname,
   sep,
 } from 'node:path';
 import {
@@ -489,6 +490,69 @@ export class WorkspaceTransaction {
     this.checkActive();
     this.finalized = true;
     rmSync(this.containerRoot, { recursive: true, force: true });
+  }
+
+  /**
+   * #10: Create a named checkpoint of the current workspace state.
+   * Copies all files that differ from the initial manifest into a
+   * checkpoint directory so they can be restored later.
+   */
+  checkpoint(label?: string): string {
+    this.checkActive();
+    const id = label ?? `cp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const cpDir = join(this.containerRoot, 'checkpoints', id);
+    mkdirSync(cpDir, { recursive: true });
+    const current = scanWorkspace(this.workspaceRoot, this.metadata.protected_links);
+    const manifest: Record<string, ManifestEntry> = {};
+    for (const [rel, entry] of Object.entries(current)) {
+      const initial = this.metadata.initial[rel];
+      if (!equalEntry(initial, entry)) {
+        // File changed or created — copy it
+        if (entry.kind === 'file') {
+          const src = join(this.workspaceRoot, rel);
+          const dst = join(cpDir, rel);
+          mkdirSync(dirname(dst), { recursive: true });
+          copyFileSync(src, dst);
+        }
+        manifest[rel] = entry;
+      }
+    }
+    // Also record deleted files from initial
+    for (const [rel, entry] of Object.entries(this.metadata.initial)) {
+      if (current[rel] === undefined) {
+        manifest[rel] = entry;
+      }
+    }
+    writeFileSync(join(cpDir, '.manifest.json'), JSON.stringify(manifest));
+    return id;
+  }
+
+  /**
+   * #10: Restore the workspace to a previously created checkpoint.
+   */
+  restore(checkpointId: string): void {
+    this.checkActive();
+    const cpDir = join(this.containerRoot, 'checkpoints', checkpointId);
+    if (!existsSync(cpDir)) {
+      throw new VfsError(`checkpoint not found: ${checkpointId}`);
+    }
+    const manifest = JSON.parse(
+      readFileSync(join(cpDir, '.manifest.json'), 'utf8'),
+    ) as Record<string, ManifestEntry>;
+    for (const [rel, entry] of Object.entries(manifest)) {
+      const absPath = join(this.workspaceRoot, rel);
+      const cpPath = join(cpDir, rel);
+      if (entry === null) continue;
+      if (existsSync(cpPath)) {
+        // Restore from checkpoint copy
+        mkdirSync(dirname(absPath), { recursive: true });
+        copyFileSync(cpPath, absPath);
+        if (entry.kind === 'file') chmodSync(absPath, entry.mode);
+      } else {
+        // File was deleted at checkpoint time — remove it
+        if (existsSync(absPath)) rmSync(absPath, { recursive: true, force: true });
+      }
+    }
   }
 
   private checkActive(): void {
