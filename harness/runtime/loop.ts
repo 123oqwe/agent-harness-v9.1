@@ -70,7 +70,7 @@ export interface LoopResult {
 export interface LoopDeps {
   session: DurableSession;
   // model call: given messages, returns a turn; never called after termination
-  modelCall: (messages: unknown[], attempt: number) => Promise<ModelTurn>;
+  modelCall: (messages: unknown[], attempt: number, tools?: unknown[]) => Promise<ModelTurn>;
   // tool execute: given tool name+args, returns result; goes through Policy/Capability/PEP externally
   toolExecute?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   // goal checker: returns true if goal is satisfied

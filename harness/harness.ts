@@ -23,13 +23,14 @@ import type { EventBus } from './runtime/event-bus.js';
 import type { PluginManager } from './runtime/plugin-manager.js';
 import type { SessionManager } from './runtime/session-manager.js';
 import type { HealthMonitor } from './runtime/health-monitor.js';
+import { sanitizeToolCall, redactCredentials } from './runtime/context-rag.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './runtime/sandbox.js';
 import type { SandboxProfile as _SP } from './runtime/sandbox.js';
 
 /** A provider that can be called by the Runtime — typed, not a raw callback. */
 export interface HarnessProvider {
-  resolve(messages: Array<{ role: string; content: string }>): Promise<ModelTurn>;
+  resolve(messages: Array<{ role: string; content: string }>, tools?: Array<{ name: string; description?: string }>): Promise<ModelTurn>;
 }
 
 /** Outcome returned to the caller (Vertical or user). */
@@ -89,12 +90,21 @@ export class Harness {
   }
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
-  async run(task: TaskContract, runId?: string): Promise<HarnessOutcome> {
+  async run(task: TaskContract, runId?: string, sessionId?: string): Promise<HarnessOutcome> {
     // 1. Create session (event log = source of truth)
     const session = new DurableSession(runId ?? `run-${deterministicRunId(task)}`);
     // Create an overlay for write isolation (plan_execute stages writes here)
     this.currentOverlay = new OverlayBackend('/scratch');
     this.currentTarget = null; // set when overlay is committed
+
+    // P1-08: Inject prior session context for multi-turn conversation
+    if (this.config.sessionManager && sessionId) {
+      const priorContext = this.config.sessionManager.getContext(sessionId);
+      if (priorContext.length > 0) {
+        const contextSummary = priorContext.map(r => `Previous: ${r.task} -> ${r.result}`).join('\n');
+        task = { ...task, goal: `${task.goal}\n\n[Previous conversation context]\n${contextSummary}` };
+      }
+    }
 
     // 2. StaticRouter: TaskContract → RunPlan (policy prefilter + strategy selection)
     const router = new StaticRouter({
@@ -136,9 +146,11 @@ export class Harness {
       },
       {
         session,
-        modelCall: async (messages: unknown[]) => {
+        modelCall: async (messages: unknown[], _attempt: number, _tools?: unknown[]) => {
           const typedMessages = messages as Array<{ role: string; content: string }>;
-          const turn = await this.config.provider.resolve(typedMessages);
+          // P1-01: pass tool definitions for native function calling
+          const toolSpecs = this.config.policyEngine.snapshot.allowed_tools.map(name => ({ name, description: `Tool: ${name}` }));
+          const turn = await this.config.provider.resolve(typedMessages, toolSpecs);
           return turn;
         },
         toolExecute: async (name: string, args: Record<string, unknown>) => {
@@ -158,6 +170,14 @@ export class Harness {
     // 4. Persist session if path provided
     if (this.config.sessionLogPath) {
       persistSession(session, this.config.sessionLogPath);
+    }
+
+    // P1-08: Store task result in session manager for multi-turn context
+    if (this.config.sessionManager && sessionId) {
+      this.config.sessionManager.addTaskResult(sessionId, {
+        task: task.goal, result: loopResult.decision_summaries.join('; ') || 'completed',
+        timestamp: new Date().toISOString(), run_id: session.session_id,
+      });
     }
 
     // 5. Build evidence
@@ -183,12 +203,35 @@ export class Harness {
     }
     if (!this.config.policyEngine.snapshot.allowed_tools.includes(name)) {
       session.append('error', { tool: name, reason: 'policy denied' });
-      throw new Error(`policy denied: ${name}`);
+    throw new Error(`policy denied: ${name}`);
+    }
+    // P2-20: Output sanitization — block path traversal, shell injection before execution
+    const sanitization = sanitizeToolCall(name, args, session.session_id);
+    if (!sanitization.safe) {
+      session.append('error', { tool: name, reason: `sanitization: ${sanitization.reason}` });
+      throw new Error(`sanitization blocked: ${sanitization.reason}`);
+    }
+    // P1-24: PreToolUse hook — plugins can deny/skip/force-prompt a tool call.
+    // Deny is never bypassed.
+    if (this.config.pluginManager) {
+      const hookResults = await this.config.pluginManager.trigger('pre_tool_use', { run_id: session.session_id, tool_name: name, tool_args: args });
+      const denied = hookResults.find(r => r.action === 'deny');
+      if (denied) {
+        session.append('error', { tool: name, reason: `hook denied: ${denied.reason ?? 'no reason'}` });
+        throw new Error(`hook denied: ${name}: ${denied.reason ?? 'no reason'}`);
+      }
     }
     session.append('tool_call', { tool: name, args });
     const result = await this.dispatchTool(name, args);
-    session.append('tool_result', { tool: name, result: JSON.stringify(result).slice(0, 500) });
-    return result;
+    // P2-21: Redact credentials from tool output before it enters model context
+    const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+    const redacted = redactCredentials(resultStr);
+    // P1-24: PostToolUse hook
+    if (this.config.pluginManager) {
+      await this.config.pluginManager.trigger('post_tool_use', { run_id: session.session_id, tool_name: name, tool_result: { success: true } });
+    }
+    session.append('tool_result', { tool: name, result: redacted.slice(0, 500) });
+    return redacted;
   }
 
   private async dispatchTool(name: string, args: Record<string, unknown>): Promise<unknown> {

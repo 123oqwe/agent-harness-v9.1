@@ -193,11 +193,12 @@ export class ManagedGateway {
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(90_000),
         });
-        if (!resp.ok) {
-          const errText = await resp.text().catch(() => '');
-          if (resp.status === 429 && attempt < maxRetries) {
-            await sleep(2 ** attempt * 1000);
-            continue;
+       if (!resp.ok) {
+         const errText = await resp.text().catch(() => '');
+          // P1-09: 429 rate_limited must NOT be retried — retrying aggravates the throttle.
+          // Return immediately so the caller can respect retry-after and re-queue.
+          if (resp.status === 429) {
+            return this.providerError(binding, `HTTP 429 rate limited (do not retry): ${errText.slice(0, 300)}`, t0);
           }
           if (resp.status < 500 && resp.status !== 429) {
             return this.providerError(binding, `HTTP ${resp.status}: ${errText.slice(0, 300)}`, t0);

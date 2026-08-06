@@ -5,7 +5,8 @@
  * - backoff: baseDelay * 2^(N-1) + random(0, jitterMs)
  * - defaults: baseDelay=1000, maxDelay=30000, jitterMs=500, maxAttempts=3
  * - non-retryable errors (e.g. 400) do NOT trigger retry
- * - retryable: network errors, 429, 500, 502, 503, 504
+ * - retryable: network errors, 500, 502, 503, 504
+ * - non-retryable: 429 (rate limited — retrying aggravates throttle), 400, 401, 403
  * - circuit breaker: opens after 5 consecutive failures, blocks 60s, half-open allows 1 probe
  * - all attempts logged
  * - RetryExhausted includes last error + attempt count
@@ -68,7 +69,9 @@ export function classifyError(err: unknown): RetryableError {
     if (status === 400 || status === 401 || status === 403 || status === 404 || status === 422) {
       return { kind: 'unknown', status, retryable: false, message: (err as { message?: string })?.message ?? `status ${status}` };
     }
-    if (status === 429) return { kind: 'rate_limited', status, retryable: true, message: 'rate limited' };
+    // P1-09: 429 is NOT retryable — retrying aggravates the throttle.
+    // Caller should respect retry-after header and re-queue.
+    if (status === 429) return { kind: 'rate_limited', status, retryable: false, message: 'rate limited (do not retry)' };
     if (status >= 500) return { kind: 'server', status, retryable: true, message: `server error ${status}` };
   }
   const msg = (err as Error)?.message ?? String(err);

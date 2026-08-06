@@ -13,8 +13,10 @@ describe('AH-CAPMAP-013 retry + circuit breaker', () => {
       await expect(retry(async () => { calls++; throw Object.assign(new Error('bad'), { status: 400 }); }, { maxAttempts: 3, baseDelay: 1 })).rejects.toThrow();
       expect(calls).toBe(1);
     });
-    it('retryable errors: 429, 500, 502, 503, 504, network, timeout', () => {
-      for (const s of [429, 500, 502, 503, 504]) expect(classifyError({ status: s, message: 'x' }).retryable).toBe(true);
+    it('retryable errors: 500, 502, 503, 504, network, timeout (429 is NOT retryable)', () => {
+      // P1-09: 429 rate_limited must NOT be retried — retrying aggravates the throttle
+      expect(classifyError({ status: 429, message: 'x' }).retryable).toBe(false);
+      for (const s of [500, 502, 503, 504]) expect(classifyError({ status: s, message: 'x' }).retryable).toBe(true);
       expect(classifyError(new Error('network error')).retryable).toBe(true);
       expect(classifyError(new Error('ETIMEDOUT')).retryable).toBe(true);
     });
