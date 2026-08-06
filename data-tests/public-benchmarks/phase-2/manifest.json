@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "kind": "public-benchmarks",
-  "execution_runner_status": "not_implemented",
+  "execution_runner_status": "implemented",
   "dataset": {
     "id": "phase2-public-contract-v1",
     "availability": "bootstrap-only",
