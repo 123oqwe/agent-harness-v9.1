@@ -61,11 +61,11 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
       'provider_unavailable',
     );
   }
-  const result = await imageGenProvider.generate(input.prompt, {
-    width: input.width,
-    height: input.height,
-    style: input.style,
-  });
+  const opts: { width?: number; height?: number; style?: string } = {};
+  if (input.width !== undefined) opts.width = input.width;
+  if (input.height !== undefined) opts.height = input.height;
+  if (input.style !== undefined) opts.style = input.style;
+  const result = await imageGenProvider.generate(input.prompt, opts);
   const artifact = createArtifact('image', result.mime_type, result.image_data, {
     source: 'generated',
     generator: imageGenProvider.model,

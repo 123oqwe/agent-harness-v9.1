@@ -1,9 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import * as mod from '../../../packages/multimodal/src/image-edit.js';
-import { editImage, type ImageEditInput } from '../../../packages/multimodal/src/image-edit.js';
+import { editImage, setImageEditProvider, type ImageEditProviderPort, type ImageEditInput } from '../../../packages/multimodal/src/image-edit.js';
 import { MultimodalUnavailableError } from '../../../packages/multimodal/src/types.js';
+import { Buffer } from 'node:buffer';
 
-describe('AH-MM-IMAGE-EDIT-001', () => {
+const mockEditProvider: ImageEditProviderPort = {
+  model: 'dall-e-2',
+  async edit(image_data: Buffer, edit_prompt: string) {
+    return {
+      image_data: Buffer.from(`edited:${image_data.length}:${edit_prompt}`),
+      mime_type: 'image/png',
+    };
+  },
+};
+
+describe('AH-MM-IMAGE-EDIT-001: Image editing with identity preservation', () => {
+  afterEach(() => setImageEditProvider(undefined));
+
   it('module is importable', () => {
     expect(mod).toBeDefined();
   });
@@ -19,5 +32,19 @@ describe('AH-MM-IMAGE-EDIT-001', () => {
       preserve_identity: true,
     };
     await expect(editImage(input)).rejects.toThrow(MultimodalUnavailableError);
+  });
+
+  it('edits an image with a configured provider', async () => {
+    setImageEditProvider(mockEditProvider);
+    const result = await editImage({ image_data: Buffer.from('png-data'), edit_prompt: 'add text overlay' });
+    expect(result.image_data).toBeInstanceOf(Buffer);
+    expect(result.artifact.type).toBe('image');
+    expect(result.artifact.provenance.source).toBe('edited');
+  });
+
+  it('passes preserve_identity option to provider', async () => {
+    setImageEditProvider(mockEditProvider);
+    const result = await editImage({ image_data: Buffer.from('img'), edit_prompt: 'blur background', preserve_identity: true });
+    expect(result.artifact.provenance.parameters).toMatchObject({ preserve_identity: true });
   });
 });

@@ -32,10 +32,10 @@ export async function generateSpeech(input: SpeechGenInput): Promise<{ artifact:
       'provider_unavailable',
     );
   }
-  const result = await ttsProvider.synthesize(input.text, {
-    voice: input.voice,
-    language: input.language,
-  });
+  const ttsOpts: { voice?: string; language?: string } = {};
+  if (input.voice !== undefined) ttsOpts.voice = input.voice;
+  if (input.language !== undefined) ttsOpts.language = input.language;
+  const result = await ttsProvider.synthesize(input.text, ttsOpts);
   const artifact = createArtifact('audio', result.mime_type, result.audio_data, {
     source: 'generated',
     generator: ttsProvider.model,
@@ -70,9 +70,9 @@ export async function transcribeAudio(input: TranscribeInput): Promise<{ text: s
       'provider_unavailable',
     );
   }
-  const result = await asrProvider.transcribe(input.audio_data, {
-    language: input.language,
-  });
+  const asrOpts: { language?: string } = {};
+  if (input.language !== undefined) asrOpts.language = input.language;
+  const result = await asrProvider.transcribe(input.audio_data, asrOpts);
   return {
     text: result.text,
     language: result.language,

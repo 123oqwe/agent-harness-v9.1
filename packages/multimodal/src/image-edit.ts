@@ -31,9 +31,9 @@ export async function editImage(input: ImageEditInput): Promise<{ artifact: Mult
       'provider_unavailable',
     );
   }
-  const result = await imageEditProvider.edit(input.image_data, input.edit_prompt, {
-    preserve_identity: input.preserve_identity,
-  });
+  const opts: { preserve_identity?: boolean } = {};
+  if (input.preserve_identity !== undefined) opts.preserve_identity = input.preserve_identity;
+  const result = await imageEditProvider.edit(input.image_data, input.edit_prompt, opts);
   const artifact = createArtifact('image', result.mime_type, result.image_data, {
     source: 'edited',
     generator: imageEditProvider.model,

@@ -37,14 +37,25 @@ export async function behaviorVerify(input: BehaviorVerifyInput): Promise<ToolRe
     );
   }
   const result = await behaviorVerifyProvider.verify(input.url, input.steps, input.assertions);
+  if (result.passed) {
+    return {
+      success: true,
+      output: {
+        passed: result.passed,
+        failures: result.failures,
+        duration_ms: result.duration_ms,
+        has_screenshot: !!result.screenshot,
+      },
+    };
+  }
   return {
-    success: result.passed,
+    success: false,
     output: {
       passed: result.passed,
       failures: result.failures,
       duration_ms: result.duration_ms,
       has_screenshot: !!result.screenshot,
     },
-    error: result.passed ? undefined : `${result.failures.length} assertion(s) failed`,
+    error: `${result.failures.length} assertion(s) failed`,
   };
 }

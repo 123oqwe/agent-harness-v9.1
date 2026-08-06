@@ -145,13 +145,17 @@ print(json.dumps({"created": True, "path": data["output_path"], "slides": len(da
 }
 
 // AH-TOOL-DOCUMENT-001
-export async function generateDocument(input: {
+export interface DocumentInput {
   output_path: string;
+  template_path?: string;
   title?: string;
   paragraphs?: string[];
   headings?: Array<{ text: string; level: number }>;
-}): Promise<ToolResult> {
+  content?: { title?: string; sections?: Array<{ heading: string; body: string }> };
+}
+export async function generateDocument(input: DocumentInput): Promise<ToolResult> {
   validatePath(input.output_path, 'output_path');
+  if (input.template_path !== undefined) validatePath(input.template_path, 'template_path');
   return runCli('python3', ['-c', `
 import sys, json
 try:
@@ -160,13 +164,17 @@ except ImportError:
     print(json.dumps({"error": "python-docx not installed"}))
     sys.exit(1)
 data = json.loads(sys.stdin.read())
-doc = Document()
-if data.get("title"):
-    doc.add_heading(data["title"], 0)
+doc = Document(data["template_path"]) if data.get("template_path") else Document()
+title = data.get("title") or (data.get("content") or {}).get("title")
+if title:
+    doc.add_heading(title, 0)
 for h in data.get("headings", []):
     doc.add_heading(h["text"], h["level"])
 for p in data.get("paragraphs", []):
     doc.add_paragraph(p)
+for s in (data.get("content") or {}).get("sections", []):
+    doc.add_heading(s["heading"], 1)
+    doc.add_paragraph(s["body"])
 doc.save(data["output_path"])
 print(json.dumps({"created": True, "path": data["output_path"]}))
 `], JSON.stringify(input));

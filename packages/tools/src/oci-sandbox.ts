@@ -63,10 +63,16 @@ export async function runInOciSandbox(config: OciSandboxConfig): Promise<ToolRes
   if (result.error) {
     return { success: false, output: null, error: `OCI execution failed: ${result.error.message}` };
   }
+  if (result.status === 0) {
+    return {
+      success: true,
+      output: { exitCode: result.status, stdout: result.stdout, stderr: result.stderr, runtime },
+    };
+  }
   return {
-    success: result.status === 0,
+    success: false,
     output: { exitCode: result.status, stdout: result.stdout, stderr: result.stderr, runtime },
-    error: result.status === 0 ? undefined : `OCI container exited with code ${result.status}`,
+    error: `OCI container exited with code ${result.status}`,
   };
 }
 
