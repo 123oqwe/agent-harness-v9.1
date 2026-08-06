@@ -305,12 +305,17 @@ export function buildProviderSelectionRequest(
   );
   const requiredCapabilities =
     input.runPlan.reasoning_strategy === 'direct'
-      ? ['reasoning']
-      : ['reasoning', 'tool_calling'];
+      ? ['text_reasoning']
+      : ['text_reasoning', 'tool_calling'];
   const providerId = input.runPlan.model_bindings[0]?.provider;
   if (providerId === undefined) {
     throw new Error('RunPlan must bind a model provider');
   }
+  // Check for model_restriction constraints that explicitly limit provider choice
+  const modelRestrictions = input.task.constraints
+    .filter((c) => c.type === 'model_restriction')
+    .map((c) => c.value);
+  const allowedProviderIds = modelRestrictions.length > 0 ? modelRestrictions : undefined;
   return {
     registry_snapshot_hash: input.registrySnapshotHash,
     request: {
@@ -347,11 +352,11 @@ export function buildProviderSelectionRequest(
       training_allowed: false,
     },
     policy: {
-      allowed_provider_ids: [providerId],
+      allowed_provider_ids: allowedProviderIds,
       denied_provider_ids: [],
     },
     run_plan: {
-      allowed_provider_ids: [providerId],
+      allowed_provider_ids: allowedProviderIds,
       required_capabilities: requiredCapabilities,
     },
   };

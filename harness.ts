@@ -735,10 +735,7 @@ export class Harness {
               );
             }
           }
-          let resolved;
-          try { resolved = this.config.gateway.resolve(effectiveRequest); }
-          catch (resolveErr) { console.error('[DEBUG] resolve failed:', resolveErr instanceof Error ? resolveErr.message : String(resolveErr)); throw resolveErr; }
-          console.error('[DEBUG] resolved provider:', resolved.provider_id);
+          const resolved = this.config.gateway.resolve(effectiveRequest);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
           const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
          // P2-12: track LLM cache key for prompt cache management
@@ -785,8 +782,6 @@ export class Harness {
            signal: dispatchSignal,
          });
        } catch (dispatchError) {
-        // DEBUG: log dispatch error
-        console.error('[DEBUG] dispatch failed for', resolved.provider_id, ':', dispatchError instanceof Error ? dispatchError.message : String(dispatchError));
          // Try fallback to another provider if modelFallback is configured
          if (this.modelFallback) {
            try {
@@ -804,8 +799,7 @@ export class Harness {
                initial_failure: dispatchError,
              });
              result = fallbackResult.dispatch_result as GatewayDispatchResult;
-              } catch (fbErr) {
-                console.error('[DEBUG] fallback failed:', fbErr instanceof Error ? fbErr.message : String(fbErr));
+              } catch {
              // Fallback also failed — throw original error
              throw dispatchError;
            }
@@ -818,7 +812,6 @@ export class Harness {
             for (let i = 0; i < 5 && !found; i++) {
               try {
                 fallbackResolved = this.config.gateway.switchProvider(fallbackResolved, effectiveRequest, [...attempted]);
-                console.error('[DEBUG] fallback trying:', fallbackResolved.provider_id);
                 attempted.add(fallbackResolved.provider_id);
                 result = await this.config.gateway.dispatch(fallbackResolved, effectiveRequest, {
                    operation_id: `${opId}-fb${i}`,

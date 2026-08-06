@@ -377,7 +377,7 @@ export class StaticRouter {
       .filter((constraint) => constraint.type === 'model_restriction')
       .map((constraint) => constraint.value);
     const capabilities =
-      strategy === 'direct' ? ['reasoning'] : ['reasoning', 'tool_calling'];
+      strategy === 'direct' ? ['text_reasoning'] : ['text_reasoning', 'tool_calling'];
     return {
       registry_snapshot_hash: this.deps.gateway.registrySnapshotHash,
       request: {

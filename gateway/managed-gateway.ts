@@ -108,7 +108,9 @@ export class ManagedGateway {
   private buildMetadata(binding: ModelBinding): GatewayProviderMetadata {
     const isLocal = binding.api_base.startsWith('http://localhost') || binding.api_base.startsWith('http://127.0.0.1');
     return {
-      capabilities: Object.keys(binding.capabilities),
+      // Include both 'reasoning' (registry key) and 'text_reasoning' (router request name)
+      // so provider resolution works regardless of which name the caller uses.
+      capabilities: [...Object.keys(binding.capabilities), ...(binding.capabilities['reasoning'] !== undefined ? ['text_reasoning'] as const : [])],
       max_context_tokens: binding.max_context,
       structured_output: (binding.capabilities['structured_output'] ?? 0) > 0.5,
       tool_calling: binding.supports_tools,
