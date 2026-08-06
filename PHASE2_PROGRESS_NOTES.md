@@ -228,3 +228,26 @@ Thickened 20+ Phase 2 unit tests with real mock-based behavioral coverage:
 - Equivalent mutant waivers rebound to current HEAD (uncommitted, allowed by gate)
 - Phase 1 mutation running: gateway module in progress (16/43 chunks)
 - Estimated completion: 2-4 hours for all 15 modules
+
+## Session 3: GLM 5.2 Real API + Mutation Rerun (2026-08-07)
+
+### GLM 5.2 Gateway Integration Fixes (commit a7b09d5)
+Ran real GLM 5.2 API through the full ManagedGateway pipeline. Found and fixed 3 bugs:
+1. capability-registry: Added glm-5.2 binding (was only glm-4-plus)
+2. managed-gateway: Fixed tool schema passing (was name-only, now full schema)
+3. provider-adapters: Added reasoning_effort+thinking for glm-5.x, fixed stop_reason
+
+### Mutation Test Improvements (commit 9336c13)
+Added tests for previously untested tool files (0% mutation score):
+- apply-patch.ts: 14 new tests (was 0% → expected ~85%+)
+- undo.ts: 5 new tests (was 0%)
+- screenshot.ts: 4 new tests (was 0%)
+- execute-command.ts: +6 tests (was 54.5%)
+- read-file.ts: +6 tests (was 73.3%)
+- search-files.ts: +7 tests (was 11.6%)
+
+### Phase 1 Mutation Rerun
+- Killed old mutation process (was running on stale commit 1d604e3)
+- Rebound equivalent mutant waivers to HEAD 3f94675
+- Started fresh mutation run on current HEAD
+- Gateway was FAIL at 84.68% on old commit — new tool tests + GLM fixes should improve
