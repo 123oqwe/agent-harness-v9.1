@@ -104,6 +104,37 @@ const DEFAULT_MODELS: ModelBinding[] = [
     api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', api_format: 'openai_chat',
     supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
   },
+  // Doubao (Volcengine Ark) — OpenAI-compatible, model field is endpoint ID
+  {
+    model_id: 'doubao-pro-32k', provider: 'doubao', tier: 'work',
+    capabilities: { code: 0.78, reasoning: 0.80, tool_calling: 0.75, structured_output: 0.78, long_context: 0.70, chinese: 0.94 },
+    price_input: 0.8, price_output: 2.0, max_context: 32768, avg_latency_ms: 600,
+    api_base: 'https://ark.cn-beijing.volces.com/api/v3', api_format: 'openai_chat',
+    supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  // Ollama — local, no auth, OpenAI-compatible
+  {
+    model_id: 'llama3', provider: 'ollama', tier: 'route',
+    capabilities: { code: 0.70, reasoning: 0.72, tool_calling: 0.65, structured_output: 0.68, long_context: 0.50, chinese: 0.40 },
+    price_input: 0, price_output: 0, max_context: 8192, avg_latency_ms: 300,
+    api_base: 'http://localhost:11434/v1', api_format: 'openai_chat',
+    supports_tools: false, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  {
+    model_id: 'qwen2.5', provider: 'ollama', tier: 'work',
+    capabilities: { code: 0.75, reasoning: 0.76, tool_calling: 0.70, structured_output: 0.72, long_context: 0.60, chinese: 0.85 },
+    price_input: 0, price_output: 0, max_context: 32768, avg_latency_ms: 300,
+    api_base: 'http://localhost:11434/v1', api_format: 'openai_chat',
+    supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  // vLLM — local, no auth, OpenAI-compatible
+  {
+    model_id: 'vllm-default', provider: 'vllm', tier: 'work',
+    capabilities: { code: 0.75, reasoning: 0.75, tool_calling: 0.70, structured_output: 0.72, long_context: 0.60, chinese: 0.50 },
+    price_input: 0, price_output: 0, max_context: 32768, avg_latency_ms: 200,
+    api_base: 'http://localhost:8000/v1', api_format: 'openai_chat',
+    supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
 ];
 
 export class CapabilityRegistry {

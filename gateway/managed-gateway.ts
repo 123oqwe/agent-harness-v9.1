@@ -106,13 +106,14 @@ export class ManagedGateway {
   get registrySnapshotHash(): string { return this.frozenRegistry.snapshot.hash; }
 
   private buildMetadata(binding: ModelBinding): GatewayProviderMetadata {
+    const isLocal = binding.api_base.startsWith('http://localhost') || binding.api_base.startsWith('http://127.0.0.1');
     return {
       capabilities: Object.keys(binding.capabilities),
       max_context_tokens: binding.max_context,
       structured_output: (binding.capabilities['structured_output'] ?? 0) > 0.5,
       tool_calling: binding.supports_tools,
       data_policy: {
-        execution: 'remote',
+        execution: isLocal ? 'local' : 'remote',
         regions: getProviderRegions(binding.provider),
         retention_days: 30,
         training_allowed: false,
@@ -123,8 +124,9 @@ export class ManagedGateway {
         output_per_million: binding.price_output,
       },
       health: 'healthy' as const,
-      network: { required: true, destination: binding.api_base },
-      credentials: { required: true, audience: binding.api_base },
+      // Local providers (Ollama, vLLM): no network egress, no credentials
+      network: isLocal ? { required: false } : { required: true, destination: binding.api_base },
+      credentials: { required: !isLocal, audience: binding.api_base },
     };
   }
 
