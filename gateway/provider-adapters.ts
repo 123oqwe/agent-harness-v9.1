@@ -174,15 +174,89 @@ export function createProviderAdapter(
     },
 
     async *streamEvents(request: ProviderRequest): AsyncIterable<StreamEvent> {
-      const raw = await adapter.resolve(request);
-      const res = adapter.parseResponse(raw);
-      if (res.content) yield { type: 'text_delta', text: res.content };
-      for (const tc of res.tool_calls ?? []) yield { type: 'tool_call', tool_call: tc };
-      const stopEv: { type: 'message_stop'; stop_reason: NonNullable<typeof res.stop_reason> } & { usage?: Usage } = {
-        type: 'message_stop', stop_reason: res.stop_reason ?? 'stop',
-      };
-      if (res.usage) stopEv.usage = res.usage;
-      yield stopEv;
+      const skey = keyVault.getKey(binding.provider);
+      if (!skey) throw new Error(`No API key for ${binding.provider}`);
+      const sbody = buildRequestBody(binding, request);
+      (sbody as Record<string, unknown>)['stream'] = true;
+      const sheaders = buildHeaders(binding, skey);
+      const sendpoint = getEndpoint(binding);
+      const sresp = await fetch(sendpoint, {
+        method: 'POST', headers: sheaders, body: JSON.stringify(sbody),
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (!sresp.ok) {
+        const errText = await sresp.text().catch(() => '');
+        if (sresp.status === 429) throw new Error(`HTTP 429 rate limited (do not retry): ${errText.slice(0, 300)}`);
+        throw new Error(`HTTP ${sresp.status}: ${errText.slice(0, 300)}`);
+      }
+      const reader = sresp.body?.getReader();
+      if (!reader) {
+        const raw = await sresp.json();
+        const res = adapter.parseResponse(raw);
+        if (res.content) yield { type: 'text_delta', text: res.content };
+        for (const tc of res.tool_calls ?? []) yield { type: 'tool_call', tool_call: tc };
+        const stopEv: { type: 'message_stop'; stop_reason: NonNullable<typeof res.stop_reason> } & { usage?: Usage } = { type: 'message_stop', stop_reason: res.stop_reason ?? 'stop' };
+        if (res.usage) stopEv.usage = res.usage;
+        yield stopEv;
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let promptTokens = 0;
+      let completionTokens = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const dataStr = trimmed.slice(5).trim();
+          if (dataStr === '[DONE]') continue;
+          try {
+            const chunk = JSON.parse(dataStr) as Record<string, unknown>;
+            if (binding.api_format === 'anthropic') {
+              const evtType = chunk['type'] as string;
+              if (evtType === 'content_block_delta') {
+                const delta = chunk['delta'] as Record<string, unknown>;
+                if (delta['type'] === 'text_delta' && typeof delta['text'] === 'string') yield { type: 'text_delta', text: delta['text'] };
+              } else if (evtType === 'message_delta') {
+                const u = chunk['usage'] as Record<string, number> | undefined;
+                if (u) { promptTokens = u['input_tokens'] ?? promptTokens; completionTokens = u['output_tokens'] ?? completionTokens; }
+              } else if (evtType === 'message_stop') {
+                const stopEv: { type: 'message_stop'; stop_reason: 'stop'; usage?: Usage } = { type: 'message_stop', stop_reason: 'stop' };
+                if (promptTokens > 0 || completionTokens > 0) stopEv.usage = { input_tokens: promptTokens, output_tokens: completionTokens };
+                yield stopEv;
+                return;
+              }
+            } else {
+              const choices = chunk['choices'] as Array<{ delta?: { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> }; finish_reason?: string }> | undefined;
+              const choice = choices?.[0];
+              if (choice?.delta?.content) yield { type: 'text_delta', text: choice.delta.content };
+              if (choice?.delta?.tool_calls) {
+                for (const tc of choice.delta.tool_calls) {
+                  const toolCall: ToolCall = { id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || '{}') };
+                  yield { type: 'tool_call', tool_call: toolCall };
+                }
+              }
+              const u = chunk['usage'] as Record<string, number> | undefined;
+              if (u) { promptTokens = u['prompt_tokens'] ?? promptTokens; completionTokens = u['completion_tokens'] ?? completionTokens; }
+              if (choice?.finish_reason) {
+                const sr = choice.finish_reason === 'stop' ? 'stop' : choice.finish_reason === 'length' ? 'length' : choice.finish_reason === 'tool_calls' ? 'tool_use' : 'stop';
+                const stopEv: { type: 'message_stop'; stop_reason: 'stop' | 'length' | 'tool_use' | 'content_filter'; usage?: Usage } = { type: 'message_stop', stop_reason: sr as 'stop' | 'length' | 'tool_use' | 'content_filter' };
+                if (promptTokens > 0 || completionTokens > 0) stopEv.usage = { input_tokens: promptTokens, output_tokens: completionTokens };
+                yield stopEv;
+                return;
+              }
+            }
+          } catch { /* skip malformed chunk */ }
+        }
+      }
+      const finalStop: { type: 'message_stop'; stop_reason: 'stop'; usage?: Usage } = { type: 'message_stop', stop_reason: 'stop' };
+      if (promptTokens > 0 || completionTokens > 0) finalStop.usage = { input_tokens: promptTokens, output_tokens: completionTokens };
+      yield finalStop;
     },
 
     mapError(raw: unknown): ProviderError {

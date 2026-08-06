@@ -10,6 +10,7 @@ import {
   type EgressPolicyPort, type UsageMeterPort, type GatewayProviderRuntime,
 } from './model-gateway.js';
 import { createProviderAdapter, getProviderRegions } from './provider-adapters.js';
+import { CacheManager } from './cache-manager.js';
 import type { ModelTurn } from '../runtime/loop.js';
 import type { Message } from './scripted-provider.js';
 import type { ProviderType } from '../contracts/index.js';
@@ -47,6 +48,7 @@ export class ManagedGateway {
   private readonly modelGateway: ModelGateway;
   private readonly frozenRegistry: FrozenProviderRegistry;
   private readonly bindingMap = new Map<string, ModelBinding>();
+  private readonly cacheManager = new CacheManager();
 
   constructor(opts: ManagedGatewayOptions = {}) {
     this.keyVault = opts.keyVault ?? new KeyVault();
@@ -311,6 +313,55 @@ export class ManagedGateway {
       fallback_triggered: chain.length > 1, fallback_chain: chain,
     };
   }
+
+  async *completeStream(prompt: string, ctx: CallContext): AsyncGenerator<{
+    type: 'text_delta' | 'tool_call' | 'message_stop' | 'provider_info';
+    text?: string;
+    tool_call?: { id: string; name: string; arguments: Record<string, unknown> };
+    provider?: string;
+    model?: string;
+    usage?: { input_tokens: number; output_tokens: number };
+    cost_usd?: number;
+  }> {
+    const estInput = Math.ceil(prompt.length / 4);
+    const rl = this.rateLimiter.check(ctx.userId, estInput + (ctx.estimatedOutputTokens ?? 2000));
+    if (!rl.allowed) { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
+    const messages: Message[] = [
+      { role: 'system', content: ctx.systemPrompt ?? 'You are a precise agent execution engine.' },
+      { role: 'user', content: prompt },
+    ];
+    const request: ProviderSelectionRequest = {
+      registry_snapshot_hash: this.frozenRegistry.snapshot.hash,
+      request: { messages, temperature: this.defaultTemperature, max_tokens: this.defaultMaxTokens },
+      estimated_input_tokens: estInput,
+      required_capabilities: ctx.requiredCapabilities ?? [],
+      requires_structured_output: false,
+      data_policy: { local_only: false, allowed_regions: ['cn', 'us'], max_retention_days: 30, training_allowed: false },
+      policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+      run_plan: { allowed_provider_ids: undefined, required_capabilities: ctx.requiredCapabilities ?? [] },
+    };
+    let resolved;
+    try { resolved = this.modelGateway.resolve(request); }
+    catch { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
+    const binding = this.bindingMap.get(resolved.provider_id);
+    if (!binding) { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
+    this.cacheManager.trackCall(this.cacheManager.computeKey(binding.model_id, 'default', false));
+    yield { type: 'provider_info', provider: binding.provider, model: binding.model_id };
+    let inputTok = 0; let outputTok = 0;
+    try {
+      for await (const ev of this.modelGateway.dispatchStream(resolved, request, { operation_id: `op-${ctx.taskId}-${Date.now()}` })) {
+        if (ev.type === 'text_delta') yield { type: 'text_delta', text: ev.text };
+        else if (ev.type === 'tool_call') yield { type: 'tool_call', tool_call: ev.tool_call };
+        else if (ev.type === 'message_stop' && ev.usage) { inputTok = ev.usage.input_tokens; outputTok = ev.usage.output_tokens; }
+      }
+      const cost = inputTok / 1_000_000 * binding.price_input + outputTok / 1_000_000 * binding.price_output;
+      if (cost > 0) { this.economic.spend(ctx.taskId, cost, ctx.stepId, `model:${binding.provider}/${binding.model_id}`); this.economic.debitWallet(ctx.userId, cost); }
+      yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, ...(cost > 0 ? { cost_usd: cost } : {}) };
+    } catch { yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok } }; }
+    finally { this.rateLimiter.release(ctx.userId); }
+  }
+
+  getCacheMetrics(): Record<string, unknown> { return this.cacheManager.getMetrics() as unknown as Record<string, unknown>; }
 
   getUsageSummary(): Record<string, unknown> {
     const totalCost = this.usageLog.reduce((s, r) => s + r.cost_usd, 0);

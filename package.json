@@ -95,15 +95,16 @@
     "@types/bcrypt": "6.0.0",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "^26.1.1",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.7.0",
     "json-schema-to-typescript": "^15.0.4",
     "patch-package": "8.0.1",
     "prettier": "^3.9.5",
+    "turbo": "2.10.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^4.1.10",
-    "turbo": "2.10.5"
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.3.2",

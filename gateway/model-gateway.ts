@@ -952,12 +952,141 @@ export class ModelGateway {
         abort.code,
       );
     } finally {
+     abort.cleanup();
+   }
+ }
+
+  async *dispatchStream(
+    resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    context: {
+      readonly operation_id: string;
+      readonly attempt_id?: string;
+      readonly signal?: AbortSignal | undefined;
+      readonly deadline_at?: string | undefined;
+    },
+  ): AsyncGenerator<StreamEvent, void, void> {
+    if (
+      resolved.registry_snapshot_hash !== this.registry.snapshot.hash ||
+      resolved.selection_request_hash !== selectionHash(request)
+    ) {
+      throw new ProviderDispatchError('provider_no_longer_compatible');
+    }
+    const operationId = nonEmptyString(context.operation_id, 'dispatchStream.operation_id');
+    const deadline =
+      context.deadline_at === undefined ? undefined : Date.parse(context.deadline_at);
+    if (deadline !== undefined && !Number.isFinite(deadline)) {
+      throw new ProviderConfigurationError('dispatchStream.deadline_at must be an ISO timestamp');
+    }
+    const abort = this.createDispatchAbort(context.signal, deadline);
+    const attemptedProviderIds: string[] = [];
+    let selected = resolved;
+    try {
+      for (;;) {
+        try {
+          yield* this.dispatchToProviderStream(
+            selected,
+            request,
+            {
+              ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
+              ...(context.deadline_at === undefined ? {} : { deadline_at: context.deadline_at }),
+            },
+            operationId,
+            abort.signal,
+            abort.code,
+          );
+          return;
+        } catch (error) {
+          if (
+            !(error instanceof ProviderDispatchError) ||
+            error.code !== 'provider_failure' ||
+            error.provider_error?.retryable !== true ||
+            error.provider_error.kind === 'auth' ||
+            error.provider_error.kind === 'invalid_request'
+          ) {
+            throw error;
+          }
+          attemptedProviderIds.push(selected.provider_id);
+          try {
+            selected = this.switchProvider(selected, request, attemptedProviderIds);
+          } catch (switchError) {
+            if (switchError instanceof ProviderResolutionError) throw error;
+            throw switchError;
+          }
+        }
+      }
+    } finally {
       abort.cleanup();
     }
   }
 
-  private async dispatchToProvider(
+  private async *dispatchToProviderStream(
     resolved: ResolvedProvider,
+    request: ProviderSelectionRequest,
+    context: {
+      readonly attempt_id?: string;
+      readonly deadline_at?: string;
+    },
+    operationId: string,
+    signal: AbortSignal,
+    abortCode: () => 'cancelled' | 'timeout',
+  ): AsyncGenerator<StreamEvent, void, void> {
+    if (signal.aborted) throw new ProviderDispatchError(abortCode());
+    const { binding, credential } = await this.prepareProvider(resolved, request, operationId);
+    let collectedUsage: Usage | undefined;
+    const maxAttempts = 3;
+    for (let attempt = 0; ; attempt++) {
+      if (signal.aborted) throw new ProviderDispatchError(abortCode());
+      const attemptId =
+        context.attempt_id ?? `${operationId}.${binding.entry.provider_id}.${attempt + 1}`;
+      let eventsYielded = 0;
+      try {
+        for await (const event of binding.adapter.streamEvents(request.request, {
+          operation_id: operationId,
+          attempt_id: attemptId,
+          ...(credential === undefined ? {} : { credential }),
+          signal,
+          ...(context.deadline_at === undefined ? {} : { deadline_at: context.deadline_at }),
+        })) {
+          eventsYielded++;
+          if (event.type === 'message_stop' && event.usage !== undefined) {
+            collectedUsage = event.usage;
+          }
+          yield event;
+        }
+        break;
+      } catch (error) {
+        if (signal.aborted) throw new ProviderDispatchError(abortCode());
+        let mapped: ProviderError;
+        try { mapped = binding.adapter.mapError(error); }
+        catch { mapped = { kind: 'unknown', retryable: false, detail: 'Provider error normalization failed' }; }
+        if (eventsYielded > 0) throw new ProviderDispatchError('provider_failure', mapped);
+        if (
+          !mapped.retryable ||
+          mapped.kind === 'auth' ||
+          mapped.kind === 'invalid_request' ||
+          attempt >= maxAttempts - 1
+        ) {
+          throw new ProviderDispatchError('provider_failure', mapped);
+        }
+        const backoffMs = Math.min(100 * 2 ** attempt, 1_000);
+        await this.raceWithAbort(this.ports.clock.sleep(backoffMs, signal), signal, abortCode);
+      }
+    }
+    if (collectedUsage !== undefined) {
+      try {
+        await this.ports.usageMeter.record({
+          provider_id: binding.entry.provider_id,
+          operation_id: operationId,
+          ...(context.attempt_id === undefined ? {} : { attempt_id: context.attempt_id }),
+          usage: collectedUsage,
+        });
+      } catch { throw new ProviderDispatchError('metering_failed'); }
+    }
+  }
+
+ private async dispatchToProvider(
+   resolved: ResolvedProvider,
     request: ProviderSelectionRequest,
     context: {
       readonly attempt_id?: string;
