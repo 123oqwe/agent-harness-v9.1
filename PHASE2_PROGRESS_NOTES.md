@@ -83,3 +83,49 @@ All 11 placeholder tests rewritten with real mock-based verification:
 - Phase 2 e2e: 15 files, 78 tests, most pass (release-gate tests are timing-sensitive)
 - Phase 2 security: Some timing-sensitive failures (mutation boundary 30s timeout)
 - Phase 2 integration: gate-orchestration tests affected by concurrent changes
+
+## Session 1: Architecture Wiring (Updated)
+
+### N13: ALLOWED_TOOLS (DONE)
+- Added 5 missing tools: apply_patch, undo, web_fetch, web_search, screenshot
+- All 14 tools from tool-definitions.ts now registered
+
+### N30: PauseResumeController (DONE)
+- runtime/pause-resume-port.ts: InMemoryPauseResumeJournal, DefaultEffectReadBack, DefaultEffectReconciliation
+- harness.ts: when loop terminates with approval_required, calls pauseResume.resume()
+  to determine next action (continue_next_step, retry_new_attempt, await_human)
+- server.ts: PauseResumeController injected into HarnessConfig
+- ws-server.ts: pause/resume message type handlers added
+
+### N31: SessionTreeAuthority (DONE)
+- runtime/session-tree-port.ts: recordSessionBranch adapter that constructs
+  SessionTreeCommitRequest from session head data
+- harness.ts: calls recordSessionBranch() when sessionTreeAuthority is configured
+- ws-server.ts: fork/rewind message type handlers added
+
+### N14/N15: DagExecutor + ToolMask (DONE)
+- Both already wired into ManagedGateway (executeDag, isToolAllowed)
+- Annotated as Phase 3 reserved in source comments
+- DagExecutor needed for AH-MULTIAGENT-DAG-001
+- ToolMask for state-dependent tool visibility in multi-agent execution
+
+### N32: Complete Phase 2 Component Injection (DONE)
+server.ts createHarnessForTask() now injects:
+- PauseResumeController (N30)
+- BudgetLedger with InMemoryBudgetJournal + default pricing
+- SteeringController with InMemorySteeringJournal
+- ContextCompactor with noopCompactionVfs + CompactionHookRuntimeAdapter
+- ModelFallbackController wrapping ModelFallbackGatewayAdapter
+- ContextCompiler + HookSystem (already present)
+
+### Import Fix
+- All runtime-core imports in gateway/server.ts and runtime/loop.ts use
+  @agent-harness/runtime-core package name (not relative src paths)
+  to avoid dist/src type conflicts
+
+### Verification
+- typecheck: PASS (0 errors)
+- build: PASS (11/11 workspaces)
+- workspace-boundaries: valid (11 workspaces)
+- phase-2 unit tests: 639/639 pass (1 flaky sessiontree timeout)
+- Pushed to origin and product remotes
