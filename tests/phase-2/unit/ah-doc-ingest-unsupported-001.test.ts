@@ -4,21 +4,44 @@ import { DefaultDocumentIngestor, DocumentIngestError } from '../../../packages/
 describe('AH-DOC-INGEST-UNSUPPORTED-001: Handle unsupported formats', () => {
   const ingestor = new DefaultDocumentIngestor();
 
-  it('returns typed error for .xyz files', () => {
+  it('returns typed error for .xyz files', async () => {
     const buf = Buffer.from('unknown data', 'utf8');
-    return expect(ingestor.ingest(buf, 'file.xyz', {})).rejects.toThrow(DocumentIngestError);
+    await expect(ingestor.ingest(buf, 'file.xyz', {})).rejects.toThrow(DocumentIngestError);
   });
 
-  it('returns typed error for .dat files', () => {
+  it('returns typed error for .dat files', async () => {
     const buf = Buffer.from('binary data', 'utf8');
-    return expect(ingestor.ingest(buf, 'file.dat', {})).rejects.toThrow(DocumentIngestError);
+    await expect(ingestor.ingest(buf, 'file.dat', {})).rejects.toThrow(DocumentIngestError);
   });
 
-  it('error code is unsupported', () => {
+  it('returns typed error for .bin files', async () => {
+    const buf = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+    await expect(ingestor.ingest(buf, 'file.bin', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('returns typed error for no extension', async () => {
+    const buf = Buffer.from('no extension', 'utf8');
+    await expect(ingestor.ingest(buf, 'README', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('error code is unsupported', async () => {
     const buf = Buffer.from('unknown', 'utf8');
-    return ingestor.ingest(buf, 'file.xyz', {}).catch(err => {
+    try {
+      await ingestor.ingest(buf, 'file.xyz', {});
+      expect.fail('should have thrown');
+    } catch (err) {
       expect(err).toBeInstanceOf(DocumentIngestError);
       expect((err as DocumentIngestError).code).toBe('unsupported');
-    });
+    }
+  });
+
+  it('error message includes the file extension', async () => {
+    const buf = Buffer.from('data', 'utf8');
+    try {
+      await ingestor.ingest(buf, 'file.xyz', {});
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect((err as Error).message).toContain('.xyz');
+    }
   });
 });
