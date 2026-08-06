@@ -770,22 +770,50 @@ export class Harness {
            await this.observationalHook('after_response', streamResult, `provider-after:${runPlan.run_id}:${modelCallCount}`);
            return gatewayResultToModelTurn(streamResult);
          }
-       const result: GatewayDispatchResult = await this.config.gateway.dispatch(resolved, effectiveRequest, {
-          operation_id: opId,
-          attempt_id: attId,
-          signal:
-            this.config.signal &&
-            modelSignal &&
-            this.config.signal !== modelSignal
-              ? AbortSignal.any([this.config.signal, modelSignal])
-              : (modelSignal ?? this.config.signal),
-        });
-          await this.observationalHook(
-            'after_response',
-            result,
-            `provider-after:${runPlan.run_id}:${modelCallCount}`,
-          );
-          return gatewayResultToModelTurn(result);
+       // N28 fix: ModelFallback — if dispatch fails, try switching providers
+       let result: GatewayDispatchResult;
+       const dispatchSignal = this.config.signal && modelSignal && this.config.signal !== modelSignal
+         ? AbortSignal.any([this.config.signal, modelSignal])
+         : (modelSignal ?? this.config.signal);
+       try {
+         result = await this.config.gateway.dispatch(resolved, effectiveRequest, {
+           operation_id: opId,
+           attempt_id: attId,
+           signal: dispatchSignal,
+         });
+       } catch (dispatchError) {
+         // Try fallback to another provider if modelFallback is configured
+         if (this.modelFallback) {
+           try {
+             const fallbackResult = await this.modelFallback.execute({
+               current_provider: {
+                 provider_id: resolved.provider_id,
+                 registry_snapshot_hash: this.config.gateway.registrySnapshotHash,
+                 provider_metadata_hash: this.config.gateway.registrySnapshotHash,
+                 selection_request_hash: this.config.gateway.registrySnapshotHash,
+               },
+               selection_request: effectiveRequest,
+               dispatch_context: { operation_id: opId, attempt_id: attId, ...(dispatchSignal ? { signal: dispatchSignal } : {}) },
+               context_generation: 0,
+               visited_provider_ids: [resolved.provider_id],
+               initial_failure: dispatchError,
+             });
+             result = fallbackResult.dispatch_result as GatewayDispatchResult;
+           } catch (fallbackError) {
+             // Fallback also failed — throw original error
+             throw dispatchError;
+           }
+         } else {
+           // No fallback configured — rethrow
+           throw dispatchError;
+         }
+       }
+       await this.observationalHook(
+         'after_response',
+         result,
+         `provider-after:${runPlan.run_id}:${modelCallCount}`,
+       );
+       return gatewayResultToModelTurn(result);
         },
         toolExecute: async (
           name: string,
@@ -809,6 +837,7 @@ export class Harness {
        ...((this._onModelDelta ?? this.config.onModelDelta) ? { onModelDelta: this._onModelDelta ?? this.config.onModelDelta } : {}),
        ...((this._onToolOutput ?? this.config.onToolOutput) ? { onToolOutput: this._onToolOutput ?? this.config.onToolOutput } : {}),
        ...((this._eventBus ?? this.config.eventBus) ? { eventBus: this._eventBus ?? this.config.eventBus } : {}),
+       ...(this.contextCompiler ? { contextCompiler: this.contextCompiler } : {}),
         turnHooks: {
           beforeTurn: async ({ iteration, messages }) => {
             const before = await this.decisionHook(
