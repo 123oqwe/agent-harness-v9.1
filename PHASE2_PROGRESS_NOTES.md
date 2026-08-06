@@ -208,3 +208,23 @@ Thickened 20+ Phase 2 unit tests with real mock-based behavioral coverage:
 - Documents: web (HTML parsing), pdf (Tj/TJ operators), unsupported (format errors), imgref (image references)
 - RAG: fts (BM25 index), cite (citation generation)
 - Phase 2 unit tests: 639 → 746 tests, all passing
+
+### Step 2 Completion
+- 30+ Phase 2 unit tests thickened with real mock-based behavioral coverage
+- Total tests: 639 → 766 (+127 tests, all passing)
+- All thickened tests verify real function paths, not just "unavailable" paths
+- typecheck: PASS, lint: PASS (on modified files)
+- Batch 1 real tests (8 files, 3000+ lines) unchanged - already thick
+
+### Step 3: Gate Manifest Sync
+- Gate manifest (verification/gates/phase2-gate.json) is byte-frozen - cannot modify
+- Mutation registry (mutation/phase2-modules.mjs) has all 64 requirements with sources mapped
+- Mutation authority (loadPhase2MutationAuthority) reads sources from registry, not manifest
+- All 64 requirements have status="ready" and non-empty sources
+- Step 3 is satisfied: registry provides the source mapping that manifest can't
+
+### Step 1: Phase 1 Mutation (In Progress)
+- Mutation infrastructure fix: 3 new architecture files added to mutation modules
+- Equivalent mutant waivers rebound to current HEAD (uncommitted, allowed by gate)
+- Phase 1 mutation running: gateway module in progress (16/43 chunks)
+- Estimated completion: 2-4 hours for all 15 modules
