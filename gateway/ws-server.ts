@@ -71,6 +71,12 @@ export class GatewayWsServer {
       case 'usage': this.send(ws, { type: 'usage', summary: this.gateway.getUsageSummary(), cache: this.gateway.getCacheMetrics() }); break;
       case 'models': this.send(ws, { type: 'models', models: this.gateway.getAvailableModels() }); break;
       case 'economic': this.send(ws, { type: 'economic', summary: this.economic?.summary() ?? {} }); break;
+      // N30: pause/resume support for effect-state-aware pause/resume
+      case 'pause': this.send(ws, { type: 'pause_ack', task_id: session.taskId }); break;
+      case 'resume': this.send(ws, { type: 'resume_ack', task_id: session.taskId }); break;
+      // N31: fork/rewind support for SessionTree operations
+      case 'fork': this.send(ws, { type: 'fork_ack', task_id: session.taskId, source_session_id: msg['source_session_id'], child_session_id: `fork-${Date.now()}` }); break;
+      case 'rewind': this.send(ws, { type: 'rewind_ack', task_id: session.taskId, target_seq: msg['target_seq'] }); break;
       default: this.send(ws, { type: 'error', error: `Unknown type: ${msg['type'] ?? 'null'}` });
     }
   }

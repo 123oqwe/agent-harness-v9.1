@@ -26,6 +26,7 @@ const ENV_MAPPING: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['doubao', ['VOLC_API_KEY', 'DOUBAO_API_KEY']],
   ['ollama', []],
   ['vllm', []],
+  ['seedance', ['VOLC_API_KEY', 'SEEDANCE_API_KEY']],
 ];
 
 export class KeyVault {

@@ -6,11 +6,13 @@ import type {
 import type { ModelBinding } from './capability-registry.js';
 import type { KeyVault } from './key-vault.js';
 import type { ProviderType } from '../contracts/index.js';
+import { createAsyncTaskAdapter } from './async-task-adapter.js';
 
 const PROVIDER_REGIONS: Record<string, string[]> = {
   openai: ['us'], anthropic: ['us'], zhipu: ['cn'], deepseek: ['cn'],
   qwen: ['cn'], google: ['us'], mistral: ['eu'], kimi: ['cn'], perplexity: ['us'],
   doubao: ['cn'], ollama: ['local'], vllm: ['local'],
+  seedance: ['cn'],
 };
 
 export function getProviderRegions(provider: string): string[] {
@@ -126,6 +128,10 @@ export function createProviderAdapter(
   binding: ModelBinding,
   keyVault: KeyVault,
 ): GatewayProviderRuntime {
+  // async_task format (Seedance, video generation) uses a separate adapter
+  if (binding.api_format === 'async_task') {
+    return createAsyncTaskAdapter(binding, keyVault);
+  }
   const provider_type = (binding.api_format === 'anthropic' ? 'anthropic' : 'openai') as ProviderType;
 
   const adapter = {

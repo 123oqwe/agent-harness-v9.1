@@ -110,6 +110,7 @@ import {
   type RuntimeBudgetFactoryPort,
   type RuntimeBudgetPricing,
 } from './runtime/budget-port.js';
+import { recordSessionBranch } from './runtime/session-tree-port.js';
 
 // Phase 2 runtime-core package integration
 import type { SessionTreeAuthorityPort } from '@agent-harness/runtime-core';
@@ -576,6 +577,18 @@ export class Harness {
       sandbox: this.config.sandbox,
       stateRoot: this.config.dataDir,
     });
+    // N31: Record a branch event in the SessionTree when a new run starts
+    if (this.sessionTreeAuthority) {
+      await recordSessionBranch({
+        authority: this.sessionTreeAuthority,
+        scope: {
+          tenant_id: this.execCtx.tenant_id,
+          root_session_id: actualRunId,
+        },
+        rootSessionId: actualRunId,
+        childSessionId: `${actualRunId}-branch`,
+      });
+    }
 
     // 2a. Skill activation: check if any required skills can activate
     const allowedTools = (this.config.policyEngine.snapshot as { allowed_tools: string[] }).allowed_tools;

@@ -12,7 +12,7 @@ export interface ModelBinding {
   max_context: number;
   avg_latency_ms: number;
   api_base: string;
-  api_format: 'openai_chat' | 'anthropic';
+  api_format: 'openai_chat' | 'anthropic' | 'async_task';
   supports_tools: boolean;
   supports_streaming: boolean;
   supports_vision: boolean;
@@ -134,6 +134,21 @@ const DEFAULT_MODELS: ModelBinding[] = [
     price_input: 0, price_output: 0, max_context: 32768, avg_latency_ms: 200,
     api_base: 'http://localhost:8000/v1', api_format: 'openai_chat',
     supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  // Seedance — ByteDance video generation, async task API
+  {
+    model_id: 'seedance-1-0-pro', provider: 'seedance', tier: 'work',
+    capabilities: { video_generation: 0.90, reasoning: 0.50, structured_output: 0.0, tool_calling: 0.0, long_context: 0.0, chinese: 0.80 },
+    price_input: 0, price_output: 5.0, max_context: 4096, avg_latency_ms: 180000,
+    api_base: 'https://ark.cn-beijing.volces.com/api/v3', api_format: 'async_task',
+    supports_tools: false, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  {
+    model_id: 'seedance-1-0-lite', provider: 'seedance', tier: 'route',
+    capabilities: { video_generation: 0.75, reasoning: 0.40, structured_output: 0.0, tool_calling: 0.0, long_context: 0.0, chinese: 0.80 },
+    price_input: 0, price_output: 2.0, max_context: 4096, avg_latency_ms: 120000,
+    api_base: 'https://ark.cn-beijing.volces.com/api/v3', api_format: 'async_task',
+    supports_tools: false, supports_streaming: true, supports_vision: false, enabled: true,
   },
 ];
 

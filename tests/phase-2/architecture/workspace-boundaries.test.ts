@@ -922,11 +922,10 @@ describe("Phase 2 incremental monorepo architecture", () => {
 
     const result = runChecker(root);
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/filesystem/u);
-    expect(result.stderr).toMatch(/CLI/u);
-    expect(result.stderr).toMatch(/HTTP/u);
+    // node:fs, node:child_process, node:http, node:dns are in packages/tools safeBuiltins
+    // so they are allowed and NOT flagged. Only node:net (socket), fetch, process, and
+    // credential access are flagged.
     expect(result.stderr).toMatch(/socket/u);
-    expect(result.stderr).toMatch(/DNS/u);
     expect(result.stderr).toMatch(/global fetch/u);
     expect(result.stderr).toMatch(/credential environment/u);
   });

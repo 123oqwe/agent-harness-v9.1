@@ -36,6 +36,14 @@ export interface ParsedResponse {
   readonly stop_reason?: 'content_filter' | 'length' | 'stop' | 'tool_use';
   readonly usage?: Usage;
   readonly model?: string;
+  /** Async task results: media URL, type, and duration for video/image generation. */
+  readonly media_url?: string;
+  readonly media_type?: 'video' | 'image' | 'audio';
+  readonly duration_seconds?: number;
+  /** Async task metadata. */
+  readonly task_id?: string;
+  readonly task_status?: 'queued' | 'running' | 'succeeded' | 'failed';
+  readonly task_progress?: number;
 }
 
 export type ProviderTool = Pick<ContractToolSpec, 'name'> &
@@ -85,7 +93,9 @@ export type StreamEvent =
       readonly type: 'message_stop';
       readonly stop_reason: ParsedResponse['stop_reason'];
       readonly usage?: Usage;
-    };
+    }
+  | { readonly type: 'task_progress'; readonly progress: number; readonly task_id: string; readonly status: string }
+  | { readonly type: 'media_complete'; readonly media_url: string; readonly media_type: 'video' | 'image' | 'audio'; readonly duration_seconds?: number; readonly usage?: Usage };
 
 export interface CallMetadata {
   readonly index: number;
