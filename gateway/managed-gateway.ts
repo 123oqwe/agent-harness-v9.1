@@ -100,6 +100,10 @@ export class ManagedGateway {
   get keyVaultRef(): KeyVault { return this.keyVault; }
   get registryRef(): CapabilityRegistry { return this.capRegistry; }
   get economicRef(): EconomicKernel { return this.economic; }
+  /** Expose the inner ModelGateway so the Harness can use it directly. */
+  get modelGatewayRef(): ModelGateway { return this.modelGateway; }
+  /** Expose the registry snapshot hash (Harness needs this for RunPlan). */
+  get registrySnapshotHash(): string { return this.frozenRegistry.snapshot.hash; }
 
   private buildMetadata(binding: ModelBinding): GatewayProviderMetadata {
     return {

@@ -290,7 +290,7 @@ describe('GlmProvider mutation-killing tests', () => {
 
   it.each([
     [new ProviderHttpError(401), 'auth', false],
-    [new ProviderHttpError(429), 'rate_limited', true],
+    [new ProviderHttpError(429), 'rate_limited', false],
     [new ProviderTimeoutError(), 'timeout', true],
     [new ProviderHttpError(500), 'server', true],
     [new ProviderHttpError(400), 'invalid_request', false],

@@ -343,7 +343,7 @@ describe('ScriptedTestProvider: usage, streaming and explicit errors', () => {
 
     expect(provider.mapError(new ProviderHttpError(429, 'limited'))).toMatchObject({
       kind: 'rate_limited',
-      retryable: true,
+      retryable: false,
     });
     expect(provider.mapError(new ProviderHttpError(401, 'do not expose credential'))).toEqual({
       kind: 'auth',

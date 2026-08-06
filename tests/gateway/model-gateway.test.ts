@@ -675,9 +675,10 @@ describe('AH-GATEWAY-PROVIDER-001: deterministic Phase 1 resolution', () => {
       { operation_id: 'exact-operation' },
     )).rejects.toMatchObject({
       code: 'provider_failure',
-      provider_error: { kind: 'rate_limited', retryable: true },
+      provider_error: { kind: 'rate_limited', retryable: false },
     });
-    expect(primary.runtime.resolve).toHaveBeenCalledTimes(3);
+    // P1-09: rate_limited is retryable=false, so dispatchExact calls resolve once and fails immediately (no retry)
+    expect(primary.runtime.resolve).toHaveBeenCalledTimes(1);
     expect(fallback.provider.callCount).toBe(0);
   });
 
@@ -926,7 +927,7 @@ describe('AH-GATEWAY-PROVIDER-001: mandatory dispatch controls', () => {
     expect(failure).toBeInstanceOf(ProviderDispatchError);
     expect(failure).toMatchObject({
       code: 'provider_failure',
-      provider_error: { kind: 'rate_limited', retryable: true, status: 429 },
+      provider_error: { kind: 'rate_limited', retryable: false, status: 429 },
     });
     expect(JSON.stringify(failure)).not.toContain('credential-like-sensitive-detail');
   });
