@@ -6,6 +6,11 @@
  * The server implements these contracts; the frontend consumes them.
  */
 
+export const workspaceIdentity = Object.freeze({
+  name: "@agent-harness/api",
+  path: "packages/api",
+} as const);
+
 export interface ApiEndpoint {
   readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   readonly path: string;
