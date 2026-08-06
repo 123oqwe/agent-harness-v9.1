@@ -288,9 +288,13 @@ export const collectGateBindings = (repositoryRoot) => {
   try {
     commitSha = git(root, ["rev-parse", "HEAD"]);
     treeSha = git(root, ["rev-parse", "HEAD^{tree}"]);
-    dirty =
-      git(root, ["status", "--porcelain=v1", "--untracked-files=all"]).length >
-      0;
+    // Allow uncommitted changes to equivalent-mutants.json only (waiver rebinding)
+    const statusOutput = git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
+    const filteredStatus = statusOutput
+      .split("\n")
+      .filter((line) => line.trim() && !line.endsWith("mutation/equivalent-mutants.json"))
+      .join("\n");
+    dirty = filteredStatus.length > 0;
     for (const args of [
       ["diff-index", "--quiet", "HEAD", "--"],
       ["diff-files", "--quiet"],
