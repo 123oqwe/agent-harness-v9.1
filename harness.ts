@@ -896,6 +896,33 @@ export class Harness {
     let verificationReport: VerificationReport | null = null;
     let success = false;
     let loopResult = executionResult;
+    // N30: When the loop terminates with approval_required and a
+    // PauseResumeController is configured, invoke resume() to determine
+    // the correct next action (continue, retry, or await human).
+    if (
+      executionResult.termination_reason === 'approval_required' &&
+      this.pauseResume
+    ) {
+      const pauseAction = await this.pauseResume.resume({
+        run_id: actualRunId,
+        operation_id: `${this.execCtx!.operation_id}-pause`,
+      });
+      session.acquireWriter();
+      session.append('system', {
+        event: 'pause_resume_evaluated',
+        action: pauseAction.action,
+        operation_id: pauseAction.operation_id,
+      });
+      session.releaseWriter();
+      if (pauseAction.action === 'continue_next_step') {
+        // Resume execution by re-running the loop
+        const resumedResult = await loop.run();
+        loopResult = resumedResult;
+      }
+      // For retry_new_attempt and await_human, the caller (ws-server or
+      // API handler) is responsible for re-invoking Harness.run() after
+      // the human approval or new capability is obtained.
+    }
     if (executionResult.termination_reason === 'completed') {
       try {
         verificationReport = await this.config.verification.verify({
