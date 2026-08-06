@@ -19,13 +19,17 @@ export class CircuitBreaker {
     if (this.state === 'closed') return true;
     if (this.state === 'open') {
       if (Date.now() - this.lastFailureTime >= this.recoveryTimeout) {
+        // N26 fix: atomically transition to half_open and set probe flag.
+        // In Node.js single-threaded model this is safe, but we guard explicitly
+        // to make the half-open invariant clear and future-proof.
+        if (this.halfOpenProbeInFlight) return false; // another probe already started
         this.state = 'half_open';
         this.halfOpenProbeInFlight = true;
         return true;
       }
       return false;
     }
-    // half_open
+    // half_open: only one probe at a time
     if (!this.halfOpenProbeInFlight) {
       this.halfOpenProbeInFlight = true;
       return true;
