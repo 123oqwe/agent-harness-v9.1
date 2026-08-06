@@ -5,7 +5,7 @@
     "reason": "NoCoverage: HookRestrictionError catch block string literal at line 239. The react.ts HookRestrictionError path is tested through integration tests that are excluded from mutation scope. The string content is not observable by any test.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:43",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -15,7 +15,7 @@
     "reason": "NoCoverage: HookRestrictionError catch block at line 254. The react strategy does not have direct unit tests for HookRestrictionError handling; it is covered by integration tests excluded from mutation.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:52",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -25,7 +25,7 @@
     "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:53",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -35,7 +35,7 @@
     "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:54",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -45,7 +45,7 @@
     "reason": "NoCoverage: EqualityOperator in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:55",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -55,7 +55,7 @@
     "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 256. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:56",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -65,7 +65,7 @@
     "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 257. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:57",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -75,7 +75,7 @@
     "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:58",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -85,7 +85,7 @@
     "reason": "NoCoverage: ConditionalExpression in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:59",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -95,7 +95,7 @@
     "reason": "NoCoverage: EqualityOperator in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:60",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -105,7 +105,7 @@
     "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 258. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:61",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -115,7 +115,7 @@
     "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 259. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:62",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -125,7 +125,7 @@
     "reason": "NoCoverage: StringLiteral in HookRestrictionError catch at line 260. Not reachable by mutation-scoped tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-react-ts-151-268:63",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -135,7 +135,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a system message string. The exact content of this system instruction string is not asserted by any test; only the structural behavior is tested.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-1-150:52",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -145,7 +145,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a correction message string. The exact wording of the correction message is not asserted; only that a correction is sent.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:9",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -155,7 +155,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces an error message string. The exact error message text is not asserted by tests.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:28",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -165,7 +165,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:61",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -175,7 +175,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:63",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -185,7 +185,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a system message string. The content is not asserted by any test.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:67",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   },
@@ -195,7 +195,7 @@
     "reason": "Equivalent: StringLiteral mutation replaces a normalization regex replacement string. The replacement is a space character; tests verify behavior, not the literal string value.",
     "reviewedBy": "phase2-integration-lead",
     "reviewedAt": "2026-08-06T02:20:00Z",
-    "commitSha": "cc356f25212bc94d02590bd9ba8d13b18528f0a3",
+    "commitSha": "7e86b55c129c912eb54be4bdc3dbe0c1528aa3e2",
     "strykerMutantId": "runtime-plan-execute-ts-151-300:190",
     "configurationHash": "4d41a5bd26abef8b15f584e7fdfe5654b4bb40a23695755bce8f203ce622e8b5"
   }
