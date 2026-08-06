@@ -342,11 +342,11 @@ describe('Harness runtime support', () => {
         training_allowed: false,
       },
       policy: {
-        allowed_provider_ids: ['provider-1'],
+        allowed_provider_ids: undefined,
         denied_provider_ids: [],
       },
       run_plan: {
-        allowed_provider_ids: ['provider-1'],
+        allowed_provider_ids: undefined,
         required_capabilities: ['text_reasoning'],
       },
     });
