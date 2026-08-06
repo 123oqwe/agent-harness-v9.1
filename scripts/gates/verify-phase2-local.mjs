@@ -295,9 +295,10 @@ export const collectGateBindings = (repositoryRoot) => {
       .filter((line) => line.trim() && !line.endsWith("mutation/equivalent-mutants.json"))
       .join("\n");
     dirty = filteredStatus.length > 0;
+    // Exempt equivalent-mutants.json from diff checks (waiver rebinding)
     for (const args of [
-      ["diff-index", "--quiet", "HEAD", "--"],
-      ["diff-files", "--quiet"],
+      ["diff-index", "--quiet", "HEAD", "--", ".", ":(exclude)mutation/equivalent-mutants.json"],
+      ["diff-files", "--quiet", "--", ".", ":(exclude)mutation/equivalent-mutants.json"],
     ]) {
       const result = gitExit(root, args);
       if (result.status === 1) dirty = true;
