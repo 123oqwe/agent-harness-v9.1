@@ -236,8 +236,8 @@ export class Harness {
   /** #6: RAG store and document ingestor (lazy-initialized for packed-root compatibility). */
   private ragStore: RagIndexStore | undefined;
   private documentIngestor: DefaultDocumentIngestor | undefined;
-  /** #1: context window capacity from provider metadata. */
-  private readonly contextCapacity: number | undefined = undefined;
+  /** #1: context window capacity from provider metadata. N34 fix: read from gateway. */
+  private readonly contextCapacity: number | undefined;
 
   /** Mutable streaming callbacks — set after construction by ws-server or SSE handler. */
   private _onModelDelta: ((delta: string) => void) | undefined;
@@ -268,6 +268,9 @@ export class Harness {
     validateExecutionContext(config.executionContext);
     this.config = config;
     this.execCtx = config.executionContext;
+    // N34 fix: read context capacity from the first provider in the gateway snapshot
+    const providers = config.gateway.registrySnapshot.providers;
+    this.contextCapacity = providers.length > 0 ? providers[0]!.max_context_tokens : undefined;
     this.toolSnapshot = config.toolRegistry.freezeSnapshot();
     this.skillSnapshot = config.skillRegistry.freezeSnapshot();
     this.policySnapshotRef = `policy-${config.policyEngine.policy_hash}`;

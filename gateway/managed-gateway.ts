@@ -154,8 +154,22 @@ export class ManagedGateway {
     };
   }
 
+  // N35 fix: domain allowlist for provider egress.
+  // Only known provider API domains are allowed for remote calls.
+  private static readonly PROVIDER_DOMAIN_ALLOWLIST = new Set([
+    'api.openai.com', 'api.anthropic.com', 'api.deepseek.com',
+    'dashscope.aliyuncs.com', 'open.bigmodel.cn', 'api.moonshot.cn',
+    'api.perplexity.ai', 'open.volcengineapi.com', 'api.minimax.chat',
+    'api.together.xyz', 'api.groq.com', 'generativelanguage.googleapis.com',
+    'api.mistral.ai', 'api.x.ai', 'api.coze.com',
+    'api.endpoints.anyscale.com', 'api.fireworks.ai', 'api.lepton.ai',
+    'api.siliconflow.cn', 'api.lingyiwanwu.com', 'api.01.ai',
+    'localhost', '127.0.0.1', // local providers (ollama, vllm)
+  ]);
+
   private makeEgressPolicy(): EgressPolicyPort {
     const keyVault = this.keyVault;
+    const allowlist = ManagedGateway.PROVIDER_DOMAIN_ALLOWLIST;
     return {
       async authorize(input) {
         if (!input.network_required) return { allowed: true };
@@ -165,6 +179,15 @@ export class ManagedGateway {
         const provider = input.provider_id.split('/')[0] ?? '';
         if (!keyVault.hasProvider(provider)) {
           return { allowed: false, reason: `No API key for ${provider}` };
+        }
+        // N35 fix: check that the provider's API domain is in the allowlist
+        const apiDomain = (input as { api_endpoint?: string }).api_endpoint;
+        if (apiDomain) {
+          let hostname: string;
+          try { hostname = new URL(apiDomain).hostname; } catch { hostname = apiDomain; }
+          if (!allowlist.has(hostname)) {
+            return { allowed: false, reason: `Provider API domain ${hostname} not in allowlist` };
+          }
         }
         return { allowed: true };
       },
@@ -325,17 +348,22 @@ export class ManagedGateway {
   }
 
   async *completeStream(prompt: string, ctx: CallContext): AsyncGenerator<{
-    type: 'text_delta' | 'tool_call' | 'message_stop' | 'provider_info';
+    type: 'text_delta' | 'tool_call' | 'message_stop' | 'provider_info' | 'fallback';
     text?: string;
     tool_call?: { id: string; name: string; arguments: Record<string, unknown> };
     provider?: string;
     model?: string;
     usage?: { input_tokens: number; output_tokens: number };
     cost_usd?: number;
+    fallback_chain?: string[];
   }> {
+    // N24 fix: completeStream now has the same security mechanisms as complete():
+    // CircuitBreaker, Budget check, Fallback chain, and error classification.
     const estInput = Math.ceil(prompt.length / 4);
-    const rl = this.rateLimiter.check(ctx.userId, estInput + (ctx.estimatedOutputTokens ?? 2000));
+    const estOutput = ctx.estimatedOutputTokens ?? 2000;
+    const rl = this.rateLimiter.check(ctx.userId, estInput + estOutput);
     if (!rl.allowed) { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
+
     const messages: Message[] = [
       { role: 'system', content: ctx.systemPrompt ?? 'You are a precise agent execution engine.' },
       { role: 'user', content: prompt },
@@ -350,25 +378,78 @@ export class ManagedGateway {
       policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
       run_plan: { allowed_provider_ids: undefined, required_capabilities: ctx.requiredCapabilities ?? [] },
     };
+
     let resolved;
     try { resolved = this.modelGateway.resolve(request); }
     catch { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
-    const binding = this.bindingMap.get(resolved.provider_id);
-    if (!binding) { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: 0, output_tokens: 0 } }; return; }
-    this.cacheManager.trackCall(this.cacheManager.computeKey(binding.model_id, 'default', false));
-    yield { type: 'provider_info', provider: binding.provider, model: binding.model_id };
+
+    const fallbackChain: string[] = [resolved.provider_id];
+    const attempted: string[] = [];
     let inputTok = 0; let outputTok = 0;
-    try {
-      for await (const ev of this.modelGateway.dispatchStream(resolved, request, { operation_id: `op-${ctx.taskId}-${Date.now()}` })) {
-        if (ev.type === 'text_delta') yield { type: 'text_delta', text: ev.text };
-        else if (ev.type === 'tool_call') yield { type: 'tool_call', tool_call: ev.tool_call };
-        else if (ev.type === 'message_stop' && ev.usage) { inputTok = ev.usage.input_tokens; outputTok = ev.usage.output_tokens; }
+
+    while (true) {
+      const binding = this.bindingMap.get(resolved.provider_id);
+      if (!binding) {
+        attempted.push(resolved.provider_id);
+        try { resolved = this.modelGateway.switchProvider(resolved, request, attempted); fallbackChain.push(resolved.provider_id); continue; }
+        catch { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, ...(fallbackChain.length > 1 ? { fallback_chain: fallbackChain } : {}) }; return; }
       }
-      const cost = inputTok / 1_000_000 * binding.price_input + outputTok / 1_000_000 * binding.price_output;
-      if (cost > 0) { this.economic.spend(ctx.taskId, cost, ctx.stepId, `model:${binding.provider}/${binding.model_id}`); this.economic.debitWallet(ctx.userId, cost); }
-      yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, ...(cost > 0 ? { cost_usd: cost } : {}) };
-    } catch { yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok } }; }
-    finally { this.rateLimiter.release(ctx.userId); }
+
+      // N24 fix: CircuitBreaker check
+      const breaker = this.breakers.get(binding.provider);
+      if (breaker && !breaker.canRequest()) {
+        attempted.push(resolved.provider_id);
+        try { resolved = this.modelGateway.switchProvider(resolved, request, attempted); fallbackChain.push(resolved.provider_id); yield { type: 'fallback', provider: binding.provider, fallback_chain: fallbackChain }; continue; }
+        catch { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, fallback_chain: fallbackChain }; return; }
+      }
+
+      // N24 fix: Budget check
+      const budget = this.economic.getBudget(ctx.taskId);
+      const budgetRemaining = budget ? budget.total - budget.spent : undefined;
+      if (budgetRemaining !== undefined) {
+        const estCost = this.capRegistry.estimateCost(binding, estInput, estOutput);
+        if (estCost > budgetRemaining) {
+          attempted.push(resolved.provider_id);
+          try { resolved = this.modelGateway.switchProvider(resolved, request, attempted); fallbackChain.push(resolved.provider_id); yield { type: 'fallback', provider: binding.provider, fallback_chain: fallbackChain }; continue; }
+          catch { this.rateLimiter.release(ctx.userId); yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, fallback_chain: fallbackChain }; return; }
+        }
+      }
+
+      this.cacheManager.trackCall(this.cacheManager.computeKey(binding.model_id, 'default', false));
+      if (fallbackChain.length > 1) yield { type: 'fallback', provider: binding.provider, fallback_chain: fallbackChain };
+      yield { type: 'provider_info', provider: binding.provider, model: binding.model_id };
+
+      try {
+        for await (const ev of this.modelGateway.dispatchStream(resolved, request, { operation_id: `op-${ctx.taskId}-${Date.now()}` })) {
+          if (ev.type === 'text_delta') yield { type: 'text_delta', text: ev.text };
+          else if (ev.type === 'tool_call') yield { type: 'tool_call', tool_call: ev.tool_call };
+          else if (ev.type === 'message_stop' && ev.usage) { inputTok = ev.usage.input_tokens; outputTok = ev.usage.output_tokens; }
+        }
+        breaker?.recordSuccess();
+        const cost = inputTok / 1_000_000 * binding.price_input + outputTok / 1_000_000 * binding.price_output;
+        if (cost > 0) { this.economic.spend(ctx.taskId, cost, ctx.stepId, `model:${binding.provider}/${binding.model_id}`); this.economic.debitWallet(ctx.userId, cost); }
+        this.rateLimiter.release(ctx.userId);
+        yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, ...(cost > 0 ? { cost_usd: cost } : {}), ...(fallbackChain.length > 1 ? { fallback_chain: fallbackChain } : {}) };
+        return;
+      } catch (e) {
+        // N24 fix: error classification + breaker recording
+        if (e instanceof ProviderDispatchError) {
+          if (e.code === 'provider_failure' || e.code === 'provider_unhealthy') breaker?.recordFailure();
+        } else {
+          breaker?.recordFailure();
+        }
+        attempted.push(resolved.provider_id);
+        try {
+          resolved = this.modelGateway.switchProvider(resolved, request, attempted);
+          fallbackChain.push(resolved.provider_id);
+          yield { type: 'fallback', provider: binding.provider, fallback_chain: fallbackChain };
+        } catch {
+          this.rateLimiter.release(ctx.userId);
+          yield { type: 'message_stop', usage: { input_tokens: inputTok, output_tokens: outputTok }, fallback_chain: fallbackChain };
+          return;
+        }
+      }
+    }
   }
 
 
@@ -437,10 +518,15 @@ getCacheMetrics(): Record<string, unknown> { return this.cacheManager.getMetrics
   } {
     return {
       resolve: async (messages, tools) => {
-        const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+        // N33 fix: pass structured messages to complete(), not a flattened string.
+        // The last user message is the prompt; prior messages become the conversation context.
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        const prompt = lastUserMsg?.content ?? messages[messages.length - 1]!.content;
+        const systemMsg = messages.find(m => m.role === 'system');
         const result = await this.complete(prompt, {
           userId, taskId, stepId: 'model', tier: 'work',
           requiredCapabilities: ['reasoning'],
+          ...(systemMsg ? { systemPrompt: systemMsg.content } : {}),
           ...(tools && tools.length > 0 ? { tools } : {}),
         });
         let toolCalls: ModelTurn['tool_calls'];

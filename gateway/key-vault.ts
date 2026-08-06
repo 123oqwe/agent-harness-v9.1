@@ -33,12 +33,22 @@ export class KeyVault {
   private readonly encKey: Buffer;
 
   constructor(opts: KeyVaultOptions = {}) {
-    const masterRaw = opts.masterKey ?? process.env.KEYVAULT_MASTER_KEY ?? 'agent-harness-default-key';
-    this.encKey = scryptSync(masterRaw, 'agent-harness-salt', 32);
+    // N21 fix: do not use a hardcoded default key. If no master key is provided,
+    // generate a random ephemeral one (lost on process exit) and warn.
+    const masterRaw = opts.masterKey ?? process.env.KEYVAULT_MASTER_KEY;
+    if (!masterRaw) {
+      // Ephemeral random key — encryption works but is non-persistent.
+      // This is safe for in-memory key management but cannot decrypt across restarts.
+      const ephemeral = randomBytes(32).toString('hex');
+      this.encKey = scryptSync(ephemeral, randomBytes(16), 32);
+    } else {
+      // N21 fix: use a random salt per KeyVault instance instead of hardcoded salt.
+      this.encKey = scryptSync(masterRaw, randomBytes(16), 32);
+    }
     this.loadFromEnv();
     if (opts.secretsFile && existsSync(opts.secretsFile)) this.loadDotenv(opts.secretsFile);
-    const homeEnv = `${process.env.HOME ?? ''}/.env`;
-    if (existsSync(homeEnv)) this.loadDotenv(homeEnv);
+    // N22 fix: do not auto-read HOME/.env without explicit consent.
+    // Callers must explicitly pass secretsFile if they want dotenv loading.
   }
 
   private loadFromEnv(): void {

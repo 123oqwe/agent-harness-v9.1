@@ -5,7 +5,7 @@
  * Contract for model provider adapters. Real providers and ScriptedTestProvider must implement this interface.
  */
 export interface ProviderAdapter {
-  provider_type: "openai" | "anthropic" | "google" | "local" | "scripted_test";
+  provider_type: "openai" | "anthropic" | "google" | "local" | "scripted_test" | "deepseek" | "qwen" | "doubao" | "ollama" | "vllm";
   /**
    * Transforms internal request to provider-specific format
    */

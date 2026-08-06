@@ -7,7 +7,7 @@ export type { ActionManifest } from './generated/action_manifest.js';
 export type { CapabilityToken } from './generated/capability_token.js';
 export type { ChildCapabilityRequest } from './generated/child_capability_request.js';
 export type { ProviderAdapter } from './generated/provider_adapter.js';
-export type ProviderType = 'openai' | 'anthropic' | 'google' | 'local' | 'scripted_test';
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'local' | 'scripted_test' | 'deepseek' | 'qwen' | 'doubao' | 'ollama' | 'vllm';
 export type { AgentGraph } from './generated/agent_graph.js';
 export type { ContextGraph } from './generated/context_graph.js';
 export type { VerificationGraph } from './generated/verification_graph.js';

@@ -265,6 +265,11 @@ const PROVIDER_TYPES = [
   'google',
   'local',
   'scripted_test',
+  'deepseek',
+  'qwen',
+  'doubao',
+  'ollama',
+  'vllm',
 ] as const satisfies readonly ProviderType[];
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
@@ -809,6 +814,11 @@ export class ModelGateway {
   /** The frozen registry snapshot hash owned by this gateway. */
   get registrySnapshotHash(): string {
     return this.registry.snapshot.hash;
+  }
+
+  /** The frozen registry snapshot (providers list) owned by this gateway. */
+  get registrySnapshot(): { readonly providers: readonly ProviderSnapshotEntry[]; readonly hash: string } {
+    return this.registry.snapshot;
   }
 
   resolve(request: ProviderSelectionRequest): ResolvedProvider {
