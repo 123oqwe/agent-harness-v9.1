@@ -93,26 +93,30 @@ export const EXPECTED_WORKSPACES = Object.freeze([
     "package",
     [],
   ),
-  workspace(
-    "apps/api",
-    "@agent-harness/app-api",
-    [],
-    "app",
+ workspace(
+   "apps/api",
+   "@agent-harness/app-api",
+   [],
+   "app",
+    ["node:http", "node:url"],
+    ["fetch", "process"],
+ ),
+ workspace(
+   "apps/web",
+   "@agent-harness/app-web",
+   ["@agent-harness/ui"],
+   "app",
     [],
     ["fetch"],
-  ),
-  workspace(
-    "apps/web",
-    "@agent-harness/app-web",
-    ["@agent-harness/ui"],
-    "app",
-  ),
-  workspace(
-    "apps/desktop",
-    "@agent-harness/app-desktop",
-    ["@agent-harness/ui"],
-    "app",
-  ),
+ ),
+ workspace(
+   "apps/desktop",
+   "@agent-harness/app-desktop",
+   ["@agent-harness/ui"],
+   "app",
+    [],
+    ["process"],
+ ),
   workspace(
     "apps/tui",
     "@agent-harness/app-tui",
@@ -850,20 +854,21 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals, exemptFile = fa
   if (processBindings.mutableAuthorityAlias) {
     violations.add("mutable global authority alias is forbidden");
   }
+  const processAllowed = transportGlobals.has("process");
   const visit = (node) => {
     if (
-    ts.isIdentifier(node) &&
+   ts.isIdentifier(node) &&
       processBindings.processAliases.has(node.text) &&
       !isDeclarationName(node)
     ) {
-      if (!exemptFile) violations.add("global process access is forbidden");
+      if (!exemptFile && !processAllowed) violations.add("global process access is forbidden");
     }
     if (
       (ts.isPropertyAccessExpression(node) ||
         ts.isElementAccessExpression(node)) &&
       processBindings.isGlobalProcess(node)
     ) {
-      if (!exemptFile) violations.add("global process access is forbidden");
+      if (!exemptFile && !processAllowed) violations.add("global process access is forbidden");
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -873,7 +878,7 @@ const sourceAuthorityViolations = (sourceFile, transportGlobals, exemptFile = fa
         (element) => processBindings.bindingPropertyName(element) === "process",
       )
     ) {
-      if (!exemptFile) violations.add("global process access is forbidden");
+      if (!exemptFile && !processAllowed) violations.add("global process access is forbidden");
     }
     if (
       ts.isElementAccessExpression(node) &&
@@ -1331,13 +1336,14 @@ export const checkWorkspaceBoundaries = ({
       }
       for (const specifier of accesses.specifiers) {
         for (const [category, forbidden] of FORBIDDEN_IMPORTS) {
-          const durableJournalFilesystem =
-            RUNTIME_CORE_DURABLE_JOURNALS.has(label) &&
-            category === "filesystem" &&
-            ["node:fs", "node:fs/promises"].includes(specifier);
-          const phase2ToolExempt =
-            PHASE2_TOOL_EXEMPT_FILES.has(label);
-          if (forbidden.has(specifier) && !durableJournalFilesystem && !phase2ToolExempt)
+         const durableJournalFilesystem =
+           RUNTIME_CORE_DURABLE_JOURNALS.has(label) &&
+           category === "filesystem" &&
+           ["node:fs", "node:fs/promises"].includes(specifier);
+         const phase2ToolExempt =
+           PHASE2_TOOL_EXEMPT_FILES.has(label);
+          const safeBuiltinApproved = expected.safeBuiltins.includes(specifier);
+          if (forbidden.has(specifier) && !durableJournalFilesystem && !phase2ToolExempt && !safeBuiltinApproved)
             errors.push(`${label}: direct ${category} access is forbidden`);
         }
         if (

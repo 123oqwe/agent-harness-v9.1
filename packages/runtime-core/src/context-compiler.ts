@@ -189,10 +189,23 @@ const validateActivePlan = (value: unknown): void => {
   }
 };
 
-const roleFor = (layer: ContextContentLayer): CompiledContextMessage["role"] => {
+const VALID_ROLES = new Set(["system", "user", "assistant", "tool"]);
+
+const roleFor = (layer: ContextContentLayer, item?: ContextCompilerItem): CompiledContextMessage["role"] => {
   if (layer === "system_policy") return "system";
   if (layer === "tool_results") return "tool";
-  if (layer === "recent_conversation") return "assistant";
+  if (layer === "recent_conversation") {
+    // GLM fix: recent_conversation may contain interleaved user/assistant messages.
+    // Extract the role from the item's content if available; default to "assistant"
+    // (historical conversation entries typically represent assistant responses).
+    if (item && typeof item.content === "object" && item.content !== null) {
+      const candidate = (item.content as Record<string, unknown>)["role"];
+      if (typeof candidate === "string" && VALID_ROLES.has(candidate)) {
+        return candidate as CompiledContextMessage["role"];
+      }
+    }
+    return "assistant";
+  }
   return "user";
 };
 
@@ -328,7 +341,9 @@ export class ContextCompiler {
         if (preparation.session_id === undefined) {
           throw new Error("context reset did not return a fresh session");
         }
-        sessionId = preparation.session_id;
+        // GLM fix: validate the compactor-returned session_id via requiredId
+        // to prevent a malicious compactor from injecting an invalid session_id.
+        sessionId = requiredId("compactor.session_id", preparation.session_id);
       }
     }
     const messages: CompiledContextMessage[] = [];
@@ -340,9 +355,15 @@ export class ContextCompiler {
       const tokenCount = items.reduce((total, entry) => total + entry.token_count, 0);
       const trust = layerTrust(items);
       totalInputTokens += tokenCount;
+      // GLM fix: for recent_conversation, extract role from item content if available.
+      // Items without an explicit role default to "user" (safe default) instead of "assistant"
+      // which could produce invalid role sequences when sent to LLM APIs.
+      const layerRole = layer === "recent_conversation" && items.length > 0
+        ? roleFor(layer, items[0])
+        : roleFor(layer);
       messages.push({
         layer,
-        role: roleFor(layer),
+        role: layerRole,
         trust: trust === "mixed" ? "untrusted" : trust,
         isolated: items.some((entry) => entry.trust === "untrusted"),
         item_ids: items.map((entry) => entry.id),

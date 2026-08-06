@@ -128,6 +128,45 @@ export class GatewayWsServer {
     if (!goal) { this.send(ws, { type: 'error', error: 'Missing "goal"' }); return; }
     if (this.economic) { this.economic.createBudget(taskId, budgetUsd); this.economic.createWallet(session.userId, 100.0); }
     this.send(ws, { type: 'task_started', task_id: taskId, budget_usd: budgetUsd, streaming: true });
+
+    // Route through Harness with streaming callbacks — same security pipeline as handleTask.
+    // The onModelDelta callback streams tokens to the WebSocket; onToolOutput streams tool output.
+    if (this.harnessFactory) {
+      try {
+        const harness = this.harnessFactory(this.gateway, session.userId, taskId);
+        // Inject streaming callbacks into the harness config at runtime
+        const harnessWithStreaming = harness.withStreaming({
+          onModelDelta: (delta: string) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              this.send(ws, { type: 'model_delta', task_id: taskId, delta });
+            }
+          },
+          onToolOutput: (toolCallId: string, _stepId: string, stream: 'stdout' | 'stderr', chunk: string) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              this.send(ws, { type: 'tool_output', task_id: taskId, tool_call_id: toolCallId, stream, chunk });
+            }
+          },
+        });
+        const task: TaskContract = {
+          goal: goal!,
+          success_criteria: [{ criterion: 'task completed', verification_method: 'deterministic' }],
+          constraints: [{ type: 'budget', value: String(budgetUsd) }],
+        };
+        const outcome = await harnessWithStreaming.run(task, taskId);
+        this.send(ws, {
+          type: 'task_complete', task_id: taskId, streaming: true,
+          success: outcome.success,
+          iterations: outcome.evidence.iterations,
+          termination_reason: outcome.evidence.termination_reason,
+          budget_remaining: this.economic ? (this.economic.getBudget(taskId)?.total ?? 0) - (this.economic.getBudget(taskId)?.spent ?? 0) : 0,
+        });
+      } catch (e) {
+        this.send(ws, { type: 'task_failed', task_id: taskId, error: (e as Error).message });
+      }
+      return;
+    }
+
+    // Fallback: direct gateway streaming (no Harness pipeline)
     try {
       for await (const event of this.gateway.completeStream(goal, {
         userId: session.userId, taskId, stepId: 'model', tier: 'work',

@@ -26,14 +26,14 @@ export interface ScreenDefinition {
 }
 
 export const PHASE2_SCREENS: readonly ScreenDefinition[] = Object.freeze([
-  { id: 'doc', title: 'Documents', path: '/documents', states: ['loading', 'empty', 'success', 'error', 'offline'] },
-  { id: 'mm', title: 'Multimodal Studio', path: '/multimodal', states: ['loading', 'empty', 'success', 'error', 'offline'] },
-  { id: 'notify', title: 'Notifications', path: '/notifications', states: ['loading', 'empty', 'success', 'error', 'offline'] },
+  { id: 'doc', title: 'Documents', path: '/documents', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
+  { id: 'mm', title: 'Multimodal Studio', path: '/multimodal', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
+  { id: 'notify', title: 'Notifications', path: '/notifications', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
   { id: 'planning', title: 'Planning', path: '/planning', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
   { id: 'reconcile', title: 'Reconciliation', path: '/reconcile', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
-  { id: 'research', title: 'Research', path: '/research', states: ['loading', 'empty', 'success', 'error', 'offline'] },
+  { id: 'research', title: 'Research', path: '/research', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
   { id: 'tui', title: 'Terminal', path: '/terminal', states: ['loading', 'success', 'error'] },
-  { id: 'writing', title: 'Writing', path: '/writing', states: ['loading', 'empty', 'success', 'error', 'offline'] },
+  { id: 'writing', title: 'Writing', path: '/writing', states: ['loading', 'empty', 'success', 'error', 'offline', 'blocked', 'approval'] },
 ]);
 
 // AH-UX-CONTRACT-001: Frontend-backend contract types

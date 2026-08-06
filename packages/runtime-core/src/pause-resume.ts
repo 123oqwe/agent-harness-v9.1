@@ -7,6 +7,34 @@ export type PauseResumeEffectState =
   | "DEFINITELY_FAILED_NO_EFFECT"
   | "AWAITING_HUMAN";
 
+/**
+ * GLM fix: Valid state transitions for PauseResumeEffectState.
+ * Derived from spec/state-machines/external-effect.machine.json.
+ * Prevents arbitrary state-to-state transitions.
+ */
+const VALID_TRANSITIONS: Readonly<Record<PauseResumeEffectState, readonly PauseResumeEffectState[]>> = Object.freeze({
+  PRE_DISPATCH: ["DEFINITELY_FAILED_NO_EFFECT"],
+  IN_FLIGHT: ["EFFECT_CONFIRMED", "EFFECT_UNKNOWN", "DEFINITELY_FAILED_NO_EFFECT"],
+  EFFECT_UNKNOWN: ["RECONCILING"],
+  RECONCILING: ["EFFECT_CONFIRMED", "AWAITING_HUMAN", "DEFINITELY_FAILED_NO_EFFECT"],
+  EFFECT_CONFIRMED: [], // terminal
+  DEFINITELY_FAILED_NO_EFFECT: [], // terminal
+  AWAITING_HUMAN: ["EFFECT_CONFIRMED", "DEFINITELY_FAILED_NO_EFFECT"],
+});
+
+function assertValidTransition(from: PauseResumeEffectState, to: PauseResumeEffectState): void {
+  if (from === to) return; // idempotent re-recording is allowed
+  const allowed = VALID_TRANSITIONS[from];
+  if (!allowed || !allowed.includes(to)) {
+    throw new Error(
+      `invalid pause/resume state transition: ${from} -> ${to}`,
+    );
+  }
+}
+
+/** Maximum size for stored_outcome_json to prevent memory exhaustion. */
+const MAX_STORED_OUTCOME_BYTES = 1024 * 1024; // 1 MiB
+
 export interface PauseResumeEffectRecord {
   readonly operation_id: string;
   readonly run_id: string;
@@ -182,6 +210,12 @@ export class PauseResumeController {
     storedOutcomeJson: string,
   ): PauseResumeEffectRecord {
     requiredId("stored_outcome_json", storedOutcomeJson);
+    // GLM fix: enforce size limit on stored_outcome_json
+    if (Buffer.byteLength(storedOutcomeJson, "utf8") > MAX_STORED_OUTCOME_BYTES) {
+      throw new Error(
+        `stored_outcome_json exceeds maximum size of ${MAX_STORED_OUTCOME_BYTES} bytes`,
+      );
+    }
     try {
       JSON.parse(storedOutcomeJson);
     } catch {
@@ -199,6 +233,8 @@ export class PauseResumeController {
     effectState: PauseResumeEffectState,
     receiptJson: string | null = operation.receipt_json,
   ): PauseResumeEffectRecord {
+    // GLM fix: validate state transition before recording
+    assertValidTransition(operation.effect_state, effectState);
     const next = Object.freeze({
       ...operation,
       effect_state: effectState,

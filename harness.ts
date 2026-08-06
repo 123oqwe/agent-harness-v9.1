@@ -33,11 +33,12 @@ import {
   type ModelCallDirective,
   type ToolCallExecutionContext,
 } from './runtime/loop.js';
+import type { EventBus } from './runtime/event-bus.js';
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './sandbox/process-sandbox.js';
 import { ActionExecutor, OutputFormatValidator } from './security/action-executor.js';
-import type { RagIndexStore } from './packages/rag/src/index.js';
-import type { DefaultDocumentIngestor } from './packages/documents/src/index.js';
+import type { RagIndexStore } from '@agent-harness/rag';
+import type { DefaultDocumentIngestor } from '@agent-harness/documents';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import { LocalToolHost } from './tools/local-tool-host.js';
 import type { AuthorizationService } from './security/authorization-service.js';
@@ -51,15 +52,15 @@ import { CacheManager } from './gateway/cache-manager.js';
 // Lazy-loaded Phase 2 package modules — dynamic imports prevent the packed
 // root tarball from needing packages/ at module-load time.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-type RagModule = typeof import('./packages/rag/src/index.js');
+type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-type DocModule = typeof import('./packages/documents/src/index.js');
+type DocModule = typeof import('@agent-harness/documents');
 let _ragModulePromise: Promise<RagModule> | undefined;
 const _lazyDoc = (): Promise<DocModule> => {
-  return import('./packages/documents/src/index.js');
+  return import('@agent-harness/documents');
 };
 const lazyRag = (): Promise<RagModule> => {
-  if (!_ragModulePromise) _ragModulePromise = import('./packages/rag/src/index.js');
+  if (!_ragModulePromise) _ragModulePromise = import('@agent-harness/rag');
   return _ragModulePromise;
 };
 import { SkillLoader } from './skills/skill-loader.js';
@@ -203,6 +204,12 @@ export interface HarnessConfig {
   ragStore?: RagIndexStore;
   /** #6: Document ingestor for parse_document → RAG indexing. */
   documentIngestor?: DefaultDocumentIngestor;
+  /** Streaming: callback for each model output token delta. Enables SSE/WebSocket streaming. */
+  onModelDelta?: (delta: string) => void;
+  /** Streaming: callback for each tool output chunk. Enables live tool output streaming. */
+  onToolOutput?: (toolCallId: string, stepId: string, stream: 'stdout' | 'stderr', chunk: string) => void;
+  /** EventBus for pub/sub of agent activity events (tool calls, model calls, turns). */
+  eventBus?: EventBus;
 }
 
 export class Harness {
@@ -231,6 +238,11 @@ export class Harness {
   private documentIngestor: DefaultDocumentIngestor | undefined;
   /** #1: context window capacity from provider metadata. */
   private readonly contextCapacity: number | undefined = undefined;
+
+  /** Mutable streaming callbacks — set after construction by ws-server or SSE handler. */
+  private _onModelDelta: ((delta: string) => void) | undefined;
+  private _onToolOutput: ((toolCallId: string, stepId: string, stream: 'stdout' | 'stderr', chunk: string) => void) | undefined;
+  private _eventBus: EventBus | undefined;
 
   constructor(config: HarnessConfig) {
     if (
@@ -287,6 +299,26 @@ export class Harness {
 
   private now(): string {
     return assertTimestamp(this.execCtx!.clock(), 'execution clock');
+  }
+
+  /**
+   * Attach streaming callbacks after construction. Returns `this` for chaining.
+   * Used by ws-server / SSE handler to route model deltas and tool output
+   * through the WebSocket without bypassing the Harness security pipeline.
+   */
+  withStreaming(callbacks: {
+    onModelDelta?: (delta: string) => void;
+    onToolOutput?: (toolCallId: string, stepId: string, stream: 'stdout' | 'stderr', chunk: string) => void;
+  }): this {
+    this._onModelDelta = callbacks.onModelDelta;
+    this._onToolOutput = callbacks.onToolOutput;
+    return this;
+  }
+
+  /** Attach an EventBus for pub/sub of agent activity events. */
+  withEventBus(bus: EventBus): this {
+    this._eventBus = bus;
+    return this;
   }
 
   /** Execute a TaskContract through the full Request-to-Outcome pipeline. */
@@ -771,6 +803,9 @@ export class Harness {
          return results;
        },
        signal: this.config.signal,
+       ...((this._onModelDelta ?? this.config.onModelDelta) ? { onModelDelta: this._onModelDelta ?? this.config.onModelDelta } : {}),
+       ...((this._onToolOutput ?? this.config.onToolOutput) ? { onToolOutput: this._onToolOutput ?? this.config.onToolOutput } : {}),
+       ...((this._eventBus ?? this.config.eventBus) ? { eventBus: this._eventBus ?? this.config.eventBus } : {}),
         turnHooks: {
           beforeTurn: async ({ iteration, messages }) => {
             const before = await this.decisionHook(
