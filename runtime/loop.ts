@@ -17,6 +17,10 @@ import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
 import { HookRestrictionError } from './hook-port.js';
 import type { EventBus, BusEvent } from './event-bus.js';
+import type { ContextCompiler } from '@agent-harness/runtime-core';
+
+/** Port type for ContextCompiler — uses the real class type from runtime-core. */
+type ContextCompilerPort = Pick<ContextCompiler, 'compile'>;
 import { createEvent } from './event-bus.js';
 import type {
   RuntimeSteeringCommand,

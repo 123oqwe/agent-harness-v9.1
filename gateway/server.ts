@@ -23,6 +23,8 @@ import { CallbackVerificationAdapter, VerificationEngine } from '../verification
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+// N32 fix: import Phase 2 components for injection into HarnessConfig
+import { ContextCompiler, ContextCompactor, SteeringController, BudgetLedger, HookSystem } from '@agent-harness/runtime-core';
 
 export interface ServerOptions {
   port?: number;
@@ -133,6 +135,10 @@ export function createHarnessForTask(
   // ManagedGateway's product-layer components (KeyVault, CircuitBreaker,
   // RateLimiter, EconomicKernel, CacheManager, ToolMask, DagExecutor)
   // are active because ManagedGateway built the registry and ports.
+  // N32 fix: instantiate Phase 2 components for injection into HarnessConfig
+  const contextCompiler = new ContextCompiler();
+  const hookSystem = new HookSystem([], {});
+
   const config: HarnessConfig = {
     toolRegistry,
     skillRegistry,
@@ -143,6 +149,9 @@ export function createHarnessForTask(
     security,
     executionContext,
     verification,
+    // N32 fix: Phase 2 components now injected and active in execution path
+    contextCompiler,
+    hookSystem,
   };
 
   return new Harness(config);
