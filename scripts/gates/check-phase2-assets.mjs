@@ -13,7 +13,7 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validatePhase2Manifest } from "./check-phase2-manifest.mjs";
@@ -654,9 +654,12 @@ const validateDataManifest = ({
   ) {
     errors.push(`${definition.path} identity is invalid`);
   }
-  if (manifest.execution_runner_status !== "not_implemented") {
+  if (
+    manifest.execution_runner_status !== "not_implemented" &&
+    manifest.execution_runner_status !== "implemented"
+  ) {
     errors.push(
-      `${definition.path} execution_runner_status must be not_implemented`,
+      `${definition.path} execution_runner_status must be not_implemented or implemented`,
     );
   }
   if (!isRecord(manifest.dataset)) {
@@ -945,10 +948,29 @@ export const checkPhase2Assets = ({
     if (definition.kind === "consented-staging") stagingReady = ready;
   }
 
-  const runnerBlocked =
-    "Phase 2 data execution runner status is not_implemented; release verification remains blocked";
-  if (mode === "release") errors.push(runnerBlocked);
-  else warnings.push(runnerBlocked);
+  const notImplementedKinds = [];
+  for (const definition of DATA_MANIFESTS) {
+    try {
+      const manifestPath = join(repositoryRoot, definition.path);
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (manifest.execution_runner_status !== "implemented") {
+        notImplementedKinds.push(definition);
+      }
+    } catch {
+      notImplementedKinds.push(definition);
+    }
+  }
+  if (mode === "release" && notImplementedKinds.length > 0) {
+    for (const definition of notImplementedKinds) {
+      errors.push(
+        `${definition.path} execution_runner_status is not_implemented; release verification remains blocked`,
+      );
+    }
+  } else if (notImplementedKinds.length > 0) {
+    warnings.push(
+      "Phase 2 data execution runner status is not_implemented; release verification remains blocked",
+    );
+  }
 
   return {
     mode,
