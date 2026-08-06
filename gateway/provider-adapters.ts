@@ -10,6 +10,7 @@ import type { ProviderType } from '../contracts/index.js';
 const PROVIDER_REGIONS: Record<string, string[]> = {
   openai: ['us'], anthropic: ['us'], zhipu: ['cn'], deepseek: ['cn'],
   qwen: ['cn'], google: ['us'], mistral: ['eu'], kimi: ['cn'], perplexity: ['us'],
+  doubao: ['cn'], ollama: ['local'], vllm: ['local'],
 };
 
 export function getProviderRegions(provider: string): string[] {
@@ -63,6 +64,8 @@ function buildHeaders(binding: ModelBinding, apiKey: string): Record<string, str
   if (binding.api_format === 'anthropic') {
     return { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
   }
+  // Local providers with no auth key: omit Authorization header entirely
+  if (!apiKey) return { 'Content-Type': 'application/json' };
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
 }
 
@@ -134,9 +137,12 @@ export function createProviderAdapter(
 
     async resolve(request: ProviderRequest, _context?: ProviderDispatchContext): Promise<unknown> {
       const key = keyVault.getKey(binding.provider);
-      if (!key) throw new Error(`No API key for ${binding.provider}`);
+  // Local providers (Ollama, vLLM) don't require API keys — allow empty key
+  const isLocal = binding.api_base.startsWith('http://localhost') || binding.api_base.startsWith('http://127.0.0.1');
+  if (!key && !isLocal) throw new Error(`No API key for ${binding.provider}`);
+  const effectiveKey = key ?? '';
       const body = buildRequestBody(binding, request);
-      const headers = buildHeaders(binding, key);
+      const headers = buildHeaders(binding, effectiveKey);
       const endpoint = getEndpoint(binding);
       const resp = await fetch(endpoint, {
         method: 'POST', headers, body: JSON.stringify(body),
@@ -175,10 +181,12 @@ export function createProviderAdapter(
 
     async *streamEvents(request: ProviderRequest): AsyncIterable<StreamEvent> {
       const skey = keyVault.getKey(binding.provider);
-      if (!skey) throw new Error(`No API key for ${binding.provider}`);
+      const sIsLocal = binding.api_base.startsWith('http://localhost') || binding.api_base.startsWith('http://127.0.0.1');
+      if (!skey && !sIsLocal) throw new Error(`No API key for ${binding.provider}`);
+      const effectiveSKey = skey ?? '';
       const sbody = buildRequestBody(binding, request);
       (sbody as Record<string, unknown>)['stream'] = true;
-      const sheaders = buildHeaders(binding, skey);
+      const sheaders = buildHeaders(binding, effectiveSKey);
       const sendpoint = getEndpoint(binding);
       const sresp = await fetch(sendpoint, {
         method: 'POST', headers: sheaders, body: JSON.stringify(sbody),

@@ -30,11 +30,11 @@ function toolSpec(name: string): ToolSpec {
 
 function setupRouter(gatewayOverride?: ModelGateway) {
   const tr = new ToolRegistry();
-  ['read_file', 'write_file', 'edit_file', 'execute_command', 'list_directory', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
+  ['read_file', 'write_file', 'edit_file', 'apply_patch', 'execute_command', 'list_directory', 'search_files', 'parse_document'].forEach(n => tr.register(toolSpec(n)));
   const sr = new SkillRegistry(); sr.loadBaseSkills();
   const tsnap = tr.freezeSnapshot();
   const ssnap = sr.freezeSnapshot();
-  const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file','write_file','edit_file','execute_command','list_directory','search_files','parse_document'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
+  const pe = new PolicyEngine({ version: 'policy-v1', default_decision: 'deny', allowed_tools: ['read_file','write_file','edit_file','apply_patch','execute_command','list_directory','search_files','parse_document'], allowed_resource_prefixes: ['workspace://'], rules: [] } as Policy);
   const gateway =
     gatewayOverride ?? createScriptedGateway([{ content: 'unused' }]).gateway;
   return new StaticRouter({ toolRegistry: tr, skillRegistry: sr, toolSnapshot: tsnap, skillSnapshot: ssnap, policyEngine: pe, policySnapshotRef: 'policy-v1', gateway });
@@ -128,6 +128,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       ).toEqual([
         'read_file',
         'edit_file',
+        'apply_patch',
         'execute_command',
       ]);
     });
@@ -351,6 +352,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
         'read_file',
         'edit_file',
         'execute_command',
+        'apply_patch',
       ]);
       expect(r.run_plan!.skill_bindings).toContainEqual(
         expect.objectContaining({ skill_name: 'bug-fix', version: '1.0.0' }),
@@ -917,6 +919,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
       expect(toolNodes.map((node) => node.tool_name)).toEqual([
         'read_file',
         'edit_file',
+        'apply_patch',
         'execute_command',
       ]);
       for (const toolNode of toolNodes) {
@@ -1068,6 +1071,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
         'read_file',
         'edit_file',
         'execute_command',
+        'apply_patch',
       ]);
     });
 
@@ -1492,7 +1496,7 @@ describe('AH-ROUTER-FOUNDATION-001 StaticRouter', () => {
 
     it('binds every base skill to its exact tool set', () => {
       const cases = [
-        ['fix the bug', 'bug-fix', ['read_file', 'edit_file', 'execute_command']],
+        ['fix the bug', 'bug-fix', ['read_file', 'edit_file', 'execute_command', 'apply_patch']],
         [
           'implement code feature',
           'feature-implementation',

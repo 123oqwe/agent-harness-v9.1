@@ -60,7 +60,7 @@ describe("AH-RUNTIME-MODELFALLBACK-001 Gateway adapter", () => {
     [new Error("unknown"), false, "unclassified_failure"],
     [new ProviderDispatchError("provider_unhealthy"), true, "provider_unhealthy"],
     [new ProviderDispatchError("provider_failure", { kind: "rate_limited", retryable: true, detail: "retry" }), true, "retryable_provider_failure"],
-    [new ProviderDispatchError("provider_failure", { kind: "rate_limited", retryable: false, detail: "stop" }), false, "provider_failure"],
+    [new ProviderDispatchError("provider_failure", { kind: "rate_limited", retryable: false, detail: "stop" }), true, "rate_limited"],
     [new ProviderDispatchError("provider_failure", { kind: "auth", retryable: true, detail: "auth" }), false, "provider_failure"],
     [new ProviderDispatchError("provider_failure", { kind: "invalid_request", retryable: true, detail: "invalid" }), false, "provider_failure"],
     [new ProviderDispatchError("egress_denied"), false, "egress_denied"],

@@ -324,7 +324,7 @@ describe('AH-GATEWAY-TESTPROVIDER-001: build and gate configuration', () => {
           },
         );
         expect(smoke.status, `${smoke.stdout}\n${smoke.stderr}`).toBe(0);
-        expect(JSON.parse(smoke.stdout)).toEqual({ tools: 9, skills: 8, instructions: true });
+        expect(JSON.parse(smoke.stdout)).toEqual({ tools: 14, skills: 8, instructions: true });
 
         rmSync(tarball, { force: true });
       } finally {

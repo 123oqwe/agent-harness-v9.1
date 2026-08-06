@@ -36,8 +36,8 @@ import {
 import type { VirtualFilesystem } from './vfs/virtual-filesystem.js';
 import type { SandboxProfile } from './sandbox/process-sandbox.js';
 import { ActionExecutor, OutputFormatValidator } from './security/action-executor.js';
-import { createIndexStore, queryStore, chunkDocument, addChunkToStore, type RagIndexStore } from './packages/rag/src/index.js';
-import { DefaultDocumentIngestor } from './packages/documents/src/index.js';
+import type { RagIndexStore } from './packages/rag/src/index.js';
+import type { DefaultDocumentIngestor } from './packages/documents/src/index.js';
 import { ToolDispatcher } from './tools/tool-dispatcher.js';
 import { LocalToolHost } from './tools/local-tool-host.js';
 import type { AuthorizationService } from './security/authorization-service.js';
@@ -47,6 +47,21 @@ import type { ConsentService } from './security/consent.js';
 import type { AuditSink } from './security/audit-sink.js';
 import type { PostconditionVerifierPort, ToolCredentialBrokerPort } from './tools/tool-executor.js';
 import { CacheManager } from './gateway/cache-manager.js';
+
+// Lazy-loaded Phase 2 package modules — dynamic imports prevent the packed
+// root tarball from needing packages/ at module-load time.
+type RagModule = typeof import('./packages/rag/src/index.js');
+type DocModule = typeof import('./packages/documents/src/index.js');
+let ragModulePromise: Promise<RagModule> | undefined;
+let docModulePromise: Promise<DocModule> | undefined;
+const lazyRag = (): Promise<RagModule> => {
+  if (!ragModulePromise) ragModulePromise = import('./packages/rag/src/index.js');
+  return ragModulePromise;
+};
+const lazyDoc = (): Promise<DocModule> => {
+  if (!docModulePromise) docModulePromise = import('./packages/documents/src/index.js');
+  return docModulePromise;
+};
 import { SkillLoader } from './skills/skill-loader.js';
 import type { SqliteSessionStore } from './session/sqlite-session-store.js';
 import type {
@@ -211,9 +226,9 @@ export class Harness {
   private readonly budgetLedgerPricing: RuntimeBudgetPricing | undefined;
   /** P2-12: LLM cache manager for prompt cache tracking. */
   private readonly cacheManager = new CacheManager();
-  /** #6: RAG store and document ingestor. */
-  private readonly ragStore: RagIndexStore;
-  private readonly documentIngestor: DefaultDocumentIngestor;
+  /** #6: RAG store and document ingestor (lazy-initialized for packed-root compatibility). */
+  private ragStore: RagIndexStore | undefined;
+  private documentIngestor: DefaultDocumentIngestor | undefined;
   /** #1: context window capacity from provider metadata. */
   private readonly contextCapacity: number | undefined = undefined;
 
@@ -265,8 +280,9 @@ export class Harness {
          dispatch: (request) => config.hookSystem!.dispatch(request),
        };
     // #6: initialize RAG store and document ingestor
-    this.ragStore = config.ragStore ?? createIndexStore();
-    this.documentIngestor = config.documentIngestor ?? new DefaultDocumentIngestor();
+    // When provided in config, use directly. Otherwise lazy-load from packages.
+    this.ragStore = config.ragStore;
+    this.documentIngestor = config.documentIngestor;
   }
 
   private now(): string {
@@ -747,7 +763,8 @@ export class Harness {
        },
        // #6: RAG query for evidence injection
        ragQuery: async (query, topK) => {
-         const results = queryStore(this.ragStore, {
+         if (!this.ragStore) { const m = await lazyRag(); this.ragStore = m.createIndexStore(); }
+         const results = (await lazyRag()).queryStore(this.ragStore, {
            text: query,
            tenant_id: this.execCtx!.tenant_id,
            principal_id: this.execCtx!.user_id,

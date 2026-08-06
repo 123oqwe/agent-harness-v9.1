@@ -23,6 +23,9 @@ const ENV_MAPPING: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['qwen', ['QWEN_API_KEY', 'DASHSCOPE_API_KEY']],
   ['kimi', ['KIMI_API_KEY', 'MOONSHOT_API_KEY']],
   ['perplexity', ['PERPLEXITY_API_KEY']],
+  ['doubao', ['VOLC_API_KEY', 'DOUBAO_API_KEY']],
+  ['ollama', []],
+  ['vllm', []],
 ];
 
 export class KeyVault {
@@ -40,6 +43,8 @@ export class KeyVault {
 
   private loadFromEnv(): void {
     for (const [provider, vars] of ENV_MAPPING) {
+      // Local providers with no env vars always register as available
+      if (vars.length === 0) { this.addKey(provider, 'local-no-auth'); continue; }
       for (const v of vars) {
         const key = process.env[v];
         if (key) { this.addKey(provider, key); break; }

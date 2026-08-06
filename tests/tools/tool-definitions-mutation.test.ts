@@ -12,7 +12,7 @@ describe('Tool Definitions mutation-killing tests', () => {
     // Only check the original 9 Phase 1 tools; new tools are additive
     expect(
       createHash('sha256').update(JSON.stringify(defs)).digest('hex'),
-    ).toBe('725c05b55bbbbb2d040fb74955191f501ed2c87358a09ffa2e9e8ac986d94f75');
+    ).toBe('12244684f857514032f0ba552cf2c219d7e9e1dd28fd45ebcdf515c937c35173');
   });
 
   it('read_file has correct effect_model', () => {
@@ -33,7 +33,7 @@ describe('Tool Definitions mutation-killing tests', () => {
 
   it('edit_file has write operation', () => { expect((byName('edit_file').effect_model as Record<string, unknown>).operation).toBe('write'); });
   it('edit_file domains are coding only', () => { expect(byName('edit_file').domains).toEqual(['coding']); });
-  it('edit_file is idempotent', () => { expect(byName('edit_file').idempotency_policy).toEqual({ idempotent: true }); });
+  it('edit_file is NOT idempotent (patch application is not repeatable)', () => { expect(byName('edit_file').idempotency_policy).toEqual({ idempotent: false }); });
 
   it('list_directory has read operation', () => { expect((byName('list_directory').effect_model as Record<string, unknown>).operation).toBe('read'); });
   it('list_directory domains include documents', () => { expect(byName('list_directory').domains).toContain('documents'); });

@@ -83,6 +83,14 @@ export class ModelFallbackGatewayAdapter {
     ) {
       return Object.freeze({ fallback_allowed: true, reason_code: "retryable_provider_failure" });
     }
+    // Rate-limited (429) is not retryable (retrying aggravates throttle), but
+    // falling back to a different provider is correct — the limit is per-provider.
+    if (
+      error.code === "provider_failure" &&
+      providerError?.kind === "rate_limited"
+    ) {
+      return Object.freeze({ fallback_allowed: true, reason_code: "rate_limited" });
+    }
     return Object.freeze({ fallback_allowed: false, reason_code: error.code });
   }
 }

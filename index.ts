@@ -100,15 +100,3 @@ export * from './ui/ah_ui_coding_001.js';
 export * from './ui/ah_ui_evidence_001.js';
 export * from './ui/ah_ui_privacy_001.js';
 export * from './ui/ah_ui_task_001.js';
-
-// Managed-platform gateway: KeyVault, CapabilityRegistry, CircuitBreaker, RateLimiter, EconomicKernel, ManagedGateway
-export { KeyVault } from './gateway/key-vault.js';
-export { CapabilityRegistry } from './gateway/capability-registry.js';
-export { CircuitBreaker } from './gateway/circuit-breaker.js';
-export { RateLimiter } from './gateway/rate-limiter.js';
-export { EconomicKernel } from './gateway/economic-kernel.js';
-export { ManagedGateway } from './gateway/managed-gateway.js';
-export { createProviderAdapter } from './gateway/provider-adapters.js';
-export { ToolMaskStateMachine, type ExecutionState, type ToolGroup } from './gateway/tool-mask.js';
-export { DagExecutor, type DagDefinition, type DagNode, type DagExecutionResult } from './gateway/dag-executor.js';
-export { CacheManager, type CacheMetrics } from './gateway/cache-manager.js';
