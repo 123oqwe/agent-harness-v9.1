@@ -1,6 +1,6 @@
 /**
  * AH-TOOL-BEHAVIOR-VERIFY-001: Playwright-based UI behavior verification.
- * Returns typed unavailable when Playwright is not configured.
+ * Supports provider injection; falls back to typed unavailable when no provider configured.
  */
 import type { ToolResult } from './types.js';
 import { ToolUnavailableError } from './types.js';
@@ -11,11 +11,40 @@ interface BehaviorVerifyInput {
   assertions: Array<{ type: string; selector?: string; expected?: string }>;
 }
 
-export async function behaviorVerify(_input: BehaviorVerifyInput): Promise<ToolResult> {
-  // Playwright is not available in this environment
-  throw new ToolUnavailableError(
-    'Playwright not configured for behavior verification',
-    'behavior_verify',
-    'provider_unavailable',
-  );
+/** Provider port for behavior verification. Implementations drive a browser. */
+export interface BehaviorVerifyProviderPort {
+  verify(url: string, steps: BehaviorVerifyInput['steps'], assertions: BehaviorVerifyInput['assertions']): Promise<{
+    passed: boolean;
+    screenshot?: Buffer;
+    failures: Array<{ assertion: string; actual: string }>;
+    duration_ms: number;
+  }>;
+}
+
+let behaviorVerifyProvider: BehaviorVerifyProviderPort | undefined;
+
+/** Configure the behavior verification provider. */
+export function setBehaviorVerifyProvider(provider: BehaviorVerifyProviderPort | undefined): void {
+  behaviorVerifyProvider = provider;
+}
+
+export async function behaviorVerify(input: BehaviorVerifyInput): Promise<ToolResult> {
+  if (!behaviorVerifyProvider) {
+    throw new ToolUnavailableError(
+      'Playwright not configured for behavior verification',
+      'behavior_verify',
+      'provider_unavailable',
+    );
+  }
+  const result = await behaviorVerifyProvider.verify(input.url, input.steps, input.assertions);
+  return {
+    success: result.passed,
+    output: {
+      passed: result.passed,
+      failures: result.failures,
+      duration_ms: result.duration_ms,
+      has_screenshot: !!result.screenshot,
+    },
+    error: result.passed ? undefined : `${result.failures.length} assertion(s) failed`,
+  };
 }

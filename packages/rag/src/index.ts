@@ -47,10 +47,19 @@ export {
 } from './embedding-migrator.js';
 
 export {
+  type EmbeddingProviderPort,
+  MockEmbeddingProvider,
+} from './embedding-provider.js';
+
+export {
   createIndexStore,
   addChunkToStore,
   removeChunkFromStore,
   queryStore,
   deleteFromStore,
   type RagIndexStore,
+} from './query-engine.js';
+
+export {
+  setStoreEmbeddingProvider,
 } from './query-engine.js';

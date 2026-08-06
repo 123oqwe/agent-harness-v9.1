@@ -10,11 +10,11 @@ function makeDoc(text: string, hash: string): DocumentIngestResult {
 }
 
 describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
-  it('removes chunk from all indices', () => {
+  it('removes chunk from all indices', async () => {
     const store = createIndexStore();
     const doc = makeDoc('Some searchable text content here', 'src1');
     const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
-    for (const c of chunks) addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
     expect(store.chunks.size).toBe(chunks.length);
     expect(store.fts.getChunkIds().length).toBe(chunks.length);
     const removed = removeChunkFromStore(store, chunks[0]!.chunk_id);
@@ -24,13 +24,13 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     expect(store.metadata.getChunkIds().length).toBe(chunks.length - 1);
   });
 
-  it('deletes all chunks by source hash', () => {
+  it('deletes all chunks by source hash', async () => {
     const store = createIndexStore();
     const doc1 = makeDoc('First document content', 'src1');
     const doc2 = makeDoc('Second document content', 'src2');
     const chunks1 = chunkDocument(doc1, { tenant_id: 't1', principal_ids: ['p1'] });
     const chunks2 = chunkDocument(doc2, { tenant_id: 't1', principal_ids: ['p1'] });
-    for (const c of [...chunks1, ...chunks2]) addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of [...chunks1, ...chunks2]) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
     const deleted = deleteFromStore(store, 'src1');
     expect(deleted).toBe(chunks1.length);
     expect(store.chunks.size).toBe(chunks2.length);

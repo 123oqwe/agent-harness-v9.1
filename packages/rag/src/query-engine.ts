@@ -7,6 +7,7 @@ import { GraphIndex } from './graph-index.js';
 import { safeChunkForRetrieval } from './injection-guard.js';
 import { generateCitation } from './citation.js';
 import { rerankResults } from './reranker.js';
+import type { EmbeddingProviderPort } from './embedding-provider.js';
 
 export interface RagIndexStore {
   readonly fts: FtsIndex;
@@ -15,6 +16,14 @@ export interface RagIndexStore {
   readonly graph: GraphIndex;
   readonly chunks: Map<string, RagChunk>;
   readonly acl: Map<string, RagAclEntry>;
+}
+
+/** Track embedding quality for each store. When a real provider is injected, quality is 'real'; otherwise 'degraded'. */
+const storeEmbeddingProvider = new WeakMap<RagIndexStore, EmbeddingProviderPort | undefined>();
+
+/** Set the embedding provider for a store. When set, real embeddings replace pseudo-embeddings. */
+export function setStoreEmbeddingProvider(store: RagIndexStore, provider: EmbeddingProviderPort | undefined): void {
+  storeEmbeddingProvider.set(store, provider);
 }
 
 export function createIndexStore(): RagIndexStore {
@@ -45,19 +54,25 @@ function generatePseudoEmbedding(text: string, dimensions = 64): number[] {
   return norm > 0 ? vector.map(v => v / norm) : vector;
 }
 
-export function addChunkToStore(store: RagIndexStore, chunk: RagChunk, acl: RagAclEntry): void {
+export async function addChunkToStore(store: RagIndexStore, chunk: RagChunk, acl: RagAclEntry): Promise<void> {
   store.chunks.set(chunk.chunk_id, chunk);
   store.acl.set(chunk.chunk_id, acl);
   store.fts.addChunk(chunk);
   store.metadata.addChunk(chunk);
   store.graph.addChunk(chunk, [...store.chunks.values()]);
-  // Generate a simple hash-based pseudo-embedding so vector search works
-  // without an external embedding provider. This is a placeholder; real
-  // embeddings should be added via store.vector.addEmbedding().
-  const pseudoVector = generatePseudoEmbedding(chunk.text);
-  const model = { model_id: 'pseudo-hash-v1', version: '1.0', dimensions: pseudoVector.length };
+  const provider = storeEmbeddingProvider.get(store);
+  let vector: number[];
+  let model;
+  if (provider) {
+    vector = [...(await provider.embed(chunk.text))];
+    model = provider.model;
+  } else {
+    // Fallback to pseudo-embedding for backward compatibility
+    vector = generatePseudoEmbedding(chunk.text);
+    model = { model_id: 'pseudo-hash-v1', version: '1.0', dimensions: vector.length };
+  }
   store.vector.setModel(model);
-  store.vector.addEmbedding({ chunk_id: chunk.chunk_id, model, vector: pseudoVector });
+  store.vector.addEmbedding({ chunk_id: chunk.chunk_id, model, vector });
 }
 
 export function removeChunkFromStore(store: RagIndexStore, chunkId: string): boolean {
@@ -72,11 +87,11 @@ export function removeChunkFromStore(store: RagIndexStore, chunkId: string): boo
   return true;
 }
 
-export function queryStore(
+export async function queryStore(
   store: RagIndexStore,
   query: RagQuery,
   queryVector?: readonly number[],
-): RagRetrievalResult[] {
+): Promise<RagRetrievalResult[]> {
   // ACL check: filter chunks by tenant_id
   const aclFiltered = new Set<string>();
   for (const [chunkId, acl] of store.acl) {
@@ -118,16 +133,25 @@ export function queryStore(
       });
     }
   } else {
-    // Use pseudo-embedding for vector search when no external query vector
-    const pseudoQueryVector = generatePseudoEmbedding(query.text);
-    const vecResults = store.vector.search(pseudoQueryVector, topK * 2);
+    // Use provider embedding if available, else pseudo-embedding
+    const provider = storeEmbeddingProvider.get(store);
+    let searchVector: number[];
+    let isDegraded: boolean;
+    if (provider) {
+      searchVector = [...(await provider.embed(query.text))];
+      isDegraded = false;
+    } else {
+      searchVector = generatePseudoEmbedding(query.text);
+      isDegraded = true;
+    }
+    const vecResults = store.vector.search(searchVector, topK * 2);
     for (const { chunk_id, score } of vecResults) {
       if (!aclFiltered.has(chunk_id)) continue;
       const chunk = store.chunks.get(chunk_id);
       if (!chunk) continue;
       results.push({
         chunk: safeChunkForRetrieval(chunk),
-        score: score * 0.7, // lower weight for pseudo-embedding
+        score: isDegraded ? score * 0.7 : score,
         source: 'vector',
         citation: generateCitation(chunk),
       });
