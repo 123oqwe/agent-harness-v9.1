@@ -1,11 +1,14 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ManagedGateway } from './managed-gateway.js';
 import type { EconomicKernel } from './economic-kernel.js';
+import type { Harness } from '../harness.js';
+import type { TaskContract } from '../contracts/index.js';
 
 export interface WsServerOptions {
   port: number;
   gateway: ManagedGateway;
   economic?: EconomicKernel;
+  harnessFactory?: (gateway: ManagedGateway, userId: string, taskId: string) => Harness;
 }
 
 interface ClientSession {
@@ -18,6 +21,7 @@ export class GatewayWsServer {
   private readonly wss: WebSocketServer;
   private readonly gateway: ManagedGateway;
   private readonly economic: EconomicKernel | undefined;
+  private readonly harnessFactory: ((gateway: ManagedGateway, userId: string, taskId: string) => Harness) | undefined;
   private readonly sessions = new Map<WebSocket, ClientSession>();
   private running = false;
 
@@ -25,6 +29,7 @@ export class GatewayWsServer {
     this.wss = new WebSocketServer({ port: opts.port });
     this.gateway = opts.gateway;
     this.economic = opts.economic;
+    this.harnessFactory = opts.harnessFactory;
   }
 
   start(): void {
@@ -71,7 +76,33 @@ export class GatewayWsServer {
   private async handleTask(ws: WebSocket, session: ClientSession, goal: string | undefined, taskId: string, budgetUsd: number): Promise<void> {
     if (!goal) { this.send(ws, { type: 'error', error: 'Missing "goal"' }); return; }
     if (this.economic) { this.economic.createBudget(taskId, budgetUsd); this.economic.createWallet(session.userId, 100.0); }
+
+    // If harnessFactory is provided, route through the full Harness pipeline
+    // (Policy → Router → Loop → ModelGateway → Tools → Verification).
+    // Otherwise, fall back to direct ManagedGateway.complete().
     this.send(ws, { type: 'task_started', task_id: taskId, budget_usd: budgetUsd });
+    if (this.harnessFactory) {
+      try {
+        const harness = this.harnessFactory(this.gateway, session.userId, taskId);
+        const task: TaskContract = {
+          goal: goal!,
+          success_criteria: [{ criterion: 'task completed', verification_method: 'deterministic' }],
+          constraints: [{ type: 'budget', value: String(budgetUsd) }],
+        };
+        const outcome = await harness.run(task, taskId);
+        this.send(ws, {
+          type: 'task_complete', task_id: taskId,
+          success: outcome.success,
+          iterations: outcome.evidence.iterations,
+          termination_reason: outcome.evidence.termination_reason,
+          budget_remaining: this.economic ? (this.economic.getBudget(taskId)?.total ?? 0) - (this.economic.getBudget(taskId)?.spent ?? 0) : 0,
+        });
+      } catch (e) {
+        this.send(ws, { type: 'task_failed', task_id: taskId, error: (e as Error).message });
+      }
+      return;
+    }
+
     try {
       const result = await this.gateway.complete(goal, {
         userId: session.userId, taskId, stepId: 'model', tier: 'work',
