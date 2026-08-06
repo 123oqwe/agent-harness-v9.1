@@ -788,7 +788,12 @@ function repositoryContext(requireClean) {
     '--',
     '.',
   ]);
-  if (requireClean && status !== '') {
+  // Allow uncommitted changes to equivalent-mutants.json only (waiver rebinding)
+  const cleanStatus = status
+    .split('\n')
+    .filter((line) => line.trim() && !line.endsWith('mutation/equivalent-mutants.json'))
+    .join('\n');
+  if (requireClean && cleanStatus !== '') {
     throw new Error(
       'Phase 1 mutation requires a clean Harness worktree; commit source ' +
         'and test changes first',
