@@ -315,14 +315,13 @@ export class StaticRouter {
       /\b(?:bug|fix|patch|change|modify|update|refactor)\b|修复|修改|更新|重构/u.test(
         goal,
       );
-   if (codingMutation) {
-     return [
-       'read_file',
-       'edit_file',
-        'apply_patch',
-       ...(intent.requires_tests ? ['execute_command'] : []),
-     ];
-   }
+    if (codingMutation) {
+      return [
+        'read_file',
+        'edit_file',
+        ...(intent.requires_tests ? ['execute_command'] : []),
+      ];
+    }
     if (intent.requires_writes) {
       if (intent.explicit_plan && paths.length === 0) return [];
       const mutationInPlace =
