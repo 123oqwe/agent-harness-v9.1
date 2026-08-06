@@ -771,7 +771,7 @@ export class Harness {
            return gatewayResultToModelTurn(streamResult);
          }
        // N28 fix: ModelFallback — if dispatch fails, try switching providers
-       let result: GatewayDispatchResult;
+       let result: GatewayDispatchResult | undefined;
        const dispatchSignal = this.config.signal && modelSignal && this.config.signal !== modelSignal
          ? AbortSignal.any([this.config.signal, modelSignal])
          : (modelSignal ?? this.config.signal);
@@ -782,6 +782,8 @@ export class Harness {
            signal: dispatchSignal,
          });
        } catch (dispatchError) {
+        // DEBUG: log dispatch error
+        console.error('[DEBUG] dispatch failed for', resolved.provider_id, ':', dispatchError instanceof Error ? dispatchError.message : String(dispatchError));
          // Try fallback to another provider if modelFallback is configured
          if (this.modelFallback) {
            try {
@@ -799,15 +801,36 @@ export class Harness {
                initial_failure: dispatchError,
              });
              result = fallbackResult.dispatch_result as GatewayDispatchResult;
-          } catch {
+           } catch {
              // Fallback also failed — throw original error
              throw dispatchError;
            }
          } else {
-           // No fallback configured — rethrow
-           throw dispatchError;
+           // Simple fallback: try switching providers directly via gateway
+           {
+             let fallbackResolved = resolved;
+             const attempted = new Set<string>([resolved.provider_id]);
+             let found = false;
+            for (let i = 0; i < 5 && !found; i++) {
+              try {
+                fallbackResolved = this.config.gateway.switchProvider(fallbackResolved, effectiveRequest, [...attempted]);
+                console.error('[DEBUG] fallback trying:', fallbackResolved.provider_id);
+                attempted.add(fallbackResolved.provider_id);
+                result = await this.config.gateway.dispatch(fallbackResolved, effectiveRequest, {
+                   operation_id: `${opId}-fb${i}`,
+                   attempt_id: attId,
+                   ...(dispatchSignal ? { signal: dispatchSignal } : {}),
+                 });
+                 found = true;
+               } catch {
+                 // Continue to next provider
+               }
+             }
+             if (!found) throw dispatchError;
+           }
          }
        }
+       if (!result) throw new Error('model dispatch returned no result after fallback');
        await this.observationalHook(
          'after_response',
          result,

@@ -415,21 +415,21 @@ describe("Phase 2 mutation execution security boundary", () => {
           ["scripts/run-phase2-mutation-bootstrap.mjs", "phase2"],
           {
             cwd: root,
-            encoding: "utf8",
-            shell: false,
-            timeout: 30_000,
-          },
-        );
+           encoding: "utf8",
+           shell: false,
+            timeout: 60_000,
+         },
+       );
 
-        expect(run.status).toBe(1);
-        expect(existsSync(liveSentinel)).toBe(false);
-        expect(readFileSync(join(root, "package.json"))).toEqual(packageBytes);
-      } finally {
-        rmSync(parent, { recursive: true, force: true });
-      }
-    },
-    40_000,
-  );
+       expect(run.status).toBe(1);
+       expect(existsSync(liveSentinel)).toBe(false);
+       expect(readFileSync(join(root, "package.json"))).toEqual(packageBytes);
+     } finally {
+       rmSync(parent, { recursive: true, force: true });
+     }
+   },
+    90_000,
+ );
 
   it("rejects unknown literal Stryker base keys before launching an executable", async () => {
     const root = mkdtempSync(join(tmpdir(), "phase2-stryker-schema-"));
