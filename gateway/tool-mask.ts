@@ -1,3 +1,9 @@
+/**
+ * ToolMaskStateMachine: State-dependent tool visibility control.
+ * Wired into ManagedGateway via isToolAllowed()/enableToolMask().
+ * Phase 3 reserved: will be activated when multi-agent execution states
+ * require dynamic tool restriction per execution phase.
+ */
 import type { CacheManager } from './cache-manager.js';
 
 export type ExecutionState = 'setup' | 'planning' | 'executing' | 'verifying' | 'idle';

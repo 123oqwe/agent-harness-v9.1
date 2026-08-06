@@ -1,3 +1,9 @@
+/**
+ * DagExecutor: Multi-model DAG execution for Phase 3 (AH-MULTIAGENT-DAG-001).
+ * Currently wired into ManagedGateway.executeDag() but not yet invoked by
+ * the Harness run() path. Phase 3 will call executeDag() for multi-agent
+ * reasoning workflows that require parallel/sequential model dispatch.
+ */
 import type { ManagedGateway } from './managed-gateway.js';
 import type { ModelTier } from './capability-registry.js';
 
