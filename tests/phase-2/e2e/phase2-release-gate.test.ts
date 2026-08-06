@@ -287,6 +287,7 @@ describe("Phase 2 real release gate", () => {
         "packages/documents",
         "packages/rag",
         "packages/multimodal",
+        "packages/api",
         "apps/api",
         "apps/web",
         "apps/desktop",
