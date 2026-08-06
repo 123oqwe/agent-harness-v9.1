@@ -13,6 +13,32 @@ interface McpStdioConfig {
 interface McpConnection {
   child: ChildProcess;
   initialized: boolean;
+  requestId: number;
+  pending: Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timeout: NodeJS.Timeout }>;
+  buffer: string;
+}
+
+/** JSON-RPC 2.0 request message. */
+interface JsonRpcRequest {
+  jsonrpc: '2.0';
+  id: number;
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+/** JSON-RPC 2.0 response message. */
+interface JsonRpcResponse {
+  jsonrpc: '2.0';
+  id: number;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+}
+
+/** MCP tool definition as returned by tools/list. */
+export interface McpToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
 }
 
 const connections = new Map<string, McpConnection>();
@@ -69,10 +95,108 @@ function validateMcpCommand(command: string): { allowed: boolean; reason?: strin
   return { allowed: true };
 }
 
-// Drain stdout/stderr to prevent pipe deadlock
-function drainStreams(child: ChildProcess): void {
-  child.stdout?.on('data', () => {});
-  child.stderr?.on('data', () => {});
+// Drain stdout/stderr to prevent pipe deadlock and parse JSON-RPC responses
+function setupStreamHandlers(conn: McpConnection): void {
+  conn.child.stdout?.on('data', (data: Buffer) => {
+    conn.buffer += data.toString('utf8');
+    // Process complete JSON-RPC messages (newline-delimited)
+    let newlineIdx: number;
+    while ((newlineIdx = conn.buffer.indexOf('\n')) >= 0) {
+      const line = conn.buffer.slice(0, newlineIdx).trim();
+      conn.buffer = conn.buffer.slice(newlineIdx + 1);
+      if (line.length === 0) continue;
+      try {
+        const msg = JSON.parse(line) as JsonRpcResponse;
+        const pending = conn.pending.get(msg.id);
+        if (pending) {
+          clearTimeout(pending.timeout);
+          conn.pending.delete(msg.id);
+          if (msg.error) {
+            pending.reject(new Error(msg.error.message));
+          } else {
+            pending.resolve(msg.result);
+          }
+        }
+      } catch { /* not a valid JSON-RPC message, ignore */ }
+    }
+  });
+  conn.child.stderr?.on('data', () => {});
+}
+
+/** Send a JSON-RPC 2.0 request and wait for the response. */
+function sendRequest(conn: McpConnection, method: string, params?: Record<string, unknown>, timeoutMs = 30_000): Promise<unknown> {
+  const id = ++conn.requestId;
+  const request: JsonRpcRequest = { jsonrpc: '2.0', id, method, ...(params ? { params } : {}) };
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      conn.pending.delete(id);
+      reject(new Error(`MCP request "${method}" timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    conn.pending.set(id, { resolve, reject, timeout });
+    conn.child.stdin?.write(JSON.stringify(request) + '\n');
+  });
+}
+
+/** Initialize the MCP connection via JSON-RPC initialize handshake. */
+export async function initializeMcp(id: string): Promise<ToolResult> {
+  const conn = connections.get(id);
+  if (!conn) return { success: false, output: null, error: 'connection not found' };
+  if (conn.initialized) return { success: true, output: { id, status: 'already_initialized' } };
+  try {
+    const result = await sendRequest(conn, 'initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'agent-harness', version: '0.1.0' },
+    }) as { protocolVersion?: string; serverInfo?: { name?: string; version?: string } };
+    // Send initialized notification (no response expected)
+    conn.child.stdin?.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+    conn.initialized = true;
+    return {
+      success: true,
+      output: {
+        id, status: 'initialized',
+        protocol_version: result?.protocolVersion,
+        server_name: result?.serverInfo?.name,
+        server_version: result?.serverInfo?.version,
+      },
+    };
+  } catch (e) {
+    return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** List available tools from an MCP server via JSON-RPC tools/list. */
+export async function listMcpTools(id: string): Promise<ToolResult> {
+  const conn = connections.get(id);
+  if (!conn) return { success: false, output: null, error: 'connection not found' };
+  if (!conn.initialized) return { success: false, output: null, error: 'connection not initialized' };
+  try {
+    const result = await sendRequest(conn, 'tools/list') as { tools?: McpToolDefinition[] };
+    return {
+      success: true,
+      output: { id, tools: result?.tools ?? [] },
+    };
+  } catch (e) {
+    return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Call a tool on an MCP server via JSON-RPC tools/call. */
+export async function callMcpTool(id: string, toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
+  const conn = connections.get(id);
+  if (!conn) return { success: false, output: null, error: 'connection not found' };
+  if (!conn.initialized) return { success: false, output: null, error: 'connection not initialized' };
+  try {
+    const result = await sendRequest(conn, 'tools/call', { name: toolName, arguments: args }) as { content?: Array<{ type: string; text?: string }>; isError?: boolean };
+    const text = (result?.content ?? []).map(c => c.text ?? '').join('\n');
+    return {
+      success: !result?.isError,
+      output: { id, tool: toolName, result: text },
+      ...(result?.isError ? { error: text } : {}),
+    };
+  } catch (e) {
+    return { success: false, output: null, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 // Clean up child processes on parent exit
@@ -96,14 +220,26 @@ export async function connectMcpStdio(id: string, config: McpStdioConfig): Promi
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ...config.env },
     });
-    drainStreams(proc);
+    const conn: McpConnection = { child: proc, initialized: false, requestId: 0, pending: new Map(), buffer: '' };
+    setupStreamHandlers(conn);
     proc.on('exit', () => {
+      // Reject all pending requests
+      for (const pending of conn.pending.values()) {
+        clearTimeout(pending.timeout);
+        pending.reject(new Error('MCP server process exited'));
+      }
+      conn.pending.clear();
       connections.delete(id);
     });
     proc.on('error', () => {
+      for (const pending of conn.pending.values()) {
+        clearTimeout(pending.timeout);
+        pending.reject(new Error('MCP server process error'));
+      }
+      conn.pending.clear();
       connections.delete(id);
     });
-    connections.set(id, { child: proc, initialized: false });
+    connections.set(id, conn);
     proc.unref();
     return {
       success: true,
