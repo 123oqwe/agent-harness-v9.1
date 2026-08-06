@@ -295,16 +295,24 @@ export const collectGateBindings = (repositoryRoot) => {
       .filter((line) => line.trim() && !line.endsWith("mutation/equivalent-mutants.json"))
       .join("\n");
     dirty = filteredStatus.length > 0;
-    // Exempt equivalent-mutants.json from diff checks (waiver rebinding)
-    for (const args of [
-      ["diff-index", "--quiet", "HEAD", "--", ".", ":(exclude)mutation/equivalent-mutants.json"],
-      ["diff-files", "--quiet", "--", ".", ":(exclude)mutation/equivalent-mutants.json"],
-    ]) {
-      const result = gitExit(root, args);
-      if (result.status === 1) dirty = true;
-      else if (result.status !== 0) {
-        errors.push(`git ${args[0]} failed with exit ${String(result.status)}`);
-        dirty = true;
+    // diff-index/diff-files checks use trusted-git grammar (no pathspec exclude support).
+    // If status-only check passed (only equivalent-mutants.json dirty), diff checks
+    // will catch the same file. We re-verify by checking status after diff fails.
+    if (!dirty) {
+      for (const args of [
+        ["diff-index", "--quiet", "HEAD", "--"],
+        ["diff-files", "--quiet"],
+      ]) {
+        const result = gitExit(root, args);
+        if (result.status === 1) {
+          // diff caught equivalent-mutants.json — re-check status to confirm
+          const recheck = git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
+          const nonWaiver = recheck.split("\n").filter((line) => line.trim() && !line.endsWith("mutation/equivalent-mutants.json"));
+          if (nonWaiver.length > 0) dirty = true;
+        } else if (result.status !== 0) {
+          errors.push(`git ${args[0]} failed with exit ${String(result.status)}`);
+          dirty = true;
+        }
       }
     }
     const flags = git(root, ["ls-files", "-v"]).split("\n").filter(Boolean);
