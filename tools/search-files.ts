@@ -6,6 +6,7 @@
  * search when rg is unavailable or when searching non-local backends.
  */
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import type { VirtualFilesystem, VfsEntry } from '../vfs/virtual-filesystem.js';
 
 export interface SearchFilesInput {
@@ -46,10 +47,13 @@ function tryRipgrep(
   glob: string | undefined,
   maxResults: number,
 ): SearchMatch[] | null {
-  // Only attempt rg for absolute paths that look like real FS paths
-  if (!root.startsWith('/workspace/') && root !== '/workspace') {
-    // VFS virtual paths — rg can't help, but the workspace root maps
-    // to a real directory. We still try, because LocalBackend serves /workspace.
+  // N52 fix: rg can only search real filesystem paths.
+  // VFS paths like /workspace are virtual — rg would fail or search the wrong dir.
+  // Only attempt rg for paths that exist on the real filesystem.
+  try {
+    if (!existsSync(root)) return null;
+  } catch {
+    return null; // path doesn't exist on real FS
   }
 
   const args: string[] = ['--json', '--max-count', String(maxResults)];

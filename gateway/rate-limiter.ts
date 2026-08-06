@@ -9,7 +9,6 @@ export interface RateLimitConfig {
 export class RateLimiter {
   private readonly windows = new Map<string, WindowEntry[]>();
   private readonly concurrent = new Map<string, number>();
-  private readonly lock = { current: Promise.resolve() };
 
   constructor(private readonly config: RateLimitConfig = { rpmLimit: 60, tpmLimit: 100_000, concurrentLimit: 5 }) {}
 

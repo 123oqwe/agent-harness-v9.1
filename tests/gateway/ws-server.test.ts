@@ -46,20 +46,18 @@ describe('GatewayWsServer', () => {
   afterEach(() => { server.stop(); });
 
   it('starts and accepts connections', async () => {
-    const ws = await connect(port);
+    const { ws } = await connectAndWaitConnected(port);
     ws.close();
   });
 
   it('sends connected message on connect', async () => {
-    const ws = await connect(port);
-    const msg = await waitForMsg(ws, 'connected');
-    expect(msg['user_id']).toBe('test-user');
+    const { ws, connected } = await connectAndWaitConnected(port);
+    expect(connected['user_id']).toBe('test-user');
     ws.close();
   });
 
   it('returns models on models request', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send(JSON.stringify({ type: 'models' }));
     const msg = await waitForMsg(ws, 'models');
     expect(Array.isArray(msg['models'])).toBe(true);
@@ -67,8 +65,7 @@ describe('GatewayWsServer', () => {
   });
 
   it('returns usage on usage request', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send(JSON.stringify({ type: 'usage' }));
     const msg = await waitForMsg(ws, 'usage');
     expect(msg['summary']).toBeDefined();
@@ -76,8 +73,7 @@ describe('GatewayWsServer', () => {
   });
 
   it('returns error for missing goal', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send(JSON.stringify({ type: 'task' }));
     const msg = await waitForMsg(ws, 'error');
     expect(msg['error']).toContain('goal');
@@ -85,8 +81,7 @@ describe('GatewayWsServer', () => {
   });
 
   it('returns error for unknown message type', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send(JSON.stringify({ type: 'unknown_type' }));
     const msg = await waitForMsg(ws, 'error');
     expect(msg['error']).toContain('Unknown type');
@@ -94,8 +89,7 @@ describe('GatewayWsServer', () => {
   });
 
   it('returns error for invalid JSON', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send('not valid json');
     const msg = await waitForMsg(ws, 'error');
     expect(msg['error']).toContain('Invalid JSON');
@@ -104,8 +98,7 @@ describe('GatewayWsServer', () => {
 
   it('tracks client count', async () => {
     expect(server.clientCount).toBe(0);
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     await new Promise<void>((r) => setTimeout(r, 50));
     expect(server.clientCount).toBe(1);
     ws.close();
@@ -123,8 +116,7 @@ describe('GatewayWsServer', () => {
   });
 
   it('returns economic summary on economic request', async () => {
-    const ws = await connect(port);
-    await waitForMsg(ws, 'connected');
+    const { ws } = await connectAndWaitConnected(port);
     ws.send(JSON.stringify({ type: 'economic' }));
     const msg = await waitForMsg(ws, 'economic');
     expect(msg['summary']).toBeDefined();

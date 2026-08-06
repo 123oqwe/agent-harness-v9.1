@@ -125,7 +125,8 @@ export class ManagedGateway {
       },
       health: 'healthy' as const,
       // Local providers (Ollama, vLLM): no network egress, no credentials
-      network: isLocal ? { required: false } : { required: true, destination: binding.api_base },
+      // Extract origin from api_base (normalizeNetwork requires HTTPS origin without path)
+      network: isLocal ? { required: false } : { required: true, destination: new URL(binding.api_base).origin },
       credentials: { required: !isLocal, audience: binding.api_base },
     };
   }
