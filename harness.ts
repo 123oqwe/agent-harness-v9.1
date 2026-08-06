@@ -109,14 +109,14 @@ import {
 } from './runtime/budget-port.js';
 
 // Phase 2 runtime-core package integration
-import type { SessionTreeAuthorityPort } from './packages/runtime-core/src/session-tree.js';
-import type { HookSystem } from './packages/runtime-core/src/hook-system.js';
-import type { BudgetLedger as RuntimeCoreBudgetLedger } from './packages/runtime-core/src/budget-ledger.js';
-import type { SteeringController } from './packages/runtime-core/src/steering.js';
-import type { ContextCompactor } from './packages/runtime-core/src/compaction.js';
-import type { ContextCompiler } from './packages/runtime-core/src/context-compiler.js';
-import type { ModelFallbackController } from './packages/runtime-core/src/model-fallback.js';
-import type { PauseResumeController } from './packages/runtime-core/src/pause-resume.js';
+import type { SessionTreeAuthorityPort } from '@agent-harness/runtime-core';
+import type { HookSystem } from '@agent-harness/runtime-core';
+import type { BudgetLedger as RuntimeCoreBudgetLedger } from '@agent-harness/runtime-core';
+import type { SteeringController } from '@agent-harness/runtime-core';
+import type { ContextCompactor } from '@agent-harness/runtime-core';
+import type { ContextCompiler } from '@agent-harness/runtime-core';
+import type { ModelFallbackController } from '@agent-harness/runtime-core';
+import type { PauseResumeController } from '@agent-harness/runtime-core';
 
 export {
   createDefaultExecutionContext,

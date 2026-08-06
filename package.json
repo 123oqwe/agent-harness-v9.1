@@ -37,7 +37,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "packages/rag/dist",
+    "packages/documents/dist",
+    "packages/multimodal/dist",
+    "packages/tools/dist",
+    "packages/ui/dist",
+    "packages/api/dist",
+    "packages/runtime-core/dist"
   ],
   "overrides": {
     "qs": "6.15.3"
