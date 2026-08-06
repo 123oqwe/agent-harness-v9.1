@@ -233,7 +233,18 @@ export class ManagedGateway {
       request: {
         messages,
         ...(ctx.tools && ctx.tools.length > 0
-          ? { tools: ctx.tools.map((t, i) => ({ name: typeof t === 'object' && t !== null && 'name' in t ? String((t as Record<string, unknown>)['name']) : `tool_${i}` })) }
+          ? { tools: ctx.tools.map((t, i) => {
+              if (typeof t === 'object' && t !== null && 'name' in t) {
+                const obj = t as Record<string, unknown>;
+                return {
+                  name: String(obj['name']),
+                  ...(obj['description'] !== undefined ? { description: String(obj['description']) } : {}),
+                  ...(obj['parameters'] !== undefined ? { parameters: obj['parameters'] } : {}),
+                  ...(obj['risk_feature_extractor'] !== undefined ? { risk_feature_extractor: String(obj['risk_feature_extractor']) } : {}),
+                };
+              }
+              return { name: `tool_${i}` };
+            }) }
           : {}),
         temperature: this.defaultTemperature,
         max_tokens: this.defaultMaxTokens,

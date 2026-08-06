@@ -48,6 +48,11 @@ function buildRequestBody(binding: ModelBinding, request: ProviderRequest): Reco
   const messages: unknown[] = [{ role: 'system', content: systemPrompt }];
   for (const m of nonSystemMessages) messages.push({ role: m.role, content: m.content });
   const body: Record<string, unknown> = { model: binding.model_id, messages, temperature, max_tokens: maxTokens };
+  // GLM 5.x models support reasoning_effort and thinking parameters
+  if (binding.provider === 'zhipu' && binding.model_id.startsWith('glm-5')) {
+    body['reasoning_effort'] = 'xhigh';
+    body['thinking'] = { type: 'enabled', clear_thinking: false };
+  }
   if (request.tools && request.tools.length > 0) {
     body['tools'] = request.tools.map(t => ({
       type: 'function',
@@ -164,9 +169,10 @@ export function createProviderAdapter(
 
     parseResponse(raw: unknown): ParsedResponse {
       const parsed = parseResponseData(binding, raw);
-      const result: { content: string; stop_reason: 'stop'; usage: Usage; model: string; tool_calls?: ToolCall[] } = {
+      const hasToolCalls = parsed.tool_calls !== undefined && parsed.tool_calls.length > 0;
+      const result: { content: string; stop_reason: 'stop' | 'tool_use' | 'length' | 'content_filter'; usage: Usage; model: string; tool_calls?: ToolCall[] } = {
         content: parsed.content,
-        stop_reason: 'stop',
+        stop_reason: hasToolCalls ? 'tool_use' : 'stop',
         usage: { input_tokens: parsed.usage.prompt_tokens, output_tokens: parsed.usage.completion_tokens },
         model: binding.model_id,
       };

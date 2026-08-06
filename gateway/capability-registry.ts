@@ -42,6 +42,20 @@ export interface RouteResult {
 
 const DEFAULT_MODELS: ModelBinding[] = [
   {
+    model_id: 'glm-5.2', provider: 'zhipu', tier: 'work',
+    capabilities: { code: 0.95, reasoning: 0.96, tool_calling: 0.93, structured_output: 0.92, long_context: 0.90, chinese: 0.98 },
+    price_input: 0.5, price_output: 1.5, max_context: 131072, avg_latency_ms: 800,
+    api_base: 'https://open.bigmodel.cn/api/paas/v4', api_format: 'openai_chat',
+    supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  {
+    model_id: 'glm-5.2', provider: 'zhipu', tier: 'route',
+    capabilities: { code: 0.95, reasoning: 0.96, tool_calling: 0.93, structured_output: 0.92, long_context: 0.90, chinese: 0.98 },
+    price_input: 0.5, price_output: 1.5, max_context: 131072, avg_latency_ms: 800,
+    api_base: 'https://open.bigmodel.cn/api/paas/v4', api_format: 'openai_chat',
+    supports_tools: true, supports_streaming: true, supports_vision: false, enabled: true,
+  },
+  {
     model_id: 'glm-4-plus', provider: 'zhipu', tier: 'work',
     capabilities: { code: 0.82, reasoning: 0.80, tool_calling: 0.78, structured_output: 0.80, long_context: 0.85, chinese: 0.95 },
     price_input: 0.5, price_output: 1.5, max_context: 131072, avg_latency_ms: 800,
