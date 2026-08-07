@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
+// Ollama may not be running; allow extra time for connection refusal.
+const OLLAMA_TEST_TIMEOUT = 30_000;
 import { ManagedGateway } from '../../gateway/managed-gateway.js';
 import { KeyVault } from '../../gateway/key-vault.js';
 import { CapabilityRegistry } from '../../gateway/capability-registry.js';
@@ -16,6 +19,7 @@ describe('ManagedGateway completeStream security', () => {
   });
 
   it('completeStream yields provider_info with provider and model', async () => {
+    // Ollama may not be running locally; connection refusal takes time.
     const events: Array<Record<string, unknown>> = [];
     // Use a local provider (ollama) which will fail — but the stream should still yield events
     for await (const ev of gateway.completeStream('test prompt', {
@@ -26,7 +30,7 @@ describe('ManagedGateway completeStream security', () => {
     }
     // Should have at least a message_stop event
     expect(events.some(e => e['type'] === 'message_stop')).toBe(true);
-  });
+  }, OLLAMA_TEST_TIMEOUT);
 
   it('completeStream respects rate limits', async () => {
     // Exhaust the rate limit with many requests
