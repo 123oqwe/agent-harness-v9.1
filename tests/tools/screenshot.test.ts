@@ -227,4 +227,108 @@ describe('AH-TOOL-SCREENSHOT-001 screenshot', () => {
     expect(result.width).toBe(100);
     expect(mockedSpawnSync.mock.calls[0]![0]).toBe('import');
   });
+
+  // -- Temp file path assertion (kills StringLiteral mutants on L39/L42) --
+
+  it('readFileSync is called with the same temp path as spawnSync on macOS', async () => {
+    setPlatform('darwin');
+    const png = makePng(100, 100);
+    mockSpawnSuccess(png);
+    await screenshot(vfs, {});
+    const spawnArgs = mockedSpawnSync.mock.calls[0]![1] as string[];
+    const tempPath = spawnArgs.find(a => typeof a === 'string' && a.includes('/tmp/ah-screenshot-'));
+    expect(tempPath).toBeDefined();
+    expect(tempPath).toMatch(/^\/tmp\/ah-screenshot-\d+\.png$/);
+    expect(mockedReadFileSync).toHaveBeenCalledWith(tempPath);
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(tempPath);
+  });
+
+  it('readFileSync is called with temp path matching spawnSync on Linux', async () => {
+    setPlatform('linux');
+    const png = makePng(100, 100);
+    mockSpawnSuccess(png);
+    await screenshot(vfs, {});
+    const spawnArgs = mockedSpawnSync.mock.calls[0]![1] as string[];
+    const tempPath = spawnArgs.find(a => typeof a === 'string' && a.includes('/tmp/ah-screenshot-'));
+    expect(tempPath).toBeDefined();
+    expect(mockedReadFileSync).toHaveBeenCalledWith(tempPath);
+  });
+
+  // -- spawnSync args structure (kills ObjectLiteral/ArrayDeclaration/BooleanLiteral) --
+
+  it('passes correct args array to screencapture on macOS', async () => {
+    setPlatform('darwin');
+    mockSpawnSuccess(makePng(100, 100));
+    await screenshot(vfs, {});
+    const args = mockedSpawnSync.mock.calls[0]![1] as string[];
+    expect(args).toEqual(['-x', '-t', 'png', expect.stringMatching(/^\/tmp\/ah-screenshot-\d+\.png$/)]);
+  });
+
+  it('passes correct args array to import on Linux', async () => {
+    setPlatform('linux');
+    mockSpawnSuccess(makePng(100, 100));
+    await screenshot(vfs, {});
+    const args = mockedSpawnSync.mock.calls[0]![1] as string[];
+    expect(args).toEqual(['-window', 'root', expect.stringMatching(/^\/tmp\/ah-screenshot-\d+\.png$/)]);
+  });
+
+  it('passes correct args array to scrot on Linux fallback', async () => {
+    setPlatform('linux');
+    mockedSpawnSync
+      .mockReturnValueOnce({ status: 1, stdout: '', stderr: 'fail', pid: 1, output: [null, '', ''], signal: null } as any)
+      .mockReturnValueOnce({ status: 0, stdout: '', stderr: '', pid: 2, output: [null, '', ''], signal: null } as any);
+    mockedReadFileSync.mockReturnValue(makePng(100, 100) as unknown as string);
+    await screenshot(vfs, {});
+    const args = mockedSpawnSync.mock.calls[1]![1] as string[];
+    expect(args).toHaveLength(1);
+    expect(args[0]).toMatch(/^\/tmp\/ah-screenshot-\d+\.png$/);
+  });
+
+  it('passes timeout and shell=false in options on Linux', async () => {
+    setPlatform('linux');
+    mockSpawnSuccess(makePng(100, 100));
+    await screenshot(vfs, {});
+    const opts = mockedSpawnSync.mock.calls[0]![2] as any;
+    expect(opts.shell).toBe(false);
+    expect(opts.timeout).toBe(10_000);
+    expect(opts.encoding).toBe('utf8');
+  });
+
+  // -- PNG dimension boundary cases (kills EqualityOperator > → >=) --
+
+  it('returns width=0 when data length is exactly 24 bytes (boundary)', async () => {
+    setPlatform('darwin');
+    const png = Buffer.alloc(24);
+    png[0] = 0x89;
+    mockSpawnSuccess(png);
+    const result = await screenshot(vfs, {});
+    // data.length > 24 is false when length === 24, so width should be 0
+    expect(result.width).toBe(0);
+    expect(result.height).toBe(0);
+  });
+
+  it('returns width from data when length is exactly 25 bytes (boundary)', async () => {
+    setPlatform('darwin');
+    const png = Buffer.alloc(25);
+    png[0] = 0x89;
+    png.writeUInt32BE(500, 16); // width at bytes 16-19
+    mockSpawnSuccess(png);
+    const result = await screenshot(vfs, {});
+    // data.length > 24 is true when length === 25, so width should be 500
+    expect(result.width).toBe(500);
+    expect(result.height).toBe(0); // length <= 28
+  });
+
+  it('returns height from data when length is exactly 29 bytes (boundary)', async () => {
+    setPlatform('darwin');
+    const png = Buffer.alloc(29);
+    png[0] = 0x89;
+    png.writeUInt32BE(300, 16); // width
+    png.writeUInt32BE(200, 20); // height at bytes 20-23
+    mockSpawnSuccess(png);
+    const result = await screenshot(vfs, {});
+    // data.length > 28 is true when length === 29
+    expect(result.width).toBe(300);
+    expect(result.height).toBe(200);
+  });
 });
