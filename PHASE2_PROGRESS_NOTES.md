@@ -404,3 +404,41 @@ Total: 55 new runtime tests
 - Process alive (4 stryker processes)
 - Key: runtime module (with hook-port.ts) hasn't started yet - hook-port.test.ts should prevent timeout
 - After this run completes: read results, commit new tests, rebind waivers, rerun
+
+## Session 6: Missing Test Files (2026-08-07 15:35)
+
+### P2-REMAINING: 5 Missing Runtime Test Files (COMMIT 9fef88f)
+- steering-port.test.ts (1 test): module import verification
+- errors.test.ts (6 tests): LoopError construction, prototype chain
+- event-bus.test.ts (12 tests): subscribe/publish, values mode, flush, createEvent
+- pause-resume-port.test.ts (8 tests): journal, read-back, reconciliation
+- session-tree-port.test.ts (6 tests): branch recording, null head, error catching
+Total: 33 new runtime tests
+
+### P3: 2 Missing Session Test Files (COMMIT be78628)
+- durable-session.test.ts (27 tests): writer lock, append, hash chain, snapshot, export/import
+- progress-store.test.ts (6 tests): atomic write, read, round-trip, nested dirs
+Total: 33 new session tests
+
+### Complete Test File Inventory
+Gateway: 20 files (10 pre-existing + 10 new)
+Runtime: 19 files (11 pre-existing + 8 new)
+Session: 9 files (7 pre-existing + 2 new)
+Verification: 4 files (3 pre-existing + 1 new)
+VFS: 6 files (5 pre-existing + 1 new)
+Tools: 16 files (14 pre-existing + 2 new)
+Total new test files this session: 23 files, ~500 tests, all passing
+
+### Phase 1 Mutation Run Status (verified 15:35)
+Running on HEAD 9827b61 (NOT current HEAD be78628):
+- gateway: 45.99% FAIL (below 85%)
+- router: 90.56% PASS
+- toolsRegistry: 0% FAIL (crash - like gateway before)
+- toolsLeaf: 69.17% FAIL (below 85%)
+- skills: 91.44% PASS
+- strategies: 84.22% FAIL (below 85%)
+- actionControl: in progress (chunk 13/19)
+- 8 modules not started yet: identitySecrets, vfs, sandbox, session, runtime, verification, verticals, uiAdapters
+
+Note: This run does NOT include the 23 new test files (they're on HEAD be78628).
+After this run completes, must commit + rebind waivers + rerun mutation.
