@@ -7,7 +7,7 @@ import { searchFiles } from '../../tools/search-files.js';
 
 describe('AH-TOOL-SEARCH-001 search_files', () => {
   let tmp: string, vfs: VirtualFilesystem;
-  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'sd-')); vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp)); });
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'sd-')); vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }, { prefix: tmp, read: true, write: true }]); vfs.mount(new LocalBackend('/workspace', tmp)); vfs.mount(new LocalBackend(tmp, tmp)); });
   afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
   it('finds files containing the needle', async () => {

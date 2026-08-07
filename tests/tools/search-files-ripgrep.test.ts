@@ -21,9 +21,18 @@ describe('searchFiles with ripgrep', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('finds content matches using ripgrep', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
+  function createVfs(): VirtualFilesystem {
+    const vfs = new VirtualFilesystem([
+      { prefix: '/workspace', read: true, write: true },
+      { prefix: tempDir, read: true, write: true },
+    ]);
     vfs.mount(new LocalBackend('/workspace', tempDir));
+    vfs.mount(new LocalBackend(tempDir, tempDir));
+    return vfs;
+  }
+
+  it('finds content matches using ripgrep', async () => {
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'hello',
@@ -37,8 +46,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('finds content matches with case sensitivity', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'function',
@@ -48,8 +56,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('uses filename mode to list files', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: '',
@@ -60,8 +67,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('uses regex mode', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'export\\s+function',
@@ -71,8 +77,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('respects max_results', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'o',
@@ -84,8 +89,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('respects glob filter', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'hello',
@@ -97,8 +101,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('returns empty matches when needle not found', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'nonexistent_string_xyz',
@@ -109,8 +112,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('defaults to content mode when mode is undefined', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'hello',
@@ -119,8 +121,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('defaults max_results to 100 when undefined', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'o',
@@ -129,8 +130,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('includes line_number in content matches', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     const result = await searchFiles(vfs, {
       root: tempDir,
       needle: 'function',
@@ -143,8 +143,7 @@ describe('searchFiles with ripgrep', () => {
   });
 
   it('falls back to VFS when root does not exist on real FS', async () => {
-    const vfs = new VirtualFilesystem([{ prefix: '/workspace', read: true, write: true }]);
-    vfs.mount(new LocalBackend('/workspace', tempDir));
+    const vfs = createVfs();
     // Use a VFS path that doesn't map to a real filesystem path
     const result = await searchFiles(vfs, {
       root: '/workspace/nonexistent-dir',
