@@ -556,3 +556,22 @@ FAIL (5/15):
 - gateway and runtime need deep test coverage (1000+ mutants each)
 - session and toolsRegistry are closer (53 and 44 kills needed)
 - Priority: fix session and toolsRegistry first (smallest gaps)
+
+## Session 7 Continued: tool-registry mutation tests (2026-08-07 23:30)
+
+### tool-registry-mutation.test.ts (47 tests, all passing)
+Covers surviving mutants in tool-registry.ts:
+- L63: Duplicate name error message assertion
+- L72: Uncertified production tool check (implementation_status + maturity)
+- L75-76: Snapshot invalidation on register + cached snapshot
+- L89: Deep freeze verification (nested objects, null values)
+- L104-113: Validate error formatting + validateErrors
+- L133-136: loadFromDir non-existent dir + non-JSON skip
+- L148-158: loadJsonResource path escape + non-JSON + non-existent
+- L172: loadFull snapshot guard
+- L189: output_schema_ref empty string check
+- L208-224: search/toCompact field assertions (summary, tags, risk_ceiling, transport, available)
+- L254: inSnapshot version + content hash verification
+- contentHash determinism + difference
+
+Expected improvement: tool-registry.ts 81.2% → 90%+
