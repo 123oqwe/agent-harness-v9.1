@@ -611,3 +611,32 @@ Total new: ~196 tests across 10 files, all passing, typecheck clean
 
 ### Pre-existing Failures (not caused by our changes)
 - managed-gateway-stream.test.ts: 2 timeout failures (100-loop rate limit test, 5s timeout)
+
+### ATTENTION: P0-P13 PLAN STATUS (updated 2026-08-08 00:27)
+
+Context was compacted. The P0-P13 plan was lost from session memory. Here is the current status:
+
+COMPLETED (committed):
+- P0: runPhase1 runOne fix
+- P1: delete steering-port.test.ts
+- P2: managed-gateway-deep.test.ts 22 tests (incl P2-FIX fallback/cb/budget/all-fail)
+- P3: provider-adapters resolve() 8 tests
+- P4: async-task-adapter-deep 24 tests
+- P5: ws-server-deep 15 tests
+- P7: direct-strategy 12 tests
+- P10: sqlite-store-deep 21 tests + progress-store 5 tests
+- P11: tool-registry-mutation 47 tests
+
+STILL REMAINING — DO NOT SKIP THESE:
+- P6: model-gateway deep tests (70.2% -> need 85%+, 235 survived + 76 noCov)
+  Read mutation.json in reports/mutation/runs/2026-08-07T09-56-02-195Z-bf5dd864-d409-4f20-8233-a8c8cd6f90ce/gateway/chunks/ for model-gateway survived mutants
+  Test: resolve() provider selection, switchProvider(), dispatch() error classification, capability matching edge cases
+- P8: harness.ts deep tests (42.5% -> need 85%+, 194 noCov + 187 survived)
+  Test: Harness.run() full execution, strategy selection, tool call execution, termination conditions, error recovery
+  Mock ModelGateway/LocalToolHost/ToolRegistry/DurableSession
+- P9: loop.ts deep tests (57.6% -> need 85%+, 179 noCov + 88 survived)
+  Test: LoopConfig fields, ModelCallBudget exhaustion, ModelCallDirective types, TerminationReason cases, RuntimeStepState transitions
+
+### DO NOT RUN verify:phase1:local UNTIL P6, P8, P9 ARE DONE
+4 modules still FAIL: gateway 55.23%, runtime 65.57%, session 84.14%, toolsRegistry 86.16%
+After P6/P8/P9: commit everything, run `node scripts/run-mutation.mjs phase1`, then verify
