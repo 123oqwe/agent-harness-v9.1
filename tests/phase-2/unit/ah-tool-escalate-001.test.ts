@@ -19,7 +19,6 @@ describe('AH-TOOL-ESCALATE-001: Asynchronous human escalation with audit trail',
   });
 
   it('stores reason and urgency in the audit record', async () => {
-    const before = getAuditTrail().length;
     await escalateToHuman({ reason: 'Critical failure detected', urgency: 'critical' });
     const trail = getAuditTrail();
     const record = trail[trail.length - 1]!;
@@ -29,7 +28,6 @@ describe('AH-TOOL-ESCALATE-001: Asynchronous human escalation with audit trail',
   });
 
   it('records context and requested_action when provided', async () => {
-    const before = getAuditTrail().length;
     await escalateToHuman({
       reason: 'Uncertain about deployment',
       urgency: 'low',
@@ -51,7 +49,6 @@ describe('AH-TOOL-ESCALATE-001: Asynchronous human escalation with audit trail',
   });
 
   it('computes audit hash from the record fields', async () => {
-    const before = getAuditTrail().length;
     await escalateToHuman({ reason: 'Hash test', urgency: 'high' });
     const trail = getAuditTrail();
     const record = trail[trail.length - 1]!;
@@ -70,4 +67,21 @@ describe('AH-TOOL-ESCALATE-001: Asynchronous human escalation with audit trail',
       expect(result.success).toBe(true);
     }
   });
+  it('handles default context when not provided', async () => {
+    const result = await escalateToHuman({ reason: 'No context', urgency: 'low' });
+    expect(result.success).toBe(true);
+  });
+
+  it('audit trail records are ordered by creation time', async () => {
+    const before = getAuditTrail().length;
+    await escalateToHuman({ reason: 'First ordered', urgency: 'low' });
+    await escalateToHuman({ reason: 'Second ordered', urgency: 'low' });
+    const trail = getAuditTrail();
+    expect(trail.length).toBe(before + 2);
+    const last = trail[trail.length - 1]!;
+    const secondLast = trail[trail.length - 2]!;
+    expect(last.reason).toBe('Second ordered');
+    expect(secondLast.reason).toBe('First ordered');
+  });
+
 });

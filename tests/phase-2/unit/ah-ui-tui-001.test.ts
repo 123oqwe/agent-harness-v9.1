@@ -58,4 +58,16 @@ describe('AH-UI-TUI-001: Terminal UI with diff rendering', () => {
     // 'a' appears in both so it is unchanged
     expect(diff.unchanged).toContain('a');
   });
+  it('handles single line addition', () => {
+    const diff = renderDiff(['same'], ['same', 'added']);
+    expect(diff.added).toContain('added');
+    expect(diff.unchanged).toContain('same');
+  });
+
+  it('handles single line removal', () => {
+    const diff = renderDiff(['keep', 'remove'], ['keep']);
+    expect(diff.removed).toContain('remove');
+    expect(diff.unchanged).toContain('keep');
+  });
+
 });

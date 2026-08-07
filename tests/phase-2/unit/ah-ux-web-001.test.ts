@@ -54,4 +54,18 @@ describe('AH-UX-WEB-001: Web application with Phase 2 screens', () => {
     expect(doc.path).toBe('/documents');
     expect(doc.component).toBe('DocumentWorkspace');
   });
+  it('all screen titles are non-empty strings', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(typeof screen.title).toBe('string');
+      expect(screen.title.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('all screen components are non-empty strings', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(typeof screen.component).toBe('string');
+      expect(screen.component.length).toBeGreaterThan(0);
+    }
+  });
+
 });
