@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "personal-assistant",
+  "contract_fixture": true,
+  "purpose": "phase1-vertical-bootstrap",
+  "vertical_requirement": "AH-PA-VERTICAL-001",
+  "description": "task list -> daily plan (no external action)"
+}

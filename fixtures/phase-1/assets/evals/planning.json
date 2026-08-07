@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "planning",
+  "contract_fixture": true,
+  "purpose": "phase1-vertical-bootstrap",
+  "vertical_requirement": "AH-PLANNING-VERTICAL-001",
+  "description": "goal+constraints -> plan -> validate deps"
+}

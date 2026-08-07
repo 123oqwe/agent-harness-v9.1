@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "documents",
+  "contract_fixture": true,
+  "purpose": "phase1-vertical-bootstrap",
+  "vertical_requirement": "AH-DOC-VERTICAL-001",
+  "description": "read PDF -> extract -> summarize -> cite pages"
+}

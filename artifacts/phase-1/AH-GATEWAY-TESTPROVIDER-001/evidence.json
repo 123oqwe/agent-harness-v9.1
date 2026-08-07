@@ -1,0 +1,34 @@
+{
+  "requirement_id": "AH-GATEWAY-TESTPROVIDER-001",
+  "commit_sha": "7f2eafaa0985d8add957254464d03e8481c6f053",
+  "tree_sha": "ee7899d49ca3d990f9ae713187d6a78c3bc858bb",
+  "source_files": [
+    "gateway/scripted-provider.ts",
+    "gateway/model-gateway.ts"
+  ],
+  "tests_added": [
+    "tests/gateway/scripted-provider.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run tests/gateway/scripted-provider.test.ts --reporter=verbose"
+  ],
+  "exit_codes": [
+    0
+  ],
+  "test_results": {
+    "pass": 71,
+    "total": 71,
+    "failed": 0
+  },
+  "test_output": "\n RUN  v4.1.10 /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated\n\n \u2713 tests/gateway/scripted-provider.test.ts > AH-GATEWAY-TESTPROVIDER-001: generated ProviderAdapter contract > loads the registered Contract and both local fixtures 3ms\n \u2713 tests/gateway/scripted-provider.test.ts > AH-GATEWAY-TESTPROVIDER-001: generated ProviderAdapter contract > publishes a descriptor that satisfies every generated contract feature 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > AH-GATEWAY-TESTPROVIDER-001: generated ProviderAdapter contract > does not embed the formal ModelGateway implementation 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: recursive canonical hashing > canonicalizes keys recursively without changing array order 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: recursive canonical hashing > does not collide when nested ToolCall arguments differ 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: queue and map lookup > deep-copies queue inputs and returns responses in order 2ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: queue and map lookup > maps recursively canonical messages to deterministic responses 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: queue and map lookup > fails explicitly for exhausted queues and missing map entries 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > preserves validated nested ToolCalls, usage and model 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 0 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 1 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 2 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 3 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 4 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 5 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 6 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 7 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 8 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 9 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed response 10 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 0 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 1 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 2 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 3 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 4 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 5 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 6 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > rejects malformed ToolCall 7 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: strict normalization > normalizes requests into deeply immutable independent snapshots 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: immutable call metadata > records a deeply frozen snapshot with deterministic clock injection 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: usage, streaming and explicit errors > preserves declared zero usage and defaults missing usage to zero 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: usage, streaming and explicit errors > streams text, nested ToolCalls and final usage in order 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: usage, streaming and explicit errors > maps typed errors and status codes without message substring guessing 0ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: zero-network boundary > executes all public provider paths while fetch and network modules are denied 1ms\n \u2713 tests/gateway/scripted-provider.test.ts > ScriptedTestProvider: validation and taxonomy boundaries > publishes",
+  "test_output_sha256": "e077efe9e696186fd2a6d74b3d58d7f20ea80f1fd82c3f82614a07210450b9c2",
+  "test_pass_count": 71,
+  "test_total_count": 71,
+  "independent_verifier": {
+    "model": "glm-5.2-xhigh",
+    "verdict": "pass_with_notes",
+    "severity": "low"
+  },
+  "verifier_result": "pass_with_notes",
+  "verifier_model": "glm-5.2-xhigh"
+}

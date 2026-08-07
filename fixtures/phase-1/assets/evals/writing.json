@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "writing",
+  "contract_fixture": true,
+  "purpose": "phase1-vertical-bootstrap",
+  "vertical_requirement": "AH-WRITING-VERTICAL-001",
+  "description": "brief -> draft -> self-check -> output"
+}

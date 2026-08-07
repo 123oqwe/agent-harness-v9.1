@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "coding",
+  "contract_fixture": true,
+  "purpose": "phase1-vertical-bootstrap",
+  "vertical_requirement": "AH-CODING-VERTICAL-001",
+  "description": "read repo -> fix bug -> run tests -> diff"
+}

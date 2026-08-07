@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase1-personal-assistant-contract",
+  "domain": "personal-assistant",
+  "requirement_ids": [
+    "AH-PA-VERTICAL-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-1/assets/evals/personal-assistant.json",
+    "sha256": "b93235240ead89ca4ec64a7cd97c9c241828e27f84f65a076bff20521e79c496"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      {
+        "path": "$.schema_version",
+        "equals": "1.0.0"
+      },
+      {
+        "path": "$.domain",
+        "equals": "personal-assistant"
+      },
+      {
+        "path": "$.contract_fixture",
+        "equals": true
+      },
+      {
+        "path": "$.purpose",
+        "equals": "phase1-vertical-bootstrap"
+      }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}

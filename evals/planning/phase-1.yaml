@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "format": "yaml-json-subset-v1",
+  "id": "phase1-planning-contract",
+  "domain": "planning",
+  "requirement_ids": [
+    "AH-PLANNING-VERTICAL-001"
+  ],
+  "input": {
+    "path": "fixtures/phase-1/assets/evals/planning.json",
+    "sha256": "923f57d056fcf15f07d2b4b00b6508705ba4d38cc61a20c359e02bc547ff6c2a"
+  },
+  "grader": {
+    "type": "json_assertions_v1",
+    "assertions": [
+      {
+        "path": "$.schema_version",
+        "equals": "1.0.0"
+      },
+      {
+        "path": "$.domain",
+        "equals": "planning"
+      },
+      {
+        "path": "$.contract_fixture",
+        "equals": true
+      },
+      {
+        "path": "$.purpose",
+        "equals": "phase1-vertical-bootstrap"
+      }
+    ]
+  },
+  "forbidden_effects": [
+    "requirement_verified",
+    "evidence_pass",
+    "external_side_effect"
+  ],
+  "evidence_fields": [
+    "case_id",
+    "requirement_ids",
+    "fixture_sha256",
+    "grader_results",
+    "forbidden_effects",
+    "evidence_path"
+  ]
+}
