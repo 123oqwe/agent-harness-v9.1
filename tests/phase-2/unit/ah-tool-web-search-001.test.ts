@@ -66,4 +66,46 @@ describe('AH-TOOL-WEB-SEARCH-001: Web search tool returning ranked results', () 
     expect(result.success).toBe(true);
     expect((result.output as { results: unknown[] }).results).toHaveLength(0);
   });
+
+  it('handles special characters in query', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: 'hello & world! @#$%' });
+    expect(result.success).toBe(true);
+  });
+
+  it('handles very long queries', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: 'x'.repeat(500) });
+    expect(result.success).toBe(true);
+  });
+
+  it('propagates provider errors without swallowing', async () => {
+    setWebSearchProvider({
+      async search() { throw new Error('API timeout'); },
+    });
+    await expect(webSearch({ query: 'test' })).rejects.toThrow('API timeout');
+  });
+
+  it('handles multiple sequential searches', async () => {
+    setWebSearchProvider(mockProvider);
+    const r1 = await webSearch({ query: 'first' });
+    const r2 = await webSearch({ query: 'second' });
+    expect(r1.success).toBe(true);
+    expect(r2.success).toBe(true);
+    const o1 = r1.output as { results: Array<{ title: string }> };
+    const o2 = r2.output as { results: Array<{ title: string }> };
+    expect(o1.results[0]!.title).toContain('first');
+    expect(o2.results[0]!.title).toContain('second');
+  });
+
+  it('returns results with url, title, and snippet fields', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: 'test' });
+    const output = result.output as { results: Array<{ url: string; title: string; snippet: string }> };
+    for (const r of output.results) {
+      expect(r.url).toBeTruthy();
+      expect(r.title).toBeTruthy();
+      expect(r.snippet).toBeTruthy();
+    }
+  });
 });

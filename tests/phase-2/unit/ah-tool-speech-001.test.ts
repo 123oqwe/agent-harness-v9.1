@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { generateSpeech, transcribeAudio, setTtsProvider, setAsrProvider } from '../../../packages/multimodal/src/speech.js';
 import type { TtsProviderPort, AsrProviderPort } from '../../../packages/multimodal/src/speech.js';
-import { MultimodalUnavailableError } from '../../../packages/multimodal/src/types.js';
+import { MultimodalUnavailableError, computeContentHash } from '../../../packages/multimodal/src/types.js';
 import { Buffer } from 'node:buffer';
 
 const mockTts: TtsProviderPort = {
@@ -23,6 +23,16 @@ const mockAsr: AsrProviderPort = {
       confidence: 0.92,
     };
   },
+};
+
+const errorTts: TtsProviderPort = {
+  model: 'error-tts',
+  async synthesize() { throw new Error('TTS API failed'); },
+};
+
+const errorAsr: AsrProviderPort = {
+  model: 'error-asr',
+  async transcribe() { throw new Error('ASR API failed'); },
 };
 
 describe('AH-TOOL-SPEECH-001: Speech generation and transcription adapter', () => {
@@ -68,5 +78,48 @@ describe('AH-TOOL-SPEECH-001: Speech generation and transcription adapter', () =
     setAsrProvider(mockAsr);
     const result = await transcribeAudio({ audio_data: Buffer.from('test') });
     expect(result.language).toBe('en');
+  });
+
+  it('generateSpeech computes correct content hash', async () => {
+    setTtsProvider(mockTts);
+    const result = await generateSpeech({ text: 'hash test' });
+    expect(result.artifact.content_hash).toBe(computeContentHash(result.audio_data));
+  });
+
+  it('generateSpeech propagates provider errors', async () => {
+    setTtsProvider(errorTts);
+    await expect(generateSpeech({ text: 'trigger error' })).rejects.toThrow('TTS API failed');
+  });
+
+  it('transcribeAudio propagates provider errors', async () => {
+    setAsrProvider(errorAsr);
+    await expect(transcribeAudio({ audio_data: Buffer.from('x') })).rejects.toThrow('ASR API failed');
+  });
+
+  it('generateSpeech handles different voice options', async () => {
+    setTtsProvider(mockTts);
+    const r1 = await generateSpeech({ text: 'hello', voice: 'alloy' });
+    const r2 = await generateSpeech({ text: 'hello', voice: 'nova' });
+    expect(r1.audio_data.toString()).toContain('alloy');
+    expect(r2.audio_data.toString()).toContain('nova');
+  });
+
+  it('generateSpeech handles multiple sequential calls', async () => {
+    setTtsProvider(mockTts);
+    const r1 = await generateSpeech({ text: 'first' });
+    const r2 = await generateSpeech({ text: 'second' });
+    expect(r1.artifact.artifact_id).not.toBe(r2.artifact.artifact_id);
+  });
+
+  it('generateSpeech defaults voice when not specified', async () => {
+    setTtsProvider(mockTts);
+    const result = await generateSpeech({ text: 'default voice' });
+    expect(result.audio_data.toString()).toContain('default');
+  });
+
+  it('generateSpeech records text in artifact parameters', async () => {
+    setTtsProvider(mockTts);
+    const result = await generateSpeech({ text: 'audit text' });
+    expect(result.artifact.provenance.parameters).toMatchObject({ text: 'audit text' });
   });
 });
