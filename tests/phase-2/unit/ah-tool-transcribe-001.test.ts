@@ -63,4 +63,25 @@ describe('AH-TOOL-TRANSCRIBE-001: Transcribe audio tool (http_api ASR)', () => {
     const result = await transcribeAudio({ audio_data: Buffer.from('test'), language: 'fr' });
     expect(result.language).toBe('fr');
   });
+
+  it('propagates provider errors', async () => {
+    setAsrProvider({
+      model: 'error',
+      async transcribe() { throw new Error('ASR API failed'); },
+    });
+    await expect(transcribeAudio({ audio_data: Buffer.from('x') })).rejects.toThrow('ASR API failed');
+  });
+
+  it('handles empty audio data', async () => {
+    setAsrProvider(mockAsrProvider);
+    const result = await transcribeAudio({ audio_data: Buffer.alloc(0) });
+    expect(result.text).toContain('transcribed:0');
+  });
+
+  it('handles sequential calls', async () => {
+    setAsrProvider(mockAsrProvider);
+    const r1 = await transcribeAudio({ audio_data: Buffer.from('audio1-data') });
+    const r2 = await transcribeAudio({ audio_data: Buffer.from('audio2-longer') });
+    expect(r1.text).not.toBe(r2.text);
+  });
 });

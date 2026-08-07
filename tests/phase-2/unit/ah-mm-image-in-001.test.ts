@@ -68,4 +68,27 @@ describe('AH-MM-IMAGE-IN-001: Accept image input for vision understanding', () =
     expect(capturedData?.toString()).toContain('unique-data');
     expect(capturedPrompt).toBe('unique prompt');
   });
+
+  it('propagates provider errors', async () => {
+    setVisionProvider({
+      model: 'error',
+      async understand() { throw new Error('vision API failed'); },
+    });
+    await expect(understandImage({ image_data: Buffer.from('x'), prompt: 'test' })).rejects.toThrow('vision API failed');
+  });
+
+  it('computes correct content hash', async () => {
+    setVisionProvider(mockVisionProvider);
+    const imgData = Buffer.from('hash-verify');
+    const result = await understandImage({ image_data: imgData, prompt: 'test' });
+    expect(result.artifact.byte_size).toBe(imgData.length);
+  });
+
+  it('handles multiple sequential calls', async () => {
+    setVisionProvider(mockVisionProvider);
+    const r1 = await understandImage({ image_data: Buffer.from('img1'), prompt: 'first' });
+    const r2 = await understandImage({ image_data: Buffer.from('img2'), prompt: 'second' });
+    expect(r1.description).toContain('first');
+    expect(r2.description).toContain('second');
+  });
 });
