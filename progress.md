@@ -97,6 +97,9 @@
 | What have I learned? | See findings.md - GLM_API_KEY env leak is root cause of test failures under mutation runner |
 | What have I done? | Phase A complete, B0 complete, B1 env leak fixed (3 files, 603/603 pass), ready to rerun mutation |
 | Phase 1 mutation | screen -list / tail /tmp/phase1-mutation-run.log | running | PID 3240, gateway 1/43 | IN PROGRESS |
+| Phase 1 mutation (restart 1) | crashed at chunk 32/43, PID 3215 died | failed | 31 chunks lost | CRASHED |
+| Phase 1 mutation (restart 2) | screen + caffeinate -i, PID 69340 | running | gateway 1/43 in progress | IN PROGRESS |
+| Phase 1 mutation (restart 2 actual) | started 05:23, 2 chunks done by 05:28, chunk 3 in progress | running | 2/43 gateway chunks done, ~5min/chunk | IN PROGRESS |
 | Gateway chunk 1/43 | async-task-adapter.ts:1-150 | done | 1m35s, score 33.55% | DONE |
 | Gateway chunk 2/43 | async-task-adapter.ts:151-270 | done | ~1m | DONE |
 | Gateway chunk 3/43 | (next file) | done | ~1m | DONE |

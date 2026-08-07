@@ -4,10 +4,10 @@
 Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, evidence refreshed, thin tests thickened, gate closure, GLM acceptance, then commit and push source code to GitHub.
 
 ## Next Step
-Rerun Phase 1 mutation (node scripts/run-mutation.mjs phase1). GLM_API_KEY env leak in 3 test files has been fixed and committed (1f9c3232). All 603 gateway tests pass with GLM_API_KEY set.
+Monitor Phase 1 mutation (running in screen "mutation" with caffeinate -i, PID 69340). Gateway chunk 1/43 in progress. 5-8h ETA.
 
 ## Current Phase
-Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
+Phase B: Phase 1 Mutation Running (restarted with caffeinate -i to prevent sleep)
 
 ## Phases
 
@@ -22,6 +22,7 @@ Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
 - [x] B0: Clean .stryker-tmp, npm run prepare (patches applied), set GLM_API_KEY
 - [ ] B1: Run Phase 1 mutation (env leak fixed in 3 files, 603/603 gateway tests pass with GLM_API_KEY, ready to rerun)
 - [ ] B1: Mutation RUNNING in screen session "mutation" (PID 3240, gateway chunk 1/43 dry run PASSED, 5-8h ETA)
+- [ ] B1: Previous run crashed at chunk 32/43 (PID 3215 died, 31 chunks lost). Restarted with caffeinate -i (PID 69340). Gateway chunk 1/43 in progress.
 - [ ] B2: Check mutation results, fix failing modules (add tests or register waivers)
 - [ ] B3: Independent mutation verification (npm run test:mutation:check)
 - [ ] B4: verify:phase1:local (typecheck + cycles + build + lint + test + coverage + mutation)
@@ -81,8 +82,12 @@ Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
 
 ## Notes
 - HEAD: 7052dcf3 (pushed to origin)
+- HEAD: 0fc68dbd (after plan update commit, not yet pushed)
 - Uncommitted: only mutation/equivalent-mutants.json (waiver rebind to 7052dcf3, runner allows)
+- Uncommitted: only mutation/equivalent-mutants.json (waiver rebind to 0fc68dbd, runner allows)
 - Mutation running in screen session "mutation", monitor: tail -f /tmp/phase1-mutation-run.log
+- Mutation restarted with caffeinate -i to prevent system sleep (previous run died after 2h)
+- Previous run: 31/43 gateway chunks completed then process died (PID 3215). Results lost (new runId).
 - Env leak fix committed: 1f9c3232 (3 test files: provider-adapters, key-vault, managed-gateway-stream)
 - 603/603 gateway tests pass with GLM_API_KEY set in env (verified 03:12)
 - Previous mutation session 78665 ended (no new results generated, all old results still stale)
