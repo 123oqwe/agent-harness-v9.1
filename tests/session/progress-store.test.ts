@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeProgressAtomic, readProgress, type ProgressEntry } from '../../session/progress-store.js';
@@ -81,5 +81,86 @@ describe('progress-store', () => {
     writeProgressAtomic(dir, entry);
     const raw = readFileSync(join(dir, 'progress.json'), 'utf8');
     expect(() => JSON.parse(raw)).not.toThrow();
+  });
+
+  it('writes with file mode 0o600 (owner read/write only)', () => {
+    const entry: ProgressEntry = {
+      run_id: 'r1', current_step: 0, goal: 'g',
+      completed_steps: [], open_tasks: [], last_error: null,
+      checkpoint_refs: [], last_updated: 't',
+    };
+    writeProgressAtomic(dir, entry);
+    const stat = statSync(join(dir, 'progress.json'));
+    // On macOS, mode may have extra bits, but owner rw should be set
+    expect(stat.mode & 0o600).toBe(0o600);
+  });
+
+  it('writes entry with string current_step', () => {
+    const entry: ProgressEntry = {
+      run_id: 'r1', current_step: 'step-1', goal: 'g',
+      completed_steps: [], open_tasks: [], last_error: null,
+      checkpoint_refs: [], last_updated: 't',
+    };
+    const path = writeProgressAtomic(dir, entry);
+    const result = readProgress(dir);
+    expect(result).not.toBeNull();
+    expect(result!.current_step).toBe('step-1');
+  });
+
+  it('writes entry with last_error string', () => {
+    const entry: ProgressEntry = {
+      run_id: 'r1', current_step: 0, goal: 'g',
+      completed_steps: [], open_tasks: [], last_error: 'something failed',
+      checkpoint_refs: [], last_updated: 't',
+    };
+    writeProgressAtomic(dir, entry);
+    const result = readProgress(dir);
+    expect(result!.last_error).toBe('something failed');
+  });
+
+  it('writes entry with populated arrays', () => {
+    const entry: ProgressEntry = {
+      run_id: 'r1', current_step: 0, goal: 'g',
+      completed_steps: [{ step: 1, result: 'done' }],
+      open_tasks: ['task-a', 'task-b'],
+      last_error: null,
+      checkpoint_refs: ['cp-1', 'cp-2'],
+      last_updated: '2026-08-07T12:00:00Z',
+    };
+    writeProgressAtomic(dir, entry);
+    const result = readProgress(dir);
+    expect(result!.completed_steps).toHaveLength(1);
+    expect(result!.open_tasks).toEqual(['task-a', 'task-b']);
+    expect(result!.checkpoint_refs).toEqual(['cp-1', 'cp-2']);
+    expect(result!.last_updated).toBe('2026-08-07T12:00:00Z');
+  });
+
+  it('returns correct progress path', () => {
+    const entry: ProgressEntry = {
+      run_id: 'r1', current_step: 0, goal: 'g',
+      completed_steps: [], open_tasks: [], last_error: null,
+      checkpoint_refs: [], last_updated: 't',
+    };
+    const path = writeProgressAtomic(dir, entry);
+    expect(path).toBe(join(dir, 'progress.json'));
+  });
+
+  it('overwrites existing file with new content', () => {
+    const entry1: ProgressEntry = {
+      run_id: 'r1', current_step: 1, goal: 'first',
+      completed_steps: [], open_tasks: [], last_error: null,
+      checkpoint_refs: [], last_updated: 't1',
+    };
+    writeProgressAtomic(dir, entry1);
+    const entry2: ProgressEntry = {
+      run_id: 'r2', current_step: 2, goal: 'second',
+      completed_steps: [], open_tasks: [], last_error: null,
+      checkpoint_refs: [], last_updated: 't2',
+    };
+    writeProgressAtomic(dir, entry2);
+    const result = readProgress(dir);
+    expect(result!.run_id).toBe('r2');
+    expect(result!.goal).toBe('second');
+    expect(result!.current_step).toBe(2);
   });
 });
