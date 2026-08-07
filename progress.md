@@ -1,55 +1,85 @@
 # Progress Log
 
-## Session: 2026-08-08 (comprehensive state verification)
+## Session: 2026-08-08
 
-### State Assessment (02:45)
-- HEAD: 05dd3424aa7f7723d824a73f0fd18087fa82f473
-- origin: behind 1 commit (not pushed)
-- Uncommitted: HARNESS_SESSION_DIRECTIVE.md + equivalent-mutants.json (waiver rebind)
-- Stale mutation lock (PID 77574 dead): cleaned
+### Phase A: Preparation
+- **Status:** complete
+- **Started:** 2026-08-08 02:45
+- Actions taken:
+  - Read HARNESS_SESSION_DIRECTIVE.md (complete session directive, 6 unfinished items)
+  - Checked stryker process: NOT running (PID 77574 dead, stale lock)
+  - Verified HEAD: 05dd3424 -> 721450a8 (after commit)
+  - Checked git status: uncommitted HARNESS_SESSION_DIRECTIVE.md + equivalent-mutants.json
+  - Verified Phase 1 tests: 2859/2859 PASS (130 test files)
+  - Verified Phase 2 unit tests: 758/758 PASS (64 test files)
+  - Verified dev gate: success=true (5 commands pass)
+  - Verified typecheck + lint: PASS
+  - Analyzed mutation state: 11 modules stale, 4 missing, gateway FAIL
+  - Analyzed Phase 1 evidence: 40/40 SHA stale
+  - Analyzed Phase 2 evidence: 0/64 (does not exist)
+  - Discovered: Phase 2 mutation CANNOT run locally (macOS bubblewrap error)
+  - Cleaned stale mutation lock (python3 shutil.rmtree)
+  - Rebound 20 waivers to new HEAD (equivalent-mutants.json, kept uncommitted)
+  - Committed docs: HARNESS_SESSION_DIRECTIVE.md + task_plan.md + findings.md + progress.md
+  - Pushed to origin: 721450a8
+- Files created/modified:
+  - task_plan.md (rewritten with template format)
+  - findings.md (rewritten with template format)
+  - progress.md (rewritten with template format)
+  - HARNESS_SESSION_DIRECTIVE.md (committed with mutation repair guide)
+  - mutation/equivalent-mutants.json (waiver rebind, uncommitted)
 
-### Test Results
-| Check | Result |
-|-------|--------|
-| typecheck | PASS |
-| lint | PASS |
-| Phase 1 tests (130 files) | 2859/2859 PASS |
-| Phase 2 unit tests (64 files) | 758/758 PASS |
-| Phase 2 dev gate | success=true |
-| configurationHash | 2e02aab1... (verified correct) |
-| active_stub_count | 0 |
+### Phase B: Phase 1 Mutation Rerun
+- **Status:** in_progress
+- **Started:** 2026-08-08 03:10
+- Actions taken:
+  - B0: Cleaned .stryker-tmp (3 old directories removed)
+  - B0: npm run prepare (patches applied: @stryker-mutator/core + vitest-runner)
+  - B0: Set GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
+  - B0: Verified stale lock cleaned
+  - B1: Started mutation run (node scripts/run-mutation.mjs phase1, session 78665)
+  - B1: Gateway chunk 1/43 FAILED in dry run: "expected 'Bearer e93c1f...' to be 'Bearer test-key'"
+  - B1: Root cause: GLM_API_KEY env var leaks into KeyVault.loadFromEnv(), tests don't isolate env
+  - B1: Fixed provider-adapters.test.ts: added beforeEach delete GLM_API_KEY/ZHIPU_API_KEY in resolve() describe
+  - B1: Verified fix: 37/37 tests pass with GLM_API_KEY set in env
+  - B1: Found 2 more failures: key-vault.test.ts (ZHIPU_API_KEY test), managed-gateway-stream.test.ts (rate limit)
+  - B1: Mutation runner continued to router module after gateway chunk 1 failed (gateway skipped, no report)
+- Files created/modified:
+  - .stryker-tmp/ (cleaned, will be repopulated by mutation run)
+  - /tmp/phase1-mutation-run.log (mutation output log)
+  - tests/gateway/provider-adapters.test.ts (MODIFIED: added beforeEach delete env vars in resolve() describe)
 
-### Mutation Status (STALE)
-- 11 modules have old result.json (config_hash mismatch)
-- 4 modules missing: actionControl, runtime, session, identitySecrets
-- gateway old score: 84.68 (FAIL, threshold 85)
-- P6/P8/P9 121 new tests not in old results
-- Phase 1 mutation must be completely rerun
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| typecheck | npx tsc --noEmit | 0 errors | 0 errors | PASS |
+| lint | npx eslint ... | 0 errors | 0 errors | PASS |
+| Phase 1 tests | npx vitest run tests/gateway... | all pass | 2859/2859 pass | PASS |
+| Phase 2 unit | npx vitest run tests/phase-2/unit | all pass | 758/758 pass | PASS |
+| Phase 2 dev gate | verify-phase2-local --mode dev | success=true | success=true | PASS |
+| config hash | computeMutationConfigurationHash() | 2e02aab1... | 2e02aab1... | PASS |
+| Phase 1 baseline | git merge-base --is-ancestor | descendant | descendant | PASS |
+| provider-adapters with GLM_API_KEY set | npx vitest run tests/gateway/provider-adapters.test.ts (GLM_API_KEY set) | 37/37 pass | 37/37 pass | PASS |
+| gateway tests with GLM_API_KEY set | npx vitest run tests/gateway/ (GLM_API_KEY set) | all pass | 601/603 pass (2 fail: key-vault, managed-gateway-stream) | PARTIAL FAIL |
 
-### Evidence Status
-- Phase 1: 40/40 exist, all SHA stale (bd85e7ed or 7f2eafaa)
-- Phase 2: 0/64 (artifacts/phase-2/ does not exist)
-- No automated script for Phase 1 evidence regeneration
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 02:50 | Stale mutation lock (PID 77574 dead) | 1 | python3 shutil.rmtree removed lock |
+| 03:05 | nohup mutation process exited silently | 1 | Run via exec_command session for monitoring |
+| 02:45 | Python triple-quote syntax error writing plan | 1 | Used heredoc (<< 'PYEOF') instead |
+| 03:00 | Mutation gateway chunk 1/43 dry run failed: expected 'Bearer e93c1f...' to be 'Bearer test-key' | 1 | Fixed provider-adapters.test.ts: beforeEach delete GLM_API_KEY/ZHIPU_API_KEY |
+| 03:02 | key-vault.test.ts "supports ZHIPU_API_KEY for zhipu provider" fails with GLM_API_KEY set | 1 | Pending: need same env isolation fix |
+| 03:02 | managed-gateway-stream.test.ts "completeStream respects rate limits" fails with GLM_API_KEY set | 1 | Pending: need to investigate (timeout or env-related) |
 
-### Critical Discovery: Phase 2 Mutation Cannot Run Locally
-- run-phase2-mutation-bootstrap.mjs throws on macOS:
-  'Seatbelt is diagnostic-only; release candidate CI requires Linux bubblewrap'
-- Also throws on Linux without bubblewrap
-- Only runs on GitHub Actions ubuntu-22.04
-- Phase 1 mutation (run-mutation.mjs) has NO platform restriction
-- verify:phase2:local --mode local command #18 will fail locally
-- Phase 2 mutation must be triggered via: gh workflow run phase2-mutation.yml
-
-### Plan Status
-- task_plan.md: rewritten with verified state and critical constraints
-- findings.md: rewritten with comprehensive findings
-- Plan has been through 3 rounds of verification
-
-### 5-Question Reboot Check
+## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase A preparation, mutation needs rerun |
-| Where am I going? | mutation -> thin tests -> gate -> GLM -> push |
+| Where am I? | Phase B: fixing GLM_API_KEY env leak in 2 more test files before rerunning mutation |
+| Where am I going? | Fix env leak -> rerun mutation -> B2-B7 -> C thin tests -> D gate -> E GLM -> F push |
 | What's the goal? | Phase 1+2 pass, push source to GitHub |
-| What have I learned? | See findings.md - mutation stale, evidence stale, Phase 2 mutation CI-only |
-| What have I done? | Full state verification, stale lock cleaned, plan written |
+| What have I learned? | See findings.md - GLM_API_KEY env leak is root cause of test failures under mutation runner |
+| What have I done? | Phase A complete, B0 complete, B1 started (gateway chunk 1 failed, 1 test fixed, 2 pending) |
+
+---
+*Update after completing each phase or encountering errors*

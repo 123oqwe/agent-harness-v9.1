@@ -285,6 +285,7 @@ describe('createProviderAdapter', () => {
 const originalFetch = globalThis.fetch;
 
 describe('createProviderAdapter resolve()', () => {
+  beforeEach(() => { delete process.env.GLM_API_KEY; delete process.env.ZHIPU_API_KEY; });
   afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
 
   function makeReq(): any {

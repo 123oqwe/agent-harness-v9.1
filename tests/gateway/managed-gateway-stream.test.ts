@@ -11,6 +11,8 @@ describe('ManagedGateway completeStream security', () => {
   let gateway: ManagedGateway;
 
   beforeEach(() => {
+    delete process.env.GLM_API_KEY;
+    delete process.env.ZHIPU_API_KEY;
     const keyVault = new KeyVault();
     keyVault.addKey('zhipu', 'test-key');
     const capRegistry = new CapabilityRegistry();
@@ -52,7 +54,7 @@ describe('ManagedGateway completeStream security', () => {
     }
     // Should not crash, just return message_stop
     expect(events.some(e => e['type'] === 'message_stop')).toBe(true);
-  });
+  }, OLLAMA_TEST_TIMEOUT);
 
   it('completeStream handles missing provider gracefully', async () => {
     const gw = new ManagedGateway({

@@ -39,6 +39,7 @@ describe('KeyVault', () => {
   });
 
   it('supports ZHIPU_API_KEY for zhipu provider', () => {
+    delete process.env.GLM_API_KEY;
     process.env.ZHIPU_API_KEY = 'zhipu-test-key';
     const kv = new KeyVault();
     expect(kv.getKey('zhipu')).toBe('zhipu-test-key');
