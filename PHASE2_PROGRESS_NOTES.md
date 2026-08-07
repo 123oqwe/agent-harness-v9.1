@@ -505,3 +505,28 @@ After this run completes, must commit + rebind waivers + rerun mutation.
 - Previous waiver rebinding used wrong hash calculation (JSON.stringify vs canonicalJson)
 - Runner uses canonicalJson (sorted keys, specific format) for config hash
 - Correct hash: 922872c30f469457ba493be2f8db3a61b63db4e2d9e4012f86424805fb238693
+
+## B1 Run Progress (2026-08-07 19:40)
+
+### B1 Status
+- Started: 17:56 on commit 1d48fb6d with waivers applied
+- Currently: gateway module, chunk 21/43 (model-gateway.ts:301-450)
+- Elapsed: ~1h 45m
+- Gateway has 43 chunks, ~22 remaining
+- After gateway: 14 more modules (router, toolsRegistry, toolsLeaf, skills, strategies, actionControl, identitySecrets, vfs, sandbox, session, runtime, verification, verticals, uiAdapters)
+- Estimated total: 6-8 hours
+
+### Key Differences from B0
+- B1 runs on HEAD 1d48fb6d (includes 29 new test files, ~474 tests from Sessions 5-7)
+- B1 has waivers properly applied (20 strategies waivers, config hash matches)
+- B1 should show improved scores for:
+  - strategies (waivers applied → should pass)
+  - toolsLeaf (screenshot/search-files/apply-patch tests added)
+  - runtime (hook-port/react-loop/retry/notifications tests added)
+  - session (durable-session/progress-store tests added)
+  - gateway (10 new gateway test files added)
+
+### What's Blocked
+- Step 1 (Phase 1 foundation) cannot complete until B1 finishes
+- Steps 2-6 depend on Step 1 being green
+- The mutation run is the critical path bottleneck
