@@ -34,6 +34,49 @@ describe('AH-DOC-INGEST-PPTX-001: Ingest PPTX documents extracting slides', () =
       expect(result.text).toContain('Second');
     });
   });
+  it('records provenance for PPTX', async () => {
+    const slideXml = '<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Test</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+    const pptx = createZipWithEntry('ppt/slides/slide1.xml', slideXml);
+    const result = await parser.parse(pptx, 'test.pptx', {});
+    expect(result.provenance.format).toBe('pptx');
+    expect(result.provenance.content_hash).toHaveLength(64);
+    expect(result.provenance.byte_size).toBe(pptx.length);
+  });
+
+  it('records parser version and name', async () => {
+    const slideXml = '<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>V</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+    const pptx = createZipWithEntry('ppt/slides/slide1.xml', slideXml);
+    const result = await parser.parse(pptx, 'test.pptx', {});
+    expect(result.provenance.parser_version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(result.provenance.parser_name).toBeTruthy();
+  });
+
+  it('rejects files exceeding max bytes', () => {
+    const buf = Buffer.alloc(200);
+    return expect(parser.parse(buf, 'big.pptx', { max_bytes: 100 })).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles empty PPTX (no slides)', async () => {
+    const pptx = createZipWithEntry('ppt/presentation.xml', '<?xml version="1.0"?><p:presentation/>');
+    const result = await parser.parse(pptx, 'empty.pptx', {});
+    expect(result.provenance.format).toBe('pptx');
+  });
+
+  it('produces deterministic content hash', async () => {
+    const slideXml = '<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Det</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+    const pptx = createZipWithEntry('ppt/slides/slide1.xml', slideXml);
+    const r1 = await parser.parse(pptx, 'a.pptx', {});
+    const r2 = await parser.parse(pptx, 'b.pptx', {});
+    expect(r1.provenance.content_hash).toBe(r2.provenance.content_hash);
+  });
+
+  it('records source_path in provenance', async () => {
+    const slideXml = '<?xml version="1.0"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>P</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>';
+    const pptx = createZipWithEntry('ppt/slides/slide1.xml', slideXml);
+    const result = await parser.parse(pptx, 'path/to/slides.pptx', {});
+    expect(result.provenance.source_path).toBe('path/to/slides.pptx');
+  });
+
 });
 
 function createMultiSlideZip(slide1Xml: string, slide2Xml: string): Buffer {
