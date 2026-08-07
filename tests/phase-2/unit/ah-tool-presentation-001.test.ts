@@ -90,4 +90,35 @@ describe('AH-TOOL-PRESENTATION-001: generate_presentation tool (cli_wrapper, pyt
     });
     expect(spawn).toHaveBeenCalledWith('python3', expect.arrayContaining(['-c']), expect.any(Object));
   });
+
+  it('handles non-zero exit code with error', async () => {
+    mockSpawnFailure('Error: invalid template', 2);
+    const result = await generatePresentation({
+      output_path: 'output/slides.pptx',
+      slides: [{ title: 'Test' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('handles single slide', async () => {
+    mockSpawnSuccess(JSON.stringify({ created: true, path: 'output/single.pptx', slides: 1 }));
+    const result = await generatePresentation({
+      output_path: 'output/single.pptx',
+      slides: [{ title: 'Only Slide' }],
+    });
+    expect(result.success).toBe(true);
+    expect((result.output as Record<string, unknown>).slides).toBe(1);
+  });
+
+  it('handles slides with content', async () => {
+    mockSpawnSuccess(JSON.stringify({ created: true, path: 'output/content.pptx', slides: 2 }));
+    const result = await generatePresentation({
+      output_path: 'output/content.pptx',
+      slides: [
+        { title: 'Title Slide' },
+        { title: 'Content Slide', content: ['Point A', 'Point B', 'Point C'] },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
 });

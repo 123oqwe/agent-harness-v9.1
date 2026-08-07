@@ -90,4 +90,41 @@ describe('AH-TOOL-DOCUMENT-001: generate_document tool (cli_wrapper, python-docx
     expect(mockProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('template_path'));
     expect(mockProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('output_path'));
   });
+
+  it('handles non-zero exit code with error', async () => {
+    mockSpawnFailure('Error: template not found', 2);
+    const result = await generateDocument({
+      template_path: 'workspace/missing.docx',
+      output_path: 'output/report.docx',
+      content: { title: 'Test' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('handles empty content', async () => {
+    mockSpawnSuccess(JSON.stringify({ path: 'output/empty.docx', pages: 0 }));
+    const result = await generateDocument({
+      template_path: 'workspace/template.docx',
+      output_path: 'output/empty.docx',
+      content: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('handles multiple sections in content', async () => {
+    mockSpawnSuccess(JSON.stringify({ path: 'output/multi.docx', pages: 5 }));
+    const result = await generateDocument({
+      template_path: 'workspace/template.docx',
+      output_path: 'output/multi.docx',
+      content: {
+        title: 'Multi',
+        sections: [
+          { heading: 'Section 1', body: 'Content 1' },
+          { heading: 'Section 2', body: 'Content 2' },
+          { heading: 'Section 3', body: 'Content 3' },
+        ],
+      },
+    });
+    expect(result.success).toBe(true);
+  });
 });

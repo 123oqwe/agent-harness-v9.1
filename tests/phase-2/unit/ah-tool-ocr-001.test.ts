@@ -76,4 +76,42 @@ describe('AH-TOOL-OCR-001: ocr_document tool (cli_wrapper, tesseract)', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('handles multiple languages', async () => {
+    mockSpawnSuccess(JSON.stringify({ text: 'Hello world', language: 'eng+chi_sim', confidence: 0.85 }));
+    const result = await ocrDocument({
+      image_path: 'workspace/multi.png',
+      language: 'eng+chi_sim',
+    });
+    expect(result.success).toBe(true);
+    expect((result.output as Record<string, unknown>).language).toBe('eng+chi_sim');
+  });
+
+  it('handles empty OCR output', async () => {
+    mockSpawnSuccess(JSON.stringify({ text: '', language: 'eng', confidence: 0 }));
+    const result = await ocrDocument({
+      image_path: 'workspace/blank.png',
+      language: 'eng',
+    });
+    expect(result.success).toBe(true);
+    expect((result.output as Record<string, unknown>).text).toBe('');
+  });
+
+  it('handles non-zero exit code with stderr', async () => {
+    mockSpawnFailure('Error: invalid image format', 1);
+    const result = await ocrDocument({
+      image_path: 'workspace/bad.png',
+      language: 'eng',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('passes language option to spawn process', async () => {
+    const mockProc = mockSpawnSuccess(JSON.stringify({ text: 'text', language: 'fra', confidence: 0.9 }));
+    await ocrDocument({
+      image_path: 'workspace/french.png',
+      language: 'fra',
+    });
+    expect(mockProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('fra'));
+  });
 });
