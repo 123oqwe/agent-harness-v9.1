@@ -41,8 +41,71 @@ describe('AH-RAG-RERANK-001: Rerank retrieval results', () => {
       makeResult('c', 0.5, 'cooking recipes pasta'),
     ];
     const reranked = rerankResults(results, { top_k: 2, diversity_lambda: 0.5 });
-    // With diversity, 'c' might be preferred over 'b' since it's different from 'a'
     expect(reranked).toHaveLength(2);
     expect(reranked[0]!.chunk.chunk_id).toBe('a');
+  });
+
+  it('returns empty array for empty input', () => {
+    const reranked = rerankResults([], { top_k: 5 });
+    expect(reranked).toHaveLength(0);
+  });
+
+  it('returns single result unchanged', () => {
+    const results = [makeResult('only', 0.9, 'unique content')];
+    const reranked = rerankResults(results, { top_k: 5 });
+    expect(reranked).toHaveLength(1);
+    expect(reranked[0]!.chunk.chunk_id).toBe('only');
+  });
+
+  it('defaults top_k to 10 when not specified', () => {
+    const results = Array.from({ length: 15 }, (_, i) => makeResult(`c${i}`, 1 - i * 0.05, `text ${i}`));
+    const reranked = rerankResults(results);
+    expect(reranked).toHaveLength(10);
+  });
+
+  it('handles top_k larger than results', () => {
+    const results = [makeResult('a', 0.9, 'a'), makeResult('b', 0.8, 'b')];
+    const reranked = rerankResults(results, { top_k: 100 });
+    expect(reranked).toHaveLength(2);
+  });
+
+  it('selects highest score first', () => {
+    const results = [
+      makeResult('low', 0.1, 'low score'),
+      makeResult('high', 0.95, 'high score'),
+      makeResult('mid', 0.5, 'mid score'),
+    ];
+    const reranked = rerankResults(results, { top_k: 3, diversity_lambda: 1.0 });
+    expect(reranked[0]!.chunk.chunk_id).toBe('high');
+  });
+
+  it('with zero diversity lambda, purely uses score', () => {
+    const results = [
+      makeResult('a', 0.9, 'same text'),
+      makeResult('b', 0.8, 'same text'),
+      makeResult('c', 0.7, 'same text'),
+    ];
+    const reranked = rerankResults(results, { top_k: 3, diversity_lambda: 1.0 });
+    expect(reranked.map(r => r.chunk.chunk_id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('with high diversity, prefers dissimilar results', () => {
+    const results = [
+      makeResult('a', 0.9, 'machine learning ai'),
+      makeResult('b', 0.88, 'machine learning ai'),
+      makeResult('c', 0.3, 'cooking pasta recipe'),
+    ];
+    const reranked = rerankResults(results, { top_k: 2, diversity_lambda: 0.1 });
+    expect(reranked).toHaveLength(2);
+    expect(reranked[0]!.chunk.chunk_id).toBe('a');
+    // With high diversity penalty, 'c' should be preferred over 'b'
+    expect(reranked[1]!.chunk.chunk_id).toBe('c');
+  });
+
+  it('does not modify original results array', () => {
+    const results = [makeResult('a', 0.9, 'a'), makeResult('b', 0.8, 'b')];
+    const original = [...results];
+    rerankResults(results, { top_k: 2 });
+    expect(results).toEqual(original);
   });
 });

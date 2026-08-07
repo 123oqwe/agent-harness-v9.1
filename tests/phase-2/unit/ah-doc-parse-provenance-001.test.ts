@@ -45,4 +45,37 @@ describe('AH-DOC-PARSE-PROVENANCE-001: Track parser version and provenance', () 
       expect(dt.getTime()).not.toBeNaN();
     });
   });
+
+  it('produces different content hashes for different content', async () => {
+    const r1 = await ingestor.ingest(Buffer.from('# Content A\n', 'utf8'), 'a.md', {});
+    const r2 = await ingestor.ingest(Buffer.from('# Content B\n', 'utf8'), 'b.md', {});
+    expect(r1.provenance.content_hash).not.toBe(r2.provenance.content_hash);
+  });
+
+  it('records source path in provenance', async () => {
+    const buf = Buffer.from('# Test\n', 'utf8');
+    const result = await ingestor.ingest(buf, 'path/to/doc.md', {});
+    expect(result.provenance.source_path).toBe('path/to/doc.md');
+  });
+
+  it('records parser name for markdown format', async () => {
+    const buf = Buffer.from('# Test\n', 'utf8');
+    const result = await ingestor.ingest(buf, 'doc.md', {});
+    expect(result.provenance.parser_name).toBeTruthy();
+    expect(typeof result.provenance.parser_name).toBe('string');
+  });
+
+  it('ingested_at is a valid ISO timestamp', async () => {
+    const buf = Buffer.from('# Test\n', 'utf8');
+    const result = await ingestor.ingest(buf, 'doc.md', {});
+    expect(result.provenance.ingested_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('byte_size matches buffer length for various sizes', async () => {
+    for (const size of [10, 100, 1000]) {
+      const buf = Buffer.alloc(size, 0x41);
+      const result = await ingestor.ingest(buf, 'test.md', {});
+      expect(result.provenance.byte_size).toBe(size);
+    }
+  });
 });
