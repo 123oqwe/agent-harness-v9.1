@@ -62,7 +62,7 @@ const exactCommitSha = /^[0-9a-f]{40}$/u;
  * The hash covers the canonical JSON of every field EXCEPT self_hash.
  * prev_hash is included so the chain is tamper-evident.
  */
-function computeSelfHash(evidence: Readonly<EvidencePackage>): string {
+export function computeSelfHash(evidence: Readonly<EvidencePackage>): string {
   const { self_hash: _omitted, ...rest } = evidence;
   return createHash('sha256')
     .update(JSON.stringify(rest))

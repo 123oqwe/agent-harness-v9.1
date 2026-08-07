@@ -1,5 +1,6 @@
 import {
   existsSync,
+  writeFileSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -11,9 +12,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   EvidenceError,
   generateEvidence,
+  computeSelfHash,
   runCommand,
   validateEvidence,
   writeEvidence,
+  verifyHashChain,
   type EvidencePackage,
 } from '../../verification/evidence.js';
 import { SPEC_ROOT } from '../helpers/repository-paths.js';
@@ -316,5 +319,79 @@ describe('AH-EVIDENCE-001 real argv evidence', () => {
     expect(() =>
       runCommand({ argv: [node], timeout_ms: -1 }),
     ).toThrow('command timeout_ms must be a positive integer');
+  });
+});
+
+describe('verifyHashChain', () => {
+  it('returns true for legacy package without self_hash', () => {
+    const evidence = validEvidence();
+    delete (evidence as Partial<EvidencePackage>).self_hash;
+    expect(verifyHashChain(evidence)).toBe(true);
+  });
+
+  it('returns true when self_hash matches recomputed hash', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = computeSelfHash(evidence);
+    expect(verifyHashChain(evidence)).toBe(true);
+  });
+
+  it('returns false when self_hash is tampered', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = computeSelfHash(evidence);
+    evidence.self_hash = 'tampered123';
+    expect(verifyHashChain(evidence)).toBe(false);
+  });
+
+  it('returns false when evidence content is modified after hashing', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = computeSelfHash(evidence);
+    evidence.requirement_id = 'TAMPERED';
+    expect(verifyHashChain(evidence)).toBe(false);
+  });
+
+  it('returns true when self_hash is null (legacy)', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = null as unknown as string;
+    expect(verifyHashChain(evidence)).toBe(true);
+  });
+
+  it('detects tampering in commit_sha field', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = computeSelfHash(evidence);
+    const original = evidence.commit_sha;
+    evidence.commit_sha = 'b'.repeat(40);
+    expect(verifyHashChain(evidence)).toBe(false);
+    evidence.commit_sha = original;
+    expect(verifyHashChain(evidence)).toBe(true);
+  });
+
+  it('detects tampering in test_results field', () => {
+    const evidence = validEvidence();
+    evidence.self_hash = computeSelfHash(evidence);
+    evidence.test_results = { tampered: true };
+    expect(verifyHashChain(evidence)).toBe(false);
+  });
+
+});
+
+describe('writeEvidence hash chain', () => {
+  it('chains prev_hash to existing evidence self_hash on replacement', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ev-chain-'));
+    try {
+      const path = join(dir, 'evidence.json');
+      const failEvidence = validEvidence();
+      failEvidence.verifier_result = 'fail';
+      failEvidence.self_hash = 'abc123';
+      writeFileSync(path, JSON.stringify(failEvidence));
+
+      const passEvidence = validEvidence();
+      passEvidence.verifier_result = 'pass';
+      writeEvidence(passEvidence, path);
+
+      const written = JSON.parse(readFileSync(path, 'utf8')) as EvidencePackage;
+      expect(written.prev_hash).toBe('abc123');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

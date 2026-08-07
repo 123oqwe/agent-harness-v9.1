@@ -283,3 +283,10 @@ FAIL (8 modules):
 - verification: 84.2% (needs 85%) — 106 survived / 822 total
 
 Priority: Fix near-miss modules first (strategies, verification), then infrastructure failures (gateway, runtime), then larger gaps (toolsLeaf, session, toolsRegistry, vfs).
+
+### Mutation Fix Progress (2026-08-07)
+- Exported computeSelfHash from evidence.ts (was private)
+- Added 8 verifyHashChain tests + 1 writeEvidence chain test
+- verification module: 84.2% → expected 85%+ with new tests
+- Full Phase 1 mutation rerun started via screen on HEAD 19efd4e
+- Pushed to both remotes (origin + product)
