@@ -42,4 +42,71 @@ describe('AH-RAG-GRAPH-001: Build optional graph index for relationships', () =>
     index.removeChunk('src-1');
     expect(index.getNodeCount()).toBe(1);
   });
+
+  it('does not link first chunk to previous (no sequential edge)', () => {
+    const index = new GraphIndex();
+    const c0 = makeChunk('src-0', 'src', 0);
+    index.addChunk(c0, [c0]);
+    expect(index.getEdgeCount()).toBe(0);
+  });
+
+  it('removes edges when chunk is removed', () => {
+    const index = new GraphIndex();
+    const c0 = makeChunk('src-0', 'src', 0);
+    const c1 = makeChunk('src-1', 'src', 1);
+    index.addChunk(c0, [c0]);
+    index.addChunk(c1, [c0, c1]);
+    expect(index.getEdgeCount()).toBeGreaterThan(0);
+    index.removeChunk('src-1');
+    expect(index.getEdgeCount()).toBe(0);
+  });
+
+  it('returns empty neighbors for isolated node', () => {
+    const index = new GraphIndex();
+    const c0 = makeChunk('iso-0', 'iso', 0);
+    index.addChunk(c0, [c0]);
+    const neighbors = index.getNeighbors('iso-0');
+    expect(neighbors.size).toBe(0);
+  });
+
+  it('returns empty neighbors for non-existent node', () => {
+    const index = new GraphIndex();
+    const neighbors = index.getNeighbors('nonexistent');
+    expect(neighbors.size).toBe(0);
+  });
+
+  it('supports multi-depth traversal', () => {
+    const index = new GraphIndex();
+    const c0 = makeChunk('src-0', 'src', 0);
+    const c1 = makeChunk('src-1', 'src', 1);
+    const c2 = makeChunk('src-2', 'src', 2);
+    index.addChunk(c0, [c0]);
+    index.addChunk(c1, [c0, c1]);
+    index.addChunk(c2, [c0, c1, c2]);
+    const depth1 = index.getNeighbors('src-0', 1);
+    const depth2 = index.getNeighbors('src-0', 2);
+    expect(depth2.size).toBeGreaterThan(depth1.size);
+  });
+
+  it('tracks edge and node counts correctly', () => {
+    const index = new GraphIndex();
+    const c0 = makeChunk('s-0', 's', 0);
+    const c1 = makeChunk('s-1', 's', 1);
+    index.addChunk(c0, [c0]);
+    expect(index.getNodeCount()).toBe(1);
+    expect(index.getEdgeCount()).toBe(0);
+    index.addChunk(c1, [c0, c1]);
+    expect(index.getNodeCount()).toBe(2);
+    expect(index.getEdgeCount()).toBe(1);
+  });
+
+  it('does not create same_page edges for chunks without page', () => {
+    const index = new GraphIndex();
+    const c1 = makeChunk('a-0', 'a', 0);
+    const c2 = makeChunk('b-0', 'b', 0);
+    index.addChunk(c1, [c1]);
+    index.addChunk(c2, [c1, c2]);
+    const neighbors = index.getNeighbors('a-0');
+    expect(neighbors.has('b-0')).toBe(false);
+  });
 });
