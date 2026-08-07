@@ -260,3 +260,26 @@ Replaced all fake/filler tests with real behavioral assertions:
 - search-files: 2 weak toBeDefined → real path content + rg match shape assertions
 
 Test count: 766 → 758 (removed 8 filler, rest unchanged). All 758 pass.
+
+### Phase 1 Mutation Results (HEAD 52cb26d, completed 2026-08-07 09:14)
+
+PASS (7 modules):
+- router: 90.19% (needs 90%)
+- skills: 91.44% (needs 85%)
+- actionControl: 91.47% (needs 90%)
+- identitySecrets: 90.78% (needs 90%)
+- sandbox: 91.0% (needs 90%)
+- verticals: 88.48% (needs 85%)
+- uiAdapters: 95.77% (needs 85%)
+
+FAIL (8 modules):
+- gateway: 0% (1 chunk crashed: server-ts-1-150) — old committed score 84.7%
+- runtime: 0% (1 chunk timed out: hook-port-ts-151-300)
+- toolsRegistry: 79.9% (needs 90%) — 208 survived / 1156 total
+- toolsLeaf: 60.9% (needs 85%) — 114 survived, 47 no coverage / 412 total
+- strategies: 83.8% (needs 85%) — 175 survived / 1268 total
+- vfs: 88.2% (needs 90%) — 52 survived, 62 no coverage / 966 total
+- session: 81.3% (needs 90%) — 132 survived / 914 total
+- verification: 84.2% (needs 85%) — 106 survived / 822 total
+
+Priority: Fix near-miss modules first (strategies, verification), then infrastructure failures (gateway, runtime), then larger gaps (toolsLeaf, session, toolsRegistry, vfs).
