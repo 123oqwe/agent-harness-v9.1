@@ -351,3 +351,56 @@ Priority: Fix near-miss modules first (strategies, verification), then infrastru
 - 6 chunks completed successfully (async-task-adapter, cache-manager, capability-registry, circuit-breaker)
 - Key verification: server.ts chunk (previously crashed) now runs successfully via standalone Stryker
 - Full Phase 1 mutation run (B1) will be the authoritative verification
+
+### Phase 1 Full Mutation Run Progress (2026-08-07 14:12)
+- Gateway module completed: 44.9% (killed=2172, survived=1054, noCov=1557, total=4834)
+  - CRITICAL: No crash! server.ts chunks produced reports successfully
+  - Previous: 0% (crash) → Now: 44.9% (real score)
+  - Below 85% threshold — many noCov from tests not directly importing source files
+  - The 1557 noCov suggest test-to-source import relationships need strengthening
+- Mutation runner moved to router module (1/5 chunks)
+- Full Phase 1 mutation run continues...
+
+## Session 5: Gateway + Runtime Test Files (2026-08-07 15:19)
+
+### Gateway 10 Test Files (COMMIT 55853d3)
+Created 10 test files for gateway modules with no direct test coverage:
+- circuit-breaker.test.ts (11 tests): state machine, threshold, half-open probe
+- rate-limiter.test.ts (9 tests): RPM/TPM/concurrent, per-user, release
+- economic-kernel.test.ts (14 tests): budget, spend, refund, settle, wallet
+- cache-manager.test.ts (13 tests): key hash, hit/miss, invalidation layers
+- tool-mask.test.ts (17 tests): state-dependent masking, classify, hint, history
+- key-vault.test.ts (19 tests): env loading, encrypt/decrypt, dotenv, health
+- capability-registry.test.ts (18 tests): model binding, tier/capability/price
+- dag-executor.test.ts (7 tests): topology, parallel, cycle, failure propagation
+- glm-gateway-bridge.test.ts (6 tests): gateway creation, usage meter, registry
+- provider-adapters.test.ts (35 tests): request/response, error classification
+Total: ~149 new gateway tests
+
+### Runtime Test Files (COMMITS a931716, c01f2a9)
+- retry.test.ts (30 tests): classifyError, CircuitBreaker, retry with idempotency
+- notifications.test.ts (11 tests): create, list, markRead, dismiss, purgeExpired
+- react-strategy.test.ts (14 tests): explicitOutputLimitInstruction parsing
+Total: 55 new runtime tests
+
+### Overall Test Count
+- A1-A8: 213 tests (8 files)
+- Gateway P1: ~149 tests (10 files)  
+- Runtime P2: 55 tests (3 files)
+- Grand total new: ~417 tests across 21 files, all passing, typecheck clean
+
+### CI Workflow Verified (items #33-34)
+- ci.yml: 8 steps (build:workspaces, typecheck, check:cycles, build, lint, test, test:coverage, audit, pack)
+- ci.yml does NOT run: mutation, GLM, verify, active-stubs
+- phase2-mutation.yml: separate workflow_dispatch, 360min timeout, attestations:write
+- G5 (CI green) only confirms compile+test, not mutation
+- G6 (mutation PASS) must trigger phase2-mutation.yml separately
+
+### Phase 1 Mutation Run Progress
+- Running on HEAD 9827b61 (doesn't include gateway 10 test files)
+- Completed modules: gateway (44.9%), router, toolsRegistry, toolsLeaf, skills, strategies
+- In progress: actionControl (5/19 chunks)
+- Remaining: identitySecrets, vfs, sandbox, session, runtime, verification, verticals, uiAdapters
+- Process alive (4 stryker processes)
+- Key: runtime module (with hook-port.ts) hasn't started yet - hook-port.test.ts should prevent timeout
+- After this run completes: read results, commit new tests, rebind waivers, rerun
