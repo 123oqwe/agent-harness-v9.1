@@ -79,3 +79,29 @@
 | What's the goal? | 完成 Phase 1 地基 → 补厚薄测试 → evidence → gate 闭环 → push agentharness91 |
 | What have I learned? | See findings.md — 所有源文件模式已理解, mutation 状态已掌握 |
 | What have I done? | P0-P11 已提交, P6(47)+P9(51)+P8(23)=121 新测试完成 (未提交), P12/P13 已验证 |
+
+### Waiver 重绑修复
+- **Status:** complete
+- **Started:** 2026-08-08 00:50
+- 发现 mutation runner 报 "waiver 0 is not bound to the current commit"
+- 原因: commit 6979cf9d 改变了 HEAD, 但 waiver commitSha 还是 c0fd48f1
+- 修复: 重绑 20 个 waiver 到 HEAD b3977e6c, 保持 uncommitted (runner 允许)
+- **关键发现 (#31)**: repositoryContext (line 793-795) 过滤 equivalent-mutants.json, 允许 uncommitted
+- configurationHash 不变: 2e02aab1... (因为 normalizedAuthorityContent 过滤 commitSha)
+
+### MUTATION_REVIEW_PROMPT.md 整合
+- **Status:** complete
+- 读取 MUTATION_REVIEW_PROMPT.md (734 行, 38 条审查注意事项)
+- 将所有 38 条整合到 task_plan.md 的审查注意事项索引表
+- 将执行顺序 (10 步) 整合到 task_plan.md
+- 将关键机制发现整合到 findings.md
+- 之前的计划遗漏了: #1-6 (补测试文件清单), #7 (server.test.ts 质量), #11-16 (mutation 运行细节), #20-25 (Phase 1 额外 criteria), #29 (evidence SHA 过期), #33-38 (CI/gate/evidence 机制)
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | P0-P13 完成, waiver 重绑完成, 准备跑 Phase 1 mutation + 补 gateway 无测试文件 |
+| Where am I going? | mutation → 补测试 → verify:phase1:local → evidence → gate → push |
+| What's the goal? | 完成 Phase 1 地基 → 补厚薄测试 → evidence → gate 闭环 → push agentharness91 |
+| What have I learned? | See findings.md — 38 条审查注意事项, waiver 机制, gate 机制, CI 机制 |
+| What have I done? | P0-P11 已提交, P6/P8/P9 已提交 (6979cf9d), waiver 重绑 (uncommitted), 计划文件完整 |

@@ -136,3 +136,36 @@
 - Remote: product = https://github.com/123oqwe/agentharness91.git
 - Worktree: /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated
 - Branch: codex/phase2-integrated, HEAD: 5d1ec4b8
+
+## MUTATION_REVIEW_PROMPT.md 整合 (38 条审查注意事项)
+
+### 关键机制发现
+1. **waiver commitSha 鸡蛋问题 (#31)**: 每次 commit 改变 HEAD, waiver 的 commitSha 失效。runner 允许 equivalent-mutants.json uncommitted (repositoryContext line 793-795 过滤该文件)。正确流程: commit 代码 → 重绑 waiver 到新 HEAD → 保持 uncommitted → 跑 mutation
+2. **configurationHash 不受 commitSha 影响 (#18)**: normalizedAuthorityContent() 过滤 commitSha + configurationHash 字段后再 hash。改 commitSha 不影响 configHash。但改 modules.mjs 会影响 (因为在 mutationAuthorityFiles 列表里)
+3. **releaseReady 硬编码 false (#36)**: verify-phase2-local.mjs line 882 `const releaseReady = false`。formalAuthority.status 永远 "external_attestation_required"。本地目标是 candidateReady=true, 不是 releaseReady
+4. **Evidence RELEASE_AUTHORITY (#38)**: CLI 运行传递 Symbol, 6 前置条件全满足才发布。candidateReady 要求 candidateEvidenceCount === 64
+5. **verify:phase2:local 22 命令 (#37)**: 不是简单确认, 是 3-4 小时完整 gate。可能卡住: phase1-regression(15min), mutation(60min), source-checkout-reproduction(60min)
+6. **CI 不跑 mutation (#33,34)**: reports/ 在 .gitignore, ci.yml 只跑 typecheck/build/lint/test/coverage/audit/pack。mutation 需单独触发 phase2-mutation.yml
+7. **product 仓库可能无 runner (#35)**: agentharness91 可能 private, GitHub Actions 免费额度耗尽。origin (public) 有 runner
+8. **chunk 超时 15 分钟 (#11,19)**: defaultChunkTimeoutMs = 15 * 60 * 1000, 不是 30 分钟
+9. **Stryker exit code 非 0 拒绝报告 (#12)**: 即使 mutation.json 已生成, exit 非 0 整个模块 FAIL
+10. **stryker patch 改变 mutant 激活 (#14)**: patches/@stryker-mutator+core+9.6.1.patch, 本地和 CI 都必须应用
+
+### 补测试文件清单 (来自 #1-6)
+- gateway: 10 个无测试文件 (circuit-breaker, rate-limiter, key-vault, capability-registry, economic-kernel, cache-manager, tool-mask, dag-executor, glm-gateway-bridge; provider-adapters 已有)
+- runtime: 7 个无测试 (retry, steering-port, errors, notifications, pause-resume-port, session-tree-port; event-bus 和 loop.ts 已覆盖)
+- session: 2 个无测试 (durable-session, progress-store 部分覆盖)
+- strategies: react.ts 缺测试 (direct.ts 和 plan-execute.ts 已有)
+- vfs/toolsRegistry/verification: 需加厚到 90%+
+- toolsLeaf: 13 个文件 60.9%, 需读 mutation.json 找 survived 集中文件
+
+### Phase 1 额外 exit criteria (#22-25)
+- GLM live acceptance: npm run test:glm:live (需 GLM_API_KEY)
+- domain evals: evals/{domain}/phase-1.yaml 可能不存在
+- active_stub_count: node scripts/gates/check-active-stubs.mjs
+- crash_restore_no_duplicate: tests/session/crash-restore.test.ts 3 个测试
+
+### 环境差异 (#26-28)
+- 本地 node v24, CI node v20 (native 模块差异)
+- CI 用 --maxWorkers=1, 本地也加
+- coverage threshold: lines 80%, branches 75%, functions 80%
