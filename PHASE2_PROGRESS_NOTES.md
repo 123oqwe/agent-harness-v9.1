@@ -290,3 +290,64 @@ Priority: Fix near-miss modules first (strategies, verification), then infrastru
 - verification module: 84.2% → expected 85%+ with new tests
 - Full Phase 1 mutation rerun started via screen on HEAD 19efd4e
 - Pushed to both remotes (origin + product)
+
+## Session 4: Phase 1 Mutation Test Fix (2026-08-07)
+
+### A1: Gateway crash fix (COMMIT a7265b3)
+- Root cause: `gateway/server.ts` had no Phase 1 test file directly importing it
+- Stryker's vitest runner couldn't find related tests → exit 1 → entire gateway module scored 0%
+- Fix: Created `tests/gateway/server.test.ts` (13 tests) importing server.ts factory functions directly
+- Verified: Standalone Stryker run on server.ts:1-150 produced report (31 killed, 13 survived, 29 noCov, score 42.47%)
+- No more crash — gateway module will produce a real score instead of 0%
+
+### A2: Runtime timeout fix (COMMIT a7265b3)
+- Root cause: `runtime/hook-port.ts` only imported by Phase 2 tests (excluded from mutation config)
+- Stryker timed out after 900s running all Phase 1 tests with no coverage of hook-port.ts
+- Fix: Created `tests/runtime/hook-port.test.ts` (39 tests) importing hook-port.ts directly
+- Tests cover: createHarnessHookAttenuationPolicy (all event types), dispatchHookBoundary (timeout, cancel, error, invalid results, observational vs decision mode)
+
+### A3: Verification module (COMMIT a7265b3)
+- Created `tests/verification/evidence-mutation.test.ts` (41 tests)
+- Covers: computeSelfHash, verifyHashChain (legacy + tampered), writeEvidence hash chain, validateEvidence, runCommand, generateEvidence
+- Targeted 24 noCov + 106 survived mutants in evidence.ts and eval-runner.ts
+
+### A4: Strategies module (COMMIT a7265b3)
+- Created `tests/runtime/plan-execute-mutation.test.ts` (22 tests)
+- Covers: planActionInstruction path extraction (read/write/edit/execute), workspace path normalization, depends_on JSON instruction
+
+### A5: VFS module (COMMIT e07bbbf)
+- Created `tests/vfs/workspace-transaction-checkpoint.test.ts` (15 tests)
+- Covers: checkpoint(), restore(), multi-checkpoint, file mode preservation, deleted file capture
+- Targeted 52 noCov mutants in workspace-transaction.ts lines 490-560
+
+### A6: Session module (COMMIT 294ced8)
+- Created `tests/session/sqlite-store-mutation.test.ts` (32 tests)
+- Covers: createScopedRun validation, operation state transitions (all 7 states), receipt conflicts, error message assertions
+- Targeted 93 survived + 39 noCov in sqlite-session-store.ts
+
+### A7: toolsRegistry module (COMMIT c5ee923)
+- Created `tests/tools/tool-definitions-fields.test.ts` (40 tests)
+- Asserts specific effect_model, policies, metadata values for all 14 tool definitions
+- Targeted 135 survived StringLiteral/ObjectLiteral/BooleanLiteral mutants in tool-definitions.ts
+
+### A8: toolsLeaf module (COMMIT c5ee923)
+- Created `tests/tools/search-files-ripgrep.test.ts` (11 tests)
+- Exercises real ripgrep path with content/filename/regex modes, glob filter, max_results, VFS fallback
+- Targeted 60 survived + 11 noCov in search-files.ts
+
+### Test Count Summary
+- A1: 13 tests (gateway/server.test.ts)
+- A2: 39 tests (runtime/hook-port.test.ts)
+- A3: 41 tests (verification/evidence-mutation.test.ts)
+- A4: 22 tests (runtime/plan-execute-mutation.test.ts)
+- A5: 15 tests (vfs/workspace-transaction-checkpoint.test.ts)
+- A6: 32 tests (session/sqlite-store-mutation.test.ts)
+- A7: 40 tests (tools/tool-definitions-fields.test.ts)
+- A8: 11 tests (tools/search-files-ripgrep.test.ts)
+- Total new: 213 tests, all passing, typecheck clean
+
+### Gateway Mutation Progress
+- Full gateway mutation run attempted multiple times, process dies after ~6 chunks (broken pipe / signal handling)
+- 6 chunks completed successfully (async-task-adapter, cache-manager, capability-registry, circuit-breaker)
+- Key verification: server.ts chunk (previously crashed) now runs successfully via standalone Stryker
+- Full Phase 1 mutation run (B1) will be the authoritative verification
