@@ -1013,7 +1013,7 @@ async function runPhase1(context) {
       moduleStartedAt: new Date().toISOString(),
     };
     try {
-      results.push(await runModule(moduleName, moduleContext));
+      results.push(await runOne(moduleName, moduleContext));
     } catch (error) {
       const failed = failedModuleResult(moduleName, moduleContext, error);
       results.push(failed);
