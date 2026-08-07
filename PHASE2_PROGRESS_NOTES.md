@@ -575,3 +575,39 @@ Covers surviving mutants in tool-registry.ts:
 - contentHash determinism + difference
 
 Expected improvement: tool-registry.ts 81.2% → 90%+
+
+## Session 7 Continued: P0-P13 Execution (2026-08-07 23:50)
+
+### Completed
+- P0: Fixed runPhase1() to call runOne() instead of runModule() — result.json now published to module dirs
+- P1: Deleted steering-port.test.ts (142 lines of type-only assertions, 0 mutants)
+- P2: managed-gateway-deep.test.ts (18 tests for complete() with mock fetch)
+- P3: provider-adapters resolve() tests (+8 tests for HTTP paths, auth, signal)
+- P4: async-task-adapter-deep.test.ts (24 tests for Seedance submit/poll/resolve/streamEvents)
+- P7: direct-strategy.test.ts (12 tests for runDirect all branches)
+- P11: tool-registry-mutation.test.ts (47 tests, already done in prior session)
+- P12: Committed equivalent-mutants.json (was always uncommitted)
+- P13: Verified configHash — changed due to P0 fix, rebound all 20 waivers
+
+### Remaining
+- P5: ws-server deep tests (task/task_stream/pause/resume message handling)
+- P6: model-gateway deep tests (resolve provider selection, edge cases)
+- P8: harness.ts deep tests (Harness.run, strategy selection)
+- P9: loop.ts deep tests (config fields, budget, termination)
+- P10: sqlite-session-store deep tests (schema validation, state transitions)
+
+### Test Count Summary (this session)
+- screenshot: 14→23 tests (+9 boundary tests)
+- apply-patch: 14→34 tests (+20 error message/sort/bytes tests)
+- search-files: +20 mock ripgrep tests
+- react-loop: +29 runReact termination tests
+- local-tool-host: +5 dispatch path tests
+- tool-registry-mutation: +47 mutation coverage tests
+- direct-strategy: +12 new tests
+- managed-gateway-deep: +18 complete() tests
+- provider-adapters: +8 resolve() tests
+- async-task-adapter-deep: +24 Seedance tests
+Total new: ~196 tests across 10 files, all passing, typecheck clean
+
+### Pre-existing Failures (not caused by our changes)
+- managed-gateway-stream.test.ts: 2 timeout failures (100-loop rate limit test, 5s timeout)
