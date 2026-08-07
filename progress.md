@@ -105,3 +105,48 @@
 | What's the goal? | 完成 Phase 1 地基 → 补厚薄测试 → evidence → gate 闭环 → push agentharness91 |
 | What have I learned? | See findings.md — 38 条审查注意事项, waiver 机制, gate 机制, CI 机制 |
 | What have I done? | P0-P11 已提交, P6/P8/P9 已提交 (6979cf9d), waiver 重绑 (uncommitted), 计划文件完整 |
+
+### Session: 2026-08-08 continued
+
+#### managed-gateway-stream.test.ts timeout fixed (commit ddd84615)
+- Problem: completeStream test used ollama provider, connection refusal took ~7s, exceeding 5s default timeout
+- Fix: Added OLLAMA_TEST_TIMEOUT=30000 to the specific test
+- Result: 7/7 tests pass (was 6/7 with 1 timeout)
+- Impact: verify:phase1:local will no longer fail on this test
+
+#### Missing Phase 1 evidence created (commit 47960c53)
+- Created AH-GATEWAY-TESTPROVIDER-001 evidence (was the only missing requirement)
+- 71/71 tests pass, commit_sha=current HEAD
+- Now 40/40 Phase 1 requirements have evidence directories
+
+#### Phase 1 domain evals created (commit 47960c53)
+- Created 6 evals/{domain}/phase-1.yaml files + fixtures
+- coding, documents, research, writing, planning, personal-assistant
+- Fixes B5b: domain_evals_all_pass can now be satisfied
+
+#### server.test.ts port fix (commit 75020cfa)
+- Replaced hardcoded ports 18099/18098/18097 with port:0
+- Fixes #7: flaky tests when ports are in use
+
+#### task_plan.md corrected (commit 7f2eafaa)
+- 43 errors fixed per HARNESS_SESSION_DIRECTIVE.md
+- All test file counts verified via rg
+- All commits verified via git log
+
+#### Push status
+- agentharness91 (product): HEAD ddd84615 ✓
+- agent-harness-v9.1 (origin): HEAD ddd84615 ✓ (upstream tracking set)
+
+#### Mutation run status
+- Session 7968, gateway module, chunk 5/43
+- Chunk 4 (capability-registry.ts:1-150) done: score=26.22% (43 killed, 121 survived)
+- model-gateway.ts chunks expected around chunk 10-12
+- Estimated total runtime: 5-8 hours
+
+#### Verified quality metrics
+- typecheck: ✓ PASS
+- lint: ✓ PASS
+- gateway tests: 603/603 ✓ (was 602/603)
+- active_stub_count: 0 ✓
+- Phase 1 evidence: 40/40 ✓
+- Phase 1 domain evals: 6/6 ✓
