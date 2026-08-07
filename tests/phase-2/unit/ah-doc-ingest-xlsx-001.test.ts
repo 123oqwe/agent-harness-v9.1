@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { XlsxParser, DocumentIngestError } from '../../../packages/documents/src/index.js';
-import { createZipWithEntry } from './ah-doc-ingest-docx-001.test';
+
 
 describe('AH-DOC-INGEST-XLSX-001: Ingest spreadsheets extracting table cells', () => {
   const parser = new XlsxParser();
@@ -36,6 +36,69 @@ describe('AH-DOC-INGEST-XLSX-001: Ingest spreadsheets extracting table cells', (
       expect(result.tables[0]!.rows[0]).toEqual(['Name', 'Value']);
       expect(result.tables[0]!.rows[1]).toEqual(['Alice', '42']);
     });
+  });
+
+  it('records provenance for XLSX', async () => {
+    const sharedStrings = '<?xml version="1.0"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>A</t></si></sst>';
+    const sheet = '<?xml version="1.0"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>';
+    const xlsx = createMultiEntryZip([
+      { name: 'xl/sharedStrings.xml', data: sharedStrings },
+      { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ]);
+    const result = await parser.parse(xlsx, 'test.xlsx', {});
+    expect(result.provenance.format).toBe('xlsx');
+    expect(result.provenance.content_hash).toHaveLength(64);
+    expect(result.provenance.byte_size).toBe(xlsx.length);
+  });
+
+  it('records parser version and name', async () => {
+    const sharedStrings = '<?xml version="1.0"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"></sst>';
+    const sheet = '<?xml version="1.0"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></sheetData></worksheet>';
+    const xlsx = createMultiEntryZip([
+      { name: 'xl/sharedStrings.xml', data: sharedStrings },
+      { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ]);
+    const result = await parser.parse(xlsx, 'test.xlsx', {});
+    expect(result.provenance.parser_version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(result.provenance.parser_name).toBeTruthy();
+  });
+
+  it('handles empty sheet data', async () => {
+    const sharedStrings = '<?xml version="1.0"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"></sst>';
+    const sheet = '<?xml version="1.0"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></sheetData></worksheet>';
+    const xlsx = createMultiEntryZip([
+      { name: 'xl/sharedStrings.xml', data: sharedStrings },
+      { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ]);
+    const result = await parser.parse(xlsx, 'empty.xlsx', {});
+    expect(result.provenance.format).toBe('xlsx');
+    expect(result.tables).toHaveLength(0);
+  });
+
+  it('rejects files exceeding max bytes', () => {
+    const buf = Buffer.alloc(200);
+    return expect(parser.parse(buf, 'big.xlsx', { max_bytes: 100 })).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles numeric cell values without shared strings', async () => {
+    const sheet = '<?xml version="1.0"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1"><v>123</v></c><c r="B1"><v>456</v></c></row></sheetData></worksheet>';
+    const xlsx = createMultiEntryZip([
+      { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ]);
+    const result = await parser.parse(xlsx, 'numbers.xlsx', {});
+    expect(result.provenance.format).toBe('xlsx');
+  });
+
+  it('produces deterministic content hash for same input', async () => {
+    const sharedStrings = '<?xml version="1.0"?>\n<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>Test</t></si></sst>';
+    const sheet = '<?xml version="1.0"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>';
+    const xlsx = createMultiEntryZip([
+      { name: 'xl/sharedStrings.xml', data: sharedStrings },
+      { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ]);
+    const r1 = await parser.parse(xlsx, 'a.xlsx', {});
+    const r2 = await parser.parse(xlsx, 'b.xlsx', {});
+    expect(r1.provenance.content_hash).toBe(r2.provenance.content_hash);
   });
 });
 

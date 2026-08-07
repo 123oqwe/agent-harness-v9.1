@@ -24,6 +24,51 @@ describe('AH-DOC-INGEST-DOCX-001: Ingest DOCX documents preserving structure', (
       expect(result.text).toContain('Hello');
     });
   });
+
+  it('extracts headings from DOCX', async () => {
+    const docx = createMinimalDocx();
+    const result = await parser.parse(docx, 'test.docx', {});
+    expect(result.headings.length).toBeGreaterThan(0);
+    expect(result.headings[0]!.text).toContain('Heading');
+  });
+
+  it('records byte_size in provenance', async () => {
+    const docx = createMinimalDocx();
+    const result = await parser.parse(docx, 'test.docx', {});
+    expect(result.provenance.byte_size).toBe(docx.length);
+  });
+
+  it('records source_path in provenance', async () => {
+    const docx = createMinimalDocx();
+    const result = await parser.parse(docx, 'path/to/doc.docx', {});
+    expect(result.provenance.source_path).toBe('path/to/doc.docx');
+  });
+
+  it('rejects files exceeding max bytes', () => {
+    const buf = Buffer.alloc(200);
+    return expect(parser.parse(buf, 'big.docx', { max_bytes: 100 })).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('records parser version', async () => {
+    const docx = createMinimalDocx();
+    const result = await parser.parse(docx, 'test.docx', {});
+    expect(result.provenance.parser_version).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('produces deterministic content hash for same input', async () => {
+    const docx = createMinimalDocx();
+    const r1 = await parser.parse(docx, 'a.docx', {});
+    const r2 = await parser.parse(docx, 'b.docx', {});
+    expect(r1.provenance.content_hash).toBe(r2.provenance.content_hash);
+  });
+
+  it('handles multiple paragraphs', async () => {
+    const xmlContent = '<?xml version="1.0"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>First paragraph</w:t></w:r></w:p><w:p><w:r><w:t>Second paragraph</w:t></w:r></w:p></w:body></w:document>';
+    const docx = createZipWithEntry('word/document.xml', xmlContent);
+    const result = await parser.parse(docx, 'multi.docx', {});
+    expect(result.text).toContain('First paragraph');
+    expect(result.text).toContain('Second paragraph');
+  });
 });
 
 function createMinimalDocx(): Buffer {
