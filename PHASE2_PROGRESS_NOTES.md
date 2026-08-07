@@ -442,3 +442,42 @@ Running on HEAD 9827b61 (NOT current HEAD be78628):
 
 Note: This run does NOT include the 23 new test files (they're on HEAD be78628).
 After this run completes, must commit + rebind waivers + rerun mutation.
+
+## Session 7: Mutation Test Deep Coverage (2026-08-07 16:50)
+
+### B0 Run Status (commit 9827b61, NO waivers applied)
+- actionControl: 91.54% PASS
+- gateway: 45.99% FAIL (managed-gateway.ts 363 noCov — needs deep provider chain mocking)
+- identitySecrets: 90.78% PASS
+- router: 90.56% PASS
+- sandbox: 91.0% PASS
+- skills: 91.44% PASS
+- strategies: 84.22% FAIL (7 mutants short of 85% — waivers not applied because bound to be78628 not 9827b61)
+- toolsLeaf: 69.17% FAIL (screenshot.ts 25% — Linux branch untested)
+- toolsRegistry: 0% FAIL (tool-definitions.ts-151-228 chunk timed out at 900s — 109 mutants × 70s test suite)
+- vfs: 92.13% PASS
+- session: running...
+- runtime: not started
+- verification: not started
+- verticals: not started
+- uiAdapters: not started
+
+### Test Improvements (commit 5a08c1fd)
+1. **screenshot.ts** (4→14 tests): Mock spawnSync + process.platform to test darwin/linux/win32 branches, PNG dimension extraction, temp cleanup, error paths
+2. **apply-patch.ts** (14→34 tests): Assert exact error messages, sort order verification, bytes_changed accumulation, multi-file/multi-hunk edge cases
+3. **search-files.ts** (+20 tests): Mock ripgrep spawnSync to test error paths (status 127/1/2/null), JSON parsing, Buffer stdout, truncation, existsSync failures
+4. **react-loop** (+29 tests): Cover runReact termination paths (budget_exhausted, malformed_response, model_refusal, tool_oscillation, iteration_limit), HookRestrictionError (deny/force_prompt/skip), tool rejection, duplicate IDs, reasoning_content passthrough
+5. **equivalent-mutants.json**: Rebound to HEAD 5a08c1fd (uncommitted, allowed by gate design)
+
+### Key Findings
+- B0 ran on commit 9827b61 with NO waivers applied (waivers bound to be78628, B0 on 9827b61)
+- strategies 84.22% would be 85%+ with waivers applied (7 waiver mutants counted as survived)
+- toolsRegistry 0% is timeout, not real failure — published report shows 100% for tool-definitions.ts
+- toolsLeaf 69.17% with new tests should improve to 85%+ (screenshot 25%→90%+, search-files 67%→90%+)
+- gateway 45.99% needs deep work: managed-gateway.ts has 363 noCov from untested dispatch chain
+
+### Next Steps
+1. Wait for B0 to complete (session, runtime, verification, verticals, uiAdapters)
+2. Run B1 on HEAD 5a08c1fd with uncommitted waivers (applied this time)
+3. If strategies passes with waivers → focus on gateway and toolsLeaf
+4. toolsRegistry timeout: may need chunkTimeoutMs increase (changes config hash, requires waiver rebinding)
