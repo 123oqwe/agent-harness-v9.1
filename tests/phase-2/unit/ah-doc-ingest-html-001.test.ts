@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HtmlParser, DocumentIngestError } from '../../../packages/documents/src/index.js';
+import { HtmlParser } from '../../../packages/documents/src/index.js';
 
 const html = `<!DOCTYPE html>
 <html><head><title>Test</title></head><body>
@@ -69,5 +69,22 @@ describe('AH-DOC-INGEST-WEB-001: Ingest webpages with content extraction', () =>
       expect(result.provenance.format).toBe('html');
       expect(result.provenance.parser_name).toBe('html-native');
     });
+  });
+  it('handles empty HTML', async () => {
+    const result = await parser.parse(Buffer.from('', 'utf8'), 'empty.html', {});
+    expect(result).toBeDefined();
+  });
+
+  it('handles HTML with links', async () => {
+    const html = '<html><body><a href="https://example.com">Link</a></body></html>';
+    const result = await parser.parse(Buffer.from(html, 'utf8'), 'links.html', {});
+    expect(result).toBeDefined();
+  });
+
+  it('records provenance for HTML', async () => {
+    const html = '<html><body><h1>Title</h1></body></html>';
+    const result = await parser.parse(Buffer.from(html, 'utf8'), 'test.html', {});
+    expect(result.provenance.format).toBe('html');
+    expect(result.provenance.content_hash).toHaveLength(64);
   });
 });

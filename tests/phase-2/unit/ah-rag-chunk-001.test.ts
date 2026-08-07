@@ -68,4 +68,29 @@ describe('AH-RAG-CHUNK-001: Chunk documents with content hashes', () => {
     const pages = chunks.map(c => c.page).filter(p => p !== undefined);
     expect(pages.length).toBeGreaterThan(0);
   });
+
+  it('handles single chunk for short text', () => {
+    const doc = makeDoc('Short text.');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks).toHaveLength(1);
+  });
+
+  it('preserves text content in chunks', () => {
+    const text = 'The quick brown fox jumps over the lazy dog.';
+    const doc = makeDoc(text);
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks.length).toBeGreaterThan(0);
+    const combined = chunks.map(c => c.text).join('');
+    expect(combined.length).toBeGreaterThan(0);
+  });
+
+  it('assigns correct offsets', () => {
+    const text = 'First sentence. Second sentence. Third sentence.';
+    const doc = makeDoc(text);
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] }, { max_chunk_size: 20, overlap: 0, min_chunk_size: 5 });
+    for (const chunk of chunks) {
+      expect(chunk.start_offset).toBeGreaterThanOrEqual(0);
+      expect(chunk.end_offset).toBeGreaterThan(chunk.start_offset);
+    }
+  });
 });

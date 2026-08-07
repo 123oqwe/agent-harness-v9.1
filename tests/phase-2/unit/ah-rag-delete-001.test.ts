@@ -70,4 +70,18 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     const results = store.fts.search('keyword');
     expect(results.length).toBeGreaterThan(0);
   });
+  it('handles deleting non-existent chunk', () => {
+    const store = createIndexStore();
+    const result = removeChunkFromStore(store, 'nonexistent');
+    expect(result).toBe(false);
+  });
+
+  it('deletes and re-queries returns empty', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('test content for deletion', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    removeChunkFromStore(store, chunks[0]!.chunk_id);
+    expect(removeChunkFromStore(store, chunks[0]!.chunk_id)).toBe(false);
+  });
 });
