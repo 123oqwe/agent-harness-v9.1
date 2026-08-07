@@ -83,4 +83,40 @@ describe('AH-TOOL-SPREADSHEET-001: manipulate_spreadsheet tool (cli_wrapper, ope
     });
     expect(result.success).toBe(false);
   });
+
+  it('updates a spreadsheet', async () => {
+    mockSpawnSuccess(JSON.stringify({ updated: true, path: 'workspace/data.xlsx' }));
+    const result = await manipulateSpreadsheet({
+      action: 'modify',
+      file_path: 'workspace/data.xlsx',
+      data: { Sheet1: [['new', 'data']] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('returns error for non-zero exit code with stderr', async () => {
+    mockSpawnFailure('PermissionError: cannot write', 2);
+    const result = await manipulateSpreadsheet({
+      action: 'create',
+      file_path: 'output/data.xlsx',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('handles read action with multiple sheets', async () => {
+    const mockOutput = {
+      sheets: {
+        Sheet1: [['A', 'B'], ['1', '2']],
+        Sheet2: [['C', 'D'], ['3', '4']],
+      },
+    };
+    mockSpawnSuccess(JSON.stringify(mockOutput));
+    const result = await manipulateSpreadsheet({
+      action: 'read',
+      file_path: 'workspace/multi.xlsx',
+    });
+    expect(result.success).toBe(true);
+    const output = result.output as Record<string, unknown>;
+    expect(output.sheets).toBeDefined();
+  });
 });

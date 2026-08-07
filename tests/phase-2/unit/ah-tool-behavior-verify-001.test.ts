@@ -82,4 +82,54 @@ describe('AH-TOOL-BEHAVIOR-VERIFY-001: Playwright-based UI behavior verification
     expect(capturedSteps).toHaveLength(1);
     expect(capturedAssertions).toHaveLength(1);
   });
+
+  it('propagates provider errors without swallowing', async () => {
+    setBehaviorVerifyProvider({
+      async verify() { throw new Error('browser launch failed'); },
+    });
+    await expect(behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    })).rejects.toThrow('browser launch failed');
+  });
+
+  it('returns screenshot data when verification passes', async () => {
+    setBehaviorVerifyProvider(mockProvider);
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'navigate' }],
+      assertions: [{ type: 'title', expected: 'Test' }],
+    });
+    const output = result.output as Record<string, unknown>;
+    expect(output.has_screenshot).toBe(true);
+  });
+
+  it('handles multiple steps and assertions', async () => {
+    setBehaviorVerifyProvider(mockProvider);
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [
+        { action: 'navigate' },
+        { action: 'click', selector: '#btn1' },
+        { action: 'click', selector: '#btn2' },
+      ],
+      assertions: [
+        { type: 'visible', selector: '#result1' },
+        { type: 'visible', selector: '#result2' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('records duration_ms from provider', async () => {
+    setBehaviorVerifyProvider(mockProvider);
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    });
+    const output = result.output as Record<string, unknown>;
+    expect(output.duration_ms).toBe(150);
+  });
 });
