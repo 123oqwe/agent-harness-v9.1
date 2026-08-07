@@ -530,3 +530,29 @@ After this run completes, must commit + rebind waivers + rerun mutation.
 - Step 1 (Phase 1 foundation) cannot complete until B1 finishes
 - Steps 2-6 depend on Step 1 being green
 - The mutation run is the critical path bottleneck
+
+## B1 Results + toolsLeaf Fix (2026-08-07 23:16)
+
+### B1 Complete Results (commit 1d48fb6d, waivers applied)
+PASS (10/15):
+- actionControl: 91.50%, identitySecrets: 90.78%, router: 90.19%
+- sandbox: 91.00%, skills: 91.44%, strategies: 85.80% (waivers applied!)
+- vfs: 92.13%, verification: 86.62%, verticals: 88.48%, uiAdapters: 95.77%
+
+FAIL (5/15):
+- gateway: 55.23% (1438 kills needed — 1204 noCov in managed-gateway/provider-adapters/async-task-adapter/ws-server)
+- runtime: 65.57% (678 kills needed — 439 noCov in harness.ts/loop.ts)
+- session: 84.14% (53 kills needed — 121 survived in sqlite-session-store.ts)
+- toolsRegistry: 86.16% (44 kills needed — 136 survived in tool-registry.ts/tool-executor.ts)
+- toolsLeaf: 85.44% (per-file FAIL: screenshot 71%, local-tool-host 78%)
+
+### toolsLeaf Fixed (commit b7f72dbb, verified 23:16)
+- screenshot: 71%→89.29% (+9 boundary tests for PNG dims, temp path, args verification)
+- local-tool-host: 78%→96.36% (+5 dispatch tests for apply_patch/undo/screenshot/parse_document)
+- toolsLeaf overall: 85.44%→90.29% PASS ✓
+
+### Remaining Work for Step 1
+4 modules still FAIL: gateway (55%), runtime (66%), session (84%), toolsRegistry (86%)
+- gateway and runtime need deep test coverage (1000+ mutants each)
+- session and toolsRegistry are closer (53 and 44 kills needed)
+- Priority: fix session and toolsRegistry first (smallest gaps)
