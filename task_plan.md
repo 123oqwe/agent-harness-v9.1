@@ -4,10 +4,10 @@
 Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, evidence refreshed, thin tests thickened, gate closure, GLM acceptance, then commit and push source code to GitHub.
 
 ## Next Step
-Fix GLM_API_KEY env leak in key-vault.test.ts and managed-gateway-stream.test.ts, then rerun Phase 1 mutation (gateway chunk 1/43 failed due to env leak).
+Rerun Phase 1 mutation (node scripts/run-mutation.mjs phase1). GLM_API_KEY env leak in 3 test files has been fixed and committed (1f9c3232). All 603 gateway tests pass with GLM_API_KEY set.
 
 ## Current Phase
-Phase B: Phase 1 Mutation Rerun (blocked by test env leak fix)
+Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
 
 ## Phases
 
@@ -15,11 +15,12 @@ Phase B: Phase 1 Mutation Rerun (blocked by test env leak fix)
 - [x] A1: Commit uncommitted files (HARNESS_SESSION_DIRECTIVE.md), keep equivalent-mutants.json uncommitted
 - [x] A2: Verify dev gate passes (verify:phase2:dev -> success=true)
 - [x] A3: Push HEAD to origin (721450a8 pushed)
+- [ ] A3b: Push env leak fix to origin (1f9c3232 NOT yet pushed, origin still at 721450a8)
 - **Status:** complete
 
 ### Phase B: Phase 1 Mutation Rerun (LOCAL, 5-8h)
 - [x] B0: Clean .stryker-tmp, npm run prepare (patches applied), set GLM_API_KEY
-- [ ] B1: Run Phase 1 mutation (gateway chunk 1/43 FAILED: GLM_API_KEY env leak, fixing tests first)
+- [ ] B1: Run Phase 1 mutation (env leak fixed in 3 files, 603/603 gateway tests pass with GLM_API_KEY, ready to rerun)
 - [ ] B2: Check mutation results, fix failing modules (add tests or register waivers)
 - [ ] B3: Independent mutation verification (npm run test:mutation:check)
 - [ ] B4: verify:phase1:local (typecheck + cycles + build + lint + test + coverage + mutation)
@@ -74,13 +75,18 @@ Phase B: Phase 1 Mutation Rerun (blocked by test env leak fix)
 | Stale mutation lock (PID 77574 dead) | 1 | Cleaned reports/mutation/.phase1.lock via python3 shutil.rmtree |
 | nohup process exited silently | 1 | Run directly in foreground to see output, use exec_command with session |
 | Mutation gateway chunk 1/43 dry run failed: expected 'Bearer e93c1f...' to be 'Bearer test-key' | 1 | Fixed provider-adapters.test.ts: added beforeEach delete GLM_API_KEY/ZHIPU_API_KEY in resolve() describe block |
-| key-vault.test.ts: "supports ZHIPU_API_KEY for zhipu provider" fails with GLM_API_KEY set | 1 | Pending fix: need to isolate env in this test too |
-| managed-gateway-stream.test.ts: "completeStream respects rate limits" fails with GLM_API_KEY set | 1 | Pending fix: need to investigate rate limit test failure |
+| key-vault.test.ts: "supports ZHIPU_API_KEY for zhipu provider" fails with GLM_API_KEY set | 1 | Fixed: added delete process.env.GLM_API_KEY before ZHIPU_API_KEY test (commit 1f9c3232) |
+| managed-gateway-stream.test.ts: "completeStream respects rate limits" fails with GLM_API_KEY set | 1 | Fixed: added delete GLM_API_KEY/ZHIPU_API_KEY in beforeEach (commit 1f9c3232) |
 
 ## Notes
-- HEAD: 721450a8 (git rev-parse HEAD, never hardcode)
-- Uncommitted: tests/gateway/provider-adapters.test.ts (beforeEach delete GLM_API_KEY fix)
-- Mutation session 78665: gateway chunk 1/43 FAILED, router module running next
+- HEAD: 1f9c3232 (git rev-parse HEAD, never hardcode)
+- Uncommitted: only mutation/equivalent-mutants.json (waiver rebind to 1f9c3232, runner allows)
+- Uncommitted (temporary): task_plan.md, findings.md, progress.md (being reviewed, will commit after quality check)
+- origin behind by 1 commit (1f9c3232 not pushed yet)
+- Env leak fix committed: 1f9c3232 (3 test files: provider-adapters, key-vault, managed-gateway-stream)
+- 603/603 gateway tests pass with GLM_API_KEY set in env (verified 03:12)
+- Previous mutation session 78665 ended (no new results generated, all old results still stale)
+- Need full test suite re-verification with GLM_API_KEY set before rerunning mutation
 - KeyVault.loadFromEnv() reads GLM_API_KEY/ZHIPU_API_KEY on construction; tests that create KeyVault must delete these env vars first
 - Tests that pass without GLM_API_KEY can FAIL with it set (mutation runner exports it)
 - configurationHash: 2e02aab1022cac3c64b20c94300813b6dbd1d572b8bd8c9dae4f6d0749b52bd2 (verified)
@@ -92,3 +98,4 @@ Phase B: Phase 1 Mutation Rerun (blocked by test env leak fix)
 - 4 missing modules: actionControl, runtime, session, identitySecrets (no result.json)
 - Old gateway score: 84.68 (FAIL, threshold 85, gap 0.32%)
 - Phase 1 tests: 2859/2859 PASS, Phase 2 unit: 758/758 PASS
+- Phase 1 tests with GLM_API_KEY set: 603/603 gateway tests pass (other modules not yet re-verified with GLM_API_KEY)
