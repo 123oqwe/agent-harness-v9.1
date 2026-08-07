@@ -52,4 +52,19 @@ describe('AH-DOC-PARSE-IMGREF-001: Parse image references with provenance', () =
     const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
     expect(result.images).toHaveLength(0);
   });
+  it('handles images with special characters in alt text', async () => {
+    const md = '![Alt with @#$%^&*](image.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]!.alt).toContain('Alt');
+  });
+
+  it('handles images with relative and absolute paths', async () => {
+    const md = '![Rel](./images/a.png)\n![Abs](/abs/path/b.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.images).toHaveLength(2);
+    expect(result.images[0]!.ref).toContain('images/a.png');
+    expect(result.images[1]!.ref).toContain('/abs/path/b.png');
+  });
+
 });

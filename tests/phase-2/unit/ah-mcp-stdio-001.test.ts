@@ -52,4 +52,23 @@ describe('AH-MCP-STDIO-001: MCP stdio transport with lazy load', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('connection not found');
   });
+  it('handles disconnect of already disconnected connection', async () => {
+    await connectMcpStdio('temp-conn', { command: 'echo' });
+    await disconnectMcpStdio('temp-conn');
+    const result = await disconnectMcpStdio('temp-conn');
+    expect(result.success).toBe(false);
+  });
+
+  it('preserves allowlist across multiple operations', async () => {
+    const original = getMcpAllowlist();
+    setMcpAllowlist(['echo', 'cat']);
+    await connectMcpStdio('conn1', { command: 'echo' });
+    await connectMcpStdio('conn2', { command: 'cat' });
+    expect(getConnection('conn1')).toBeDefined();
+    expect(getConnection('conn2')).toBeDefined();
+    await disconnectMcpStdio('conn1');
+    await disconnectMcpStdio('conn2');
+    setMcpAllowlist(original);
+  });
+
 });

@@ -91,4 +91,12 @@ describe('AH-MM-IMAGE-GEN-001: Image generation adapter with data-egress checks'
     await expect(generateImage({ prompt: '' })).rejects.toThrow();
     expect(called).toBe(false);
   });
+  it('propagates provider errors', async () => {
+    setImageGenProvider({
+      model: 'error',
+      async generate() { throw new Error('gen API failed'); },
+    });
+    await expect(generateImage({ prompt: 'test' })).rejects.toThrow('gen API failed');
+  });
+
 });

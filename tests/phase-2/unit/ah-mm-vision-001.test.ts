@@ -90,4 +90,12 @@ describe('AH-MM-VISION-001: Vision understanding and verification adapter', () =
     expect(capturedPrompt).toContain('blue circle');
     expect(capturedPrompt).toContain('Verify');
   });
+  it('propagates provider errors', async () => {
+    setVisionProvider({
+      model: 'error',
+      async understand() { throw new Error('vision API failed'); },
+    });
+    await expect(understandImage({ image_data: Buffer.from('x'), prompt: 'test' })).rejects.toThrow('vision API failed');
+  });
+
 });

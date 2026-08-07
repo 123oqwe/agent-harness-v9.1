@@ -61,4 +61,10 @@ describe('AH-RAG-CITE-001: Generate citations with page references', () => {
     const citation = generateCitation(chunk);
     expect(citation.source_hash).toBe('abc123');
   });
+  it('citation excerpt contains text from chunk', () => {
+    const chunk = makeChunk(1);
+    const citation = generateCitation(chunk);
+    expect(citation.excerpt).toContain('cited content');
+  });
+
 });
