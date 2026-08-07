@@ -34,22 +34,19 @@ describe('async-task-adapter (Seedance)', () => {
 
   // -- seedanceParseTaskId --
 
-  it('parseTaskId extracts id field', async () => {
+  it('parseTaskId extracts id field via resolve', async () => {
+    // Use resolve() instead of streamEvents() to avoid 3s poll delay under Stryker
     const adapter = createProviderAdapter(binding, kv);
-    globalThis.fetch = vi.fn(async () => mockResp({ id: 'task-123', status: 'queued' })) as any;
-    // Trigger via resolve which calls submitTask internally
-    // We'll test via streamEvents which yields progress
-    const events: any[] = [];
-    const gen = adapter.streamEvents!(makeReq());
-    // Mock poll to return succeeded immediately
     let callCount = 0;
     globalThis.fetch = vi.fn(async () => {
       callCount++;
       if (callCount === 1) return mockResp({ id: 'task-123' });
       return mockResp({ status: 'succeeded', content: { video_url: 'https://example.com/v.mp4' } });
     }) as any;
-    for await (const e of adapter.streamEvents!(makeReq())) { events.push(e); }
-    expect(events.some(e => e.type === 'media_complete')).toBe(true);
+    const result = await adapter.resolve(makeReq());
+    const r = result as unknown as Record<string, unknown>;
+    expect(r['id']).toBe('task-123');
+    expect(r['status']).toBe('succeeded');
   });
 
   // -- submitTask error handling --
