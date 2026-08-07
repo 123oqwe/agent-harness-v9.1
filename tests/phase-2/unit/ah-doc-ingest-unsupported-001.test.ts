@@ -44,4 +44,19 @@ describe('AH-DOC-INGEST-UNSUPPORTED-001: Handle unsupported formats', () => {
       expect((err as Error).message).toContain('.xyz');
     }
   });
+  it('error is an instance of Error', async () => {
+    try {
+      await ingestor.ingest(Buffer.from('data'), 'file.xyz', {});
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(Error);
+    }
+  });
+
+  it('handles various unsupported extensions', async () => {
+    for (const ext of ['.xyz', '.dat', '.bin', '.abc', '.zzz']) {
+      await expect(ingestor.ingest(Buffer.from('x'), `file${ext}`, {})).rejects.toThrow(DocumentIngestError);
+    }
+  });
+
 });

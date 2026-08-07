@@ -52,4 +52,18 @@ describe('AH-DOC-PARSE-HEAD-001: Parse heading hierarchy preserving levels', () 
     expect(result.headings).toHaveLength(1);
     expect(result.headings[0]!.text).toContain('Bold Title');
   });
+  it('handles heading with only level 1', async () => {
+    const md = '# Only H1\nContent\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.headings).toHaveLength(1);
+    expect(result.headings[0]!.level).toBe(1);
+  });
+
+  it('handles heading text with special characters', async () => {
+    const md = '# Heading with @special #chars\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.headings).toHaveLength(1);
+    expect(result.headings[0]!.text).toContain('special');
+  });
+
 });

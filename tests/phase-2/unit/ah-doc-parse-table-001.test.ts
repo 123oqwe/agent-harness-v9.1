@@ -50,4 +50,19 @@ describe('AH-DOC-PARSE-TABLE-001: Parse table cells preserving structure', () =>
     expect(result.tables).toHaveLength(1);
     expect(result.tables[0]!.rows[0]).toEqual(['A', 'B']);
   });
+  it('handles tables with alignment markers', async () => {
+    const md = '| A | B |\n|:--|--:|\n| 1 | 2 |\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.tables).toHaveLength(1);
+    expect(result.tables[0]!.rows[0]).toEqual(['A', 'B']);
+  });
+
+  it('handles tables with long cell content', async () => {
+    const longText = 'x'.repeat(100);
+    const md = `| A | B |\n|---|---|\n| ${longText} | short |\n`;
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'test.md', {});
+    expect(result.tables).toHaveLength(1);
+    expect(result.tables[0]!.rows[1]![0]).toContain(longText);
+  });
+
 });

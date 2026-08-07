@@ -51,4 +51,15 @@ describe('AH-UX-CONTRACT-001: Frontend-backend contract tests', () => {
     };
     expect(validateContract(contract, contract)).toBe(true);
   });
+  it('does not check response_type (only method and path)', () => {
+    const actual: ApiContract = { endpoints: [{ method: 'GET', path: '/api/health', response_type: 'Health' }] };
+    const expected: ApiContract = { endpoints: [{ method: 'GET', path: '/api/health', response_type: 'Status' }] };
+    expect(validateContract(actual, expected)).toBe(true);
+  });
+
+  it('validates single endpoint contract', () => {
+    const contract: ApiContract = { endpoints: [{ method: 'POST', path: '/api/test', response_type: 'TestResult' }] };
+    expect(validateContract(contract, contract)).toBe(true);
+  });
+
 });

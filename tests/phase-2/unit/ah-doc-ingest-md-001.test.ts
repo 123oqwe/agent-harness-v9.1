@@ -77,4 +77,22 @@ describe('AH-DOC-INGEST-MD-001: DefaultDocumentIngestor routing', () => {
       expect(result.headings[0]!.text).toBe('Hello');
     });
   });
+  it('handles empty markdown', async () => {
+    const result = await ingestor.ingest(Buffer.from('', 'utf8'), 'empty.md', {});
+    expect(result.headings).toHaveLength(0);
+    expect(result.text).toBe('');
+  });
+
+  it('handles markdown with code blocks', async () => {
+    const md = '```js\nconst x = 1;\n```\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'code.md', {});
+    expect(result).toBeDefined();
+  });
+
+  it('handles markdown with links', async () => {
+    const md = '[Link text](https://example.com)\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'links.md', {});
+    expect(result).toBeDefined();
+  });
+
 });
