@@ -481,3 +481,27 @@ After this run completes, must commit + rebind waivers + rerun mutation.
 2. Run B1 on HEAD 5a08c1fd with uncommitted waivers (applied this time)
 3. If strategies passes with waivers → focus on gateway and toolsLeaf
 4. toolsRegistry timeout: may need chunkTimeoutMs increase (changes config hash, requires waiver rebinding)
+
+## Session 7 Update: B1 Run Started (2026-08-07 17:54)
+
+### B0 Results (commit 9827b61, NO waivers applied)
+- PASS (6): actionControl 91.54%, identitySecrets 90.78%, router 90.56%, sandbox 91.0%, skills 91.44%, vfs 92.13%
+- FAIL (6): gateway 45.99%, session 84.14%, strategies 84.22%, toolsLeaf 69.17%, toolsRegistry 0% (timeout), runtime 65.57%
+- Incomplete (3): verification (was running), verticals (not started), uiAdapters (not started)
+
+### B1 Run (commit 54e73378, WITH waivers applied)
+- Started: 2026-08-07 17:54
+- Waivers: 20 strategies waivers properly bound to HEAD + config hash
+- New tests since B0: 29 files, ~474 tests (Sessions 5-7)
+- Expected improvements:
+  - strategies: 84.22% → 85%+ (7 waiver mutants now ignored)
+  - toolsLeaf: 69.17% → 85%+ (screenshot, search-files, apply-patch tests)
+  - runtime: 65.57% → improvement (hook-port, react-loop, retry, notifications tests)
+  - session: 84.14% → improvement (durable-session, progress-store tests)
+  - gateway: 45.99% → improvement (10 new gateway test files)
+  - toolsRegistry: 0% → should pass (no timeout if no resource contention)
+
+### Config Hash Fix
+- Previous waiver rebinding used wrong hash calculation (JSON.stringify vs canonicalJson)
+- Runner uses canonicalJson (sorted keys, specific format) for config hash
+- Correct hash: 922872c30f469457ba493be2f8db3a61b63db4e2d9e4012f86424805fb238693
