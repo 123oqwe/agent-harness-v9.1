@@ -1,171 +1,105 @@
-# Findings & Decisions
+# Findings & Decisions (verified 2026-08-08, HEAD 05dd3424)
 
 ## Requirements
-- 完成 Phase 1 mutation 地基验证 (P0-P13 全部子项, mutation score >= 0.7)
-- 补厚 55 个薄测试 (每条 acceptance_criteria 至少 1 个测试)
-- 同步 gate manifest owned_sources (已通过 mutation registry candidate-only 机制完成)
-- Phase 2 mutation 64/64 completed (已完成)
-- Evidence 生成 (通过 createPhase2EvidenceRecords, 不可伪造)
-- Gate 闭环 + push 到 GitHub agentharness91 (product remote)
+- 完成 Phase 1 mutation 地基验证 (15 模块全 PASS, mutation score >= 阈值)
+- 补厚 52 个 Phase 2 薄测试 (每条 acceptance_criteria 至少 1 个测试)
+- Phase 2 gate 闭环 (candidateReady=true, evidence 64/64)
+- 真实 GLM 5.2 xhigh 验收
+- commit and push 源码到 GitHub (只放源码, 不放 reports/ dist/ node_modules/)
 - 铁律: 不删测试、不降阈值、不加 skip、不伪造 evidence/mutation 结果
 
-## Research Findings
+## Verified Current State (2026-08-08 02:45)
 
-### 仓库结构
-- 扁平 monorepo, 和主仓库 agent-harness-v9.1 布局完全不同
-- 源代码: packages/{runtime-core,documents,multimodal,tools,rag,api,ui}/src/ + apps/{api,web,tui,desktop}/src/ + 顶层 gateway/, runtime/, security/, tools/, router/, session/, vfs/, verification/
-- 测试: tests/phase-2/{unit,integration,security,e2e,architecture}/ + tests/{gateway,runtime,session,tools,...}/
-- Gate manifest: verification/gates/phase2-gate.json (byte-frozen, 64 requirements)
-- Mutation registry: mutation/phase2-modules.mjs (可改, 64 项 sources 映射)
-
-### model-gateway.ts (1434 lines) — P6 目标
-- ModelGateway class: resolve(), dispatch(), dispatchExact(), dispatchStream(), stream(), switchProvider(), describeResolved()
-- FrozenProviderRegistry: normalizes registrations, computes snapshot hash
-- dispatchExact: 无 provider fallback, 但同 provider 重试 (maxAttempts=3)
-- dispatchStream: 有 provider fallback for retryable, 同 provider 不重试 after eventsYielded>0
-- dispatch (full): 有 provider fallback for retryable
-- ProviderHttpError 映射:
-  - 503 → kind='server', retryable=true
-  - 401 → kind='auth', retryable=false
-  - 400 → kind='invalid_request', retryable=false
-  - 429 → kind='rate_limited', retryable=false
-- Backoff: Math.min(100 * 2^attempt, 1000) → 100, 200, 400
-- resolveExcluding: 按 estimatedPrice 排序, 然后按 provider_id 二进制比较
-- incompatibilityReason 检查: health, authority, run_plan, capabilities, context length, structured_output, tool_calling, data_policy (local_only, regions, retention, training)
-
-### loop.ts (894 lines) — P9 目标
-- LoopEngine: 单次使用 (lifecycle: idle→running→finished)
-- validateConfig: run_id/goal 非空; max_iterations/budget_tokens/deadline_ms/max_output_tokens_per_call/max_observation_bytes 非负安全整数
-- classifyUnhandled: signal.aborted→user_cancel, HookRestrictionError→(force_prompt→approval_required, skip→skipped, else→denied), LoopError→malformed_response, generic Error→provider_failure
-- recordTurn: 用 validUsage() 验证 usage (安全整数 >= 0)
-- now()/nowMs(): 验证返回值 (ISO timestamp / safe integer >= 0)
-- context_reset: 当 estimated context >= capacity * threshold (默认 0.85) 时触发
-- EventBus: 发布 model_called, tool_call_start, tool_result, step_transition, run_state_change 事件
-- RAG 注入: 查询 ragQuery, 注入为 UNTRUSTED user message
-- Steering: kill/human_cancel→stop('user_cancel'), steer→注入 content 为 user message
-- auto_execute=false → 终止 approval_required
-- Direct 策略在调用 modelCall 前将 iterations 设为 1
-
-### harness.ts (1312 lines) — P8 目标
-- Harness class: run(), runOnce(), executeTool(), dispatchHook(), decisionHook(), observationalHook()
-- 构造器验证: sessionMasterKey (32 bytes if persistence), buildCommitSha (40 hex), maxSkillRiskTier (1-4), executionContext
-- run(): dispatch user_prompt_submit hook, 然后 runOnce()
-- runOnce(): route task, open session, create LoopEngine, run loop, verify, build evidence
-- ModelFallback: 先试 modelFallback.execute(), 再试 gateway.switchProvider() 最多 5 次
-- Streaming: dispatchStream 当 onDelta 提供
-- Hooks: pre_turn (decision), post_turn (observational), pre_tool_use (decision), post_tool_use (observational)
-- Workspace: TransactionalWorkspace, finalize(success) commits/discards
-- Concurrent: activeRun flag 防止并行
-- withStreaming/withEventBus: 返回 this 用于链式调用
-- getCacheMetrics: 返回 cache manager metrics
-
-### Mutation 状态
-- 当前 configurationHash: 2e02aab1022cac3c64b20c94300813b6dbd1d572b8bd8c9dae4f6d0749b52bd2
-- Waiver commitSha: c0fd48f1002c9bb4e1b0eaeac8696695e032f763
-- 所有 20 个 waiver hash 匹配 — P13 已验证
-- equivalent-mutants.json 未提交 (P12 待提交)
-- configurationHash 计算来源: mutationAuthorityFiles (含 equivalent-mutants.json 自身, package.json, stryker config, scripts 等)
-- 重要: 修改 equivalent-mutants.json 会改变 configurationHash, 需要重新计算并更新所有 waiver
-
-### Phase 2 状态
-- 639 unit tests pass
-- workspace-boundaries: valid (11 workspaces)
-- active-stubs: 0
-- contract-drift: 0 errors, 4 warnings
-- mutation: 64/64 completed (candidate-only)
-- evidence: 0/64 (未生成)
-- releaseReady=false, candidateReady=false
-
-### 测试文件清单 (P0-P13)
-| P项 | 文件 | 测试数 | 状态 |
-|-----|------|--------|------|
-| P0 | scripts/run-mutation.mjs (修改) | N/A | 已提交 350fdb0c |
-| P1 | tests/runtime/steering-port.test.ts (删除) | N/A | 已提交 350fdb0c |
-| P2 | tests/gateway/managed-gateway-deep.test.ts | 22 | 已提交 3d5b878c |
-| P3 | tests/gateway/provider-adapters.test.ts | +8 | 已提交 0901a47f |
-| P4 | tests/gateway/async-task-adapter-deep.test.ts | 24 | 已提交 1f53cbec |
-| P5 | tests/gateway/ws-server-deep.test.ts | 15 | 已提交 7e550c2a |
-| P6 | tests/gateway/model-gateway-deep.test.ts | 47 | 未提交 |
-| P7 | tests/runtime/direct-strategy.test.ts | 12 | 已提交 350fdb0c |
-| P8 | tests/runtime/harness-deep.test.ts | 23 | 未提交 |
-| P9 | tests/runtime/loop-deep.test.ts | 51 | 未提交 |
-| P10 | tests/session/sqlite-session-store-deep.test.ts | 21+5 | 已提交 c0fd48f1 |
-| P11 | tests/tools/tool-registry-mutation.test.ts | 47 | 已提交 4a2c6152 |
-| P12 | mutation/equivalent-mutants.json | 20 waivers | 未提交 |
-| P13 | (验证, 无文件) | N/A | 已验证 |
-
-## Technical Decisions
-| Decision | Rationale |
-|----------|-----------|
-| P6 先于 P8/P9 | model-gateway 更独立, 更容易隔离测试 |
-| P9 先于 P8 | loop.ts (894 行) 比 harness.ts (1312 行) 小, 更可测 |
-| 跳过 verify:phase1:local 直到 P6/P8/P9 完成 | 用户指令 |
-| 使用 planning-with-files skill | 保留计划跨 compaction |
-| dispatchStream events-yielded 测试改为验证同 provider 不重试 | 外层仍可 switch provider for retryable |
-| EventBus 用 `new EventBus()` | createEventBus 不存在 |
-| LoopError → malformed_response | classifyUnhandled 的行为 |
-| beforeTurn iteration=1 | direct 策略先递增 |
-| afterTurn 在 finally 中不改变 termination | terminatedValue 已 true |
-| mutation authority 接受 candidate-only registry sources | gate manifest byte-frozen 不能改 |
-
-## Issues Encountered
-| Issue | Resolution |
-|-------|------------|
-| ProviderHttpError(503) kind='server' not 'server_error' | 修正断言 |
-| dispatchStream partial yield + retryable 仍 switch provider | 修正测试语义 |
-| createEventBus() 不存在 | 用 new EventBus() |
-| LoopError → malformed_response not internal_error | 修正预期 |
-| beforeTurn iteration=1 not 0 | 修正预期 |
-| afterTurn 在 finally 不改变 termination | 修正测试检查 error event |
-| nowMs=-1 在构造时 throw | 用 expect(() => new...).toThrow() |
-| step_transition 在 direct 不触发 | 改用 plan_execute |
-| policy allowed_tools=[] reject | 改为 ['read_file'] |
-| budget_tokens=undefined 与 exactOptionalPropertyTypes 冲突 | 移除显式 undefined |
-| RuntimeSteeringPriority 不含 'normal' | 改为 'user' |
-| RuntimeBudgetDecision 需要 reason | 添加 reason 字段 |
-| observedMessages unknown[] 无 find/some | 改为 any[][] |
-
-## Resources
-- 源代码: gateway/model-gateway.ts, runtime/loop.ts, harness.ts
-- 测试: tests/gateway/model-gateway-deep.test.ts (550 行, 47 tests)
-- 测试: tests/runtime/loop-deep.test.ts (683 行, 51 tests)
-- 测试: tests/runtime/harness-deep.test.ts (296 行, 23 tests)
-- Mutation authority: mutation/equivalent-mutants.json (20 waivers)
-- Gate manifest: verification/gates/phase2-gate.json (byte-frozen, 64 requirements)
-- Requirements: /Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/requirements/requirements.ndjson
-- Remote: product = https://github.com/123oqwe/agentharness91.git
+### Git
 - Worktree: /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated
-- Branch: codex/phase2-integrated, HEAD: 5d1ec4b8
+- Branch: codex/phase2-integrated
+- HEAD: 05dd3424aa7f7723d824a73f0fd18087fa82f473
+- origin (123oqwe/agent-harness-v9.1, PUBLIC, has CI runner): 落后 1 commit
+- product/release (123oqwe/agentharness91, PRIVATE, no runner): 落后 2 commits
+- Uncommitted: HARNESS_SESSION_DIRECTIVE.md + mutation/equivalent-mutants.json (waiver rebind)
+- equivalent-mutants.json 保持 uncommitted 是设计行为 (runner 允许)
+- Stale mutation lock (PID 77574 dead) 已清理
 
-## MUTATION_REVIEW_PROMPT.md 整合 (38 条审查注意事项)
+### 测试状态 (全部 PASS)
+- Phase 1 tests: 2859/2859 PASS
+- Phase 2 unit tests: 758/758 PASS (64 files)
+- Phase 2 dev gate: success=true
+- typecheck/lint/build: PASS
+- Total test files: 298
 
-### 关键机制发现
-1. **waiver commitSha 鸡蛋问题 (#31)**: 每次 commit 改变 HEAD, waiver 的 commitSha 失效。runner 允许 equivalent-mutants.json uncommitted (repositoryContext line 793-795 过滤该文件)。正确流程: commit 代码 → 重绑 waiver 到新 HEAD → 保持 uncommitted → 跑 mutation
-2. **configurationHash 不受 commitSha 影响 (#18)**: normalizedAuthorityContent() 过滤 commitSha + configurationHash 字段后再 hash。改 commitSha 不影响 configHash。但改 modules.mjs 会影响 (因为在 mutationAuthorityFiles 列表里)
-3. **releaseReady 硬编码 false (#36)**: verify-phase2-local.mjs line 882 `const releaseReady = false`。formalAuthority.status 永远 "external_attestation_required"。本地目标是 candidateReady=true, 不是 releaseReady
-4. **Evidence RELEASE_AUTHORITY (#38)**: CLI 运行传递 Symbol, 6 前置条件全满足才发布。candidateReady 要求 candidateEvidenceCount === 64
-5. **verify:phase2:local 22 命令 (#37)**: 不是简单确认, 是 3-4 小时完整 gate。可能卡住: phase1-regression(15min), mutation(60min), source-checkout-reproduction(60min)
-6. **CI 不跑 mutation (#33,34)**: reports/ 在 .gitignore, ci.yml 只跑 typecheck/build/lint/test/coverage/audit/pack。mutation 需单独触发 phase2-mutation.yml
-7. **product 仓库可能无 runner (#35)**: agentharness91 可能 private, GitHub Actions 免费额度耗尽。origin (public) 有 runner
-8. **chunk 超时 15 分钟 (#11,19)**: defaultChunkTimeoutMs = 15 * 60 * 1000, 不是 30 分钟
-9. **Stryker exit code 非 0 拒绝报告 (#12)**: 即使 mutation.json 已生成, exit 非 0 整个模块 FAIL
-10. **stryker patch 改变 mutant 激活 (#14)**: patches/@stryker-mutator+core+9.6.1.patch, 本地和 CI 都必须应用
+### Mutation 状态 (STALE - 需要重跑)
+- 11 模块有旧 result.json (config_hash 不匹配当前 2e02aab1)
+- 4 模块缺失: actionControl, runtime, session, identitySecrets
+- 旧 gateway score: 84.68 (FAIL, 阈值 85)
+- P6/P8/P9 的 121 新测试不在旧结果中
+- conclusion: Phase 1 mutation 必须完全重跑
 
-### 补测试文件清单 (来自 #1-6)
-- gateway: 10 个无测试文件 (circuit-breaker, rate-limiter, key-vault, capability-registry, economic-kernel, cache-manager, tool-mask, dag-executor, glm-gateway-bridge; provider-adapters 已有)
-- runtime: 7 个无测试 (retry, steering-port, errors, notifications, pause-resume-port, session-tree-port; event-bus 和 loop.ts 已覆盖)
-- session: 2 个无测试 (durable-session, progress-store 部分覆盖)
-- strategies: react.ts 缺测试 (direct.ts 和 plan-execute.ts 已有)
-- vfs/toolsRegistry/verification: 需加厚到 90%+
-- toolsLeaf: 13 个文件 60.9%, 需读 mutation.json 找 survived 集中文件
+### Phase 1 Evidence (40/40 STALE)
+- 全部 commit_sha 过期 (bd85e7ed 或 7f2eafaa vs 05dd3424)
 
-### Phase 1 额外 exit criteria (#22-25)
-- GLM live acceptance: npm run test:glm:live (需 GLM_API_KEY)
-- domain evals: evals/{domain}/phase-1.yaml 可能不存在
-- active_stub_count: node scripts/gates/check-active-stubs.mjs
-- crash_restore_no_duplicate: tests/session/crash-restore.test.ts 3 个测试
+### Phase 2 Evidence (0/64)
+- artifacts/phase-2/ 不存在
+- 自动生成 (只在 local gate 通过后), 不可伪造
 
-### 环境差异 (#26-28)
-- 本地 node v24, CI node v20 (native 模块差异)
-- CI 用 --maxWorkers=1, 本地也加
-- coverage threshold: lines 80%, branches 75%, functions 80%
+### Phase 2 Gate
+- dev mode: PASS (5 命令全过)
+- local mode: 23 命令, 未跑
+
+### Phase 2 Mutation (未跑)
+- 64 requirements, 是 local gate 第 17 个命令
+
+### CI (ci.yml)
+- origin (public) 有 runner, 不跑 mutation, node v20
+
+### .gitignore
+- dist/, node_modules, .stryker-tmp/, reports/, coverage/ 都被 ignore
+- "GitHub 上只放源码" 的要求已被 .gitignore 满足
+
+### control/current-state.json (主仓库)
+- Phase 1: IN_PROGRESS, Phase 2: BLOCKED, Phase 3: BLOCKED
+- 受保护路径, 需 CTO 批准
+
+## Key Mechanism Discoveries
+
+### Evidence 生成机制
+- Phase 1: 手动创建 artifacts/phase-1/AH-XXX-001/evidence.json
+- Phase 2: 自动生成 (createPhase2EvidenceRecords, 只在 local gate 通过后)
+- Phase 2 evidence 在 reports/phase2/ (gitignored)
+
+### Mutation 验证机制
+- check-mutation-thresholds.mjs 验证: commit_sha, config_hash, score, waiver commitSha
+- 旧结果 config_hash 不匹配 -> 被拒绝
+
+### candidateReady 逻辑
+- executionOk (23 命令全过) + identityStable + mutationReady (64/64) + evidenceCount===64 + errors===0
+- releaseReady 硬编码 false (需 CI attestation)
+
+## 阻塞分析
+
+### 阻塞 1: Phase 1 mutation 过期 (最高优先级)
+- 旧结果 config_hash 不匹配 -> 被拒绝
+- 4 模块缺失, gateway FAIL
+- 解决: 完整重跑 (5-8h), 可能需要补测试
+
+### 阻塞 2: Phase 1 evidence SHA 过期
+- 40/40 过期, 需重新生成
+
+### 阻塞 3: Phase 2 薄测试质量
+- 52 文件 33-116 行, 758/758 全过但需确认覆盖 acceptance_criteria
+
+### 阻塞 4: Phase 2 mutation 从未运行
+- 需要 64/64 complete
+
+### 阻塞 5: Phase 2 local gate 从未通过
+- 23 命令, 3-4h, 需 clean worktree
+
+### 非阻塞
+- dev gate PASS, 所有测试 PASS, typecheck/lint/build PASS
+- .gitignore 已排除非源码文件
+
+## 仓库结构
+- Phase 2 源码: packages/{runtime-core,documents,multimodal,tools,rag,api,ui}/src/ + apps/{api,web,tui,desktop}/src/
+- Phase 1 源码: gateway/, runtime/, security/, tools/, router/, session/, vfs/, verification/, domains/, skills/, ui/, sandbox/, ingestion/, harness.ts
+- Gate manifest: verification/gates/phase2-gate.json (byte-frozen, 64 requirements)
+- Mutation: mutation/modules.mjs (Phase 1, 15 模块), mutation/phase2-modules.mjs (Phase 2, 64 requirements)
+- Spec: /Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/phases/phase-{1,2,3}.yaml

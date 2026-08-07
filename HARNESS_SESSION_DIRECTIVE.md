@@ -518,3 +518,138 @@ A (10min) -> B (8-12h) -> C (2-3天) -> D (1-2天) -> E (1天) -> F (需批准)
              40个evidence
 
 每步全绿才进下一步。做完 A-D 后汇总结果, 确认后再做 E-F。
+
+══════════════════════════════════════════════════════════════
+Mutation 修复指南: 每个热点文件的具体修复方法
+══════════════════════════════════════════════════════════════
+
+以下基于旧 mutation.json 的 survived 分析。B1 重跑后需要重新读 mutation.json
+确认哪些 mutant 仍然 survived (P6/P8/P9 等新测试可能已经杀掉了部分)。
+读法:
+  python3 -c "
+  import json
+  d=json.load(open('reports/mutation/{module}/mutation.json'))
+  for fname, fdata in d.get('files',{}).items():
+    for m in fdata.get('mutants',[]):
+      if m.get('status')=='Survived':
+        loc=m.get('location',{})
+        print(f'{fname}:{loc.get(\"start\",{}).get(\"line\",\"?\")} mutator={m[\"mutatorName\"]} id={m[\"id\"]}')
+  "
+
+─── gateway 模块 (旧 score 84.68, 阈值 85, FAIL — 最优先) ───
+
+文件 1: gateway/model-gateway.ts — 161 survived + 16 nocov
+  P6 (model-gateway-deep.test.ts, 47 tests) 已测了 dispatchExact/dispatchStream/resolve
+  但以下辅助函数完全没测 (P6 里 0 个引用):
+    isPlainRecord (line 289): 测非对象/null/数组 -> false, 普通对象 -> true
+    assertPlainRecord (line 295): 测非对象 -> 抛 ProviderConfigurationError
+    assertKnownKeys (line 299): 测未知字段 -> 抛错, 已知字段 -> 通过
+    nonEmptyString (line 305): 测空字符串/非字符串 -> 抛错, 正常字符串 -> 返回
+    finiteNonNegative (line 310): 测负数/NaN/Infinity/非数字 -> 抛错, 正常 -> 返回
+    deepFreeze (line 342): 测已冻结对象跳过, 嵌套对象递归冻结
+    canonicalJson (line 349): 测 null/boolean/string/number/array/object 的序列化,
+      特别测试 undefined 字段被过滤, 键排序
+    contentHash (line 371): 测相同输入 -> 相同 hash, 不同输入 -> 不同 hash
+    normalizeContract (line 374): 测试 contract 规范化的各种输入
+  修复方法: 在 tests/gateway/model-gateway-deep.test.ts 里加一个 describe
+    "helper functions" 测试上述每个函数的正/负路径。
+    这些函数是纯函数, 不需要 mock, 直接 import 测试。
+  另有 ConditionalExpression (62) 和 StringLiteral (55) survived 集中在
+    resolve() 和 normalizeContract() 的条件分支 — P6 已覆盖 resolve 的主要路径,
+    但 normalizeContract 的分支可能需要额外测试。
+
+文件 2: gateway/scripted-provider.ts — 62 survived + 9 nocov (612 行)
+  有 tests/gateway/scripted-provider.test.ts 但覆盖不足。
+  关键未测函数:
+    normalizeUsage: 测各种 usage 输入 (缺失字段, 负数, 非数字)
+    normalizeToolCallValue: 测 tool call 解析 (缺失 id/name/arguments)
+    normalizeMessage: 测消息解析 (各种 role, 缺失 content)
+    normalizeMessages: 测消息数组解析 (空数组, 非数组)
+    cloneJson: 测深拷贝 (循环引用, 特殊类型)
+  修复方法: 在 tests/gateway/scripted-provider.test.ts 里加测试覆盖
+    normalize* 函数的各种输入边界。
+
+文件 3: gateway/glm-provider.ts — 39 survived + 5 nocov (362 行)
+  有 tests/gateway/glm-provider.test.ts 和 glm-provider-mutation.test.ts 但覆盖不足。
+  热点:
+    OptionalChaining (13): tool.risk_feature_extractor?.trim() 等 — 测 tool 无
+      risk_feature_extractor 时不崩溃
+    toolDescription (line 35): 测各种 tool 输入 (空 description, 无 parameters)
+    stopReason: 测各种 stop_reason 映射 (stop, length, tool_use, content_filter)
+  修复方法: 在 tests/gateway/glm-provider-mutation.test.ts 里加测试。
+
+文件 4: gateway/glm-gateway-bridge.ts — 2 survived + 6 nocov (103 行)
+  有 tests/gateway/glm-gateway-bridge.test.ts (6 tests) 但覆盖不足。
+  热点: ArrowFunction (2) at line 86-87, 回调函数没被调用。
+  修复方法: 测试 createGlmGateway 返回的对象的完整接口。
+
+─── router 模块 (旧 score 90.19, 阈值 90, 刚过线 — 回归风险) ───
+
+文件: router/static-router.ts — 74 survived
+  有 tests/router/static-router.test.ts (247 tests) 但 50 个 Regex survived。
+  热点: Regex (50) 集中在 line 70-80 — goal 解析正则:
+    /\b(?:do\s+not|don't|never|without)\b.../giu — 否定句检测
+    /(?:不要|禁止).*?.../giu — 中文否定句
+    /\b(rewrite|polish|draft|essay|article|copyedit)\b|润色|改写|.../u — 写作意图检测
+  Regex mutant 很难杀 (Stryker 改正则字符, 需要精确的输入来区分)。
+  修复方法:
+    - 对每个正则, 构造能区分原始正则和 mutant 正则的测试输入
+    - 例如: 测 "don't refactor this" -> 否定句被移除; 测 "refactor this" -> 不被移除
+    - 如果无法区分 (等价 mutant), 注册 waiver
+  ConditionalExpression (13): 路由决策分支, 需要更多路由场景测试
+
+─── strategies 模块 (旧 score 85.18, 阈值 85, 刚过线) ───
+
+文件: runtime/plan-execute.ts — 141 survived
+  有 plan-execute-validation(17)+plan-execute-mutation(22) 共 39 tests, 7 个 waiver。
+  但仍有 141 survived:
+    ConditionalExpression (60): 计划执行的各种条件分支
+    Regex (24): 输入解析正则
+  修复方法: 读 mutation.json 找具体 survived 行号, 补测试覆盖这些分支。
+  如果 Regex 无法区分, 注册 waiver。
+
+文件: runtime/react.ts — 29 survived (13 个已注册 waiver)
+  有 react-strategy(14)+react-loop(29) 共 43 tests。
+  剩余 29 survived 可能也需要 waiver 或补测试。
+
+─── verification 模块 (旧 score 87.45, 阈值 85, PASS) ───
+
+文件: verification/verification-engine.ts — 60 survived
+  有 tests/verification/verification-engine.test.ts 但覆盖不足。
+  热点: ConditionalExpression (20), StringLiteral (11)
+  修复方法: 读 mutation.json 找具体 survived 行, 补测试。
+  如果模块 PASS 且不接近阈值, 可以低优先级处理。
+
+─── toolsRegistry 模块 (旧 score 90.98, 阈值 90, PASS) ───
+
+文件: tools/tool-registry.ts — 35 survived
+  P11 (tool-registry-mutation.test.ts, 47 tests) 已覆盖, 但仍有 35 survived。
+  热点: ConditionalExpression (12), StringLiteral (9)
+文件: tools/tool-executor.ts — 26 survived
+  没有专用深度测试。
+  修复方法: 创建 tests/tools/tool-executor-deep.test.ts
+
+─── 修复优先级 ───
+
+1. gateway (FAIL, 差 0.32%) — 必须修复到 >= 85%
+   优先: model-gateway.ts 辅助函数 (isPlainRecord 等, 纯函数容易测)
+   其次: scripted-provider.ts normalize* 函数
+   然后: glm-provider.ts toolDescription/stopReason
+   最后: glm-gateway-bridge.ts 完整接口
+
+2. router (90.19, 刚过线) — 如果 B1 重跑后回归到 FAIL
+   优先: static-router.ts Regex 测试
+
+3. strategies (85.18, 刚过线) — 如果 B1 重跑后回归到 FAIL
+   优先: plan-execute.ts ConditionalExpression 分支
+
+4. 其他 PASS 模块 — 低优先级, 只有回归到 FAIL 才需要修复
+
+─── 修复后验证 ───
+
+每次补测试后:
+  npx vitest run tests/{module}/{file}.test.ts --reporter=verbose
+  npm run typecheck && npm run lint
+  重跑该模块 mutation: node scripts/run-mutation.mjs {module}
+  确认 score >= 阈值
+  每次 commit 后重绑 waiver (见 A3)

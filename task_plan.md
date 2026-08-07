@@ -1,196 +1,314 @@
-# Task Plan: agent-harness Phase 2 (verified state as of 2026-08-08)
+# Task Plan: agent-harness Phase 2 (verified 2026-08-08, HEAD 05dd3424)
 
 ## Goal
-完成 Phase 1 mutation 地基 → 补厚 55 个薄测试 → Phase 2 mutation → Evidence → Gate 闭环 → push agentharness91
+- Phase 1 mutation 15/15 PASS (local, 5-8h)
+- Phase 1 evidence 40/40 SHA refreshed
+- Phase 2 thin tests 52 thickened (cover acceptance_criteria)
+- Phase 2 mutation 64/64 (MUST run via GitHub Actions, not local)
+- Phase 2 gate: dev passes locally, local mode needs CI for mutation
+- GLM 5.2 xhigh acceptance
+- commit and push source to GitHub
 
-## Next Step
-等待 Phase 1 mutation 运行完成 (session 7968, gateway chunk 4/43)，读结果，针对性补测试
+## CRITICAL CONSTRAINT: Phase 2 Mutation Cannot Run Locally
+- run-phase2-mutation-bootstrap.mjs isolatedCommand() throws on macOS:
+  'Seatbelt is diagnostic-only; release candidate CI requires Linux bubblewrap'
+- Also throws on Linux without bubblewrap
+- Only runs on GitHub Actions ubuntu-22.04 with bubblewrap + node 20.18.1 + npm 10.8.2
+- Phase 1 mutation (run-mutation.mjs) has NO platform restriction, runs locally
+- verify:phase2:local --mode local command #18 (mutation) WILL FAIL locally
+- candidateReady requires executionOk (all 23 commands pass) -> cannot achieve locally
+- Strategy: run all local commands except mutation, trigger mutation via CI
 
-## Current Phase
-阶段 B: Phase 1 Mutation 运行中 (gateway module, chunk 4/43)
-
-## 参考文档
-- pasted-text-1.txt: 原始 6 步计划 + 铁律
-- MUTATION_REVIEW_PROMPT.md: 38 条审查提示词
-- HARNESS_SESSION_DIRECTIVE.md: 43 个错误修正 + 阶段 A-G 路线图
-- PHASE2_PROGRESS_NOTES.md: 完成工作/剩余工作台账
-- PHASE2_MULTI_AGENT_SHARED.md: 跨 session 台账
-- spec 文件在主仓库: /Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/
-
-## ═══ 已验证的当前状态 ═══
-
-### Git 状态
-- Worktree: /Users/guanjieqiao/agent-runtime-v7/worktrees/phase2-integrated
+## Current State (verified 2026-08-08 02:45)
+- HEAD: 05dd3424aa7f7723d824a73f0fd18087fa82f473
 - Branch: codex/phase2-integrated
-- HEAD: 75020cfa (动态获取: git rev-parse HEAD)
-- Remote agentharness91: 2b5d5dba (本地超前 1 commit: server.test.ts fix)
-- 未提交: mutation/equivalent-mutants.json (waiver 重绑, runner 允许)
-- Remote: product = https://github.com/123oqwe/agentharness91.git (PRIVATE, 无 runner)
-- Remote: origin = https://github.com/123oqwe/agent-harness-v9.1.git (PUBLIC, 有 runner)
+- origin: behind 1 commit (05dd3424 not pushed)
+- product: behind 2 commits
+- Uncommitted: HARNESS_SESSION_DIRECTIVE.md + equivalent-mutants.json (waiver rebind)
+- Phase 1 tests: 2859/2859 PASS
+- Phase 2 unit tests: 758/758 PASS (64 files)
+- Phase 2 dev gate: success=true
+- typecheck/lint/build: PASS
+- Mutation: STALE (config_hash mismatch, 4 modules missing, gateway FAIL)
+- Phase 1 evidence: 40/40 STALE
+- Phase 2 evidence: 0/64
+- Phase 2 local gate: not run (mutation command will fail on macOS)
+- Stale mutation lock: cleaned
+- configurationHash: 2e02aab1... (verified correct)
 
-### P0-P13 状态 (全部完成, 已验证)
-| P项 | 文件 | 测试数 | Commit | 已验证 |
-|-----|------|--------|--------|--------|
-| P0 | scripts/run-mutation.mjs | N/A | 350fdb0c | ✓ runOne() |
-| P1 | tests/runtime/steering-port.test.ts (deleted) | N/A | 350fdb0c | ✓ deleted |
-| P2+FIX | tests/gateway/managed-gateway-deep.test.ts | 22 | 3d5b878c+26390bc9 | ✓ 22 tests |
-| P3 | tests/gateway/provider-adapters.test.ts | 37 (29+8) | 0901a47f | ✓ 37 tests |
-| P4 | tests/gateway/async-task-adapter-deep.test.ts | 24 | 1f53cbec | ✓ 24 tests |
-| P5 | tests/gateway/ws-server-deep.test.ts | 15 | 7e550c2a | ✓ 15 tests |
-| P6 | tests/gateway/model-gateway-deep.test.ts | 47 | 6979cf9d | ✓ 47 tests |
-| P7 | tests/runtime/direct-strategy.test.ts | 12 | 350fdb0c | ✓ 12 tests |
-| P8 | tests/runtime/harness-deep.test.ts | 23 | 6979cf9d | ✓ 23 tests |
-| P9 | tests/runtime/loop-deep.test.ts | 51 | 6979cf9d | ✓ 51 tests |
-| P10 | tests/session/sqlite-store-deep.test.ts | 21 | c0fd48f1 | ✓ 21 tests |
-| P10b | tests/session/progress-store.test.ts | 12 | be78628d+6e366db4 | ✓ 12 tests |
-| P11 | tests/tools/tool-registry-mutation.test.ts | 47 | 4a2c6152 | ✓ 47 tests |
-| P12 | mutation/equivalent-mutants.json | 20 waivers | 6979cf9d | ✓ uncommitted (runner allows) |
-| P13 | configurationHash 验证 | N/A | N/A | ✓ 2e02aab1 matches |
+## Phase A: Preparation
 
-### gateway 10 个测试文件 (全部已存在, commit 55853d3d)
-| 文件 | 测试数 | 已验证 |
-|------|--------|--------|
-| circuit-breaker.test.ts | 11 | ✓ |
-| rate-limiter.test.ts | 9 | ✓ |
-| key-vault.test.ts | 17 | ✓ |
-| capability-registry.test.ts | 17 | ✓ |
-| economic-kernel.test.ts | 13 | ✓ |
-| cache-manager.test.ts | 13 | ✓ |
-| tool-mask.test.ts | 18 | ✓ |
-| dag-executor.test.ts | 8 | ✓ |
-| glm-gateway-bridge.test.ts | 6 | ✓ |
-| provider-adapters.test.ts | 37 | ✓ (P3 加厚) |
+### A1: Commit uncommitted files [pending]
+- Commit HARNESS_SESSION_DIRECTIVE.md update
+- equivalent-mutants.json stays uncommitted (waiver rebind, runner allows)
+- Verify: git status only has equivalent-mutants.json
 
-### runtime 6 个测试文件 (全部已存在, commit 9fef88f7/a9317164)
-| 文件 | 测试数 | 已验证 |
-|------|--------|--------|
-| retry.test.ts | 26 | ✓ |
-| errors.test.ts | 6 | ✓ |
-| notifications.test.ts | 15 | ✓ |
-| event-bus.test.ts | 12 | ✓ |
-| pause-resume-port.test.ts | 8 | ✓ |
-| session-tree-port.test.ts | 6 | ✓ |
+### A2: Verify dev gate still passes [pending]
+- node scripts/gates/verify-phase2-local.mjs --mode dev
+- Verify: success=true
 
-### session 2 个测试文件 (全部已存在)
-| 文件 | 测试数 | 已验证 |
-|------|--------|--------|
-| durable-session.test.ts | 27 | ✓ (be78628d) |
-| progress-store.test.ts | 12 | ✓ (be78628d+6e366db4) |
+### A3: Push current HEAD to origin [pending]
+- git push origin codex/phase2-integrated
+- Verify: origin/codex/phase2-integrated == HEAD
 
-### strategies 3 个测试文件 (全部已存在)
-| 文件 | 测试数 | 已验证 |
-|------|--------|--------|
-| direct-strategy.test.ts | 12 | ✓ (P7) |
-| react-strategy.test.ts | 14 | ✓ |
-| react-loop.test.ts | 29 | ✓ |
+## Phase B: Phase 1 Mutation Rerun (LOCAL, 5-8h)
 
-### Phase 1 Mutation B1 旧结果 (HEAD c0fd48f1, 已过期)
-PASS (10/15): actionControl 91.50%, identitySecrets 90.78%, router 90.19%, sandbox 91.00%, skills 91.44%, strategies 85.80% (waivers), vfs 92.13%, verification 86.62%, verticals 88.48%, uiAdapters 95.77%, toolsLeaf 90.29%
-FAIL (5/15): gateway 55.23%, runtime 65.57%, session 84.14%, toolsRegistry 86.16%
-注: P6/P8/P9 的 121 个新测试不在 B1 结果中, 需 B2 重跑
+### B0: Prepare [pending]
+- B0a: Clean old .stryker-tmp directories (python3 shutil.rmtree)
+- B0b: npm run prepare (verify patch exists)
+- B0c: export GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
+- B0d: Confirm stale lock cleaned
+- Verify: patches/@stryker-mutator+core+9.6.1.patch exists
 
-### 阈值 (mutation/thresholds.json + modules.mjs)
-85%: gateway, toolsLeaf, skills, strategies, verification, verticals, uiAdapters
-90%: router, toolsRegistry, actionControl, identitySecrets, vfs, sandbox, session, runtime
-phase1Minimum = 85 (整体)
-chunkTimeoutMs: gateway=30min, sandbox=30min, default=15min
+### B1: Run Phase 1 mutation [pending]
+- node scripts/run-mutation.mjs phase1
+- 15 modules, gateway=43 chunks, estimated 5-8h
+- chunkTimeoutMs: gateway=30min, sandbox=30min, default=15min
+- Monitor: ps aux | grep stryker, ls .stryker-tmp/
+- Do NOT kill (unless crash)
+- Verify: 15/15 modules have result.json, commit_sha=HEAD, config_hash=2e02aab1
 
-### 质量验证
-- typecheck: ✓ PASS
-- lint: ✓ PASS
-- 全部测试: 2763/2764 pass (1 pre-existing timeout in managed-gateway-stream.test.ts)
-- 3 个新测试文件: 121/121 pass
+### B2: Check results [pending]
+- Confirm 15/15 modules score >= threshold (85% or 90%)
+- For failing modules:
+  a) Read mutation.json find surviving mutants (python3 script)
+  b) Real coverage gap -> add tests to kill
+  c) Equivalent mutant -> register waiver (equivalent-mutants.json)
+  d) Rerun module: node scripts/run-mutation.mjs {module}
+  e) Loop until passing
+- After each test fix: npx vitest run + typecheck + lint
+- After each commit: rebind waiver commitSha
+- Rebind command:
+  NEW_SHA=$(git rev-parse HEAD)
+  python3 -c "import json; ..." (rebind commitSha, keep uncommitted)
+- Verify: 15/15 PASS
 
-### Waiver 机制
+### B3: Independent mutation verification [pending]
+- npm run test:mutation:check
+- = node scripts/check-mutation-thresholds.mjs
+- Verifies: commit_sha, config_hash, score, waiver commitSha + configurationHash
+- Verify: exit code 0
+
+### B4: verify:phase1:local [pending]
+- npm run verify:phase1:local
+- = typecheck + check:cycles + build + lint + test(all) + test:coverage + test:mutation:phase1
+- Note: test:mutation:phase1 reuses B1 results if no code changed
+- coverage threshold: lines 80%, branches 75%, functions 80%
+- Verify: all 7 commands pass
+
+### B5: Phase 1 exit_criteria supplements [pending]
+- B5a: Run GLM live acceptance (see B5a-detail below)
+- B5b: Confirm evals/{coding,documents,research,writing,planning,personal-assistant}/phase-1.yaml pass
+- B5c: Confirm tests/session/crash-restore.test.ts covers:
+  - restore does not duplicate step
+  - correct iteration count
+  - side effect not repeated
+- B5d: node scripts/gates/check-active-stubs.mjs (confirm count=0)
+- B5e: test:mutation:check (done in B3)
+- Verify: all pass
+
+### B5a-detail: GLM Live Acceptance [pending]
+- npm run test:glm:live = node scripts/run-glm-acceptance.mjs
+- Requires env vars:
+  GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
+  GLM_MODEL=glm-5.2
+  GLM_REASONING_EFFORT=xhigh
+  GLM_ALLOW_REMOTE=1
+  MUTATION_ARTIFACT_DIGEST=<sha256 of mutation results>
+  MUTATION_ARTIFACT_NAME=phase1-mutation-{commitSha}
+- This is a release-level acceptance, not a simple Phase 1 check
+- May need to verify what it actually requires before running
+
+### B6: Security metrics [pending]
+- Confirm sandbox_violation=0, unauthorized_effect=0, capability_replay=0
+- Check test output for security violation assertions
+- Verify: no security violations in tests
+
+### B7: Regenerate Phase 1 evidence (40) [pending]
+- 40 files exist in artifacts/phase-1/AH-XXX-001/evidence.json
+- All commit_sha stale (bd85e7ed or 7f2eafaa, need 05dd3424 or newer)
+- NO automated script exists for this (release-evidence.mjs is for Phase 2 release)
+- Must manually update each file:
+  1. Get new commit_sha: git rev-parse HEAD
+  2. Get new tree_sha: git rev-parse HEAD^{tree}
+  3. Run the requirement's tests: npx vitest run {test_files} --reporter=verbose
+  4. Capture test output
+  5. Compute test_output_sha256: sha256 of test output
+  6. Update commit_sha, tree_sha, test_output, test_output_hash, test_output_sha256
+  7. Run GLM 5.2 xhigh independent verification for each requirement
+  8. Update independent_verifier field
+- Consider writing a script to automate steps 1-6
+- Verify: 40/40 commit_sha = current HEAD
+
+## Phase C: Phase 2 Thin Test Thickening
+
+### C0: Review 52 thin tests quality [pending]
+- For each file (tests/phase-2/unit/ah-*.test.ts, 33-116 lines):
+  a) Read acceptance_criteria from main repo:
+     python3 -c "import json; ..." (query requirements.ndjson)
+  b) Read corresponding source code (see HARNESS_SESSION_DIRECTIVE.md source mapping)
+  c) Read existing thin test file
+  d) Confirm each acceptance_criteria has >= 1 test
+  e) Confirm tests use mock provider for real functional paths (not just unavailable)
+  f) If insufficient, thicken with real functional tests
+  g) npx vitest run tests/phase-2/unit/ah-XXX-001.test.ts --reporter=verbose
+  h) typecheck + lint
+- 52 files sorted by line count (33L-116L)
+- Priority: thinnest first (33L-50L)
+- Source mapping (from HARNESS_SESSION_DIRECTIVE.md):
+  - packages/multimodal/src/vision.ts -> ah-mm-doc-vision, ah-mm-vision-verify, ah-mm-vision
+  - packages/multimodal/src/image-gen.ts -> ah-tool-image-gen, ah-mm-image-in, ah-mm-image-gen
+  - packages/multimodal/src/image-edit.ts -> ah-mm-image-edit
+  - packages/multimodal/src/artifact-store.ts -> ah-mm-artifact
+  - packages/multimodal/src/speech.ts -> ah-tool-speech-gen, ah-tool-transcribe, ah-tool-speech
+  - packages/rag/src/*.ts -> ah-rag-*
+  - packages/documents/src/parsers/*.ts -> ah-doc-ingest-*
+  - packages/documents/src/ingestor.ts -> ah-doc-parse-*, ah-doc-ingest-enc
+  - packages/tools/src/*.ts -> ah-tool-*, ah-sandbox-oci, ah-mcp-stdio
+  - packages/api/src/index.ts -> ah-ux-contract
+  - packages/ui/src/index.ts -> ah-ux-states
+  - packages/runtime-core/src/model-fallback.ts -> ah-runtime-modelfallback
+  - apps/web/src/app.ts -> ah-ux-web
+  - apps/tui/src/tui.ts -> ah-ui-tui
+  - apps/desktop/src/shell.ts -> ah-ux-desktop
+  - apps/api/src/server.ts -> ah-ux-api
+- Verify: each file covers all acceptance_criteria
+
+### C1: Full Phase 2 test verification [pending]
+- npx vitest run tests/phase-2/ --reporter=dot
+- Verify: 0 failed
+
+## Phase D: Phase 2 Gate Closure
+
+### D1: git status clean [pending]
+- Only equivalent-mutants.json uncommitted (allowed)
+- Verify: git status --short only has equivalent-mutants.json
+
+### D2: verify:phase2:dev [pending]
+- node scripts/gates/verify-phase2-local.mjs --mode dev
+- 5 commands: manifest, workspace-boundaries, assets, contract-drift, phase2-unit
+- Verify: success=true
+
+### D3: Push to origin and wait for CI [pending]
+- git push origin codex/phase2-integrated
+- Wait for CI green (typecheck/build/lint/test/coverage/audit/pack)
+- CI does NOT run mutation
+- Verify: CI green
+
+### D4: Run Phase 2 mutation via GitHub Actions [pending]
+- gh workflow run phase2-mutation.yml --repo 123oqwe/agent-harness-v9.1
+- This runs on ubuntu-22.04 with bubblewrap + node 20.18.1 + npm 10.8.2
+- Takes up to 6 hours (timeout: 360 minutes)
+- Monitor: gh run list --workflow=phase2-mutation.yml
+- Verify: workflow completes with exit code 0
+- Note: CANNOT run locally (macOS throws, Linux needs bubblewrap)
+
+### D5: Run local gate commands (except mutation) [pending]
+- Run each command individually that can work locally:
+  1. node scripts/gates/check-phase2-manifest.mjs
+  2. node scripts/check-workspace-boundaries.mjs
+  3. node scripts/gates/check-phase2-assets.mjs --mode local
+  4. node scripts/gates/check-contract-drift.mjs
+  5. node scripts/gates/check-active-stubs.mjs --mode scan
+  6. npm run typecheck
+  7. npm run check:cycles
+  8. npm run build
+  9. npx vitest run tests/phase-2/architecture
+  10. npm run lint
+  11. npm test -- --maxWorkers=1 (phase1-regression)
+  12. npm run test:coverage -- --maxWorkers=1
+  13. node scripts/gates/check-workspace-coverage.mjs
+  14. npx vitest run tests/phase-2/unit
+  15. npx vitest run tests/phase-2/integration
+  16. npx vitest run tests/phase-2/security
+  17. npx vitest run tests/phase-2/e2e
+  #18 SKIP: mutation (run via CI in D4)
+  19. node scripts/gates/run-phase2-evals.mjs --mode release
+  20. node scripts/gates/run-phase2-data.mjs --mode release
+  21. node scripts/gates/package-smoke.mjs
+  22. node scripts/gates/package-smoke.mjs --mode workspace
+  23. node scripts/gates/package-smoke.mjs --mode source-checkout
+  + npm audit --omit=dev --audit-level=high
+- Verify: commands 1-17, 19-23+audit all pass
+- Note: full verify:phase2:local --mode local cannot complete (mutation fails)
+
+### D6: Confirm Phase 2 exit_criteria [pending]
+- all_phase_requirements_verified=true (evidence 64/64, via local gate)
+- regression_tests_pass=true (commands 1-17, 19-23 pass)
+- active_stub_count=0 (command 5)
+- independent_glm_5_2_xhigh=PASS (Phase E)
+- Note: candidateReady cannot be true locally (mutation command fails)
+- candidateReady requires CI attestation anyway (releaseReady=false hardcoded)
+- Verify: all achievable criteria satisfied
+
+## Phase E: GLM-5.2 xhigh Scenario Acceptance
+
+### E1: GLM source review (existing) [pending]
+- 52 source files reviewed (evidence/ 9 JSONs, 0 high/critical)
+- Reusable for independent_glm_5_2_xhigh
+
+### E2: Scenario acceptance [pending]
+- 6 scenarios: long-context, RAG, multimodal, UX, privacy, failure-recovery
+- GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
+- May use npm run test:glm:live or custom scenario scripts
+- Need to verify exact mechanism for Phase 2 scenario acceptance
+- Verify: all scenarios pass
+
+## Phase F: commit and push
+
+### F1: Final verification [pending]
+- typecheck + lint + build: PASS
+- All tests: PASS (2859 Phase 1 + 758 Phase 2)
+- Phase 2 dev gate: PASS
+- Phase 1 mutation: 15/15 PASS
+- Phase 1 evidence: 40/40 SHA correct
+- Phase 2 mutation: completed via CI
+- Local gate commands (except mutation): all pass
+- GLM acceptance: pass
+- Verify: all pass
+
+### F2: Commit all source changes [pending]
+- git add source files (tests/, packages/, apps/, gateway/, scripts/, etc.)
+- Do NOT add: reports/, dist/, node_modules/, .stryker-tmp/, coverage/
+- .gitignore already excludes these
+- equivalent-mutants.json stays uncommitted
+- Verify: git status only has equivalent-mutants.json
+
+### F3: Push to GitHub [pending]
+- git push origin codex/phase2-integrated (public, has runner)
+- Wait for CI green
+- Verify: CI green, origin/HEAD == HEAD
+- Note: user says 'GitHub上只放源码' - .gitignore ensures this
+
+## Rules
+1. Never delete tests, lower thresholds, or add skip
+2. Never fake evidence/mutation results
+3. Each fix must correspond to a specific failure
+4. Never modify byte-frozen gate manifest (verification/gates/phase2-gate.json)
+5. Never modify spec/, control/, evidence/ protected paths (needs CTO approval)
+6. Never proceed to next step until current step is fully green
+7. candidate-only: local results are not VERIFIED
+8. Never write filler tests (only toBeDefined or module importable)
+9. Waiver stays uncommitted (runner allows)
+10. After each test fix: vitest + typecheck + lint
+11. After each commit: rebind waiver commitSha
+12. Phase 2 mutation MUST run via GitHub Actions (not local)
+
+## Key Info
+- GLM_API_KEY: e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
+- HEAD: git rev-parse HEAD (never hardcode)
+- origin: https://github.com/123oqwe/agent-harness-v9.1.git (PUBLIC, has runner)
+- product: https://github.com/123oqwe/agentharness91.git (PRIVATE, no runner)
+- Spec: /Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/spec/
+- Control: /Users/guanjieqiao/agent-runtime-v7/agent-harness-v9.1/control/current-state.json
 - configurationHash: 2e02aab1022cac3c64b20c94300813b6dbd1d572b8bd8c9dae4f6d0749b52bd2
-- commitSha: 需与当前 HEAD 匹配 (每次 commit 后重绑, 保持 uncommitted)
-- runner 允许 equivalent-mutants.json uncommitted (repositoryContext line 793-795)
-- 改 modules.mjs 会变 configurationHash → 所有 waiver 失效 → 必须重绑
+- Phase 1 baseline: 8dca581e11b8043aed257cb07c5161237633c40e (HEAD is descendant)
 
-## ═══ 阶段 A-G 执行路线图 ═══
-
-### 阶段 A: 快速收尾 ✓ (已完成)
-- [x] A1: Waiver 重绑到当前 HEAD, 保持 uncommitted
-- [x] A2: server.test.ts port:0 修复 (commit 75020cfa)
-- [x] A3: task_plan.md 修正 (本文档)
-- [x] A4: typecheck + lint PASS
-
-### 阶段 B: Phase 1 Mutation (进行中)
-- [ ] B0: 清理 .stryker-tmp (已清理旧目录)
-- [ ] B1: 运行 Phase 1 mutation (session 7968, gateway chunk 4/43, 5-8h)
-  - 注意: gateway chunkTimeoutMs=30min, default=15min
-  - 注意: Stryker exit code 非 0 拒绝报告
-  - 注意: 本地 node v24, CI node v20
-- [ ] B2: 检查结果, 15/15 PASS
-  - 如果不达标: 补测试杀 surviving 或注册 waiver
-- [ ] B3: npm run test:mutation:check (独立验证)
-- [ ] B4: npm run verify:phase1:local (--maxWorkers=1)
-  - 注意: 跑全部测试 (Phase 1 + Phase 2)
-  - 注意: managed-gateway-stream.test.ts 有 1 个 pre-existing timeout
-- [ ] B5: 补充 5 个 Phase 1 exit_criteria
-  - B5a: npm run test:glm:live (GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni)
-  - B5b: domain evals (phase-1.yaml 不存在, 需创建或标 N/A)
-  - B5c: crash_restore_no_duplicate (3 tests, 确认覆盖)
-  - B5d: active_stub_count=0 (check-active-stubs.mjs)
-  - B5e: mutation:check (已在 B3)
-- [ ] B6: 安全指标 (sandbox_violation=0, unauthorized_effect=0, capability_replay=0)
-- [ ] B7: 重新生成 40 个 Phase 1 evidence (39 stale + 1 missing AH-GATEWAY-TESTPROVIDER-001)
-
-### 阶段 C: Phase 2 薄测试补厚 (未开始)
-- 52 个薄测试 (tests/phase-2/unit/ah-*.test.ts, 33-116 行)
-- 从主仓库读 acceptance_criteria, mock provider, 真实二进制内容
-- 每条 acceptance_criteria 至少 1 个测试覆盖
-
-### 阶段 D: Phase 2 Gate 闭环 (未开始)
-- D1: git status clean
-- D2: verify:phase2:dev (5 命令)
-- D3: git push -u origin codex/phase2-integrated (public, 有 runner)
-  - 注意: product (agentharness91) 是 PRIVATE 无 runner
-- D4: verify:phase2:local --mode local (23 命令, 3-4h)
-  - releaseReady 硬编码 false, 目标 candidateReady=true
-  - candidateReady 要求 candidateEvidenceCount === 64
-- D5: 确认 Phase 2 exit_criteria
-
-### 阶段 E: Phase 2 GLM 场景验收 (未开始)
-- 已有 52 个源文件 GLM 源码审查 (evidence/ 下 9 个 JSON)
-- 需补充 6 个场景验收: long-context, RAG, multimodal, UX, privacy, failure-recovery
-
-### 阶段 F: 更新控制状态 (需 CTO 批准)
-- 在主仓库 agent-harness-v9.1 更新 control/current-state.json
-- 确认 B0.5 受保护 patch 是否已批准
-
-### 阶段 G: Phase 3 实现 (数周, 需单独计划)
-- 16 个 requirement, 全部 not_started
-- 建立在 router/static-router.ts 基础上
-- multi_agent capability 在 Phase 3 启用
-- 5 个工具 requirement 需要外部服务
-
-## 铁律
-1. 不删测试, 不降阈值, 不加 skip
-2. 不伪造 evidence/mutation 结果
-3. 每个修复必须对应一个具体失败
-4. 不改动 byte-frozen gate manifest
-5. 不改动 spec/, control/, evidence/ 受保护路径 (需 CTO 批准)
-6. 步骤未全绿不进入下一步
-7. candidate-only: 本地结果不冒充 VERIFIED
-8. 不在本地死磕 releaseReady=true (需 CI attestation)
-9. 不写填充测试 (只检查 toBeDefined 或 module importable)
-10. Waiver 保持 uncommitted (runner 允许)
-
-## Errors Encountered
-| Error | Resolution |
-|-------|------------|
-| waiver commitSha mismatch | 重绑到 HEAD, 保持 uncommitted |
-| ProviderHttpError(503) kind='server' | 修正断言 |
-| createEventBus() 不存在 | 用 new EventBus() |
-| LoopError → malformed_response | 修正预期 |
-| beforeTurn iteration=1 | 修正预期 |
-| server.test.ts hardcoded ports | port:0 |
-
-## Key Questions
-1. agentharness91 是 PRIVATE 无 runner — 推到 origin (public) 或改 agentharness91 为 public?
-2. GLM_API_KEY: e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni (可用)
-3. Phase 1 domain evals 不存在 — 创建或标 N/A?
-4. gate_command factory/phase-gates/gate_runner.py 不存在 — verify:phase1:local 是替代品?
-5. B0.5 受保护 patch 是否已批准?
-6. 40 个 Phase 1 requirement, 只有 39 个 evidence (缺 AH-GATEWAY-TESTPROVIDER-001)
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase A preparation, mutation needs rerun |
+| Where am I going? | mutation -> thin tests -> gate -> GLM -> push |
+| What's the goal? | Phase 1+2 pass, push source to GitHub |
+| What have I learned? | See findings.md - old mutation stale, evidence stale, dev gate PASS, Phase 2 mutation CI-only |
+| What have I done? | Full state verification, stale lock cleaned, plan written and verified |
