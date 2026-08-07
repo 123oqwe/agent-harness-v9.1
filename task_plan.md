@@ -3,13 +3,17 @@
 ## Goal
 Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, evidence refreshed, thin tests thickened, gate closure, GLM acceptance, then commit and push source code to GitHub.
 
-## Current State (HEAD: 7d87adab, 2026-08-08)
-- CI fix pushed: search-files VFS routing + OCI sandbox runtime detection + ripgrep install
-- Phase 1 mutation RUNNING (chunk 21/43 gateway, ~2h ETA)
-- Phase 2 unit tests: 758/758 PASS
-- Phase 2 security tests: 234/234 PASS
+## Current State (HEAD: 94b134f9, 2026-08-08)
+- Phase 1 mutation RUNNING (chunk 40/43 gateway, 4 gateway + 14 modules remaining, ~45-75 min ETA)
+- CI running (31228262998) with 45-min timeout (was 30, increased for larger test suite)
+- Phase 2 unit tests: 959/959 PASS (+201 tests from thickening)
+- Phase 2 integration: 95/95 PASS
+- Phase 2 e2e: 78/78 PASS
+- Phase 2 security: 234/234 PASS
+- Phase 1 security: 113/113 PASS
 - Active stubs: 0
 - Crash restore: 3/3 PASS
+- Domain evals: 12/12 PASS
 - 20 waivers rebound to HEAD (uncommitted, as expected)
 - Only mutation/equivalent-mutants.json uncommitted
 
@@ -22,23 +26,23 @@ Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, 
 
 ### Phase B: Phase 1 Mutation - IN PROGRESS
 - [x] B0: Clean .stryker-tmp, npm run prepare, set GLM_API_KEY
-- [x] B0b: Fix CI failures (3 commits: 1f9c3232 env leak, 4fb03895 VFS+OCI, 7d87adab ripgrep)
-- [ ] B1: Run Phase 1 mutation (RUNNING, chunk 21/43, ETA ~2h)
-- [ ] B2: Check mutation results, fix failing modules (add tests or register waivers)
+- [x] B0b: Fix CI failures (env leak, VFS routing, OCI runtime, ripgrep install, timeout increase)
+- [ ] B1: Run Phase 1 mutation (RUNNING, chunk 40/43, ~45-75 min ETA)
+- [ ] B2: Check mutation results, fix failing modules (add tests or waivers)
 - [ ] B3: Independent mutation verification (npm run test:mutation:check)
 - [ ] B4: verify:phase1:local (typecheck + cycles + build + lint + test + coverage + mutation)
 - [ ] B5: Phase 1 exit_criteria supplements:
+  - [x] B5b: Domain evals 12/12 PASS
   - [x] B5c: Crash restore 3/3 PASS
   - [x] B5d: Active stubs 0
+  - [x] B6: Security tests 113/113 PASS
   - [ ] B5a: GLM live (requires mutation complete + MUTATION_ARTIFACT_DIGEST)
-  - [ ] B5b: Domain evals (6 files exist, need verify pass)
   - [ ] B5e: test:mutation:check (same as B3)
-- [ ] B6: Security metrics (sandbox_violation=0, unauthorized_effect=0, capability_replay=0)
 - [ ] B7: Regenerate Phase 1 evidence (40 files, stale SHA)
 
-### Phase C: Phase 2 Thin Test Thickening
-- [ ] C0: Review and thicken 52 Phase 2 thin tests (33-116 lines each)
-- [ ] C1: Full Phase 2 test verification (npx vitest run tests/phase-2/)
+### Phase C: Phase 2 Thin Test Thickening - COMPLETE
+- [x] C0: All 52 thin tests thickened (~201 new tests added)
+- [x] C1: Phase 2 unit tests 959/959 PASS
 
 ### Phase D: Phase 2 Gate Closure
 - [ ] D1: Verify git status clean (only equivalent-mutants.json uncommitted)
@@ -60,7 +64,6 @@ Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, 
 ## Key Facts
 - GLM_API_KEY: e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
 - origin: https://github.com/123oqwe/agent-harness-v9.1.git (PUBLIC, has runner)
-- product: https://github.com/123oqwe/agentharness91.git (PRIVATE, no runner)
 - configurationHash: 2e02aab1022cac3c64b20c94300813b6dbd1d572b8bd8c9dae4f6d0749b52bd2
 - 15 mutation modules: gateway(85), router(90), toolsRegistry(90), toolsLeaf(85), skills(85), strategies(85), actionControl(90), identitySecrets(90), vfs(90), sandbox(90), session(90), runtime(90), verification(85), verticals(85), uiAdapters(85)
 - 4 new modules: actionControl, runtime, session, identitySecrets (no old results)
@@ -68,12 +71,3 @@ Complete all Phase 1+2 conditions blocking Phase 3 entry: mutation scores pass, 
 - Phase 2 mutation CANNOT run locally (macOS, needs Linux bubblewrap)
 - GLM live test requires: mutation complete + PASS + MUTATION_ARTIFACT_DIGEST + ACCEPTANCE_EVIDENCE_ROOT
 - Phase 2 mutation workflow: .github/workflows/phase2-mutation.yml (exists)
-
-## Decisions
-| Decision | Rationale |
-|----------|-----------|
-| Install ripgrep on CI | search-files-ripgrep tests require rg for regex/glob/line_number |
-| Make tests handle rg absence | VFS fallback doesn't support rg-specific features |
-| Phase 2 mutation via GitHub Actions | macOS throws error, needs Linux bubblewrap |
-| equivalent-mutants.json stays uncommitted | repositoryContext allows uncommitted waiver rebind |
-| GLM live test after mutation | Requires mutation PASS + artifact digest |
