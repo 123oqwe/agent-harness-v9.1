@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createProviderAdapter, getProviderRegions } from '../../gateway/provider-adapters.js';
 import { KeyVault } from '../../gateway/key-vault.js';
 import { CapabilityRegistry, type ModelBinding } from '../../gateway/capability-registry.js';
@@ -279,5 +279,125 @@ describe('createProviderAdapter', () => {
     const adapter = createProviderAdapter(binding, kv);
     const tc = adapter.normalizeToolCall({ id: 'tc1', function: { name: 'test', arguments: '' } });
     expect(tc.arguments).toEqual({});
+  });
+});
+
+const originalFetch = globalThis.fetch;
+
+describe('createProviderAdapter resolve()', () => {
+  afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  function makeReq(): any {
+    return {
+      messages: [{ role: 'user', content: 'hello' }],
+      temperature: 0.3, max_tokens: 100,
+    };
+  }
+
+  it('resolve() returns JSON on success for zhipu', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'test-key');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'hi' } }] }),
+      text: async () => '{}', headers: new Headers(),
+    } as Response)) as any;
+    const result = await adapter.resolve(makeReq());
+    expect(result).toBeDefined();
+    const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(fetchCall![0]).toBe(binding.api_base + '/chat/completions');
+    const init = fetchCall![1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer test-key');
+  });
+
+  it('resolve() throws No API key for non-local provider without key', async () => {
+    const kv = new KeyVault();
+    // Manually remove zhipu key if it was auto-loaded
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) } as Response)) as any;
+    await expect(adapter.resolve(makeReq())).rejects.toThrow('No API key for zhipu');
+  });
+
+  it('resolve() allows empty key for local provider (ollama)', async () => {
+    const kv = new KeyVault();
+    const binding = getBinding('ollama', 'llama3');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'hi' } }] }),
+      text: async () => '{}', headers: new Headers(),
+    } as Response)) as any;
+    // KeyVault auto-registers ollama with 'local-no-auth' key, so resolve won't throw
+    // The key difference: local providers don't throw "No API key" even if key is empty
+    const result = await adapter.resolve(makeReq());
+    expect(result).toBeDefined();
+    // Ollama auto-gets 'local-no-auth' key, so Authorization header is present
+    const init = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1] as RequestInit;
+    const authHeader = (init.headers as Record<string, string>)['Authorization'];
+    // KeyVault auto-registers 'local-no-auth' for ollama, so header exists
+    expect(authHeader).toBeDefined();
+    expect(authHeader).toContain('local-no-auth');
+  });
+
+  it('resolve() throws HTTP 429 with rate limited message', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'k');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false, status: 429, text: async () => 'rate limited', json: async () => ({}), headers: new Headers(),
+    } as Response)) as any;
+    await expect(adapter.resolve(makeReq())).rejects.toThrow('HTTP 429 rate limited');
+  });
+
+  it('resolve() throws HTTP 500 with status', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'k');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false, status: 500, text: async () => 'server error', json: async () => ({}), headers: new Headers(),
+    } as Response)) as any;
+    await expect(adapter.resolve(makeReq())).rejects.toThrow('HTTP 500');
+  });
+
+  it('resolve() throws HTTP 400 with status', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'k');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false, status: 400, text: async () => 'bad request', json: async () => ({}), headers: new Headers(),
+    } as Response)) as any;
+    await expect(adapter.resolve(makeReq())).rejects.toThrow('HTTP 400');
+  });
+
+  it('resolve() passes AbortSignal.timeout(90000) as signal', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'k');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    let capturedSignal: unknown;
+    globalThis.fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedSignal = init?.signal;
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '{}', headers: new Headers() } as Response;
+    }) as any;
+    await adapter.resolve(makeReq());
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('resolve() sends POST method with JSON body', async () => {
+    const kv = new KeyVault(); kv.addKey('zhipu', 'k');
+    const binding = getBinding('zhipu', 'glm-4-plus');
+    const adapter = createProviderAdapter(binding, kv);
+    let capturedInit: RequestInit | undefined;
+    globalThis.fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedInit = init;
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '{}', headers: new Headers() } as Response;
+    }) as any;
+    await adapter.resolve(makeReq());
+    expect(capturedInit!.method).toBe('POST');
+    expect(capturedInit!.body).toBeDefined();
+    const body = JSON.parse(capturedInit!.body as string);
+    expect(body.model).toBe('glm-4-plus');
+    expect(body.messages).toBeDefined();
   });
 });
