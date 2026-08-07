@@ -15,12 +15,13 @@ Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
 - [x] A1: Commit uncommitted files (HARNESS_SESSION_DIRECTIVE.md), keep equivalent-mutants.json uncommitted
 - [x] A2: Verify dev gate passes (verify:phase2:dev -> success=true)
 - [x] A3: Push HEAD to origin (721450a8 pushed)
-- [ ] A3b: Push env leak fix to origin (1f9c3232 NOT yet pushed, origin still at 721450a8)
+- [x] A3b: Push to origin (7052dcf3 pushed, includes env leak fix + plan review)
 - **Status:** complete
 
 ### Phase B: Phase 1 Mutation Rerun (LOCAL, 5-8h)
 - [x] B0: Clean .stryker-tmp, npm run prepare (patches applied), set GLM_API_KEY
 - [ ] B1: Run Phase 1 mutation (env leak fixed in 3 files, 603/603 gateway tests pass with GLM_API_KEY, ready to rerun)
+- [ ] B1: Mutation RUNNING in screen session "mutation" (PID 3240, gateway chunk 1/43 dry run PASSED, 5-8h ETA)
 - [ ] B2: Check mutation results, fix failing modules (add tests or register waivers)
 - [ ] B3: Independent mutation verification (npm run test:mutation:check)
 - [ ] B4: verify:phase1:local (typecheck + cycles + build + lint + test + coverage + mutation)
@@ -79,10 +80,9 @@ Phase B: Phase 1 Mutation Rerun (env leak fix complete, ready to rerun)
 | managed-gateway-stream.test.ts: "completeStream respects rate limits" fails with GLM_API_KEY set | 1 | Fixed: added delete GLM_API_KEY/ZHIPU_API_KEY in beforeEach (commit 1f9c3232) |
 
 ## Notes
-- HEAD: 1f9c3232 (git rev-parse HEAD, never hardcode)
-- Uncommitted: only mutation/equivalent-mutants.json (waiver rebind to 1f9c3232, runner allows)
-- Uncommitted (temporary): task_plan.md, findings.md, progress.md (being reviewed, will commit after quality check)
-- origin behind by 1 commit (1f9c3232 not pushed yet)
+- HEAD: 7052dcf3 (pushed to origin)
+- Uncommitted: only mutation/equivalent-mutants.json (waiver rebind to 7052dcf3, runner allows)
+- Mutation running in screen session "mutation", monitor: tail -f /tmp/phase1-mutation-run.log
 - Env leak fix committed: 1f9c3232 (3 test files: provider-adapters, key-vault, managed-gateway-stream)
 - 603/603 gateway tests pass with GLM_API_KEY set in env (verified 03:12)
 - Previous mutation session 78665 ended (no new results generated, all old results still stale)

@@ -51,6 +51,11 @@
   - B1: Checked: no KeyVault instances in tests/ outside tests/gateway/
   - B1: Committed env leak fix: 1f9c3232 (3 test files + plan files)
   - B1: Rebound 20 waivers to 1f9c3232 (equivalent-mutants.json, uncommitted)
+  - B1: Committed plan review updates: 7052dcf3 (pushed to origin)
+  - B1: Rebound 20 waivers to 7052dcf3
+  - B1: Started mutation in screen session "mutation" (PID 3240, survives session end)
+  - B1: Gateway chunk 1/43 dry run PASSED (158 tests, 31s) - env leak fix confirmed working
+  - B1: Stryker mutation testing in progress on chunk 1/43 (4 child workers active)
 - Files created/modified:
   - .stryker-tmp/ (cleaned, will be repopulated by mutation run)
   - /tmp/phase1-mutation-run.log (mutation output log)
@@ -91,6 +96,11 @@
 | What's the goal? | Phase 1+2 pass, push source to GitHub |
 | What have I learned? | See findings.md - GLM_API_KEY env leak is root cause of test failures under mutation runner |
 | What have I done? | Phase A complete, B0 complete, B1 env leak fixed (3 files, 603/603 pass), ready to rerun mutation |
+| Phase 1 mutation | screen -list / tail /tmp/phase1-mutation-run.log | running | PID 3240, gateway 1/43 | IN PROGRESS |
+| Gateway chunk 1/43 | async-task-adapter.ts:1-150 | done | 1m35s, score 33.55% | DONE |
+| Gateway chunk 2/43 | async-task-adapter.ts:151-270 | done | ~1m | DONE |
+| Gateway chunk 3/43 | (next file) | done | ~1m | DONE |
+| Gateway chunk 4/43 | capability-registry.ts:1-150 | running | 95/164 tested, 66 survived | IN PROGRESS |
 
 ---
 *Update after completing each phase or encountering errors*
