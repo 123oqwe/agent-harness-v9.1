@@ -127,7 +127,7 @@ describe('server factory functions', () => {
     });
 
     it('starts on a specified port and returns server + managedGateway', () => {
-      const { server, managedGateway } = startServer({ port: 18099 });
+      const { server, managedGateway } = startServer({ port: 0 });
       servers.push(server);
       expect(server).toBeDefined();
       expect(managedGateway).toBeDefined();
@@ -135,13 +135,13 @@ describe('server factory functions', () => {
     });
 
     it('uses default workspace dir when not provided', () => {
-      const { server } = startServer({ port: 18098 });
+      const { server } = startServer({ port: 0 });
       servers.push(server);
       expect(server.isRunning).toBe(true);
     });
 
     it('stops cleanly', () => {
-      const { server } = startServer({ port: 18097 });
+      const { server } = startServer({ port: 0 });
       expect(server.isRunning).toBe(true);
       server.stop();
       expect(server.isRunning).toBe(false);
