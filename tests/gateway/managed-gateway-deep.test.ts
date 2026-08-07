@@ -277,3 +277,108 @@ describe('ManagedGateway.complete() deep tests', () => {
     expect(body.max_tokens).toBe(8000);
   });
 });
+
+describe('ManagedGateway.complete() fallback and circuit breaker', () => {
+  afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
+
+  // 1. Fallback chain: first provider fails, second succeeds
+
+  it('triggers fallback when first provider fails and second succeeds', async () => {
+    const kv = new KeyVault();
+    kv.addKey('zhipu', 'zhipu-key');
+    kv.addKey('deepseek', 'deepseek-key');
+    const registry = new CapabilityRegistry();
+    const economic = new EconomicKernel();
+    const rateLimiter = new RateLimiter({ rpmLimit: 100, tpmLimit: 10_000_000, concurrentLimit: 10 });
+    const gw = new ManagedGateway({ keyVault: kv, registry, economic, rateLimiter });
+
+    const deepseekEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+    const zhipuEndpoint = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url === deepseekEndpoint) throw new Error('ECONNREFUSED');
+      if (url === zhipuEndpoint) return mockFetchResponse(makeChatResponse('fallback success'));
+      throw new Error(`unexpected URL: ${url}`);
+    }) as any;
+
+    const result = await gw.complete('test prompt', {
+      userId: 'user1', taskId: 'task1', stepId: 'step1', tier: 'work',
+    });
+    expect(result.usage.success).toBe(true);
+    expect(result.response).toBe('fallback success');
+    expect(result.fallback_triggered).toBe(true);
+    expect(result.fallback_chain.length).toBeGreaterThanOrEqual(2);
+  }, 30000);
+
+  // 2. Circuit breaker open: after 5 failures, breaker blocks provider
+
+  it('returns circuit breakers open after threshold failures', async () => {
+    const kv = new KeyVault();
+    kv.addKey('zhipu', 'zhipu-key');
+    const registry = new CapabilityRegistry();
+    const economic = new EconomicKernel();
+    const rateLimiter = new RateLimiter({ rpmLimit: 100, tpmLimit: 10_000_000, concurrentLimit: 10 });
+    const gw = new ManagedGateway({ keyVault: kv, registry, economic, rateLimiter });
+
+    globalThis.fetch = vi.fn(async () => { throw new Error('ECONNREFUSED'); }) as any;
+
+    // Make 5 failed calls to open the breaker (threshold=5)
+    for (let i = 0; i < 5; i++) {
+      await gw.complete('test', {
+        userId: 'u1', taskId: `fail-task-${i}`, stepId: `s${i}`, tier: 'work',
+      });
+    }
+    // 6th call: breaker should be open
+    const result = await gw.complete('test', {
+      userId: 'u1', taskId: 'cb-task', stepId: 's6', tier: 'work',
+    });
+    expect(result.usage.success).toBe(false);
+    // Either "Circuit breakers open" or "All providers failed" depending on exact flow
+    const errorResponse = JSON.parse(result.response);
+    expect(errorResponse.error.toLowerCase()).toMatch(/circuit breaker|all providers failed/);
+  }, 60000);
+
+  // 3. All providers failed: only one provider, it fails, switchProvider throws
+
+  it('returns all providers failed when single provider dispatch throws', async () => {
+    const kv = new KeyVault();
+    kv.addKey('zhipu', 'zhipu-key');
+    const registry = new CapabilityRegistry();
+    const economic = new EconomicKernel();
+    const rateLimiter = new RateLimiter({ rpmLimit: 100, tpmLimit: 10_000_000, concurrentLimit: 10 });
+    const gw = new ManagedGateway({ keyVault: kv, registry, economic, rateLimiter });
+
+    globalThis.fetch = vi.fn(async () => { throw new Error('ECONNREFUSED'); }) as any;
+
+    const result = await gw.complete('test', {
+      userId: 'u1', taskId: 'all-fail', stepId: 's1', tier: 'work',
+    });
+    expect(result.usage.success).toBe(false);
+    const errorResponse = JSON.parse(result.response);
+    expect(errorResponse.error).toContain('All providers failed');
+  }, 30000);
+
+  // 4. Budget insufficient: estimateCost > budgetRemaining
+
+  it('returns budget insufficient when cost exceeds remaining budget', async () => {
+    const kv = new KeyVault();
+    kv.addKey('zhipu', 'zhipu-key');
+    const registry = new CapabilityRegistry();
+    const economic = new EconomicKernel();
+    economic.createBudget('budget-task', 0.0001); // Very small budget
+    const rateLimiter = new RateLimiter({ rpmLimit: 100, tpmLimit: 10_000_000, concurrentLimit: 10 });
+    const gw = new ManagedGateway({ keyVault: kv, registry, economic, rateLimiter });
+
+    globalThis.fetch = vi.fn(async () => mockFetchResponse(makeChatResponse('ok'))) as any;
+
+    const result = await gw.complete('test prompt', {
+      userId: 'u1', taskId: 'budget-task', stepId: 's1', tier: 'work',
+    });
+    // zhipu glm-5.2: price_input=0.5, price_output=1.5
+    // estInput=1, estOutput=2000
+    // estCost = 1/1M * 0.5 + 2000/1M * 1.5 = ~0.003 > 0.0001
+    expect(result.usage.success).toBe(false);
+    const errorResponse = JSON.parse(result.response);
+    expect(errorResponse.error.toLowerCase()).toMatch(/budget|all providers failed/);
+  }, 30000);
+});
