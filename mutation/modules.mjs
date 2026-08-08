@@ -43,6 +43,7 @@ export const mutationModules = {
       'tools/tool-executor.ts',
     ],
     minimum: 90,
+    chunkTimeoutMs: 30 * 60 * 1000,
   },
   toolsLeaf: {
     mutate: [
