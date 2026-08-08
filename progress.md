@@ -58,3 +58,22 @@
 - 543b84e9: test: add 162 gateway mutation-targeted tests (5 files)
 - 51b6e5a6: test: add progress-store mutation tests (13 tests)
 - 790a4279: test: add loop RAG/contextCompiler mutation tests (21 tests)
+
+### B3: Phase 1 Mutation Rerun from HEAD
+- **Started:** 2026-08-08 12:42 (screen session "mutation")
+- **HEAD:** ff3e06a0a462
+- **Config hash:** 5b5363b2dbed2e8e2f9d5e7ef23fdbbf3eed885ae2ea068416f99314fef813f1
+- **Waivers:** 20, rebound to HEAD + new config hash (uncommitted)
+- **Log:** /tmp/phase1-mutation-rerun.log
+- **Caffeinate:** PID 78000 (prevents sleep while mutation runs)
+- **Status:** Gateway chunk 1/43 in progress
+- **Expected duration:** 5-8 hours (15 modules)
+- **Monitor:** grep "Score:" /tmp/phase1-mutation-rerun.log
+- **DO NOT kill the screen session or mutation process**
+
+### Additional tests written since last update:
+- managed-gateway-mutation.test.ts (21 tests, commit 169b8dea)
+- model-gateway-helpers-mutation.test.ts (46 tests, commit ba03802f)
+- harness-hook-mutation.test.ts (18 tests, commit 7abe9052)
+- hook-port-attenuation-mutation.test.ts (30 tests, commit 20df3549)
+- Total new tests: 311 (across 11 files)
