@@ -7,6 +7,7 @@ import {
   SqliteSessionStore,
   validateSessionStoreSchema,
 } from '../../session/sqlite-session-store.js';
+import { openRunSession } from '../../session/run-session.js';
 import {
   createTrustedSessionStateRoot,
   type TrustedSessionStateRoot,
@@ -1014,5 +1015,45 @@ describe('sqlite-store-survival: error recovery paths (NoCov)', () => {
     expect(() => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot2 })).toThrow();
     rmSync(dir, { recursive: true, force: true });
     rmSync(dir2, { recursive: true, force: true });
+  });
+});
+
+describe('sqlite-store-survival: openRunSession error paths', () => {
+  it('throws with correct message when masterKey is wrong length', () => {
+    expect(() => openRunSession({
+      runId: 'test-run-1',
+      goal: 'test',
+      strategy: undefined,
+      clock: () => new Date().toISOString(),
+      dataDir: '/tmp/ah-run-test',
+      masterKey: Buffer.alloc(16, 0xab),
+    })).toThrow('32-byte sessionMasterKey is required for durable sessions');
+  });
+
+  it('throws when masterKey byteLength is 31 (off by one)', () => {
+    expect(() => openRunSession({
+      runId: 'test-run-2',
+      goal: 'test',
+      strategy: undefined,
+      clock: () => new Date().toISOString(),
+      dataDir: '/tmp/ah-run-test',
+      masterKey: Buffer.alloc(31, 0xab),
+    })).toThrow('32-byte sessionMasterKey is required');
+  });
+
+  it('works without dataDir (no persistence)', () => {
+    const result = openRunSession({
+      runId: 'test-run-3',
+      goal: 'test',
+      strategy: undefined,
+      clock: () => '2026-01-01T00:00:00Z',
+      dataDir: undefined,
+      masterKey: undefined,
+    });
+    expect(result.store).toBeNull();
+    expect(result.session).toBeDefined();
+    expect(result.existingEvents).toEqual([]);
+    expect(result.persistedRun).toBeNull();
+    result.session.releaseWriter();
   });
 });
