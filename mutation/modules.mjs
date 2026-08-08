@@ -112,6 +112,7 @@ export const mutationModules = {
       'session/run-session.ts',
     ],
     minimum: 90,
+    chunkTimeoutMs: 30 * 60 * 1000,
   },
   runtime: {
     mutate: [

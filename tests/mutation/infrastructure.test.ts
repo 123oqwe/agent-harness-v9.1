@@ -286,7 +286,7 @@ describe('Phase 1 mutation manifest', () => {
     expect(resolveChunkTimeoutMs('router')).toBe(30 * 60 * 1000);
     expect(resolveChunkTimeoutMs('toolsRegistry')).toBe(30 * 60 * 1000);
     for (const moduleName of Object.keys(mutationModules).filter(
-      (name) => name !== 'gateway' && name !== 'router' && name !== 'toolsRegistry',
+      (name) => name !== 'gateway' && name !== 'router' && name !== 'toolsRegistry' && name !== 'session',
     )) {
       expect(resolveChunkTimeoutMs(moduleName), moduleName).toBe(
         15 * 60 * 1000,
