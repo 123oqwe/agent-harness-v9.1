@@ -906,3 +906,69 @@ describe('sqlite-store-survival: validateSessionStoreSchema direct tests', () =>
     db.close();
   });
 });
+
+describe('sqlite-store-survival: identifier validation error messages', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); ctx.store.createRun('r-id', 'goal'); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  function mkOp(id: string, overrides: Record<string, unknown> = {}): any {
+    return { operation_id: id, run_id: 'r-id', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: `key-${id}`, effect_state: 'PRE_DISPATCH', receipt_json: null, ...overrides };
+  }
+
+  it('recordOperation throws with field name for empty operation_id', () => {
+    expect(() => ctx.store.recordOperation(mkOp('', { operation_id: '' }))).toThrow('operation_id is malformed');
+  });
+
+  it('recordOperation throws with field name for empty run_id', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-v1', { run_id: '' }))).toThrow('run_id is malformed');
+  });
+
+  it('recordOperation throws with field name for empty step_id', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-v2', { step_id: '' }))).toThrow('step_id is malformed');
+  });
+
+  it('recordOperation throws with field name for empty attempt_id', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-v3', { attempt_id: '' }))).toThrow('attempt_id is malformed');
+  });
+
+  it('recordOperation throws with field name for empty tool_name', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-v4', { tool_name: '' }))).toThrow('tool_name is malformed');
+  });
+
+  it('recordOperation throws with field name for empty idempotency_key', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-v5', { idempotency_key: '' }))).toThrow('idempotency_key is malformed');
+  });
+
+  it('recordReceipt throws with field name for empty operation_id', () => {
+    expect(() => ctx.store.recordReceipt('', { tool_name: 't', success: true, input_hash: 'h', output_hash: null, duration_ms: 1, timestamp: '2026-01-01T00:00:00Z' })).toThrow('operation_id is malformed');
+  });
+
+  it('getOperation throws with field name for empty operation_id', () => {
+    expect(() => ctx.store.getOperation('')).toThrow('operation_id is malformed');
+  });
+
+  it('getOperationByIdempotencyKey throws with field name for empty key', () => {
+    expect(() => ctx.store.getOperationByIdempotencyKey('')).toThrow('idempotency_key is malformed');
+  });
+
+  it('listOperations throws with field name for empty run_id', () => {
+    expect(() => ctx.store.listOperations('')).toThrow('run_id is malformed');
+  });
+
+  it('saveSnapshot throws with field name for empty run_id', () => {
+    expect(() => ctx.store.saveSnapshot('', { session_id: '', version: 1, last_seq: 0, last_hash: '', created_at: '2026-01-01T00:00:00Z', summary: {} })).toThrow('run_id is malformed');
+  });
+
+  it('getLatestSnapshot throws with field name for empty run_id', () => {
+    expect(() => ctx.store.getLatestSnapshot('')).toThrow('run_id is malformed');
+  });
+
+  it('loadEvents throws with field name for empty run_id', () => {
+    expect(() => ctx.store.loadEvents('')).toThrow('run_id is malformed');
+  });
+
+  it('appendEvent throws with field name for empty run_id', () => {
+    expect(() => ctx.store.appendEvent('', { seq: 1, type: 'user' as const, timestamp: '2026-01-01T00:00:00Z', data: {}, hash: 'h', prev_hash: '' })).toThrow('run_id is malformed');
+  });
+});
