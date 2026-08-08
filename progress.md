@@ -2,127 +2,59 @@
 
 ## Session: 2026-08-08
 
-### Phase A: Preparation
-- **Status:** complete
-- **Started:** 2026-08-08 02:45
-- Actions taken:
-  - Read HARNESS_SESSION_DIRECTIVE.md (complete session directive, 6 unfinished items)
-  - Checked stryker process: NOT running (PID 77574 dead, stale lock)
-  - Verified HEAD: 05dd3424 -> 721450a8 (after commit)
-  - Checked git status: uncommitted HARNESS_SESSION_DIRECTIVE.md + equivalent-mutants.json
-  - Verified Phase 1 tests: 2859/2859 PASS (130 test files)
-  - Verified Phase 2 unit tests: 758/758 PASS (64 test files)
-  - Verified dev gate: success=true (5 commands pass)
-  - Verified typecheck + lint: PASS
-  - Analyzed mutation state: 11 modules stale, 4 missing, gateway FAIL
-  - Analyzed Phase 1 evidence: 40/40 SHA stale
-  - Analyzed Phase 2 evidence: 0/64 (does not exist)
-  - Discovered: Phase 2 mutation CANNOT run locally (macOS bubblewrap error)
-  - Cleaned stale mutation lock (python3 shutil.rmtree)
-  - Rebound 20 waivers to new HEAD (equivalent-mutants.json, kept uncommitted)
-  - Committed docs: HARNESS_SESSION_DIRECTIVE.md + task_plan.md + findings.md + progress.md
-  - Pushed to origin: 721450a8
-- Files created/modified:
-  - task_plan.md (rewritten with template format)
-  - findings.md (rewritten with template format)
-  - progress.md (rewritten with template format)
-  - HARNESS_SESSION_DIRECTIVE.md (committed with mutation repair guide)
-  - mutation/equivalent-mutants.json (waiver rebind, uncommitted)
+### Phase A: Preparation - COMPLETE
+- Committed docs, verified dev gate, pushed to origin
 
-### Phase B: Phase 1 Mutation Rerun
-- **Status:** in_progress
-- **Started:** 2026-08-08 03:10
-- Actions taken:
-  - B0: Cleaned .stryker-tmp (3 old directories removed)
-  - B0: npm run prepare (patches applied: @stryker-mutator/core + vitest-runner)
-  - B0: Set GLM_API_KEY=e93c1f129cc44ce8908f3f6fa328c00b.hz4tGVIGo3Y8AQni
-  - B0: Verified stale lock cleaned
-  - B1: Started mutation run (node scripts/run-mutation.mjs phase1, session 78665)
-  - B1: Gateway chunk 1/43 FAILED in dry run: "expected 'Bearer e93c1f...' to be 'Bearer test-key'"
-  - B1: Root cause: GLM_API_KEY env var leaks into KeyVault.loadFromEnv(), tests don't isolate env
-  - B1: Fixed provider-adapters.test.ts: added beforeEach delete GLM_API_KEY/ZHIPU_API_KEY in resolve() describe
-  - B1: Verified fix: 37/37 tests pass with GLM_API_KEY set in env
-  - B1: Found 2 more failures: key-vault.test.ts (ZHIPU_API_KEY test), managed-gateway-stream.test.ts (rate limit)
-  - B1: Mutation runner continued to router module after gateway chunk 1 failed (gateway skipped, no report)
-  - B1: Fixed key-vault.test.ts: delete GLM_API_KEY before ZHIPU_API_KEY test (loadFromEnv checks GLM first)
-  - B1: Fixed managed-gateway-stream.test.ts: delete GLM_API_KEY/ZHIPU_API_KEY in beforeEach (was hitting real zhipu API)
-  - B1: Verified all 603/603 gateway tests pass with GLM_API_KEY set in env
-  - B1: Checked all other KeyVault-creating test files (6 files, 107/107 pass with GLM_API_KEY)
-  - B1: Checked: no KeyVault instances in tests/ outside tests/gateway/
-  - B1: Committed env leak fix: 1f9c3232 (3 test files + plan files)
-  - B1: Rebound 20 waivers to 1f9c3232 (equivalent-mutants.json, uncommitted)
-  - B1: Committed plan review updates: 7052dcf3 (pushed to origin)
-  - B1: Rebound 20 waivers to 7052dcf3
-  - B1: Started mutation in screen session "mutation" (PID 3240, survives session end)
-  - B1: Gateway chunk 1/43 dry run PASSED (158 tests, 31s) - env leak fix confirmed working
-  - B1: Stryker mutation testing in progress on chunk 1/43 (4 child workers active)
-- Files created/modified:
-  - .stryker-tmp/ (cleaned, will be repopulated by mutation run)
-  - /tmp/phase1-mutation-run.log (mutation output log)
-  - tests/gateway/provider-adapters.test.ts (MODIFIED: added beforeEach delete env vars in resolve() describe)
-  - tests/gateway/key-vault.test.ts (MODIFIED: delete GLM_API_KEY before ZHIPU_API_KEY test)
-  - tests/gateway/managed-gateway-stream.test.ts (MODIFIED: delete GLM_API_KEY/ZHIPU_API_KEY in beforeEach)
+### Phase B: Phase 1 Mutation
+- B0: Preparation complete (clean .stryker-tmp, npm prepare, GLM_API_KEY set)
+- B0b: CI fix - env leak fixed (commit 1f9c3232)
+- B1: Discovery mutation run COMPLETE (2026-08-08 05:23 - 12:10)
+  - 15/15 modules processed
+  - 11 PASS: router(90.19%), toolsLeaf(90.29%), skills(91.44%), strategies(85.88%),
+    actionControl(91.65%), identitySecrets(90.78%), vfs(92.13%), sandbox(91%),
+    verification(86.62%), verticals(88.48%), uiAdapters(95.77%)
+  - 4 FAIL: gateway(64.23%), toolsRegistry(0% timeout), session(85.89%), runtime(68.38%)
+  - Discovery run started from 0fc68dbd, current HEAD is 790a4279 (commit_sha mismatch, must rerun from HEAD)
+
+- B2: IN PROGRESS - writing tests for failing modules
+  - Gateway: 162 new tests written (5 files, committed 543b84e9)
+    - provider-adapters-mutation.test.ts (53 tests)
+    - capability-registry-mutation.test.ts (26 tests)
+    - key-vault-mutation.test.ts (39 tests)
+    - cache-manager-mutation.test.ts (20 tests)
+    - rate-limiter-circuit-mutation.test.ts (24 tests)
+  - Session: 13 new tests written (1 file, committed 51b6e5a6)
+    - progress-store-mutation.test.ts (13 tests)
+  - Runtime: 21 new tests written (1 file, committed 790a4279)
+    - loop-rag-context-mutation.test.ts (21 tests)
+  - Total new tests: 196
+
+### Remaining B2 work:
+- Gateway: need more tests for managed-gateway.ts, model-gateway.ts, server.ts, ws-server.ts
+- toolsRegistry: fix timeout in tool-definitions.ts:151-300, then add tests
+- Session: add tests for sqlite-session-store.ts (69 survived, 21 nocov)
+- Runtime: add tests for harness.ts (187 survived, 191 nocov), hook-port.ts (153 survived, 64 nocov),
+  loop.ts (108 survived, 84 nocov), harness-support.ts (51 survived, 2 nocov)
+
+### Phase C: Phase 2 Thin Test Thickening - COMPLETE
+- All 52 thin tests thickened (~201 new tests)
+- Phase 2 tests: unit 959, integration 95, security 234, e2e 78 (all verified)
+
+### Phase E1: GLM source review - COMPLETE (52 files, 0 high/critical)
 
 ## Test Results
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| typecheck | npx tsc --noEmit | 0 errors | 0 errors | PASS |
-| lint | npx eslint ... | 0 errors | 0 errors | PASS |
-| Phase 1 tests | npx vitest run tests/gateway... | all pass | 2859/2859 pass | PASS |
-| Phase 1 tests (note) | above result without GLM_API_KEY set; gateway 603/603 verified separately with GLM_API_KEY | - | - | PASS |
-| Phase 2 unit | npx vitest run tests/phase-2/unit | all pass | 758/758 pass | PASS |
-| Phase 2 dev gate | verify-phase2-local --mode dev | success=true | success=true | PASS |
-| config hash | computeMutationConfigurationHash() | 2e02aab1... | 2e02aab1... | PASS |
-| Phase 1 baseline | git merge-base --is-ancestor | descendant | descendant | PASS |
-| provider-adapters with GLM_API_KEY set | npx vitest run tests/gateway/provider-adapters.test.ts (GLM_API_KEY set) | 37/37 pass | 37/37 pass | PASS |
-| gateway tests with GLM_API_KEY set (after fix) | npx vitest run tests/gateway/ (GLM_API_KEY set) | 603/603 pass | 603/603 pass | PASS |
-| other KeyVault tests with GLM_API_KEY set | npx vitest run 6 gateway test files (GLM_API_KEY set) | 107/107 pass | 107/107 pass | PASS |
+| Test | Result | Verified |
+|------|--------|----------|
+| typecheck | 0 errors | 2026-08-08 12:15 |
+| Phase 2 unit | 959/959 pass | 2026-08-08 08:52 |
+| Phase 2 integration | 95/95 pass | 2026-08-08 09:14 |
+| Phase 2 security | 234/234 pass | 2026-08-08 09:19 |
+| Phase 2 e2e | 78/78 pass | 2026-08-08 09:22 |
+| Crash restore | 3/3 pass | 2026-08-08 08:52 |
+| Active stubs | 0 | 2026-08-08 08:52 |
+| Gateway tests | 765/765 pass (29 files) | 2026-08-08 11:59 |
 
-## Error Log
-| Timestamp | Error | Attempt | Resolution |
-|-----------|-------|---------|------------|
-| 02:50 | Stale mutation lock (PID 77574 dead) | 1 | python3 shutil.rmtree removed lock |
-| 03:05 | nohup mutation process exited silently | 1 | Run via exec_command session for monitoring |
-| 02:45 | Python triple-quote syntax error writing plan | 1 | Used heredoc (<< 'PYEOF') instead |
-| 03:00 | Mutation gateway chunk 1/43 dry run failed: expected 'Bearer e93c1f...' to be 'Bearer test-key' | 1 | Fixed provider-adapters.test.ts: beforeEach delete GLM_API_KEY/ZHIPU_API_KEY |
-| 03:02 | key-vault.test.ts "supports ZHIPU_API_KEY for zhipu provider" fails with GLM_API_KEY set | 1 | Fixed: delete GLM_API_KEY before ZHIPU_API_KEY test (commit 1f9c3232) |
-| 03:02 | managed-gateway-stream.test.ts "completeStream respects rate limits" fails with GLM_API_KEY set | 1 | Fixed: delete GLM_API_KEY/ZHIPU_API_KEY in beforeEach (commit 1f9c3232) |
-
-## 5-Question Reboot Check
-| Question | Answer |
-|----------|--------|
-| Where am I? | Phase B: env leak fix complete (1f9c3232), ready to rerun Phase 1 mutation |
-| Where am I going? | Rerun mutation -> B2-B7 -> C thin tests -> D gate -> E GLM -> F push |
-| What's the goal? | Phase 1+2 pass, push source to GitHub |
-| What have I learned? | See findings.md - GLM_API_KEY env leak is root cause of test failures under mutation runner |
-| What have I done? | Phase A complete, B0 complete, B1 env leak fixed (3 files, 603/603 pass), ready to rerun mutation |
-| Phase 1 mutation | screen -list / tail /tmp/phase1-mutation-run.log | running | PID 3240, gateway 1/43 | IN PROGRESS |
-| Phase 1 mutation (restart 1) | crashed at chunk 32/43, PID 3215 died | failed | 31 chunks lost | CRASHED |
-| Phase 1 mutation (restart 2) | screen + caffeinate -i, PID 69340 | running | gateway 1/43 in progress | IN PROGRESS |
-| Phase 1 mutation (restart 2 actual) | started 05:23, 2 chunks done by 05:28, chunk 3 in progress | running | 2/43 gateway chunks done, ~5min/chunk | IN PROGRESS |
-| Gateway chunk 1/43 | async-task-adapter.ts:1-150 | done | 1m35s, score 33.55% | DONE |
-| Gateway chunk 2/43 | async-task-adapter.ts:151-270 | done | ~1m | DONE |
-| Gateway chunk 3/43 | (next file) | done | ~1m | DONE |
-| Gateway chunk 4/43 | capability-registry.ts:1-150 | running | 95/164 tested, 66 survived | IN PROGRESS |
-
----
-*Update after completing each phase or encountering errors*
-
-### Phase B: Mutation Discovery Run Progress
-- **Status:** in_progress
-- **Started:** 2026-08-08 05:23 (from commit 0fc68dbd)
-- Modules completed:
-  - gateway: 64.23% (FAIL, threshold 85%) — 4834 mutants, 1133 survived, 596 nocov
-  - router: 90.19% (PASS)
-  - toolsLeaf: 90.29% (PASS)
-  - skills: 91.44% (PASS)
-  - toolsRegistry: TIMED OUT (FAIL, score 0)
-  - strategies: 85.88% (PASS)
-- Currently running: actionControl (chunk 1, 12/73 mutants)
-- Remaining: identitySecrets, vfs, sandbox, session, runtime, verification, verticals, uiAdapters
-
-### Plan Review
-- 4 consecutive review passes completed with no errors found
-- Critical finding: check-mutation-thresholds.mjs reads waivers from git blob (must be committed)
-- run-mutation.mjs reads waivers from filesystem (can be uncommitted during run)
-- Plan updated with all verified facts and gap fixes
+## Commits (this session)
+- 543b84e9: test: add 162 gateway mutation-targeted tests (5 files)
+- 51b6e5a6: test: add progress-store mutation tests (13 tests)
+- 790a4279: test: add loop RAG/contextCompiler mutation tests (21 tests)
