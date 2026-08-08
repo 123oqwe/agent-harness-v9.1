@@ -128,3 +128,40 @@ All 3 fixes committed in 1f9c3232. Verified: 603/603 gateway tests pass with GLM
 ---
 *Update this file after every 2 view/browser/search operations*
 *This prevents visual information from being lost*
+
+### Gateway Mutation Analysis (2026-08-08 09:30)
+- Gateway score: 64.23% (FAIL, threshold 85%)
+- Total mutants: 4834, killed: 3051, timeout: 54, survived: 1133, nocov: 596
+- Need +1004 killed to reach 85% (4109 total needed)
+
+Survived by mutator type (top 6):
+  StringLiteral: 323, ConditionalExpression: 291, BooleanLiteral: 95,
+  ObjectLiteral: 77, EqualityOperator: 72, LogicalOperator: 70
+
+NoCoverage by mutator type (top 5):
+  StringLiteral: 142, ConditionalExpression: 122, BlockStatement: 90,
+  ObjectLiteral: 65, EqualityOperator: 53
+
+Test strategy for B2.1:
+1. Assert specific string values (not just existence) — kills StringLiteral mutants
+2. Test both true/false branches of all conditionals — kills ConditionalExpression
+3. Verify object properties in detail — kills ObjectLiteral
+4. Test edge cases for equality/logical operators — kills EqualityOperator/LogicalOperator
+5. Cover untested code blocks — kills BlockStatement NoCoverage
+
+Key untested areas by file:
+- provider-adapters.ts (228 nocov): buildRequestBody anthropic path, buildHeaders, getEndpoint,
+  parseResponseData, resolve (fetch mock), streamEvents (SSE mock), mapError, normalizeToolCall
+- managed-gateway.ts (146 nocov): buildMetadata, makeSecretsBroker/Clock/EgressPolicy/UsageMeter,
+  complete fallback chain, completeStream, getUsageSummary, getAvailableModels, toHarnessProvider
+- async-task-adapter.ts (86 nocov): seedanceParseTaskStatus all paths, submitTask, pollTask,
+  resolve full flow, parseResponse, streamEvents, mapError
+- ws-server.ts (42 nocov): WebSocket handling
+- server.ts (39 nocov): HTTP server routes
+
+### Critical: Waiver Commit Requirement
+- check-mutation-thresholds.mjs reads waivers from git blob (readTrustedGitBlob, line 684-688)
+- run-mutation.mjs reads waivers from filesystem (readFileSync, line 973)
+- Waivers MUST be committed before B4 (check-mutation-thresholds)
+- Directive says "keep uncommitted" — this only applies during mutation run (B3)
+- After B3 completes, commit equivalent-mutants.json before running B4

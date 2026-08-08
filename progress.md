@@ -107,3 +107,22 @@
 
 ---
 *Update after completing each phase or encountering errors*
+
+### Phase B: Mutation Discovery Run Progress
+- **Status:** in_progress
+- **Started:** 2026-08-08 05:23 (from commit 0fc68dbd)
+- Modules completed:
+  - gateway: 64.23% (FAIL, threshold 85%) — 4834 mutants, 1133 survived, 596 nocov
+  - router: 90.19% (PASS)
+  - toolsLeaf: 90.29% (PASS)
+  - skills: 91.44% (PASS)
+  - toolsRegistry: TIMED OUT (FAIL, score 0)
+  - strategies: 85.88% (PASS)
+- Currently running: actionControl (chunk 1, 12/73 mutants)
+- Remaining: identitySecrets, vfs, sandbox, session, runtime, verification, verticals, uiAdapters
+
+### Plan Review
+- 4 consecutive review passes completed with no errors found
+- Critical finding: check-mutation-thresholds.mjs reads waivers from git blob (must be committed)
+- run-mutation.mjs reads waivers from filesystem (can be uncommitted during run)
+- Plan updated with all verified facts and gap fixes
