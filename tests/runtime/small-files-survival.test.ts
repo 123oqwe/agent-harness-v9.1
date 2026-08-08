@@ -292,20 +292,20 @@ describe('retry.ts: retry function behavior', () => {
     expect(attempts).toBe(1);
   });
 
-  it('validates maxAttempts >= 1', () => {
-    expect(() => retry(async () => 1, { maxAttempts: 0 } as any)).rejects.toThrow(RangeError);
+  it('validates maxAttempts >= 1', async () => {
+    await expect(retry(async () => 1, { maxAttempts: 0 } as any)).rejects.toThrow(RangeError);
   });
 
-  it('validates baseDelay >= 0', () => {
-    expect(() => retry(async () => 1, { baseDelay: -1 } as any)).rejects.toThrow(RangeError);
+  it('validates baseDelay >= 0', async () => {
+    await expect(retry(async () => 1, { baseDelay: -1 } as any)).rejects.toThrow(RangeError);
   });
 
-  it('validates maxDelay >= 0', () => {
-    expect(() => retry(async () => 1, { maxDelay: -1 } as any)).rejects.toThrow(RangeError);
+  it('validates maxDelay >= 0', async () => {
+    await expect(retry(async () => 1, { maxDelay: -1 } as any)).rejects.toThrow(RangeError);
   });
 
-  it('validates jitterMs >= 0', () => {
-    expect(() => retry(async () => 1, { jitterMs: -1 } as any)).rejects.toThrow(RangeError);
+  it('validates jitterMs >= 0', async () => {
+    await expect(retry(async () => 1, { jitterMs: -1 } as any)).rejects.toThrow(RangeError);
   });
 
   it('log callback receives attempt, delayMs, error, timestamp', async () => {

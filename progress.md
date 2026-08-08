@@ -152,3 +152,32 @@ ToolsRegistry: chunkTimeoutMs 30min fix
 - Typecheck: 0 errors
 - CI fix applied (infrastructure.test.ts: toolsRegistry 30min timeout)
 - Next: Run session module mutation, then runtime module mutation
+
+### Update: 2026-08-09 00:24
+- Session mutation chunk 1/12 COMPLETE: 93.02% (80 killed, 6 survived)
+  This is for sqlite-session-store.ts:1-150 (86 mutants)
+  New sqlite-store-survival tests are working well
+- Chunk 2/12 running (130 mutants)
+- Expected total session mutation time: ~15-20 min (12 chunks)
+
+### Update: 2026-08-09 00:50
+- Session mutation: 8/12 chunks complete, chunk 9 at 86/87 (last mutant timing out)
+  Chunk scores: 93%, 97%, 89%, 84%, 67%, 95%, n/a(0), 58%
+  Chunk 8 (sqlite-session-store:301-450) had 32 survived out of 76 -> 58%
+  This is the NoCoverage block - many untested code paths
+  Current aggregate estimate: ~86% (below 90% threshold)
+  May need additional tests for sqlite-session-store.ts:301-450 section
+  OR may need to accept that session will need more work
+  Wait for all 12 chunks to complete before making final assessment
+
+### Update: 2026-08-09 00:55
+- Session mutation COMPLETE: 86.54% / 90% FAIL (gap: 32 kills)
+  sqlite-session-store.ts: 82.01% (68 survived, 16 nocov) - biggest gap
+  durable-session.ts: 92.14% (29 survived) - passes per-file
+  progress-store.ts: 66.67% (7 survived) - small file, high ratio
+  run-session.ts: 94.74% (3 survived) - passes per-file
+- Need 32 more kills for 90% threshold
+- Focus: sqlite-session-store.ts (68+16=84 surv+nocov) and progress-store.ts (7 surv)
+- toolsRegistry: PASSED (92.13%)
+- Next: Write more targeted tests for sqlite-session-store.ts and progress-store.ts
+  Then rerun session mutation
