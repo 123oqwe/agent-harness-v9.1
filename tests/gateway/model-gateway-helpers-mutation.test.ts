@@ -77,7 +77,7 @@ describe('FrozenProviderRegistry: registration validation', () => {
   });
 
   it('rejects non-object registration', () => {
-    expect(() => new FrozenProviderRegistry(['not object'])).toThrow(ProviderConfigurationError);
+    expect(() => new FrozenProviderRegistry(["not object"] as any)).toThrow(ProviderConfigurationError);
   });
 
   it('rejects registration without provider_id', () => {
