@@ -972,3 +972,47 @@ describe('sqlite-store-survival: identifier validation error messages', () => {
     expect(() => ctx.store.appendEvent('', { seq: 1, type: 'user' as const, timestamp: '2026-01-01T00:00:00Z', data: {}, hash: 'h', prev_hash: '' })).toThrow('run_id is malformed');
   });
 });
+
+describe('sqlite-store-survival: error recovery paths (NoCov)', () => {
+  it('disposes record key and closes db when deriveSessionRecordKey throws', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ah-err-'));
+    const stateRoot = createTrustedSessionStateRoot(dir);
+    const dbPath = join(dir, 'session.db');
+    let disposed = false;
+    let allZero = false;
+    expect(() => new SqliteSessionStore(dbPath, {
+      masterKey: MASTER_KEY,
+      state_root: stateRoot,
+      _test_after_record_key_derived: () => { throw new Error('test fault'); },
+      _test_on_record_key_disposed: (zero) => { disposed = true; allZero = zero; },
+    })).toThrow('test fault');
+    expect(disposed).toBe(true);
+    expect(allZero).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not call dispose callback when key is undefined', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ah-err2-'));
+    const stateRoot = createTrustedSessionStateRoot(dir);
+    const dbPath = join(dir, 'session.db');
+    // Create store successfully first
+    const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('closes db when assertSessionDatabaseIdentity fails', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ah-err3-'));
+    const stateRoot = createTrustedSessionStateRoot(dir);
+    const dbPath = join(dir, 'session.db');
+    // Create a valid store first, then try to open with wrong identity
+    const store = new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot });
+    store.close();
+    // Try to open with a different state root
+    const dir2 = mkdtempSync(join(tmpdir(), 'ah-err3b-'));
+    const stateRoot2 = createTrustedSessionStateRoot(dir2);
+    expect(() => new SqliteSessionStore(dbPath, { masterKey: MASTER_KEY, state_root: stateRoot2 })).toThrow();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir2, { recursive: true, force: true });
+  });
+});
