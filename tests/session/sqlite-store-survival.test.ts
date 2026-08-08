@@ -466,3 +466,339 @@ describe('sqlite-store-survival: close', () => {
     rmSync(ctx.dir, { recursive: true, force: true });
   });
 });
+
+describe('sqlite-store-survival: snapshot encryption round-trip', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  it('saveSnapshot and getLatestSnapshot round-trip with complex summary', () => {
+    ctx.store.createRun('run-snap-1', 'test goal');
+    const snap = {
+      session_id: 'run-snap-1',
+      version: 1,
+      last_seq: 5,
+      last_hash: 'abc123',
+      created_at: '2026-01-01T00:00:00Z',
+      summary: { steps: [{ id: 1, action: 'read' }, { id: 2, action: 'write' }], count: 2 },
+    };
+    ctx.store.saveSnapshot('run-snap-1', snap);
+    const loaded = ctx.store.getLatestSnapshot('run-snap-1');
+    expect(loaded).not.toBeNull();
+    expect(loaded!.session_id).toBe('run-snap-1');
+    expect(loaded!.version).toBe(1);
+    expect(loaded!.last_seq).toBe(5);
+    expect(loaded!.last_hash).toBe('abc123');
+    expect(loaded!.created_at).toBe('2026-01-01T00:00:00Z');
+    expect(loaded!.summary).toEqual({ steps: [{ id: 1, action: 'read' }, { id: 2, action: 'write' }], count: 2 });
+  });
+
+  it('getLatestSnapshot returns null when no snapshots exist', () => {
+    ctx.store.createRun('run-snap-2', 'test goal');
+    expect(ctx.store.getLatestSnapshot('run-snap-2')).toBeNull();
+  });
+
+  it('saveSnapshot rejects mismatched session_id', () => {
+    ctx.store.createRun('run-snap-3', 'test goal');
+    expect(() => ctx.store.saveSnapshot('run-snap-3', {
+      session_id: 'different-id',
+      version: 1,
+      last_seq: 0,
+      last_hash: '',
+      created_at: '2026-01-01T00:00:00Z',
+      summary: {},
+    })).toThrow('snapshot identity conflict');
+  });
+
+  it('multiple snapshots return the latest version', () => {
+    ctx.store.createRun('run-snap-4', 'test goal');
+    ctx.store.saveSnapshot('run-snap-4', {
+      session_id: 'run-snap-4', version: 1, last_seq: 3, last_hash: 'h1',
+      created_at: '2026-01-01T00:00:00Z', summary: { v: 1 },
+    });
+    ctx.store.saveSnapshot('run-snap-4', {
+      session_id: 'run-snap-4', version: 2, last_seq: 6, last_hash: 'h2',
+      created_at: '2026-01-02T00:00:00Z', summary: { v: 2 },
+    });
+    const loaded = ctx.store.getLatestSnapshot('run-snap-4');
+    expect(loaded!.version).toBe(2);
+    expect(loaded!.summary).toEqual({ v: 2 });
+  });
+
+  it('snapshot summary with null and numeric values round-trips', () => {
+    ctx.store.createRun('run-snap-5', 'test goal');
+    ctx.store.saveSnapshot('run-snap-5', {
+      session_id: 'run-snap-5', version: 1, last_seq: 0, last_hash: '',
+      created_at: '2026-01-01T00:00:00Z', summary: { n: null, num: 42, str: 'hello', bool: true },
+    });
+    const loaded = ctx.store.getLatestSnapshot('run-snap-5');
+    expect(loaded!.summary).toEqual({ n: null, num: 42, str: 'hello', bool: true });
+  });
+});
+
+describe('sqlite-store-survival: operation state transitions', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); ctx.store.createRun('r-op', 'goal'); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  function mkOp(id: string, state: string, idem = `key-${id}`, attempt = 'att-1'): any {
+    return { operation_id: id, run_id: 'r-op', step_id: 's1', attempt_id: attempt, tool_name: 'tool', idempotency_key: idem, effect_state: state, receipt_json: null };
+  }
+
+  it('PRE_DISPATCH -> IN_FLIGHT transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-1', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-1', 'IN_FLIGHT'));
+    expect(ctx.store.getOperation('op-1')!.effect_state).toBe('IN_FLIGHT');
+  });
+
+  it('PRE_DISPATCH -> DEFINITELY_FAILED_NO_EFFECT transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-2', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-2', 'DEFINITELY_FAILED_NO_EFFECT'));
+    expect(ctx.store.getOperation('op-2')!.effect_state).toBe('DEFINITELY_FAILED_NO_EFFECT');
+  });
+
+  it('IN_FLIGHT -> EFFECT_CONFIRMED transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-3', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-3', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-3', 'EFFECT_CONFIRMED'));
+    expect(ctx.store.getOperation('op-3')!.effect_state).toBe('EFFECT_CONFIRMED');
+  });
+
+  it('IN_FLIGHT -> EFFECT_UNKNOWN transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-4', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-4', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-4', 'EFFECT_UNKNOWN'));
+    expect(ctx.store.getOperation('op-4')!.effect_state).toBe('EFFECT_UNKNOWN');
+  });
+
+  it('IN_FLIGHT -> DEFINITELY_FAILED_NO_EFFECT transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-5', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-5', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-5', 'DEFINITELY_FAILED_NO_EFFECT'));
+    expect(ctx.store.getOperation('op-5')!.effect_state).toBe('DEFINITELY_FAILED_NO_EFFECT');
+  });
+
+  it('EFFECT_UNKNOWN -> RECONCILING transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-6', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-6', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-6', 'EFFECT_UNKNOWN'));
+    ctx.store.recordOperation(mkOp('op-6', 'RECONCILING'));
+    expect(ctx.store.getOperation('op-6')!.effect_state).toBe('RECONCILING');
+  });
+
+  it('RECONCILING -> EFFECT_CONFIRMED transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-7', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-7', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-7', 'EFFECT_UNKNOWN'));
+    ctx.store.recordOperation(mkOp('op-7', 'RECONCILING'));
+    ctx.store.recordOperation(mkOp('op-7', 'EFFECT_CONFIRMED'));
+    expect(ctx.store.getOperation('op-7')!.effect_state).toBe('EFFECT_CONFIRMED');
+  });
+
+  it('RECONCILING -> DEFINITELY_FAILED_NO_EFFECT transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-8', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-8', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-8', 'EFFECT_UNKNOWN'));
+    ctx.store.recordOperation(mkOp('op-8', 'RECONCILING'));
+    ctx.store.recordOperation(mkOp('op-8', 'DEFINITELY_FAILED_NO_EFFECT'));
+    expect(ctx.store.getOperation('op-8')!.effect_state).toBe('DEFINITELY_FAILED_NO_EFFECT');
+  });
+
+  it('RECONCILING -> AWAITING_HUMAN transition succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-9', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-9', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-9', 'EFFECT_UNKNOWN'));
+    ctx.store.recordOperation(mkOp('op-9', 'RECONCILING'));
+    ctx.store.recordOperation(mkOp('op-9', 'AWAITING_HUMAN'));
+    expect(ctx.store.getOperation('op-9')!.effect_state).toBe('AWAITING_HUMAN');
+  });
+
+  it('DEFINITELY_FAILED_NO_EFFECT -> PRE_DISPATCH (retry) succeeds', () => {
+    ctx.store.recordOperation(mkOp('op-10', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-10', 'DEFINITELY_FAILED_NO_EFFECT'));
+    ctx.store.recordOperation(mkOp('op-10', 'PRE_DISPATCH', 'key-op-10', 'att-2'));
+    expect(ctx.store.getOperation('op-10')!.effect_state).toBe('PRE_DISPATCH');
+    expect(ctx.store.getOperation('op-10')!.attempt_id).toBe('att-2');
+  });
+
+  it('invalid transition PRE_DISPATCH -> EFFECT_CONFIRMED throws', () => {
+    ctx.store.recordOperation(mkOp('op-11', 'PRE_DISPATCH'));
+    expect(() => ctx.store.recordOperation(mkOp('op-11', 'EFFECT_CONFIRMED'))).toThrow('invalid effect transition');
+  });
+
+  it('invalid transition EFFECT_CONFIRMED -> IN_FLIGHT throws', () => {
+    ctx.store.recordOperation(mkOp('op-12', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-12', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-12', 'EFFECT_CONFIRMED'));
+    expect(() => ctx.store.recordOperation(mkOp('op-12', 'IN_FLIGHT'))).toThrow('invalid effect transition');
+  });
+
+  it('invalid transition AWAITING_HUMAN -> EFFECT_CONFIRMED throws', () => {
+    ctx.store.recordOperation(mkOp('op-13', 'PRE_DISPATCH'));
+    ctx.store.recordOperation(mkOp('op-13', 'IN_FLIGHT'));
+    ctx.store.recordOperation(mkOp('op-13', 'EFFECT_UNKNOWN'));
+    ctx.store.recordOperation(mkOp('op-13', 'RECONCILING'));
+    ctx.store.recordOperation(mkOp('op-13', 'AWAITING_HUMAN'));
+    expect(() => ctx.store.recordOperation(mkOp('op-13', 'EFFECT_CONFIRMED'))).toThrow('invalid effect transition');
+  });
+
+  it('operation identity conflict on different run_id throws', () => {
+    ctx.store.recordOperation(mkOp('op-14', 'PRE_DISPATCH'));
+    const conflict = { ...mkOp('op-14', 'IN_FLIGHT'), run_id: 'different-run' };
+    expect(() => ctx.store.recordOperation(conflict)).toThrow('operation identity conflict');
+  });
+
+  it('operation identity conflict on different tool_name throws', () => {
+    ctx.store.recordOperation(mkOp('op-15', 'PRE_DISPATCH'));
+    const conflict = { ...mkOp('op-15', 'IN_FLIGHT'), tool_name: 'different-tool' };
+    expect(() => ctx.store.recordOperation(conflict)).toThrow('operation identity conflict');
+  });
+
+  it('operation attempt conflict throws when not retrying', () => {
+    ctx.store.recordOperation(mkOp('op-16', 'PRE_DISPATCH', 'key-16', 'att-1'));
+    ctx.store.recordOperation(mkOp('op-16', 'IN_FLIGHT', 'key-16', 'att-1'));
+    const conflict = mkOp('op-16', 'IN_FLIGHT', 'key-16', 'att-2');
+    expect(() => ctx.store.recordOperation(conflict)).toThrow('operation attempt conflict');
+  });
+
+  it('new operation must begin PRE_DISPATCH', () => {
+    expect(() => ctx.store.recordOperation(mkOp('op-17', 'IN_FLIGHT'))).toThrow('new operation must begin PRE_DISPATCH');
+  });
+
+  it('idempotency key collision with different operation_id throws', () => {
+    ctx.store.recordOperation(mkOp('op-18', 'PRE_DISPATCH', 'shared-key'));
+    const collision = mkOp('op-19', 'PRE_DISPATCH', 'shared-key');
+    expect(() => ctx.store.recordOperation(collision)).toThrow('idempotency key collision');
+  });
+
+  it('idempotency key reuse with same operation_id is allowed', () => {
+    ctx.store.recordOperation(mkOp('op-20', 'PRE_DISPATCH', 'shared-key-2'));
+    ctx.store.recordOperation(mkOp('op-20', 'IN_FLIGHT', 'shared-key-2'));
+    expect(ctx.store.getOperation('op-20')!.effect_state).toBe('IN_FLIGHT');
+  });
+
+  it('receipt_json is encrypted in operations table', () => {
+    ctx.store.recordOperation({ ...mkOp('op-21', 'PRE_DISPATCH'), receipt_json: '{"result":"secret"}' });
+    ctx.store.recordOperation({ ...mkOp('op-21', 'IN_FLIGHT'), receipt_json: '{"result":"secret"}' });
+    const op = ctx.store.getOperation('op-21');
+    expect(op!.receipt_json).toBe('{"result":"secret"}');
+  });
+
+  it('state replay with same attempt_id and receipt_json is allowed', () => {
+    ctx.store.recordOperation({ ...mkOp('op-22', 'PRE_DISPATCH'), receipt_json: null });
+    ctx.store.recordOperation({ ...mkOp('op-22', 'PRE_DISPATCH'), receipt_json: null });
+    expect(ctx.store.getOperation('op-22')!.effect_state).toBe('PRE_DISPATCH');
+  });
+
+  it('state replay conflict with different receipt_json throws', () => {
+    ctx.store.recordOperation({ ...mkOp('op-23', 'PRE_DISPATCH'), receipt_json: null });
+    expect(() => ctx.store.recordOperation({ ...mkOp('op-23', 'PRE_DISPATCH'), receipt_json: '{"x":1}' })).toThrow();
+  });
+});
+
+describe('sqlite-store-survival: receipt encryption and conflicts', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); ctx.store.createRun('r-rc', 'goal'); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  it('recordReceipt stores and retrieves receipt correctly', () => {
+    ctx.store.recordOperation({ operation_id: 'op-r1', run_id: 'r-rc', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k1', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    ctx.store.recordReceipt('op-r1', {
+      tool_name: 'tool', success: true, input_hash: 'hash-in', output_hash: 'hash-out',
+      duration_ms: 100, timestamp: '2026-01-01T00:00:00Z',
+    });
+    const rc = ctx.store.getReceipt('op-r1');
+    expect(rc).not.toBeNull();
+    expect(rc!.tool_name).toBe('tool');
+    expect(rc!.success).toBe(true);
+    expect(rc!.input_hash).toBe('hash-in');
+    expect(rc!.output_hash).toBe('hash-out');
+    expect(rc!.duration_ms).toBe(100);
+    expect(rc!.timestamp).toBe('2026-01-01T00:00:00Z');
+  });
+
+  it('recordReceipt with null output_hash', () => {
+    ctx.store.recordOperation({ operation_id: 'op-r2', run_id: 'r-rc', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k2', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    ctx.store.recordReceipt('op-r2', {
+      tool_name: 'tool', success: false, input_hash: 'hash-in', output_hash: null,
+      duration_ms: 50, timestamp: '2026-01-01T00:00:00Z',
+    });
+    const rc = ctx.store.getReceipt('op-r2');
+    expect(rc!.success).toBe(false);
+    expect(rc!.output_hash).toBeNull();
+  });
+
+  it('duplicate receipt with same fields is allowed', () => {
+    ctx.store.recordOperation({ operation_id: 'op-r3', run_id: 'r-rc', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k3', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    const receipt = {
+      tool_name: 'tool', success: true, input_hash: 'h1', output_hash: 'h2',
+      duration_ms: 100, timestamp: '2026-01-01T00:00:00Z',
+    };
+    ctx.store.recordReceipt('op-r3', receipt);
+    ctx.store.recordReceipt('op-r3', receipt);
+    expect(ctx.store.getReceipt('op-r3')).not.toBeNull();
+  });
+
+  it('receipt conflict on tool_name throws', () => {
+    ctx.store.recordOperation({ operation_id: 'op-r4', run_id: 'r-rc', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k4', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    ctx.store.recordReceipt('op-r4', { tool_name: 'tool', success: true, input_hash: 'h1', output_hash: null, duration_ms: 100, timestamp: '2026-01-01T00:00:00Z' });
+    expect(() => ctx.store.recordReceipt('op-r4', { tool_name: 'different', success: true, input_hash: 'h1', output_hash: null, duration_ms: 100, timestamp: '2026-01-01T00:00:00Z' })).toThrow('receipt conflict');
+  });
+
+  it('receipt conflict on duration_ms throws', () => {
+    ctx.store.recordOperation({ operation_id: 'op-r5', run_id: 'r-rc', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k5', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    ctx.store.recordReceipt('op-r5', { tool_name: 'tool', success: true, input_hash: 'h1', output_hash: null, duration_ms: 100, timestamp: '2026-01-01T00:00:00Z' });
+    expect(() => ctx.store.recordReceipt('op-r5', { tool_name: 'tool', success: true, input_hash: 'h1', output_hash: null, duration_ms: 200, timestamp: '2026-01-01T00:00:00Z' })).toThrow('receipt conflict');
+  });
+});
+
+describe('sqlite-store-survival: loadEvents decryption', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); ctx.store.createRun('r-ev', 'goal'); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  it('loadEvents decrypts complex nested data', () => {
+    const ev1 = { seq: 1, type: 'user' as const, timestamp: '2026-01-01T00:00:00Z', data: { nested: { deep: [1, 2, 3] } }, hash: 'h1', prev_hash: '' };
+    const ev2 = { seq: 2, type: 'assistant' as const, timestamp: '2026-01-01T00:00:01Z', data: { text: 'response' }, hash: 'h2', prev_hash: 'h1' };
+    ctx.store.appendEvent('r-ev', ev1);
+    ctx.store.appendEvent('r-ev', ev2);
+    const events = ctx.store.loadEvents('r-ev');
+    expect(events).toHaveLength(2);
+    expect(events[0]!.data).toEqual({ nested: { deep: [1, 2, 3] } });
+    expect(events[1]!.data).toEqual({ text: 'response' });
+  });
+
+  it('loadEvents returns empty array for nonexistent run', () => {
+    expect(ctx.store.loadEvents('nonexistent')).toEqual([]);
+  });
+
+  it('loadEvents preserves event hash chain', () => {
+    ctx.store.appendEvent('r-ev', { seq: 1, type: 'user' as const, timestamp: '2026-01-01T00:00:00Z', data: { msg: 'first' }, hash: 'hash-1', prev_hash: '' });
+    ctx.store.appendEvent('r-ev', { seq: 2, type: 'assistant' as const, timestamp: '2026-01-01T00:00:01Z', data: { msg: 'second' }, hash: 'hash-2', prev_hash: 'hash-1' });
+    const events = ctx.store.loadEvents('r-ev');
+    expect(events[0]!.prev_hash).toBe('');
+    expect(events[1]!.prev_hash).toBe(events[0]!.hash);
+  });
+});
+
+describe('sqlite-store-survival: isEffectConfirmed', () => {
+  let ctx: ReturnType<typeof createStore>;
+  beforeEach(() => { ctx = createStore(); ctx.store.createRun('r-ec', 'goal'); });
+  afterEach(() => { cleanup(ctx.store, ctx.dir); });
+
+  it('returns true for EFFECT_CONFIRMED operation', () => {
+    ctx.store.recordOperation({ operation_id: 'op-ec1', run_id: 'r-ec', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k-ec1', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    ctx.store.recordOperation({ operation_id: 'op-ec1', run_id: 'r-ec', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k-ec1', effect_state: 'IN_FLIGHT', receipt_json: null });
+    ctx.store.recordOperation({ operation_id: 'op-ec1', run_id: 'r-ec', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k-ec1', effect_state: 'EFFECT_CONFIRMED', receipt_json: null });
+    expect(ctx.store.isEffectConfirmed('k-ec1')).toBe(true);
+  });
+
+  it('returns false for PRE_DISPATCH operation', () => {
+    ctx.store.recordOperation({ operation_id: 'op-ec2', run_id: 'r-ec', step_id: 's1', attempt_id: 'a1', tool_name: 'tool', idempotency_key: 'k-ec2', effect_state: 'PRE_DISPATCH', receipt_json: null });
+    expect(ctx.store.isEffectConfirmed('k-ec2')).toBe(false);
+  });
+
+  it('returns false for unknown idempotency key', () => {
+    expect(ctx.store.isEffectConfirmed('unknown-key')).toBe(false);
+  });
+});
