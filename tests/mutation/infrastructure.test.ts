@@ -166,7 +166,7 @@ describe('Phase 1 mutation manifest', () => {
     expect(patch).toContain("+            pool: 'forks'");
     expect(patch).toContain('+            fileParallelism: false');
     expect(patch).toContain("-            pool: 'threads'");
-    expect(strykerBase.concurrency).toBe(4);
+    expect(strykerBase.concurrency).toBe(2);
   });
 
   it('keeps generated mutation state out of every Stryker sandbox', () => {
