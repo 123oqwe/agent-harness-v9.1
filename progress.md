@@ -77,3 +77,32 @@
 - harness-hook-mutation.test.ts (18 tests, commit 7abe9052)
 - hook-port-attenuation-mutation.test.ts (30 tests, commit 20df3549)
 - Total new tests: 311 (across 11 files)
+
+### Plan Review Complete (2026-08-08 14:50)
+- 4 rounds of review completed, all corrections applied
+- Plan verified against source code: scripts, thresholds, gate commands, evidence format
+- Key findings:
+  1. Phase 2 gate has 24 commands (not 23 as directive says)
+  2. GLM acceptance CI requires main branch (must run locally)
+  3. phase1/mutation.json only published when aggregate PASS
+  4. evaluations/data use --mode release (not bootstrap)
+  5. Caffeinate PID is 5334 (not 78000)
+  6. Config hash consistent: 5b5363b2... (both waivers and computed)
+
+### B3 Mutation Rerun Progress (2026-08-08 14:50)
+- Gateway: chunk 33/43 completed (77%)
+- Remaining gateway chunks: ~10 (estimated 30-50 min)
+- After gateway: 14 more modules (estimated 2.5-3 hours)
+- Expected B3 completion: ~17:00-18:30
+- Stryker processes: 5-6 (healthy)
+- DO NOT KILL
+
+### B1 Runtime Analysis (for B2.5 preparation)
+- Runtime module: 65.57% (need 90%), gap = 683 killed
+- Worst files:
+  1. harness.ts: 42.53% (187 survived, 194 nocov, 663 total)
+  2. loop.ts: 57.62% (88 survived, 179 nocov, 630 total)
+  3. hook-port.ts: 64.66% (153 survived, 64 nocov, 614 total)
+  4. harness-support.ts: 87.26% (51 survived, 2 nocov, 416 total)
+- B2 tests added: 69 tests (harness-hook 18, hook-port 30, loop-rag 21)
+- May need additional tests after B3 if runtime still FAILs
