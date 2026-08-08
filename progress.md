@@ -106,3 +106,35 @@
   4. harness-support.ts: 87.26% (51 survived, 2 nocov, 416 total)
 - B2 tests added: 69 tests (harness-hook 18, hook-port 30, loop-rag 21)
 - May need additional tests after B3 if runtime still FAILs
+
+### B3 Mutation Rerun #1 Results (2026-08-08 16:04)
+- Gateway: 73.33% FAIL (need 85%)
+- 10 modules: FAIL (test bug in server-coverage.test.ts - verification engine TypeError)
+- Runtime: FAIL (process tree timeout on harness-support.ts:151-300)
+- Verification: 86.62% PASS
+- Verticals: 88.48% PASS
+- uiAdapters: 95.77% PASS
+- Aggregate: 77.15% FAIL
+
+### Test Bug Fix + Additional Tests (2026-08-08 15:30-16:10)
+- Fixed server-coverage.test.ts verification engine test (removed TypeError)
+- Committed 144 new gateway tests across 6 files:
+  1. managed-gateway-coverage.test.ts (32 tests) - commit fe330e8b
+  2. async-task-adapter-coverage.test.ts (28 tests) - commit fe330e8b
+  3. server-coverage.test.ts (14 tests) - commit fe330e8b
+  4. ws-server-coverage.test.ts (17 tests) - commit fe330e8b
+  5. provider-adapters-coverage.test.ts (37 tests) - commit a9666a4b
+  6. model-gateway-dispatch-coverage.test.ts (16 tests) - commit b31863e4
+- All 144 tests pass, typecheck 0 errors
+- Total new tests this session: 311 (B2) + 144 (B2.5b) = 455
+
+### B3b: Full Mutation Rerun #2 (2026-08-08 16:12)
+- Started: 2026-08-08 16:12 from HEAD 399151b5
+- All 144 new tests included
+- Test bug fixed (10 modules should now pass)
+- Waivers: 20, rebound to full SHA 399151b5a0a8...
+- Config hash: 5b5363b2dbed...
+- Log: /tmp/phase1-mutation-rerun2.log
+- Expected duration: 5-8 hours (ETA ~21:00-00:00)
+- DO NOT KILL, DO NOT run CPU-intensive commands during mutation
+- Monitor: grep '^\[' /tmp/phase1-mutation-rerun2.log | tail -3
