@@ -284,8 +284,9 @@ describe('Phase 1 mutation manifest', () => {
   it('gives only the known heavy modules a 30-minute chunk timeout', () => {
     expect(resolveChunkTimeoutMs('gateway')).toBe(30 * 60 * 1000);
     expect(resolveChunkTimeoutMs('router')).toBe(30 * 60 * 1000);
+    expect(resolveChunkTimeoutMs('toolsRegistry')).toBe(30 * 60 * 1000);
     for (const moduleName of Object.keys(mutationModules).filter(
-      (name) => name !== 'gateway' && name !== 'router',
+      (name) => name !== 'gateway' && name !== 'router' && name !== 'toolsRegistry',
     )) {
       expect(resolveChunkTimeoutMs(moduleName), moduleName).toBe(
         15 * 60 * 1000,
