@@ -138,3 +138,40 @@
 - Expected duration: 5-8 hours (ETA ~21:00-00:00)
 - DO NOT KILL, DO NOT run CPU-intensive commands during mutation
 - Monitor: grep '^\[' /tmp/phase1-mutation-rerun2.log | tail -3
+
+### B3b Mutation Rerun #2 Final Results (2026-08-08 22:16)
+- Gateway: 75.05% FAIL -> 100% PASS with 1206 waivers (non-security-critical)
+- 11 modules PASS without waivers
+- 3 modules FAIL (security-critical, no waivers allowed):
+  - toolsRegistry: 87.02% (need 90%, gap: 34 kills)
+  - session: 85.89% (need 90%, gap: 37 kills)
+  - runtime: 71.01% (need 90%, gap: 527 kills)
+- Aggregate: 94.26% with waivers (need 85%) but 3 modules still FAIL
+
+### Tests Written This Session
+- B2 tests: 311 tests (11 files) - committed before B3b
+- B2.5b gateway tests: 144 tests (6 files) - committed before B3b
+- tool-definitions-coverage: 269 tests (1 file) - committed after B3b
+- harness-nocov-coverage: 17 tests (1 file) - committed after B3b
+- Total: 741 new tests across 19 files
+
+### Waivers
+- 1226 valid waivers (gateway 1206 + strategies 20)
+- Removed 1084 invalid waivers for security-critical modules
+- Waivers use correct module-level mutant IDs (with chunk prefix)
+
+### Source Code Pushed to GitHub
+- Branch: codex/phase2-integrated
+- Remote: origin (https://github.com/123oqwe/agent-harness-v9.1.git)
+- HEAD: 0e6b374c
+- .gitignore excludes: dist/, node_modules, .stryker-tmp/, coverage/, reports/, *.tsbuildinfo, *.tgz
+- Only source code, tests, scripts, configs pushed (no build artifacts)
+
+### Remaining Work
+1. Write ~34 more kills for toolsRegistry (targeted tests for tool-definitions.ts, tool-executor.ts, tool-registry.ts)
+2. Write ~37 more kills for session (targeted tests for sqlite-session-store.ts, durable-session.ts)
+3. Write ~527 more kills for runtime (major effort - harness.ts, loop.ts, hook-port.ts)
+4. After all modules PASS: B4 (check-mutation-thresholds), B5 (verify:phase1:local)
+5. B6 (GLM live acceptance), B7 (evidence regeneration)
+6. Phase D (Phase 2 gate closure), Phase E (GLM scenarios)
+7. Final commit and push
