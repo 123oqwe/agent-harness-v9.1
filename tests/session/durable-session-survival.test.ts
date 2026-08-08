@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -434,5 +434,78 @@ describe('durable-session-survival: clock injection', () => {
     const ev = session.append('user', { msg: 'a' });
     session.releaseWriter();
     expect(() => new Date(ev.timestamp).toISOString()).not.toThrow();
+  });
+});
+
+describe('durable-session-survival: encryption error messages', () => {
+  it('decryptFileRecord throws "session file authentication failed" for tampered ciphertext', () => {
+    const session = new DurableSession('test-enc-1');
+    session.setLogPath('/tmp/ah-test-enc-1.log', { encryptionKey: TEST_KEY });
+    session.acquireWriter();
+    session.append('user', { msg: 'test' });
+    session.releaseWriter();
+    // Read the log, tamper with the ciphertext, and try to reload
+    const content = readFileSync('/tmp/ah-test-enc-1.log', 'utf8');
+    const lines = content.split('\n').filter(l => l.trim());
+    if (lines.length >= 2) {
+      const tamperedLine = lines[1]!.slice(0, -4) + 'XXXX';
+      writeFileSync('/tmp/ah-test-enc-1.log', `${lines[0]!}\n${tamperedLine}\n`);
+      expect(() => loadSession('test-enc-1', '/tmp/ah-test-enc-1.log', { encryptionKey: TEST_KEY }))
+        .toThrow('session file authentication failed');
+    }
+    rmSync('/tmp/ah-test-enc-1.log', { force: true });
+  });
+
+  it('loadSession throws "invalid header" for wrong header line', () => {
+    writeFileSync('/tmp/ah-test-header.log', 'WRONG HEADER\nsomedata\n');
+    expect(() => loadSession('test-header', '/tmp/ah-test-header.log', { encryptionKey: TEST_KEY }))
+      .toThrow('invalid session log header');
+    rmSync('/tmp/ah-test-header.log', { force: true });
+  });
+
+  it('loadSession throws "snapshot record missing" for empty snapshot after header', () => {
+    writeFileSync('/tmp/ah-test-snap.log', `${'AH-SESSION-LOG:1'}\n`);
+    writeFileSync('/tmp/ah-test-snap.log.snapshot.json', `${'AH-SESSION-LOG:1'}\n\n`);
+    expect(() => loadSession('test-snap', '/tmp/ah-test-snap.log', { encryptionKey: TEST_KEY }))
+      .toThrow('invalid encrypted session snapshot');
+    rmSync('/tmp/ah-test-snap.log', { force: true });
+    rmSync('/tmp/ah-test-snap.log.snapshot.json', { force: true });
+  });
+
+  it('appendEvent writes new file with header line', () => {
+    const logPath = '/tmp/ah-test-append.log';
+    rmSync(logPath, { force: true });
+    appendEvent(
+      { seq: 1, type: 'user', timestamp: '2026-01-01T00:00:00Z', data: { msg: 'hello' }, hash: 'h1', prev_hash: '' },
+      logPath,
+      { encryptionKey: TEST_KEY },
+      'test-append',
+    );
+    const content = readFileSync(logPath, 'utf8');
+    expect(content.startsWith('AH-SESSION-LOG:1')).toBe(true);
+    rmSync(logPath, { force: true });
+  });
+
+  it('appendEvent appends to existing file without duplicate header', () => {
+    const logPath = '/tmp/ah-test-append2.log';
+    rmSync(logPath, { force: true });
+    appendEvent(
+      { seq: 1, type: 'user', timestamp: '2026-01-01T00:00:00Z', data: { msg: 'first' }, hash: 'h1', prev_hash: '' },
+      logPath,
+      { encryptionKey: TEST_KEY },
+      'test-append2',
+    );
+    appendEvent(
+      { seq: 2, type: 'assistant', timestamp: '2026-01-01T00:00:01Z', data: { msg: 'second' }, hash: 'h2', prev_hash: 'h1' },
+      logPath,
+      { encryptionKey: TEST_KEY },
+      'test-append2',
+    );
+    const content = readFileSync(logPath, 'utf8');
+    const lines = content.split('\n').filter(l => l.trim());
+    // First line is header, then 2 encrypted event lines
+    expect(lines.length).toBe(3);
+    expect(lines[0]).toBe('AH-SESSION-LOG:1');
+    rmSync(logPath, { force: true });
   });
 });
