@@ -802,3 +802,107 @@ describe('sqlite-store-survival: isEffectConfirmed', () => {
     expect(ctx.store.isEffectConfirmed('unknown-key')).toBe(false);
   });
 });
+
+describe('sqlite-store-survival: validateSessionStoreSchema direct tests', () => {
+  it('accepts a valid schema with all required tables', () => {
+    const ctx = createStore();
+    const db = new Database(ctx.dbPath);
+    expect(() => validateSessionStoreSchema(db)).not.toThrow();
+    db.close();
+    cleanup(ctx.store, ctx.dir);
+  });
+
+  it('rejects schema missing a required table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE runs (run_id TEXT PRIMARY KEY, goal TEXT NOT NULL);
+    `);
+    expect(() => validateSessionStoreSchema(db)).toThrow('session store schema is malformed');
+    db.close();
+  });
+
+  it('rejects schema with extra non-session-tree table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE runs (run_id TEXT PRIMARY KEY, goal TEXT NOT NULL, strategy TEXT, status TEXT DEFAULT 'running', created_at TEXT NOT NULL);
+      CREATE TABLE run_scopes (run_id TEXT PRIMARY KEY REFERENCES runs(run_id), tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind = 'root'), UNIQUE (tenant_id, root_session_id, kind));
+      CREATE TABLE events (seq INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(run_id), type TEXT NOT NULL, timestamp TEXT NOT NULL, data_json TEXT NOT NULL, hash TEXT NOT NULL, prev_hash TEXT NOT NULL DEFAULT '', PRIMARY KEY (run_id, seq));
+      CREATE TABLE snapshots (run_id TEXT NOT NULL REFERENCES runs(run_id), version INTEGER NOT NULL, last_seq INTEGER NOT NULL, last_hash TEXT NOT NULL, created_at TEXT NOT NULL, summary_json TEXT, PRIMARY KEY (run_id, version));
+      CREATE TABLE operations (operation_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(run_id), step_id TEXT NOT NULL, attempt_id TEXT NOT NULL, tool_name TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, effect_state TEXT NOT NULL DEFAULT 'PRE_DISPATCH', receipt_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE receipts (receipt_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES operations(operation_id), tool_name TEXT NOT NULL, success INTEGER NOT NULL, input_hash TEXT NOT NULL, output_hash TEXT, duration_ms INTEGER, timestamp TEXT NOT NULL);
+      CREATE INDEX idx_events_run ON events(run_id, seq);
+      CREATE INDEX idx_operations_run ON operations(run_id);
+      CREATE INDEX idx_receipts_op ON receipts(operation_id);
+      CREATE TABLE extra_table (id INTEGER);
+    `);
+    expect(() => validateSessionStoreSchema(db)).toThrow('session store schema is malformed');
+    db.close();
+  });
+
+  it('accepts schema with valid session_tree extension tables', () => {
+    const ctx = createStore();
+    const db = new Database(ctx.dbPath);
+    db.exec(`
+      CREATE TABLE session_tree_scopes (
+        tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL,
+        tree_run_id TEXT NOT NULL UNIQUE REFERENCES runs(run_id), created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, root_session_id)
+      );
+      CREATE TABLE session_tree_sessions (
+        tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, session_id TEXT NOT NULL,
+        storage_run_id TEXT NOT NULL UNIQUE REFERENCES runs(run_id), parent_session_id TEXT,
+        depth INTEGER NOT NULL, security_json TEXT NOT NULL, created_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, root_session_id, session_id),
+        FOREIGN KEY (tenant_id, root_session_id) REFERENCES session_tree_scopes(tenant_id, root_session_id)
+      );
+      CREATE TABLE session_tree_commands (
+        tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, command_id TEXT NOT NULL,
+        child_session_id TEXT NOT NULL, fingerprint TEXT NOT NULL, event_seq INTEGER NOT NULL,
+        PRIMARY KEY (tenant_id, root_session_id, command_id),
+        UNIQUE (tenant_id, root_session_id, child_session_id),
+        FOREIGN KEY (tenant_id, root_session_id) REFERENCES session_tree_scopes(tenant_id, root_session_id)
+      );
+    `);
+    expect(() => validateSessionStoreSchema(db)).not.toThrow();
+    db.close();
+    cleanup(ctx.store, ctx.dir);
+  });
+
+  it('rejects schema with malformed session_tree extension table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE runs (run_id TEXT PRIMARY KEY, goal TEXT NOT NULL, strategy TEXT, status TEXT DEFAULT 'running', created_at TEXT NOT NULL);
+      CREATE TABLE run_scopes (run_id TEXT PRIMARY KEY REFERENCES runs(run_id), tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind = 'root'), UNIQUE (tenant_id, root_session_id, kind));
+      CREATE TABLE events (seq INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(run_id), type TEXT NOT NULL, timestamp TEXT NOT NULL, data_json TEXT NOT NULL, hash TEXT NOT NULL, prev_hash TEXT NOT NULL DEFAULT '', PRIMARY KEY (run_id, seq));
+      CREATE TABLE snapshots (run_id TEXT NOT NULL REFERENCES runs(run_id), version INTEGER NOT NULL, last_seq INTEGER NOT NULL, last_hash TEXT NOT NULL, created_at TEXT NOT NULL, summary_json TEXT, PRIMARY KEY (run_id, version));
+      CREATE TABLE operations (operation_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(run_id), step_id TEXT NOT NULL, attempt_id TEXT NOT NULL, tool_name TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, effect_state TEXT NOT NULL DEFAULT 'PRE_DISPATCH', receipt_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE receipts (receipt_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES operations(operation_id), tool_name TEXT NOT NULL, success INTEGER NOT NULL, input_hash TEXT NOT NULL, output_hash TEXT, duration_ms INTEGER, timestamp TEXT NOT NULL);
+      CREATE INDEX idx_events_run ON events(run_id, seq);
+      CREATE INDEX idx_operations_run ON operations(run_id);
+      CREATE INDEX idx_receipts_op ON receipts(operation_id);
+      CREATE TABLE session_tree_wrong (different_column INTEGER);
+    `);
+    expect(() => validateSessionStoreSchema(db)).toThrow('session store schema is malformed');
+    db.close();
+  });
+
+  it('rejects schema with missing index', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE runs (run_id TEXT PRIMARY KEY, goal TEXT NOT NULL, strategy TEXT, status TEXT DEFAULT 'running', created_at TEXT NOT NULL);
+      CREATE TABLE run_scopes (run_id TEXT PRIMARY KEY REFERENCES runs(run_id), tenant_id TEXT NOT NULL, root_session_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind = 'root'), UNIQUE (tenant_id, root_session_id, kind));
+      CREATE TABLE events (seq INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(run_id), type TEXT NOT NULL, timestamp TEXT NOT NULL, data_json TEXT NOT NULL, hash TEXT NOT NULL, prev_hash TEXT NOT NULL DEFAULT '', PRIMARY KEY (run_id, seq));
+      CREATE TABLE snapshots (run_id TEXT NOT NULL REFERENCES runs(run_id), version INTEGER NOT NULL, last_seq INTEGER NOT NULL, last_hash TEXT NOT NULL, created_at TEXT NOT NULL, summary_json TEXT, PRIMARY KEY (run_id, version));
+      CREATE TABLE operations (operation_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(run_id), step_id TEXT NOT NULL, attempt_id TEXT NOT NULL, tool_name TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, effect_state TEXT NOT NULL DEFAULT 'PRE_DISPATCH', receipt_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE receipts (receipt_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES operations(operation_id), tool_name TEXT NOT NULL, success INTEGER NOT NULL, input_hash TEXT NOT NULL, output_hash TEXT, duration_ms INTEGER, timestamp TEXT NOT NULL);
+      CREATE INDEX idx_operations_run ON operations(run_id);
+      CREATE INDEX idx_receipts_op ON receipts(operation_id);
+    `);
+    expect(() => validateSessionStoreSchema(db)).toThrow('session store schema is malformed');
+    db.close();
+  });
+});
