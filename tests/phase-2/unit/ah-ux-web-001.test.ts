@@ -68,4 +68,52 @@ describe('AH-UX-WEB-001: Web application with Phase 2 screens', () => {
     }
   });
 
+
+  it('WEB_SCREENS is an array', () => {
+    expect(Array.isArray(WEB_SCREENS)).toBe(true);
+  });
+
+  it('WEB_SCREENS has multiple screens', () => {
+    expect(WEB_SCREENS.length).toBeGreaterThan(0);
+  });
+
+  it('getScreen returns undefined for non-existent id', () => {
+    expect(getScreen('nonexistent')).toBeUndefined();
+  });
+
+  it('each screen has unique id', () => {
+    const ids = WEB_SCREENS.map(s => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('each screen has accessible property', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(screen).toHaveProperty('accessible');
+    }
+  });
+
+  it('getScreen returns correct screen for each id', () => {
+    for (const screen of WEB_SCREENS) {
+      const found = getScreen(screen.id);
+      expect(found).toBeDefined();
+      expect(found!.id).toBe(screen.id);
+    }
+  });
+
+  it('handles empty string as screen id', () => {
+    expect(getScreen('')).toBeUndefined();
+  });
+
+  it('all screens have accessible=true', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(screen.accessible).toBe(true);
+    }
+  });
+
+  it('getScreen returns object with id property', () => {
+    const first = WEB_SCREENS[0]!;
+    const found = getScreen(first.id);
+    expect(found).toHaveProperty('id');
+  });
+
 });

@@ -67,4 +67,84 @@ describe('AH-DOC-PARSE-IMGREF-001: Parse image references with provenance', () =
     expect(result.images[1]!.ref).toContain('/abs/path/b.png');
   });
 
+
+  it('handles multiple images in same document', async () => {
+    const md = '![First](img1.png)\n![Second](img2.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'multi.md', {});
+    expect(result.images).toHaveLength(2);
+    expect(result.images[0]!.ref).toBe('img1.png');
+    expect(result.images[1]!.ref).toBe('img2.png');
+  });
+
+  it('handles image with URL reference', async () => {
+    const md = '![Logo](https://example.com/logo.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'url.md', {});
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]!.ref).toContain('https://');
+  });
+
+  it('handles image with special characters in alt text', async () => {
+    const md = '![Alt @special #chars](img.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'special.md', {});
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]!.alt).toContain('@special');
+  });
+
+  it('handles image with Unicode alt text', async () => {
+    const md = '![图片说明](image.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'unicode.md', {});
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]!.alt).toBe('图片说明');
+  });
+
+  it('handles images with relative paths', async () => {
+    const md = '![Alt](../images/photo.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'relative.md', {});
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]!.ref).toContain('images');
+  });
+
+  it('handles images with absolute paths', async () => {
+    const md = '![Alt](/usr/share/images/photo.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'absolute.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
+  it('handles images with special file extensions', async () => {
+    const md = '![Alt](photo.jpeg)\n![Alt2](animation.gif)\n![Alt3](icon.svg)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'extensions.md', {});
+    expect(result.images).toHaveLength(3);
+  });
+
+
+  it('handles image with title attribute', async () => {
+    const md = '![Alt](image.png "Title text")\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'title.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
+  it('handles image with spaces in path', async () => {
+    const md = '![Alt](path with spaces/image.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'spaces.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
+  it('handles image at start of document', async () => {
+    const md = '![Start](start.png)\nText after.\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'start.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
+  it('handles image at end of document', async () => {
+    const md = 'Text before.\n![End](end.png)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'end.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
+  it('handles image with data URI', async () => {
+    const md = '![Alt](data:image/png;base64,iVBOR)\n';
+    const result = await parser.parse(Buffer.from(md, 'utf8'), 'datauri.md', {});
+    expect(result.images).toHaveLength(1);
+  });
+
 });
