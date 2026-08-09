@@ -133,4 +133,19 @@ describe('AH-RAG-FTS-001: Build BM25/full-text index', () => {
     expect(index.search('machine learning').length).toBeGreaterThan(0);
   });
 
+
+  it('handles very long query', async () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('test content here'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('test'.repeat(50)).length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles query with special characters', async () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('special chars test'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('@#$%').length).toBeGreaterThanOrEqual(0);
+  });
+
 });

@@ -115,4 +115,15 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     expect(store.chunks.size).toBe(chunks.length);
   })
 
+
+  it('handles deleting from empty store', async () => {
+    const store = createIndexStore();
+    expect(removeChunkFromStore(store, 'any')).toBe(false);
+  });
+
+  it('store has correct initial state', () => {
+    const store = createIndexStore();
+    expect(store.chunks.size).toBe(0);
+  });
+
 });

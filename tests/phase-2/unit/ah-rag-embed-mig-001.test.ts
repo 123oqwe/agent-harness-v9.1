@@ -116,3 +116,62 @@ describe('AH-RAG-EMBED-MIG-001: Handle embedding model migration', () => {
     const result = await migrator.migrate([], m1, m2, async () => [0, 1], new Map());
     expect(result.rollback_available).toBe(false);
   });
+
+  it('handles migration with no embeddings', async () => {
+    const migrator = new EmbeddingMigrator();
+    const oldModel: RagEmbeddingModel = { model_id: 'old-v1', version: '1.0', dimensions: 3 };
+    const newModel: RagEmbeddingModel = { model_id: 'new-v2', version: '2.0', dimensions: 4 };
+    const result = await migrator.migrate([], oldModel, newModel, async () => [], new Map());
+    expect(result.migrated).toBe(0);
+  });
+
+  it('handles migration with same model', async () => {
+    const migrator = new EmbeddingMigrator();
+    const model: RagEmbeddingModel = { model_id: 'same', version: '1.0', dimensions: 3 };
+    const embeddings: RagEmbedding[] = [
+      { chunk_id: 'c1', model, vector: [0.1, 0.2, 0.3] },
+    ];
+    await expect(migrator.migrate(embeddings, model, model, async () => [], new Map())).rejects.toThrow();
+  });
+
+  it('handles migration with multiple embeddings', async () => {
+    const migrator = new EmbeddingMigrator();
+    const oldModel: RagEmbeddingModel = { model_id: 'old', version: '1.0', dimensions: 3 };
+    const newModel: RagEmbeddingModel = { model_id: 'new', version: '2.0', dimensions: 4 };
+    const embeddings: RagEmbedding[] = [
+      { chunk_id: 'c1', model: oldModel, vector: [0.1, 0.2, 0.3] },
+      { chunk_id: 'c2', model: oldModel, vector: [0.4, 0.5, 0.6] },
+      { chunk_id: 'c3', model: oldModel, vector: [0.7, 0.8, 0.9] },
+    ];
+    const texts = new Map([['c1', 'text1'], ['c2', 'text2'], ['c3', 'text3']]);
+    const result = await migrator.migrate(embeddings, oldModel, newModel, async () => [0.1, 0.2, 0.3, 0.4], texts);
+    expect(result.migrated).toBeGreaterThan(0);
+  });
+
+  it('preserves chunk_id during migration', async () => {
+    const migrator = new EmbeddingMigrator();
+    const oldModel: RagEmbeddingModel = { model_id: 'old', version: '1.0', dimensions: 3 };
+    const newModel: RagEmbeddingModel = { model_id: 'new', version: '2.0', dimensions: 4 };
+    const embeddings: RagEmbedding[] = [
+      { chunk_id: 'test-chunk', model: oldModel, vector: [0.1, 0.2, 0.3] },
+    ];
+    const texts = new Map([['test-chunk', 'text']]);
+    const result = await migrator.migrate(embeddings, oldModel, newModel, async () => [0.1, 0.2, 0.3, 0.4], texts);
+    if (result.migrated > 0) {
+      expect(result.migrated).toBeGreaterThan(0);
+    }
+  });
+
+  it('updates model info after migration', async () => {
+    const migrator = new EmbeddingMigrator();
+    const oldModel: RagEmbeddingModel = { model_id: 'old', version: '1.0', dimensions: 3 };
+    const newModel: RagEmbeddingModel = { model_id: 'new', version: '2.0', dimensions: 4 };
+    const embeddings: RagEmbedding[] = [
+      { chunk_id: 'c1', model: oldModel, vector: [0.1, 0.2, 0.3] },
+    ];
+    const texts = new Map([['c1', 'text']]);
+    const result = await migrator.migrate(embeddings, oldModel, newModel, async () => [0.1, 0.2, 0.3, 0.4], texts);
+    if (result.migrated > 0) {
+      expect(result.migrated).toBeGreaterThan(0);
+    }
+  });

@@ -116,4 +116,16 @@ describe('AH-UX-WEB-001: Web application with Phase 2 screens', () => {
     expect(found).toHaveProperty('id');
   });
 
+
+  it('all screens have non-empty id', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(screen.id.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('getScreen returns defined screen for known id', () => {
+    const first = WEB_SCREENS[0]!;
+    expect(getScreen(first.id)).toBeDefined();
+  });
+
 });

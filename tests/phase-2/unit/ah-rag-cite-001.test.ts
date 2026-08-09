@@ -121,4 +121,17 @@ describe('AH-RAG-CITE-001: Generate citations with page references', () => {
     expect(citation).toHaveProperty('excerpt');
   });
 
+
+  it('handles very long source path', () => {
+    const chunk: RagChunk = { ...makeChunk(1), provenance: { ...makeChunk(1).provenance, source_path: 'a'.repeat(200) + '.pdf' } };
+    const citation = generateCitation(chunk);
+    expect(citation.source_path).toContain('.pdf');
+  });
+
+  it('handles source path with spaces', () => {
+    const chunk: RagChunk = { ...makeChunk(1), provenance: { ...makeChunk(1).provenance, source_path: 'my documents/report.pdf' } };
+    const citation = generateCitation(chunk);
+    expect(citation.source_path).toBe('my documents/report.pdf');
+  });
+
 });

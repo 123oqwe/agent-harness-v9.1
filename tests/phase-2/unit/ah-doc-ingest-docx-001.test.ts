@@ -69,6 +69,70 @@ describe('AH-DOC-INGEST-DOCX-001: Ingest DOCX documents preserving structure', (
     expect(result.text).toContain('First paragraph');
     expect(result.text).toContain('Second paragraph');
   });
+
+  it('rejects empty buffer', async () => {
+    await expect(parser.parse(Buffer.alloc(0), 'empty.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('rejects non-ZIP content', async () => {
+    await expect(parser.parse(Buffer.from('plain text'), 'fake.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('reports docx format', () => {
+    expect(parser.format).toBe('docx');
+  });
+
+  it('handles only docx format', () => {
+    expect(parser.canHandle('docx')).toBe(true);
+    expect(parser.canHandle('pdf')).toBe(false);
+    expect(parser.canHandle('md')).toBe(false);
+  });
+
+  it('rejects corrupted DOCX with invalid ZIP local file header', async () => {
+    const buf = Buffer.alloc(100, 0x00);
+    await expect(parser.parse(buf, 'corrupt.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles DOCX with missing document.xml', async () => {
+    const buf = createZipWithEntry('wrong.xml', 'content');
+    await expect(parser.parse(buf, 'missing.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles very small DOCX', async () => {
+    const buf = createZipWithEntry('word/document.xml', '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:t>Test</w:t></w:p></w:body></w:document>');
+    const result = await parser.parse(buf, 'small.docx', {});
+    expect(result.text).toContain('Test');
+  });
+
+  it('extracts text from paragraph elements', async () => {
+    const xml = '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:t>Hello</w:t></w:p><w:p><w:t>World</w:t></w:p></w:body></w:document>';
+    const buf = createZipWithEntry('word/document.xml', xml);
+    const result = await parser.parse(buf, 'paragraphs.docx', {});
+    expect(result.text).toContain('Hello');
+    expect(result.text).toContain('World');
+  });
+
+  it('records provenance for valid DOCX', async () => {
+    const xml = '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:t>Test</w:t></w:p></w:body></w:document>';
+    const buf = createZipWithEntry('word/document.xml', xml);
+    const result = await parser.parse(buf, 'prov.docx', {});
+    expect(result.provenance.format).toBe('docx');
+    expect(result.provenance.source_path).toBe('prov.docx');
+  });
+
+  it('handles empty document.xml', async () => {
+    const buf = createZipWithEntry('word/document.xml', '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>');
+    const result = await parser.parse(buf, 'empty_body.docx', {});
+    expect(result.text).toBe('');
+  });
+
+  it('extracts heading elements', async () => {
+    const xml = '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:t>Chapter 1</w:t></w:p></w:body></w:document>';
+    const buf = createZipWithEntry('word/document.xml', xml);
+    const result = await parser.parse(buf, 'headings.docx', {});
+    expect(result.text).toContain('Chapter 1');
+  });
+
 });
 
 function createMinimalDocx(): Buffer {

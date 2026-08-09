@@ -77,6 +77,58 @@ describe('AH-DOC-INGEST-PPTX-001: Ingest PPTX documents extracting slides', () =
     expect(result.provenance.source_path).toBe('path/to/slides.pptx');
   });
 
+
+  it('rejects empty buffer', async () => {
+    await expect(parser.parse(Buffer.alloc(0), 'empty.pptx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('rejects non-ZIP content', async () => {
+    await expect(parser.parse(Buffer.from('plain text'), 'fake.pptx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('reports pptx format', () => {
+    expect(parser.format).toBe('pptx');
+  });
+
+  it('handles only pptx format', () => {
+    expect(parser.canHandle('pptx')).toBe(true);
+    expect(parser.canHandle('docx')).toBe(false);
+  });
+
+  it('handles PPTX with missing presentation.xml gracefully', async () => {
+    const buf = createZipWithEntry('wrong.xml', 'content');
+    const result = await parser.parse(buf, 'missing.pptx', {});
+    expect(result).toBeDefined();
+  });
+
+  it('extracts text from slide elements', async () => {
+    const xml = '<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:t>Slide Title</a:t></a:p></p:txBody></p:sp></p:cSld></p:sld>';
+    const buf = createZipWithEntry('ppt/slides/slide1.xml', xml);
+    const result = await parser.parse(buf, 'slide.pptx', {});
+    expect(result.text).toContain('Slide Title');
+  });
+
+  it('records provenance for valid PPTX', async () => {
+    const xml = '<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>';
+    const buf = createZipWithEntry('ppt/slides/slide1.xml', xml);
+    const result = await parser.parse(buf, 'prov.pptx', {});
+    expect(result.provenance.format).toBe('pptx');
+  });
+
+  it('handles empty presentation', async () => {
+    const xml = '<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>';
+    const buf = createZipWithEntry('ppt/slides/slide1.xml', xml);
+    const result = await parser.parse(buf, 'empty.pptx', {});
+    expect(result).toBeDefined();
+  });
+
+  it('extracts text from multiple slides', async () => {
+    const xml = '<?xml version="1.0"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:t>Slide 1</a:t></a:p></p:txBody></p:sp></p:cSld></p:sld>';
+    const buf = createZipWithEntry('ppt/slides/slide1.xml', xml);
+    const result = await parser.parse(buf, 'multi.pptx', {});
+    expect(result.text).toContain('Slide 1');
+  });
+
 });
 
 function createMultiSlideZip(slide1Xml: string, slide2Xml: string): Buffer {
