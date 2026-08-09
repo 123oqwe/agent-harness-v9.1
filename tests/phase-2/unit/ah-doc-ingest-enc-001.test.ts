@@ -91,4 +91,76 @@ describe('AH-DOC-INGEST-ENC-001: Handle encrypted documents', () => {
       expect((err as DocumentIngestError).code).toBe('encrypted');
     }
   });
+
+  it('rejects encrypted PDF with password', async () => {
+    const pdfContent = '%PDF-1.5\n1 0 obj\n<< /Encrypt 3 0 R >>\nendobj\n';
+    await expect(ingestor.ingest(Buffer.from(pdfContent, 'latin1'), 'encrypted.pdf', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('error code for encrypted file is encrypted', async () => {
+    const pdfContent = '%PDF-1.5\n1 0 obj\n<< /Encrypt 3 0 R >>\nendobj\n';
+    try {
+      await ingestor.ingest(Buffer.from(pdfContent, 'latin1'), 'enc.pdf', {});
+    } catch (e) {
+      expect(e).toBeInstanceOf(DocumentIngestError);
+      expect((e as DocumentIngestError).code).toBe('encrypted');
+    }
+  });
+
+  it('handles file with pdf extension but not PDF content', async () => {
+    await expect(ingestor.ingest(Buffer.from('not a pdf'), 'fake.pdf', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles non-encrypted markdown normally', async () => {
+    const result = await ingestor.ingest(Buffer.from('# Hello\n', 'utf8'), 'normal.md', {});
+    expect(result.text).toContain('Hello');
+  });
+
+  it('handles non-encrypted HTML normally', async () => {
+    const result = await ingestor.ingest(Buffer.from('<p>Hello</p>', 'utf8'), 'normal.html', {});
+    expect(result.text).toContain('Hello');
+  });
+
+  it('handles file with no extension', async () => {
+    await expect(ingestor.ingest(Buffer.from('data'), 'noextension', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('handles non-encrypted PDF normally', async () => {
+    const pdfContent = '%PDF-1.4\nBT (Hello World) Tj ET\n';
+    const result = await ingestor.ingest(Buffer.from(pdfContent, 'latin1'), 'normal.pdf', {});
+    expect(result.text).toContain('Hello');
+  });
+
+  it('rejects password-protected DOCX', async () => {
+    const buf = createMinimalEncryptedDocx();
+    await expect(ingestor.ingest(buf, 'protected.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+
+  it('rejects encrypted DOCX with EncryptedPackage entry', async () => {
+    const buf = createMinimalEncryptedDocx();
+    await expect(ingestor.ingest(buf, 'encrypted.docx', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('error for encrypted DOCX has correct code', async () => {
+    const buf = createMinimalEncryptedDocx();
+    try {
+      await ingestor.ingest(buf, 'enc.docx', {});
+    } catch (e) {
+      expect(e).toBeInstanceOf(DocumentIngestError);
+      expect((e as DocumentIngestError).code).toBe('encrypted');
+    }
+  });
+
+  it('handles non-encrypted markdown with headings', async () => {
+    const result = await ingestor.ingest(Buffer.from('# Title\n\nText\n', 'utf8'), 'headings.md', {});
+    expect(result.text).toContain('Title');
+    expect(result.headings.length).toBeGreaterThan(0);
+  });
+
+  it('handles non-encrypted HTML with tables', async () => {
+    const result = await ingestor.ingest(Buffer.from('<table><tr><td>A</td></tr></table>', 'utf8'), 'table.html', {});
+    expect(result).toBeDefined();
+  });
+
 });

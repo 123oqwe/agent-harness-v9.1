@@ -126,4 +126,26 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     expect(store.chunks.size).toBe(0);
   });
 
+
+  it('store has fts index', async () => {
+    const store = createIndexStore();
+    expect(store.fts).toBeDefined();
+  });
+
+  it('store has chunks map', async () => {
+    const store = createIndexStore();
+    expect(store.chunks).toBeDefined();
+    expect(store.chunks instanceof Map).toBe(true);
+  });
+
+  it('removing chunk decreases store size', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('searchable text content here', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    const sizeBefore = store.chunks.size;
+    removeChunkFromStore(store, chunks[0]!.chunk_id);
+    expect(store.chunks.size).toBe(sizeBefore - 1);
+  });
+
 });

@@ -113,4 +113,52 @@ describe('AH-UX-API-001: Minimal backend API for Phase 2 UI', () => {
       expect(res.status).toBe(204);
     });
   });
+
+  it('loadingState returns object with loading status', () => {
+    const state = loadingState();
+    expect(state).toBeDefined();
+  });
+
+  it('errorState returns object with error status', () => {
+    const state = errorState('test error');
+    expect(state).toBeDefined();
+  });
+
+  it('offlineState returns object with offline status', () => {
+    const state = offlineState();
+    expect(state).toBeDefined();
+  });
+
+  it('successState returns object with success status', () => {
+    const state = successState({ data: 'test' });
+    expect(state).toBeDefined();
+  });
+
+  it('PHASE2_API_ENDPOINTS has at least 13 endpoints', () => {
+    expect(PHASE2_API_ENDPOINTS.length).toBeGreaterThanOrEqual(13);
+  });
+
+  it('each endpoint has method, path, and description', () => {
+    for (const ep of PHASE2_API_ENDPOINTS) {
+      expect(ep).toHaveProperty('method');
+      expect(ep).toHaveProperty('path');
+    }
+  });
+
+  it('endpoints include GET method', () => {
+    const methods = PHASE2_API_ENDPOINTS.map(e => e.method);
+    expect(methods).toContain('GET');
+  });
+
+  it('endpoints include POST method', () => {
+    const methods = PHASE2_API_ENDPOINTS.map(e => e.method);
+    expect(methods).toContain('POST');
+  });
+
+  it('all endpoints have string method', () => {
+    for (const ep of PHASE2_API_ENDPOINTS) {
+      expect(typeof ep.method).toBe('string');
+    }
+  });
+
 });

@@ -139,4 +139,13 @@ describe('AH-DOC-INGEST-UNSUPPORTED-001: Handle unsupported formats', () => {
     await expect(ingestor.ingest(Buffer.from('disk image'), 'file.iso', {})).rejects.toThrow(DocumentIngestError);
   });
 
+
+  it('returns typed error for .sys files', async () => {
+    await expect(ingestor.ingest(Buffer.from('system'), 'file.sys', {})).rejects.toThrow(DocumentIngestError);
+  });
+
+  it('returns typed error for .dll files', async () => {
+    await expect(ingestor.ingest(Buffer.from('library'), 'file.dll', {})).rejects.toThrow(DocumentIngestError);
+  });
+
 });

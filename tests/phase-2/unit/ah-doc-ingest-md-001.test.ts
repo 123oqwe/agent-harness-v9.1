@@ -95,4 +95,79 @@ describe('AH-DOC-INGEST-MD-001: DefaultDocumentIngestor routing', () => {
     expect(result).toBeDefined();
   });
 
+
+  it('handles empty markdown', async () => {
+    const result = await ingestor.ingest(Buffer.from('', 'utf8'), 'empty.md', {});
+    expect(result.text).toBe('');
+  });
+
+  it('handles markdown with only whitespace', async () => {
+    const result = await ingestor.ingest(Buffer.from('   \n\n  ', 'utf8'), 'ws.md', {});
+    expect(result).toBeDefined();
+  });
+
+  it('handles markdown with code blocks', async () => {
+    const md = '```js\nconst x = 1;\n```\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'code.md', {});
+    expect(result.text).toContain('const x');
+  });
+
+  it('handles markdown with blockquotes', async () => {
+    const md = '> This is a quote\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'quote.md', {});
+    expect(result.text).toContain('quote');
+  });
+
+  it('handles markdown with numbered lists', async () => {
+    const md = '1. First\n2. Second\n3. Third\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'list.md', {});
+    expect(result.text).toContain('First');
+    expect(result.text).toContain('Second');
+  });
+
+  it('handles markdown with links', async () => {
+    const md = '[Link text](https://example.com)\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'links.md', {});
+    expect(result.text).toContain('Link text');
+  });
+
+  it('handles markdown with bold and italic', async () => {
+    const md = '**bold** and *italic*\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'format.md', {});
+    expect(result.text).toContain('bold');
+    expect(result.text).toContain('italic');
+  });
+
+
+  it('handles markdown with horizontal rules', async () => {
+    const md = 'Content above\n---\nContent below\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'hr.md', {});
+    expect(result.text).toContain('above');
+    expect(result.text).toContain('below');
+  });
+
+  it('handles markdown with inline code', async () => {
+    const md = 'Use `npm install` to install.\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'inline.md', {});
+    expect(result.text).toContain('npm install');
+  });
+
+  it('handles markdown with nested formatting', async () => {
+    const md = '**bold *and italic* text**\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'nested.md', {});
+    expect(result.text).toContain('bold');
+  });
+
+  it('handles markdown with reference links', async () => {
+    const md = '[ref][1]\n[1]: https://example.com\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'reflinks.md', {});
+    expect(result.text).toContain('ref');
+  });
+
+  it('handles markdown with footnotes', async () => {
+    const md = 'Text[^1]\n[^1]: Footnote\n';
+    const result = await ingestor.ingest(Buffer.from(md, 'utf8'), 'footnotes.md', {});
+    expect(result.text).toContain('Text');
+  });
+
 });

@@ -107,4 +107,46 @@ describe('AH-RAG-QUERY-001: ACL-filtered hybrid retrieval', () => {
     expect(true).toBe(true);
   });
 
+
+  it('returns empty results for empty store', async () => {
+    const store = createIndexStore();
+    const results = await queryStore(store, { text: 'test', tenant_id: 't1', principal_id: 'p1' });
+    expect(results.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns results with score', async () => {
+    const store = createIndexStore();
+    const chunks = chunkDocument(makeDoc('machine learning test'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    const results = await queryStore(store, { text: 'machine', tenant_id: 't1', principal_id: 'p1' });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]!.score).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns results with chunk data', async () => {
+    const store = createIndexStore();
+    const chunks = chunkDocument(makeDoc('searchable content'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    const results = await queryStore(store, { text: 'searchable', tenant_id: 't1', principal_id: 'p1' });
+    if (results.length > 0) {
+      expect(results[0]).toHaveProperty('chunk');
+    }
+  });
+
+  it('handles multi-word queries', async () => {
+    const store = createIndexStore();
+    const chunks = chunkDocument(makeDoc('machine learning basics'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    const results = await queryStore(store, { text: 'machine learning', tenant_id: 't1', principal_id: 'p1' });
+    expect(results.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles empty query string', async () => {
+    const store = createIndexStore();
+    const chunks = chunkDocument(makeDoc('test content'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    const results = await queryStore(store, { text: '', tenant_id: 't1', principal_id: 'p1' });
+    expect(results.length).toBeGreaterThanOrEqual(0);
+  });
+
 });

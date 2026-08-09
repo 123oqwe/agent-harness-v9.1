@@ -70,4 +70,82 @@ describe('AH-UI-TUI-001: Terminal UI with diff rendering', () => {
     expect(diff.unchanged).toContain('keep');
   });
 
+
+  it('handles empty old content', () => {
+    const diff = renderDiff([], ['new line']);
+    expect(diff.added).toContain('new line');
+  });
+
+  it('handles empty new content', () => {
+    const diff = renderDiff(['old line'], []);
+    expect(diff.removed).toContain('old line');
+  });
+
+  it('handles both empty', () => {
+    const diff = renderDiff([], []);
+    expect(diff.added).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+  });
+
+  it('handles identical content', () => {
+    const diff = renderDiff(['same'], ['same']);
+    expect(diff.added).toHaveLength(0);
+    expect(diff.removed).toHaveLength(0);
+  });
+
+  it('handles Unicode content', () => {
+    const diff = renderDiff(['旧的'], ['新的']);
+    expect(diff.added).toContain('新的');
+    expect(diff.removed).toContain('旧的');
+  });
+
+  it('handles multiple line changes', () => {
+    const diff = renderDiff(['a', 'b', 'c'], ['a', 'x', 'y']);
+    expect(diff.added).toContain('x');
+    expect(diff.added).toContain('y');
+    expect(diff.removed).toContain('b');
+    expect(diff.removed).toContain('c');
+  });
+
+  it('handles line insertion', () => {
+    const diff = renderDiff(['a', 'c'], ['a', 'b', 'c']);
+    expect(diff.added).toContain('b');
+  });
+
+  it('handles line deletion', () => {
+    const diff = renderDiff(['a', 'b', 'c'], ['a', 'c']);
+    expect(diff.removed).toContain('b');
+  });
+
+  it('returns diff object with added and removed arrays', () => {
+    const diff = renderDiff(['old'], ['new']);
+    expect(diff).toHaveProperty('added');
+    expect(diff).toHaveProperty('removed');
+    expect(Array.isArray(diff.added)).toBe(true);
+    expect(Array.isArray(diff.removed)).toBe(true);
+  });
+
+
+  it('handles very long lines', () => {
+    const longLine = 'A'.repeat(1000);
+    const diff = renderDiff([longLine], ['B'.repeat(1000)]);
+    expect(diff.added).toHaveLength(1);
+    expect(diff.removed).toHaveLength(1);
+  });
+
+  it('handles lines with special characters', () => {
+    const diff = renderDiff(['line @with #chars'], ['line @with #different']);
+    expect(diff.added).toContain('line @with #different');
+  });
+
+  it('handles lines with tabs', () => {
+    const diff = renderDiff(['\ttabbed'], ['\tnew']);
+    expect(diff.added).toContain('\tnew');
+  });
+
+  it('preserves line order in diff', () => {
+    const diff = renderDiff(['a', 'b', 'c'], ['a', 'x', 'c']);
+    expect(diff.added[0]).toBe('x');
+  });
+
 });

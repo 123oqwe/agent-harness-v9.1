@@ -128,4 +128,26 @@ describe('AH-UX-WEB-001: Web application with Phase 2 screens', () => {
     expect(getScreen(first.id)).toBeDefined();
   });
 
+
+  it('all screens have non-empty id', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(screen.id.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('getScreen returns defined screen for known id', () => {
+    const first = WEB_SCREENS[0]!;
+    expect(getScreen(first.id)).toBeDefined();
+  });
+
+  it('handles screen lookup with whitespace id', () => {
+    expect(getScreen(' ')).toBeUndefined();
+  });
+
+  it('screen objects have accessible property', () => {
+    for (const screen of WEB_SCREENS) {
+      expect(screen).toHaveProperty('accessible');
+    }
+  });
+
 });

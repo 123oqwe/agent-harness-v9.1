@@ -97,4 +97,55 @@ describe('AH-DOC-INGEST-PDF-001: Ingest PDF documents with page references', () 
     const result = await parser.parse(buf, 'escape.pdf', {});
     expect(result.text).toContain('Line1\nLine2');
   });
+
+  it('handles PDF with multiple pages', async () => {
+    const pdfContent = '%PDF-1.4\n/Type /Page\nBT (Page 1) Tj ET\n/Type /Page\nBT (Page 2) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'multi.pdf', {});
+    expect(result.text).toContain('Page 1');
+    expect(result.text).toContain('Page 2');
+  });
+
+  it('handles PDF with special characters', async () => {
+    const pdfContent = '%PDF-1.4\nBT (Hello @World #Test!) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'special.pdf', {});
+    expect(result.text).toContain('@World');
+  });
+  it('handles very large PDF content', async () => {
+    const text = 'A'.repeat(10000);
+    const pdfContent = '%PDF-1.4\nBT (' + text + ') Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'large.pdf', {});
+    expect(result.text.length).toBeGreaterThan(1000);
+  });
+
+  it('handles PDF with nested objects', async () => {
+    const pdfContent = '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\nBT (Content) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'nested.pdf', {});
+    expect(result.text).toContain('Content');
+  });
+
+
+  it('handles PDF with inline images', async () => {
+    const pdfContent = '%PDF-1.4\nBT (Text before image) Tj ET\n/Im1 Do\nBT (Text after image) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'images.pdf', {});
+    expect(result.text).toContain('Text before');
+  });
+
+  it('handles PDF with form fields', async () => {
+    const pdfContent = '%PDF-1.4\n/AcroForm << /Fields [] >>\nBT (Form) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'form.pdf', {});
+    expect(result.text).toContain('Form');
+  });
+
+  it('handles PDF with annotations', async () => {
+    const pdfContent = '%PDF-1.4\n/Annots []\nBT (Annotated) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'annot.pdf', {});
+    expect(result.text).toContain('Annotated');
+  });
+
+  it('handles PDF version 2.0', async () => {
+    const pdfContent = '%PDF-2.0\nBT (Version 2) Tj ET\n';
+    const result = await parser.parse(Buffer.from(pdfContent, 'latin1'), 'v2.pdf', {});
+    expect(result.text).toContain('Version 2');
+  });
+
 });

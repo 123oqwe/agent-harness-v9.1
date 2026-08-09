@@ -131,4 +131,31 @@ describe('AH-TOOL-SPEECH-001: Speech generation and transcription adapter', () =
     expect(true).toBe(true);
   });
 
+
+  it('handles empty text for TTS', async () => {
+    setTtsProvider({ model: 'test', async synthesize() { return { audio_data: Buffer.from('x'), mime_type: 'audio/wav' }; } });
+    const result = await generateSpeech({ text: '' });
+    expect(result).toBeDefined();
+  });
+
+  it('handles special characters in TTS', async () => {
+    setTtsProvider({ model: 'test', async synthesize(t: string) { return { audio_data: Buffer.from(t), mime_type: 'audio/wav' }; } });
+    const result = await generateSpeech({ text: 'Hello @world!' });
+    expect(result.audio_data.toString()).toContain('@world');
+  });
+
+  it('handles multiple TTS calls', async () => {
+    setTtsProvider({ model: 'test', async synthesize() { return { audio_data: Buffer.from('audio'), mime_type: 'audio/wav' }; } });
+    const r1 = await generateSpeech({ text: 'first' });
+    const r2 = await generateSpeech({ text: 'second' });
+    expect(r1).toBeDefined();
+    expect(r2).toBeDefined();
+  });
+
+  it('handles ASR with special characters', async () => {
+    setAsrProvider({ model: 'test', async transcribe() { return { text: 'Hello @world!', language: 'en', confidence: 0.9 }; } });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.text).toContain('@world');
+  });
+
 });

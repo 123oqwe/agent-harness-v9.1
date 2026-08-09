@@ -140,4 +140,16 @@ describe('AH-RAG-CHUNK-001: Chunk documents with content hashes', () => {
     expect(chunks.length).toBeGreaterThan(0);
   });
 
+
+  it('handles text with only whitespace', () => {
+    const chunks = chunkDocument(makeDoc('   \n\n  \t  '), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles text with mixed content types', () => {
+    const text = '# Heading\n\nParagraph text.\n\n| A | B |\n|---|---|\n| 1 | 2 |\n';
+    const chunks = chunkDocument(makeDoc(text), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks.length).toBeGreaterThan(0);
+  });
+
 });

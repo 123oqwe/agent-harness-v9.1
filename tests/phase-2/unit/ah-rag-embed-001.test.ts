@@ -143,4 +143,23 @@ describe('MockEmbeddingProvider', () => {
     expect(true).toBe(true);
   });
 
+
+  it('handles empty text', async () => {
+    const provider = new MockEmbeddingProvider();
+    const result = await provider.embed('');
+    expect(result).toBeDefined();
+  });
+
+  it('handles very long text', async () => {
+    const provider = new MockEmbeddingProvider();
+    const result = await provider.embed('A'.repeat(10000));
+    expect(result).toBeDefined();
+  });
+
+  it('handles Unicode text', async () => {
+    const provider = new MockEmbeddingProvider();
+    const result = await provider.embed('你好世界');
+    expect(result).toBeDefined();
+  });
+
 });

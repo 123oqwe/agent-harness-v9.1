@@ -78,4 +78,85 @@ describe('AH-DOC-INGEST-WEB-001: Ingest HTML/webpage documents preserving struct
     await expect(parser.parse(html, 'test.html', { max_bytes: 10 }))
       .rejects.toThrow(DocumentIngestError);
   });
+
+  it('handles empty HTML', async () => {
+    const result = await parser.parse(Buffer.from('', 'utf8'), 'empty.html', {});
+    expect(result.text).toBe('');
+  });
+
+  it('handles HTML with only head', async () => {
+    const html = Buffer.from('<html><head><title>Test</title></head><body></body></html>');
+    const result = await parser.parse(html, 'head.html', {});
+    expect(result).toBeDefined();
+  });
+
+  it('handles deeply nested elements', async () => {
+    const html = Buffer.from('<div><div><div><p>Deep text</p></div></div></div>');
+    const result = await parser.parse(html, 'nested.html', {});
+    expect(result.text).toContain('Deep text');
+  });
+
+  it('handles HTML entities', async () => {
+    const html = Buffer.from('<p>&lt;tag&gt; &amp; &quot;quote&quot;</p>');
+    const result = await parser.parse(html, 'entities.html', {});
+    expect(result.text).toContain('<tag>');
+  });
+
+  it('handles HTML comments', async () => {
+    const html = Buffer.from('<p>Visible</p><!-- Comment -->');
+    const result = await parser.parse(html, 'comments.html', {});
+    expect(result.text).toContain('Visible');
+    expect(result.text).not.toContain('Comment');
+  });
+
+  it('handles script and style tags', async () => {
+    const html = Buffer.from('<script>var x = 1;</script><style>.cls { }</style><p>Content</p>');
+    const result = await parser.parse(html, 'script.html', {});
+    expect(result.text).toContain('Content');
+  });
+
+  it('handles HTML with attributes', async () => {
+    const html = Buffer.from('<div class="container" id="main"><p>Text</p></div>');
+    const result = await parser.parse(html, 'attrs.html', {});
+    expect(result.text).toContain('Text');
+  });
+
+  it('handles malformed HTML gracefully', async () => {
+    const html = Buffer.from('<p>Unclosed paragraph');
+    const result = await parser.parse(html, 'malformed.html', {});
+    expect(result.text).toContain('Unclosed');
+  });
+
+
+  it('handles HTML with inline styles', async () => {
+    const html = Buffer.from('<p style="color: red">Styled text</p>');
+    const result = await parser.parse(html, 'styled.html', {});
+    expect(result.text).toContain('Styled text');
+  });
+
+  it('handles HTML with data attributes', async () => {
+    const html = Buffer.from('<div data-id="123">Data</div>');
+    const result = await parser.parse(html, 'data.html', {});
+    expect(result.text).toContain('Data');
+  });
+
+  it('handles HTML5 semantic elements', async () => {
+    const html = Buffer.from('<article><section><p>Semantic</p></section></article>');
+    const result = await parser.parse(html, 'semantic.html', {});
+    expect(result.text).toContain('Semantic');
+  });
+
+  it('handles self-closing tags', async () => {
+    const html = Buffer.from('<p>Text<br/>More</p>');
+    const result = await parser.parse(html, 'selfclose.html', {});
+    expect(result.text).toContain('Text');
+    expect(result.text).toContain('More');
+  });
+
+  it('handles CDATA sections', async () => {
+    const html = Buffer.from('<p>Before</p><![CDATA[cdata content]]><p>After</p>');
+    const result = await parser.parse(html, 'cdata.html', {});
+    expect(result.text).toContain('Before');
+  });
+
 });

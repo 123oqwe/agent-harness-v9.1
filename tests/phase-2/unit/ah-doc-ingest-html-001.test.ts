@@ -87,4 +87,72 @@ describe('AH-DOC-INGEST-WEB-001: Ingest webpages with content extraction', () =>
     expect(result.provenance.format).toBe('html');
     expect(result.provenance.content_hash).toHaveLength(64);
   });
+
+  it('handles empty HTML document', async () => {
+    const result = await parser.parse(Buffer.from(''), 'empty.html', {});
+    expect(result).toBeDefined();
+  });
+
+  it('extracts text from paragraphs', async () => {
+    const html = Buffer.from('<p>First</p><p>Second</p>');
+    const result = await parser.parse(html, 'paras.html', {});
+    expect(result.text).toContain('First');
+    expect(result.text).toContain('Second');
+  });
+
+  it('handles Unicode content', async () => {
+    const html = Buffer.from('<p>中文内容</p>');
+    const result = await parser.parse(html, 'unicode.html', {});
+    expect(result.text).toContain('中文');
+  });
+
+  it('handles nested lists', async () => {
+    const html = Buffer.from('<ul><li>Item 1<ul><li>Subitem</li></ul></li></ul>');
+    const result = await parser.parse(html, 'lists.html', {});
+    expect(result.text).toContain('Item 1');
+  });
+
+  it('handles blockquote elements', async () => {
+    const html = Buffer.from('<blockquote>Quoted text</blockquote>');
+    const result = await parser.parse(html, 'quote.html', {});
+    expect(result.text).toContain('Quoted');
+  });
+
+  it('handles pre-formatted text', async () => {
+    const html = Buffer.from('<pre>Line 1\nLine 2</pre>');
+    const result = await parser.parse(html, 'pre.html', {});
+    expect(result.text).toContain('Line 1');
+  });
+
+
+  it('handles HTML with inline styles', async () => {
+    const html = Buffer.from('<p style="color: red">Styled</p>');
+    const result = await parser.parse(html, 'styled.html', {});
+    expect(result.text).toContain('Styled');
+  });
+
+  it('handles HTML5 semantic elements', async () => {
+    const html = Buffer.from('<article><section><p>Semantic</p></section></article>');
+    const result = await parser.parse(html, 'semantic.html', {});
+    expect(result.text).toContain('Semantic');
+  });
+
+  it('handles self-closing tags', async () => {
+    const html = Buffer.from('<p>Text<br/>More</p>');
+    const result = await parser.parse(html, 'selfclose.html', {});
+    expect(result.text).toContain('Text');
+  });
+
+  it('handles CDATA sections', async () => {
+    const html = Buffer.from('<p>Before</p><![CDATA[cdata]]><p>After</p>');
+    const result = await parser.parse(html, 'cdata.html', {});
+    expect(result.text).toContain('Before');
+  });
+
+  it('handles very long HTML', async () => {
+    const html = Buffer.from('<p>' + 'A'.repeat(10000) + '</p>');
+    const result = await parser.parse(html, 'long.html', {});
+    expect(result.text.length).toBeGreaterThan(1000);
+  });
+
 });
