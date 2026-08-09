@@ -113,4 +113,48 @@ describe('AH-MM-ARTIFACT-001: Store multimodal artifacts with provenance', () =>
     expect(getArtifactCount()).toBe(0);
     expect(listArtifacts().length).toBe(0);
   });
+
+  it('returns undefined for non-existent artifact', () => {
+    expect(retrieveArtifact('nonexistent-id')).toBeUndefined();
+  });
+
+  it('handles storing artifact with same ID (overwrite)', () => {
+    const data = Buffer.from('same-data');
+    const art1 = createArtifact('image', 'image/png', data, { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    const art2 = createArtifact('image', 'image/png', data, { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(art1, data);
+    storeArtifact(art2, data);
+    expect(getArtifactCount()).toBe(1);
+  });
+
+  it('listArtifacts returns all stored artifacts', () => {
+    clearAllArtifacts();
+    const a1 = createArtifact('image', 'image/png', Buffer.from('1'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(a1, Buffer.from('1'));
+    const a2 = createArtifact('image', 'image/png', Buffer.from('2'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(a2, Buffer.from('2'));
+    const a3 = createArtifact('image', 'image/png', Buffer.from('3'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(a3, Buffer.from('3'));
+    expect(listArtifacts().length).toBe(3);
+  });
+
+  it('getArtifactCount returns 0 after clear', () => {
+    const testArt = createArtifact('image', 'image/png', Buffer.from('x'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(testArt, Buffer.from('x'));
+    clearAllArtifacts();
+    expect(getArtifactCount()).toBe(0);
+  });
+
+  it('deleteArtifact returns false for non-existent', () => {
+    expect(deleteArtifact('nonexistent')).toBe(false);
+  });
+
+  it('handles artifacts with different types', () => {
+    const imgArt = createArtifact('image', 'image/png', Buffer.from('img'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(imgArt, Buffer.from('img'));
+    const audioArt = createArtifact('audio', 'audio/wav', Buffer.from('audio'), { source: 'generated', generator: 'test', input_artifacts: [], parameters: {} });
+    storeArtifact(audioArt, Buffer.from('audio'));
+    expect(getArtifactCount()).toBe(2);
+  });
+
 });

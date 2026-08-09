@@ -107,4 +107,54 @@ describe('AH-MM-VISION-VERIFY-001: Vision verification of generated content', ()
     expect(result).toBeDefined();
     expect(typeof result.verified).toBe('boolean');
   });
+
+  it('returns false when confidence is below threshold', async () => {
+    setVisionProvider({
+      model: 'low-conf',
+      async understand() { return { description: 'matches', confidence: 0.5 }; },
+    });
+    const result = await verifyGeneratedContent(Buffer.from('x'), 'matches');
+    expect(result.verified).toBe(false);
+  });
+
+  it('returns true when confidence is high and description matches', async () => {
+    setVisionProvider({
+      model: 'high-conf',
+      async understand() { return { description: 'matches expected', confidence: 0.9 }; },
+    });
+    const result = await verifyGeneratedContent(Buffer.from('x'), 'matches');
+    expect(result.verified).toBe(true);
+  });
+
+  it('returns actual description from provider', async () => {
+    setVisionProvider({
+      model: 'test',
+      async understand() { return { description: 'actual description here', confidence: 0.95 }; },
+    });
+    const result = await verifyGeneratedContent(Buffer.from('x'), 'test');
+    expect(result.actual_description).toBe('actual description here');
+  });
+
+  it('handles empty expected description', async () => {
+    setVisionProvider({
+      model: 'test',
+      async understand() { return { description: 'anything', confidence: 0.9 }; },
+    });
+    const result = await verifyGeneratedContent(Buffer.from('x'), '');
+    expect(result).toBeDefined();
+  });
+
+
+  it('returns confidence from provider', async () => {
+    setVisionProvider({ model: 'test', async understand() { return { description: 'test', confidence: 0.85 }; } });
+    const result = await verifyGeneratedContent(Buffer.from('x'), 'test');
+    expect(result.confidence).toBe(0.85);
+  });
+
+  it('handles special characters in expected description', async () => {
+    setVisionProvider({ model: 'test', async understand() { return { description: 'test @special', confidence: 0.9 }; } });
+    const result = await verifyGeneratedContent(Buffer.from('x'), 'test @special');
+    expect(result).toBeDefined();
+  });
+
 });

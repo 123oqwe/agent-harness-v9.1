@@ -98,4 +98,66 @@ describe('AH-MM-VISION-001: Vision understanding and verification adapter', () =
     await expect(understandImage({ image_data: Buffer.from('x'), prompt: 'test' })).rejects.toThrow('vision API failed');
   });
 
+
+  it('handles provider returning empty result', async () => {
+    setVisionProvider({
+      model: 'empty-provider',
+      async understand() { return { description: '', confidence: 0 }; },
+    });
+    const result = await understandImage({ image_data: Buffer.from('test'), prompt: 'describe' });
+    expect(result.description).toBe('');
+    expect(result.confidence).toBe(0);
+  });
+
+  it('handles provider returning very high confidence', async () => {
+    setVisionProvider({
+      model: 'confident',
+      async understand() { return { description: 'very confident', confidence: 1.0 }; },
+    });
+    const result = await understandImage({ image_data: Buffer.from('test'), prompt: 'describe' });
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it('handles large image data', async () => {
+    setVisionProvider({
+      model: 'test',
+      async understand(image_data: Buffer) { return { description: 'large: ' + image_data.length, confidence: 0.9 }; },
+    });
+    const result = await understandImage({ image_data: Buffer.alloc(10000, 0xFF), prompt: 'describe' });
+    expect(result.description).toContain('10000');
+  });
+
+  it('handles empty prompt', async () => {
+    setVisionProvider({
+      model: 'test',
+      async understand(_image_data: Buffer, prompt: string) { return { description: 'prompt: ' + prompt, confidence: 0.5 }; },
+    });
+    const result = await understandImage({ image_data: Buffer.from('x'), prompt: '' });
+    expect(result.description).toBe('prompt: ');
+  });
+
+  it('handles Unicode prompt', async () => {
+    setVisionProvider({
+      model: 'test',
+      async understand(_image_data: Buffer, prompt: string) { return { description: prompt, confidence: 0.8 }; },
+    });
+    const result = await understandImage({ image_data: Buffer.from('x'), prompt: '描述图片内容' });
+    expect(result.description).toBe('描述图片内容');
+  });
+
+  it('state isolation: changing provider between calls', async () => {
+    setVisionProvider({ model: 'first', async understand() { return { description: 'first', confidence: 0.9 }; } });
+    const r1 = await understandImage({ image_data: Buffer.from('x'), prompt: 'test' });
+    setVisionProvider({ model: 'second', async understand() { return { description: 'second', confidence: 0.8 }; } });
+    const r2 = await understandImage({ image_data: Buffer.from('x'), prompt: 'test' });
+    expect(r1.description).toBe('first');
+    expect(r2.description).toBe('second');
+  });
+
+  it('artifact has correct type', async () => {
+    setVisionProvider({ model: 'test', async understand() { return { description: 'test', confidence: 0.9 }; } });
+    const result = await understandImage({ image_data: Buffer.from('x'), prompt: 'test' });
+    expect(result.artifact.type).toBe('image');
+  });
+
 });

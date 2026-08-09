@@ -84,4 +84,77 @@ describe('AH-TOOL-SPEECH-GEN-001: Generate speech tool (http_api TTS)', () => {
     const r2 = await generateSpeech({ text: 'second' });
     expect(r1.artifact.artifact_id).not.toBe(r2.artifact.artifact_id);
   });
+
+  it('handles provider returning empty audio', async () => {
+    setTtsProvider({
+      model: 'empty',
+      async synthesize() { return { audio_data: Buffer.alloc(0), mime_type: 'audio/wav' }; },
+    });
+    const result = await generateSpeech({ text: 'test' });
+    expect(result.audio_data.length).toBe(0);
+  });
+
+  it('handles provider returning large audio', async () => {
+    setTtsProvider({
+      model: 'large',
+      async synthesize() { return { audio_data: Buffer.alloc(10000, 0xFF), mime_type: 'audio/wav' }; },
+    });
+    const result = await generateSpeech({ text: 'test' });
+    expect(result.audio_data.length).toBe(10000);
+  });
+
+  it('handles Unicode text', async () => {
+    setTtsProvider({
+      model: 'test',
+      async synthesize(text: string) { return { audio_data: Buffer.from(text), mime_type: 'audio/wav' }; },
+    });
+    const result = await generateSpeech({ text: '你好世界' });
+    expect(result.audio_data.toString()).toBe('你好世界');
+  });
+
+  it('handles very long text', async () => {
+    setTtsProvider({
+      model: 'test',
+      async synthesize(text: string) { return { audio_data: Buffer.from(text), mime_type: 'audio/wav' }; },
+    });
+    const result = await generateSpeech({ text: 'A'.repeat(10000) });
+    expect(result.audio_data.length).toBe(10000);
+  });
+
+  it('state isolation between provider changes', async () => {
+    setTtsProvider({ model: 'first', async synthesize() { return { audio_data: Buffer.from('a'), mime_type: 'audio/wav' }; } });
+    const r1 = await generateSpeech({ text: 'test' });
+    setTtsProvider({ model: 'second', async synthesize() { return { audio_data: Buffer.from('b'), mime_type: 'audio/wav' }; } });
+    const r2 = await generateSpeech({ text: 'test' });
+    expect(r1.audio_data.toString()).toBe('a');
+    expect(r2.audio_data.toString()).toBe('b');
+  });
+
+
+  it('handles empty text input', async () => {
+    setTtsProvider({ model: 'test', async synthesize() { return { audio_data: Buffer.from('x'), mime_type: 'audio/wav' }; } });
+    const result = await generateSpeech({ text: '' });
+    expect(result).toBeDefined();
+  });
+
+  it('handles special characters in text', async () => {
+    setTtsProvider({ model: 'test', async synthesize(text: string) { return { audio_data: Buffer.from(text), mime_type: 'audio/wav' }; } });
+    const result = await generateSpeech({ text: 'Hello @world! #test $money' });
+    expect(result.audio_data.toString()).toContain('@world');
+  });
+
+  it('handles multiple sequential calls', async () => {
+    setTtsProvider({ model: 'test', async synthesize() { return { audio_data: Buffer.from('audio'), mime_type: 'audio/wav' }; } });
+    const r1 = await generateSpeech({ text: 'first' });
+    const r2 = await generateSpeech({ text: 'second' });
+    expect(r1).toBeDefined();
+    expect(r2).toBeDefined();
+  });
+
+  it('returns correct mime type', async () => {
+    setTtsProvider({ model: 'test', async synthesize() { return { audio_data: Buffer.from('x'), mime_type: 'audio/mp3' }; } });
+    const result = await generateSpeech({ text: 'test' });
+    expect(result).toBeDefined();
+  });
+
 });

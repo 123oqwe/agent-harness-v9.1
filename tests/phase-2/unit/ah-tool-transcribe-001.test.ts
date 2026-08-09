@@ -84,4 +84,77 @@ describe('AH-TOOL-TRANSCRIBE-001: Transcribe audio tool (http_api ASR)', () => {
     const r2 = await transcribeAudio({ audio_data: Buffer.from('audio2-longer') });
     expect(r1.text).not.toBe(r2.text);
   });
+
+  it('handles provider returning empty transcript', async () => {
+    setAsrProvider({
+      model: 'empty',
+      async transcribe() { return { text: '', language: 'en', confidence: 0 }; },
+    });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.text).toBe('');
+  });
+
+  it('handles provider returning high confidence', async () => {
+    setAsrProvider({
+      model: 'confident',
+      async transcribe() { return { text: 'hello world', language: 'en', confidence: 1.0 }; },
+    });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it('handles Unicode transcription', async () => {
+    setAsrProvider({
+      model: 'test',
+      async transcribe() { return { text: '你好世界', language: 'zh', confidence: 0.95 }; },
+    });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.text).toBe('你好世界');
+  });
+
+  it('handles provider returning long transcript', async () => {
+    setAsrProvider({
+      model: 'test',
+      async transcribe() { return { text: 'A'.repeat(1000), language: 'en', confidence: 0.9 }; },
+    });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.text).toHaveLength(1000);
+  });
+
+  it('state isolation between provider changes', async () => {
+    setAsrProvider({ model: 'first', async transcribe() { return { text: 'first', language: 'en', confidence: 0.9 }; } });
+    const r1 = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    setAsrProvider({ model: 'second', async transcribe() { return { text: 'second', language: 'en', confidence: 0.8 }; } });
+    const r2 = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(r1.text).toBe('first');
+    expect(r2.text).toBe('second');
+  });
+
+
+  it('handles empty audio path', async () => {
+    setAsrProvider({ model: 'test', async transcribe() { return { text: 'test', language: 'en', confidence: 0.9 }; } });
+    const result = await transcribeAudio({ audio_data: Buffer.alloc(0) });
+    expect(result).toBeDefined();
+  });
+
+  it('handles special characters in transcription', async () => {
+    setAsrProvider({ model: 'test', async transcribe() { return { text: 'Hello @world! #test', language: 'en', confidence: 0.9 }; } });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.text).toContain('@world');
+  });
+
+  it('handles multiple sequential calls', async () => {
+    setAsrProvider({ model: 'test', async transcribe() { return { text: 'test', language: 'en', confidence: 0.9 }; } });
+    const r1 = await transcribeAudio({ audio_data: Buffer.from('audio1') });
+    const r2 = await transcribeAudio({ audio_data: Buffer.from('audio2') });
+    expect(r1).toBeDefined();
+    expect(r2).toBeDefined();
+  });
+
+  it('handles low confidence transcription', async () => {
+    setAsrProvider({ model: 'test', async transcribe() { return { text: 'unclear', language: 'en', confidence: 0.3 }; } });
+    const result = await transcribeAudio({ audio_data: Buffer.from('audio') });
+    expect(result.confidence).toBeLessThan(0.5);
+  });
+
 });

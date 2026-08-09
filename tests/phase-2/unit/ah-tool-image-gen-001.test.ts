@@ -98,4 +98,77 @@ describe('AH-TOOL-IMAGE-GEN-001: Model-callable image generation tool', () => {
     expect(r1.image_data.toString()).toContain('first image');
     expect(r2.image_data.toString()).toContain('second image');
   });
+
+  it('handles provider returning empty image', async () => {
+    setImageGenProvider({
+      model: 'empty',
+      async generate() { return { image_data: Buffer.alloc(0), mime_type: 'image/png' }; },
+    });
+    const result = await generateImage({ prompt: 'test' });
+    expect(result.artifact.byte_size).toBe(0);
+  });
+
+  it('handles large image data', async () => {
+    setImageGenProvider({
+      model: 'large',
+      async generate() { return { image_data: Buffer.alloc(10000, 0xFF), mime_type: 'image/png' }; },
+    });
+    const result = await generateImage({ prompt: 'test' });
+    expect(result.artifact.byte_size).toBe(10000);
+  });
+
+  it('handles Unicode prompt', async () => {
+    setImageGenProvider({
+      model: 'test',
+      async generate(prompt: string) { return { image_data: Buffer.from(prompt), mime_type: 'image/png' }; },
+    });
+    const result = await generateImage({ prompt: '生成图片' });
+    expect(result.artifact.provenance.parameters).toMatchObject({ prompt: '生成图片' });
+  });
+
+  it('records correct artifact provenance', async () => {
+    setImageGenProvider({
+      model: 'test-model',
+      async generate() { return { image_data: Buffer.from('img'), mime_type: 'image/jpeg' }; },
+    });
+    const result = await generateImage({ prompt: 'test', width: 512, height: 512, style: 'realistic' });
+    expect(result.artifact.provenance.source).toBe('generated');
+    expect(result.artifact.provenance.generator).toBe('test-model');
+    expect(result.artifact.mime_type).toBe('image/jpeg');
+  });
+
+  it('passes options to provider', async () => {
+    let capturedOpts: { width?: number; height?: number; style?: string } = {};
+    setImageGenProvider({
+      model: 'test',
+      async generate(_prompt: string, opts: { width?: number; height?: number; style?: string }) {
+        capturedOpts = opts;
+        return { image_data: Buffer.from('x'), mime_type: 'image/png' };
+      },
+    });
+    await generateImage({ prompt: 'test', width: 1024, height: 768, style: 'abstract' });
+    expect(capturedOpts.width).toBe(1024);
+    expect(capturedOpts.height).toBe(768);
+    expect(capturedOpts.style).toBe('abstract');
+  });
+
+  it('artifact has correct content hash', async () => {
+    const imgData = Buffer.from('test-image-data');
+    setImageGenProvider({
+      model: 'test',
+      async generate() { return { image_data: imgData, mime_type: 'image/png' }; },
+    });
+    const result = await generateImage({ prompt: 'test' });
+    expect(result.artifact.content_hash).toBe(computeContentHash(imgData));
+  });
+
+  it('state isolation between provider changes', async () => {
+    setImageGenProvider({ model: 'first', async generate() { return { image_data: Buffer.from('a'), mime_type: 'image/png' }; } });
+    const r1 = await generateImage({ prompt: 'test' });
+    setImageGenProvider({ model: 'second', async generate() { return { image_data: Buffer.from('b'), mime_type: 'image/png' }; } });
+    const r2 = await generateImage({ prompt: 'test' });
+    expect(r1.image_data.toString()).toBe('a');
+    expect(r2.image_data.toString()).toBe('b');
+  });
+
 });

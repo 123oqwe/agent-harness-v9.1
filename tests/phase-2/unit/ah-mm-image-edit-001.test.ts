@@ -94,4 +94,68 @@ describe('AH-MM-IMAGE-EDIT-001: Image editing with identity preservation', () =>
     expect(r1.image_data.toString()).not.toBe(r2.image_data.toString());
     expect(r1.artifact.artifact_id).not.toBe(r2.artifact.artifact_id);
   });
+
+  it('handles provider returning edited image', async () => {
+    setImageEditProvider({
+      model: 'edit-provider',
+      async edit() { return { image_data: Buffer.from('edited'), mime_type: 'image/png' }; },
+    });
+    const result = await editImage({ image_data: Buffer.from('original'), edit_prompt: 'make it blue' });
+    expect(result.image_data.toString()).toBe('edited');
+  });
+
+  it('handles empty prompt', async () => {
+    setImageEditProvider({
+      model: 'test',
+      async edit(_image_data: Buffer, edit_prompt: string, _options: { preserve_identity?: boolean }) { return { image_data: Buffer.from(edit_prompt), mime_type: 'image/png' }; },
+    });
+    const result = await editImage({ image_data: Buffer.from('x'), edit_prompt: '' });
+    expect(result.image_data.toString()).toBe('');
+  });
+
+  it('handles Unicode prompt', async () => {
+    setImageEditProvider({
+      model: 'test',
+      async edit(_image_data: Buffer, edit_prompt: string, _options: { preserve_identity?: boolean }) { return { image_data: Buffer.from(edit_prompt), mime_type: 'image/png' }; },
+    });
+    const result = await editImage({ image_data: Buffer.from('x'), edit_prompt: '编辑图片' });
+    expect(result.image_data.toString()).toBe('编辑图片');
+  });
+
+  it('records correct artifact provenance', async () => {
+    setImageEditProvider({
+      model: 'edit-model',
+      async edit() { return { image_data: Buffer.from('edited'), mime_type: 'image/jpeg' }; },
+    });
+    const result = await editImage({ image_data: Buffer.from('orig'), edit_prompt: 'test' });
+    expect(result.artifact.provenance.generator).toBe('edit-model');
+    expect(result.artifact.mime_type).toBe('image/jpeg');
+  });
+
+  it('computes correct content hash', async () => {
+    const editedData = Buffer.from('edited-content');
+    setImageEditProvider({
+      model: 'test',
+      async edit() { return { image_data: editedData, mime_type: 'image/png' }; },
+    });
+    const result = await editImage({ image_data: Buffer.from('orig'), edit_prompt: 'test' });
+    expect(result.artifact.content_hash).toBe(computeContentHash(editedData));
+  });
+
+
+  it('handles empty image data', async () => {
+    setImageEditProvider({ model: 'test', async edit() { return { image_data: Buffer.from('edited'), mime_type: 'image/png' }; } });
+    const result = await editImage({ image_data: Buffer.alloc(0), edit_prompt: 'test' });
+    expect(result).toBeDefined();
+  });
+
+  it('handles state isolation', async () => {
+    setImageEditProvider({ model: 'first', async edit() { return { image_data: Buffer.from('a'), mime_type: 'image/png' }; } });
+    const r1 = await editImage({ image_data: Buffer.from('x'), edit_prompt: 'test' });
+    setImageEditProvider({ model: 'second', async edit() { return { image_data: Buffer.from('b'), mime_type: 'image/png' }; } });
+    const r2 = await editImage({ image_data: Buffer.from('x'), edit_prompt: 'test' });
+    expect(r1.image_data.toString()).toBe('a');
+    expect(r2.image_data.toString()).toBe('b');
+  });
+
 });
