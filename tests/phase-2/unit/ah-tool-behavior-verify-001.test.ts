@@ -133,3 +133,124 @@ describe('AH-TOOL-BEHAVIOR-VERIFY-001: Playwright-based UI behavior verification
     expect(output.duration_ms).toBe(150);
   });
 });
+
+  it('returns failures array with assertion and actual fields', async () => {
+    setBehaviorVerifyProvider({
+      async verify() {
+        return {
+          passed: false,
+          failures: [
+            { assertion: 'title matches', actual: 'got different title' },
+            { assertion: 'element visible', actual: 'element not found' },
+          ],
+          duration_ms: 200,
+        };
+      },
+    });
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'title' }],
+    });
+    expect(result.success).toBe(false);
+    const output = result.output as Record<string, unknown>;
+    const failures = output.failures as Array<{ assertion: string; actual: string }>;
+    expect(failures).toHaveLength(2);
+    expect(failures[0]!.assertion).toBe('title matches');
+    expect(failures[1]!.actual).toBe('element not found');
+  });
+
+  it('returns screenshot when provided even on failure', async () => {
+    setBehaviorVerifyProvider({
+      async verify() {
+        return {
+          passed: false,
+          screenshot: Buffer.from('failure-screenshot'),
+          failures: [{ assertion: 'test', actual: 'failed' }],
+          duration_ms: 50,
+        };
+      },
+    });
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    });
+    const output = result.output as Record<string, unknown>;
+    expect(output.has_screenshot).toBe(true);
+  });
+
+  it('returns has_screenshot=false when no screenshot on failure', async () => {
+    setBehaviorVerifyProvider({
+      async verify() {
+        return {
+          passed: false,
+          failures: [{ assertion: 'test', actual: 'failed' }],
+          duration_ms: 50,
+        };
+      },
+    });
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    });
+    const output = result.output as Record<string, unknown>;
+    expect(output.has_screenshot).toBe(false);
+  });
+
+  it('error message includes failure count', async () => {
+    setBehaviorVerifyProvider({
+      async verify() {
+        return {
+          passed: false,
+          failures: [
+            { assertion: 'a', actual: 'b' },
+            { assertion: 'c', actual: 'd' },
+            { assertion: 'e', actual: 'f' },
+          ],
+          duration_ms: 100,
+        };
+      },
+    });
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    });
+    expect(result.error).toContain('3');
+  });
+
+  it('handles provider with zero duration', async () => {
+    setBehaviorVerifyProvider({
+      async verify() {
+        return { passed: true, failures: [], duration_ms: 0 };
+      },
+    });
+    const result = await behaviorVerify({
+      url: 'http://example.com',
+      steps: [{ action: 'click' }],
+      assertions: [{ type: 'visible' }],
+    });
+    const output = result.output as Record<string, unknown>;
+    expect(output.duration_ms).toBe(0);
+  });
+
+  it('passes step values to provider', async () => {
+    let capturedSteps: unknown;
+    setBehaviorVerifyProvider({
+      async verify(_url, steps) {
+        capturedSteps = steps;
+        return { passed: true, failures: [], duration_ms: 1 };
+      },
+    });
+    await behaviorVerify({
+      url: 'http://example.com',
+      steps: [
+        { action: 'type', selector: '#input', value: 'hello world' },
+        { action: 'click', selector: '#submit' },
+      ],
+      assertions: [{ type: 'visible', selector: '#result' }],
+    });
+    expect((capturedSteps as Array<{ value?: string }>)[0]!.value).toBe('hello world');
+  });

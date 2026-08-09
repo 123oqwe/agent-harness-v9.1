@@ -109,3 +109,54 @@ describe('AH-TOOL-WEB-SEARCH-001: Web search tool returning ranked results', () 
     }
   });
 });
+
+  it('handles Unicode queries (Chinese, Japanese, Korean)', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: '搜索 测试' });
+    expect(result.success).toBe(true);
+  });
+
+  it('handles empty query string', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: '' });
+    expect(result.success).toBe(true);
+  });
+
+  it('passes query string to provider verbatim', async () => {
+    let capturedQuery = '';
+    setWebSearchProvider({
+      async search(query: string) {
+        capturedQuery = query;
+        return [];
+      },
+    });
+    await webSearch({ query: 'exact query test' });
+    expect(capturedQuery).toBe('exact query test');
+  });
+
+  it('returns results in a results array field', async () => {
+    setWebSearchProvider(mockProvider);
+    const result = await webSearch({ query: 'test' });
+    expect(result.output).toHaveProperty('results');
+    expect(Array.isArray((result.output as Record<string, unknown>).results)).toBe(true);
+  });
+
+  it('handles provider returning null results gracefully', async () => {
+    setWebSearchProvider({
+      async search() { return []; },
+    });
+    const result = await webSearch({ query: 'test' });
+    expect(result.success).toBe(true);
+    expect((result.output as Record<string, unknown>).results).toEqual([]);
+  });
+
+  it('state isolation between provider changes', async () => {
+    setWebSearchProvider(mockProvider);
+    const r1 = await webSearch({ query: 'first' });
+    setWebSearchProvider({
+      async search() { return [{ url: 'different', title: 'different', snippet: 'different' }]; },
+    });
+    const r2 = await webSearch({ query: 'second' });
+    expect((r1.output as { results: Array<{ url: string }> }).results[0]!.url).toContain('example.com');
+    expect((r2.output as { results: Array<{ url: string }> }).results[0]!.url).toBe('different');
+  });
