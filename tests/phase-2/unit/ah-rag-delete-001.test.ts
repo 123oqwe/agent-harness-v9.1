@@ -84,4 +84,35 @@ describe('AH-RAG-DELETE-001: Propagate deletions to all indices', () => {
     removeChunkFromStore(store, chunks[0]!.chunk_id);
     expect(removeChunkFromStore(store, chunks[0]!.chunk_id)).toBe(false);
   });
+
+  it('returns false when deleting non-existent chunk', async () => {
+    const store = createIndexStore();
+    expect(removeChunkFromStore(store, 'nonexistent')).toBe(false);
+  });
+
+  it('clears all chunks from store', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('searchable text content', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(store.chunks.size).toBeGreaterThan(0);
+    for (const c of chunks) removeChunkFromStore(store, c.chunk_id);
+    expect(store.chunks.size).toBe(0);
+  });
+
+  it('handles delete on empty store', () => {
+    const store = createIndexStore();
+    expect(removeChunkFromStore(store, 'any')).toBe(false);
+  });
+
+  it('handles re-adding after deletion', async () => {
+    const store = createIndexStore();
+    const doc = makeDoc('searchable text', 'src1');
+    const chunks = chunkDocument(doc, { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) await addChunkToStore(store, c, { tenant_id: 't1', principal_ids: ['p1'] });
+    removeChunkFromStore(store, chunks[0]!.chunk_id);
+    await addChunkToStore(store, chunks[0]!, { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(store.chunks.size).toBe(chunks.length);
+  })
+
 });

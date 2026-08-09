@@ -67,4 +67,58 @@ describe('AH-RAG-CITE-001: Generate citations with page references', () => {
     expect(citation.excerpt).toContain('cited content');
   });
 
+
+  it('excerpt is limited to 200 characters', () => {
+    const chunk: RagChunk = { ...makeChunk(1), text: 'A'.repeat(300) };
+    const citation = generateCitation(chunk);
+    expect(citation.excerpt).toHaveLength(200);
+  });
+
+  it('excerpt is full text when shorter than 200 chars', () => {
+    const shortText = 'Short text.';
+    const chunk: RagChunk = { ...makeChunk(1), text: shortText };
+    const citation = generateCitation(chunk);
+    expect(citation.excerpt).toBe(shortText);
+  });
+
+  it('handles empty text', () => {
+    const chunk: RagChunk = { ...makeChunk(1), text: '' };
+    const citation = generateCitation(chunk);
+    expect(citation.excerpt).toBe('');
+  });
+
+  it('formatCitation includes content hash prefix (8 chars)', () => {
+    const citation = generateCitation(makeChunk(1));
+    const formatted = formatCitation(citation);
+    expect(formatted).toContain(citation.content_hash.slice(0, 8));
+  });
+
+  it('formatCitation includes chunk index', () => {
+    const citation = generateCitation(makeChunk(2));
+    const formatted = formatCitation(citation);
+    expect(formatted).toContain('chunk 3');
+  });
+
+  it('preserves page number 0', () => {
+    const citation = generateCitation(makeChunk(0));
+    expect(citation.page).toBe(0);
+    expect(formatCitation(citation)).toContain('page 0');
+  });
+
+  it('generates consistent citations for same chunk', () => {
+    const c1 = generateCitation(makeChunk(3));
+    const c2 = generateCitation(makeChunk(3));
+    expect(c1).toEqual(c2);
+  });
+
+  it('citation contains all required fields', () => {
+    const citation = generateCitation(makeChunk(7));
+    expect(citation).toHaveProperty('source_path');
+    expect(citation).toHaveProperty('source_hash');
+    expect(citation).toHaveProperty('page');
+    expect(citation).toHaveProperty('chunk_index');
+    expect(citation).toHaveProperty('content_hash');
+    expect(citation).toHaveProperty('excerpt');
+  });
+
 });

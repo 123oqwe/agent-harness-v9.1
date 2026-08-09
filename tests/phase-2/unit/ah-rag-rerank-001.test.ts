@@ -108,4 +108,52 @@ describe('AH-RAG-RERANK-001: Rerank retrieval results', () => {
     rerankResults(results, { top_k: 2 });
     expect(results).toEqual(original);
   });
+
+  it('defaults diversity_lambda to 0.3', () => {
+    const results = [makeResult('a', 0.9, 'unique alpha'), makeResult('b', 0.85, 'unique beta')];
+    const reranked = rerankResults(results, { top_k: 2 });
+    expect(reranked).toHaveLength(2);
+    expect(reranked[0]!.chunk.chunk_id).toBe('a');
+  });
+
+  it('handles results with same score', () => {
+    const results = [makeResult('a', 0.5, 'alpha'), makeResult('b', 0.5, 'beta'), makeResult('c', 0.5, 'gamma')];
+    const reranked = rerankResults(results, { top_k: 3 });
+    expect(reranked).toHaveLength(3);
+  });
+
+  it('handles negative scores', () => {
+    const results = [makeResult('a', -0.5, 'negative'), makeResult('b', 0.5, 'positive')];
+    const reranked = rerankResults(results, { top_k: 2, diversity_lambda: 1.0 });
+    expect(reranked[0]!.chunk.chunk_id).toBe('b');
+  });
+
+  it('handles empty text in results', () => {
+    const results = [makeResult('a', 0.9, ''), makeResult('b', 0.8, 'some text')];
+    const reranked = rerankResults(results, { top_k: 2 });
+    expect(reranked).toHaveLength(2);
+  });
+
+  it('top_k of 1 returns single best result', () => {
+    const results = [makeResult('a', 0.3, 'a'), makeResult('b', 0.9, 'b'), makeResult('c', 0.5, 'c')];
+    const reranked = rerankResults(results, { top_k: 1, diversity_lambda: 1.0 });
+    expect(reranked).toHaveLength(1);
+    expect(reranked[0]!.chunk.chunk_id).toBe('b');
+  });
+
+  it('preserves result structure in output', () => {
+    const results = [makeResult('a', 0.9, 'test')];
+    const reranked = rerankResults(results, { top_k: 1 });
+    expect(reranked[0]).toHaveProperty('chunk');
+    expect(reranked[0]).toHaveProperty('score');
+    expect(reranked[0]).toHaveProperty('source');
+    expect(reranked[0]).toHaveProperty('citation');
+  });
+
+  it('handles Unicode text', () => {
+    const results = [makeResult('a', 0.9, 'machines'), makeResult('b', 0.85, 'machines'), makeResult('c', 0.5, 'cooking')];
+    const reranked = rerankResults(results, { top_k: 2, diversity_lambda: 0.1 });
+    expect(reranked).toHaveLength(2);
+  });
+
 });

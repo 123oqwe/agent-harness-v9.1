@@ -93,4 +93,39 @@ describe('AH-RAG-CHUNK-001: Chunk documents with content hashes', () => {
       expect(chunk.end_offset).toBeGreaterThan(chunk.start_offset);
     }
   });
+
+  it('handles empty text', () => {
+    const chunks = chunkDocument(makeDoc(''), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks).toHaveLength(0);
+  });
+
+  it('handles text shorter than chunk_size', () => {
+    const chunks = chunkDocument(makeDoc('Short text.'), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks).toHaveLength(1);
+  });
+
+  it('generates unique chunk IDs', () => {
+    const chunks = chunkDocument(makeDoc('A'.repeat(250)), { tenant_id: 't1', principal_ids: ['p1'] });
+    const ids = chunks.map(c => c.chunk_id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('preserves provenance in chunks', () => {
+    const chunks = chunkDocument(makeDoc('Test content.'), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks[0]!.provenance.source_path).toBe('test.md');
+  });
+
+  it('computes content hash for each chunk', () => {
+    const chunks = chunkDocument(makeDoc('Test content.'), { tenant_id: 't1', principal_ids: ['p1'] });
+    expect(chunks[0]!.content_hash).toBeTruthy();
+    expect(chunks[0]!.content_hash).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it('sets sequential chunk_index', () => {
+    const chunks = chunkDocument(makeDoc('A'.repeat(350)), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (let i = 0; i < chunks.length; i++) {
+      expect(chunks[i]!.chunk_index).toBe(i);
+    }
+  });
+
 });

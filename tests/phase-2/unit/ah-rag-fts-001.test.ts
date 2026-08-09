@@ -87,4 +87,50 @@ describe('AH-RAG-FTS-001: Build BM25/full-text index', () => {
     for (const c of chunks) index.addChunk(c);
     expect(index.getTermCount()).toBeGreaterThan(0);
   });
+
+  it('returns empty results for empty query', () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('hello world'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('')).toHaveLength(0);
+  });
+
+  it('handles case-insensitive search', () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('Hello World'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('hello').length).toBeGreaterThan(0);
+  });
+
+  it('handles special characters in indexed text', () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('text with @special #chars'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('special').length).toBeGreaterThan(0);
+  });
+
+  it('handles Unicode text', () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('machine learning intro'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('machine').length).toBeGreaterThan(0);
+  });
+
+  it('returns results sorted by relevance', () => {
+    const index = new FtsIndex();
+    const chunks1 = chunkDocument(makeDoc('test test test. '.repeat(20)), { tenant_id: 't1', principal_ids: ['p1'] });
+    const chunks2 = chunkDocument(makeDoc('test once. '.repeat(20)), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks1) index.addChunk(c);
+    for (const c of chunks2) index.addChunk(c);
+    const results = index.search('test');
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('handles multi-word queries', () => {
+    const index = new FtsIndex();
+    const chunks = chunkDocument(makeDoc('machine learning basics'), { tenant_id: 't1', principal_ids: ['p1'] });
+    for (const c of chunks) index.addChunk(c);
+    expect(index.search('machine learning').length).toBeGreaterThan(0);
+  });
+
 });

@@ -110,4 +110,57 @@ describe('AH-RAG-META-001: Build metadata index for filtering', () => {
     expect(index.filter({ count: 42 }).size).toBe(1);
     expect(index.filter({ active: true }).size).toBe(1);
   });
+
+  it('returns empty set for non-existent field value', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { category: 'tech' }));
+    expect(index.filter({ category: 'nonexistent' }).size).toBe(0);
+  });
+
+  it('returns empty set for non-existent field name', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { category: 'tech' }));
+    expect(index.filter({ nonexistent: 'value' }).size).toBe(0);
+  });
+
+  it('handles multiple values for same field', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { tag: 'alpha' }));
+    index.addChunk(makeChunk('c2', { tag: 'alpha' }));
+    index.addChunk(makeChunk('c3', { tag: 'beta' }));
+    expect(index.filter({ tag: 'alpha' }).size).toBe(2);
+    expect(index.filter({ tag: 'beta' }).size).toBe(1);
+  });
+
+  it('handles special characters in field values', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { path: '/usr/local/bin' }));
+    expect(index.filter({ path: '/usr/local/bin' }).size).toBe(1);
+  });
+
+  it('handles numeric metadata values', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { priority: 5 }));
+    expect(index.filter({ priority: 5 }).size).toBe(1);
+  });
+
+  it('handles boolean metadata values', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { published: true }));
+    expect(index.filter({ published: true }).size).toBe(1);
+  });
+
+  it('removes chunk from index', () => {
+    const index = new MetadataIndex();
+    index.addChunk(makeChunk('c1', { category: 'tech' }));
+    expect(index.filter({ category: 'tech' }).size).toBe(1);
+    index.removeChunk('c1');
+    expect(index.filter({ category: 'tech' }).size).toBe(0);
+  });
+
+  it('handles removing non-existent chunk', () => {
+    const index = new MetadataIndex();
+    index.removeChunk('nonexistent');
+  });
+
 });
