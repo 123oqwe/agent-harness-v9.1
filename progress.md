@@ -5,16 +5,18 @@
 ## 5-Question Reboot Test
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase B, B2.5a - toolsRegistry mutation running in screen |
-| Where am I going? | B2.5a -> B2.5b -> B2.5c -> B3c -> B4-B7 -> C2 -> D -> E -> F -> G |
+| Where am I? | Phase B, runtime mutation run #9 in progress (screen session "mutation") |
+| Where am I going? | Runtime PASS -> B3c full rerun -> B4-B7 -> push to GitHub |
 | What's the goal? | Complete Phase 1+2, unblock Phase 3, push source to GitHub |
-| What have I learned? | See findings.md - 3 FAIL modules, score formula, CI fix needed |
-| What have I done? | See below - B1-B3b done, tests written, mutation running |
+| What have I learned? | See findings.md - runtime is sole blocker (75.15%), 14/15 modules PASS |
+| What have I done? | See below - 14 modules PASS, session+toolsRegistry fixed, runtime run #9 in progress |
 
 ## Git State
-- HEAD: f55e4a2f2e6722dc57cd413d337d3b00fe14b44f
-- Worktree: dirty (equivalent-mutants.json, task_plan.md, sqlite-store-survival.test.ts)
-- Uncommitted: CI fix (infrastructure.test.ts), session test fixes
+- HEAD: 84d930220cff03904b1a085371759a3646790b3b
+- Worktree: dirty (equivalent-mutants.json, progress.md, tsconfig.json)
+- Uncommitted: waiver rebind (equivalent-mutants.json), progress.md, tsconfig.json rootDir fix
+- Note: tsconfig.json fix (removed duplicate rootDir) is safe, typecheck verified
+- Note: stryker.base.mjs concurrency=2 (commit 354a2694 reverted to 2 for OOM safety)
 
 ## Completed
 
@@ -53,41 +55,43 @@ ToolsRegistry: chunkTimeoutMs 30min fix
 ### Phase C: Phase 2 Thin Tests - COMPLETE
 - 52 thin tests thickened (~201 new tests)
 - Phase 2 tests: unit 959, integration 95, security 234, e2e 78
+NOTE (2026-08-09 20:55): 30/117 Phase 2 test files still < 150 lines.
+The "ALL 64 files >= 150 lines" claim was incorrect.
+Thin files remain in tests/phase-2/e2e/ (13), tests/phase-2/security/ (8),
+tests/phase-2/integration/ (6), tests/phase-2/architecture/ (1), tests/phase-2/unit/ (2).
 
 ### Phase E1: GLM Source Review - COMPLETE
 - 52 files reviewed, 0 high/critical findings
 
 ## In Progress
 
-### B2.5a: toolsRegistry single-module mutation
-- Started: 2026-08-08 23:32 in screen session "mutation"
-- HEAD: f55e4a2f (waivers rebound, uncommitted)
-- Chunk 1/12 (tool-definitions.ts:1-150): 14/234 mutants tested
-- ETA: ~2-3 hours total
-- Log: /tmp/toolsRegistry-mutation.log
+### Runtime mutation run #9
+- Started: 2026-08-09 20:25 in screen session "mutation"
+- HEAD: 84d93022 (all 122 new runtime tests committed)
+- Previous score: 75.15% (need 90%, gap: 412 kills)
+- 122 new tests since run #4: harness-survival-3 (37), loop-survival-2 (30),
+  hook-port-survival-2 (32), harness-survival-4 (23)
+- Log: /tmp/runtime-mutation-run9.log
 - DO NOT KILL, DO NOT COMMIT
 
 ## Pending (immediate)
-1. Fix CI: tests/mutation/infrastructure.test.ts (add toolsRegistry to 30min list)
-2. Fix 3 failing tests in sqlite-store-survival.test.ts
-3. Wait for toolsRegistry mutation to complete
-4. Write session tests (durable-session, progress-store, run-session)
-5. Write runtime tests (start with small files)
-6. Commit all changes
-7. Start B3c full mutation rerun
+1. Wait for runtime mutation run #9 to complete
+2. If runtime still < 90%: write more targeted tests, rerun
+3. When runtime PASS: commit all changes, rebind waivers to final HEAD
+4. Start B3c full mutation rerun (all 15 modules, 5-8 hours)
+5. Push source to GitHub (product repo is 90 commits behind)
 
 ## Test Results (verified)
 | Test | Result | Date |
 |------|--------|------|
-| typecheck | 0 errors | 2026-08-08 23:20 |
-| tools tests | 791/791 pass (31 files) | 2026-08-08 23:22 |
-| session tests | 47/51 pass (3 failing, fixing) | 2026-08-08 23:35 |
-| Phase 2 unit | 959/959 pass | 2026-08-08 08:52 |
-| Phase 2 integration | 95/95 pass | 2026-08-08 09:14 |
-| Phase 2 security | 234/234 pass | 2026-08-08 09:19 |
-| Phase 2 e2e | 78/78 pass | 2026-08-08 09:22 |
-| Crash restore | 3/3 pass | 2026-08-08 08:52 |
-| Active stubs | 0 | 2026-08-08 08:52 |
+| typecheck | 0 errors (14/14 turbo) | 2026-08-09 20:50 |
+| CI (origin) | GREEN (run 31313165326) | 2026-08-09 20:45 |
+| Crash restore | 3/3 pass | 2026-08-09 (per task_plan) |
+| Active stubs | 0 | 2026-08-09 (per task_plan) |
+| Mutation 14/15 | PASS (all except runtime) | 2026-08-09 20:50 |
+| Runtime mutation | 75.15% FAIL (run #9 in progress) | 2026-08-09 20:50 |
+| Phase 2 thin tests | 30/117 still < 150 lines | 2026-08-09 20:55 |
+| lint | 888 errors (755 any in tests) | 2026-08-09 20:50 |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -528,3 +532,57 @@ ToolsRegistry: chunkTimeoutMs 30min fix
 - Estimated completion: 2-3 more hours
 - Screen session: mutation (Detached)
 - DO NOT KILL the screen session
+
+
+### Update: 2026-08-09 20:25 - Mutation Run #9 Started, CI Pending
+- HEAD: 84d93022 (includes all 122 new tests + 30min chunk timeout fix)
+- Mutation run #9 started with 30min chunk timeout (prevents crashes)
+- Run #8 crashed on chunk 9/33 (harness.ts:1201-1312) after 15min timeout
+- Run #9 includes all 4 new test files (122 tests):
+  - harness-survival-3.test.ts (37 tests) - streaming, fallback, signal combining
+  - loop-survival-2.test.ts (30 tests) - budget guard, steering, context pressure
+  - hook-port-survival-2.test.ts (32 tests) - dispatchHookBoundary edge cases
+  - harness-survival-4.test.ts (23 tests) - tool execution, hook scope, session_end
+- Previous score: 75.15% (need 90%, gap: 426 kills)
+- Chunk 2/33 progress: 4 survived out of 40 tested (10% rate, improved from 15%)
+- CI: Previous run cancelled, new run pending (31313165326)
+- GLM API verified: curl test returned valid response from glm-4-plus model
+- Phase B-Sup status:
+  - Crash restore: 3/3 pass
+  - Active stubs: 0 (verified)
+  - Security tests: 113/113 pass
+  - Domain evals: 6 yaml + 6 fixtures exist
+  - GLM live: API verified working (full acceptance test needs clean worktree + mutation artifact)
+- Screen session: mutation (Detached)
+- Log: /tmp/runtime-mutation-run9.log
+- DO NOT KILL the screen session
+
+
+### Update: 2026-08-09 20:45 - CI GREEN + Mutation Run #9 Progress
+- CI PASSED (run 31313165326, 20m23s): typecheck, build, lint, test, coverage, audit, pack all green
+- Mutation run #9 progress (3/33 chunks complete):
+  - Chunk 1 (harness.ts:1-150): 40.0% (0K, 2TO, 2S, 1NC out of 5)
+  - Chunk 2 (harness.ts:151-300): 85.4% (41K, 0TO, 7S, 0NC out of 48)
+  - Chunk 3 (harness.ts:301-450): 75.0% (51K, 0TO, 15S, 2NC out of 68)
+  - PARTIAL: 77.7% (92K, 2TO, 24S, 3NC out of 121)
+  - Need 108 kills for 90%, have 94, gap = 14 kills in 121 mutants so far
+  - Total module has ~2777 mutants, so final gap will be much larger
+  - Chunk 4 (harness.ts:451-600): 103 mutants, IN PROGRESS
+- Previous score: 75.15% (improvement so far: +2.55%)
+- HEAD: 84d93022 (pushed to origin, CI green)
+- Screen session: mutation (Detached)
+- DO NOT KILL the screen session
+
+
+### Update: 2026-08-09 20:55 - Chunk 4 Complete, Run #9 Progress
+- Chunk 4 (harness.ts:451-600) COMPLETE: 62.14% (64K, 0TO, 34S, 5NC out of 103)
+  - Previous run #8: 32S + 9NC = 41 non-killed
+  - Current run #9: 34S + 5NC = 39 non-killed (2 fewer)
+  - Slight improvement, harness-survival-3 tests killed a few more
+- Chunk 5 (harness.ts:601-750) STARTED: 100 mutants, 0 survived so far
+- Partial total (4/33 chunks): 70.5% (156K, 2TO, 58S, 8NC out of 224)
+  - Previous run #8 at same point: similar (slightly worse)
+  - Need 201 kills for 90%, have 158, gap = 43 in 224 mutants
+  - Total module has ~2777 mutants, estimated final gap ~400+
+- CI: GREEN (run 31313165326, all 14 steps passed)
+- HEAD: 84d93022 (pushed to origin)
