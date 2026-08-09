@@ -509,3 +509,32 @@ describe('durable-session-survival: encryption error messages', () => {
     rmSync(logPath, { force: true });
   });
 });
+
+describe('durable-session-survival: cloneJsonValue error messages', () => {
+  it('append throws "event data must be JSON-serializable" for circular reference', () => {
+    const session = new DurableSession('test-circ-1');
+    session.acquireWriter();
+    const circular: any = { a: 1 };
+    circular.self = circular;
+    expect(() => session.append('user', circular)).toThrow('event data must be JSON-serializable');
+    session.releaseWriter();
+  });
+
+  it('append throws "event data must be JSON-serializable" for BigInt value', () => {
+    const session = new DurableSession('test-circ-2');
+    session.acquireWriter();
+    expect(() => session.append('user', { big: BigInt(123) })).toThrow('event data must be JSON-serializable');
+    session.releaseWriter();
+  });
+
+  it('export_ throws "event must be JSON-serializable" for circular event data', () => {
+    const session = new DurableSession('test-circ-3');
+    // Manually inject a circular event
+    (session as any).events.push({ seq: 1, type: 'user', timestamp: '2026-01-01T00:00:00Z', data: null, hash: 'h', prev_hash: '' });
+    // Replace the null data with a circular reference
+    const circular: any = {};
+    circular.self = circular;
+    (session as any).events[0].data = circular;
+    expect(() => session.export_()).toThrow('event must be JSON-serializable');
+  });
+});
