@@ -94,3 +94,52 @@ Aggregate: 83.45% raw / 94.26% with waivers (threshold 85%)
 3. Runtime approach: start with small files, work up to harness.ts
 4. B3c: run from final HEAD after all test changes committed, NO commits during run
 5. Waivers: rebind to HEAD but leave uncommitted until B4
+
+## Critical Correction (2026-08-09 09:47)
+
+### Score Formula
+- ACTUAL: score = (killed + timeout) / total * 100
+- WRONG (was in findings.md): score = (killed + timeout) / (total - ignored) * 100
+- NoCoverage is NOT the same as ignored. NoCoverage mutants stay in the denominator.
+- Proof: 818/914 = 89.50% (matches result.json), 818/908 = 90.09% (does NOT match)
+- Impact: Need 5 more kills (823/914 = 90.04%), not 1 more kill
+
+### Session Mutation Killable Mutants (8 targets)
+1. L540 StringLiteral: validateDurableIdentifier('root_session_id', ...) in createScopedRun
+   - Test: createScopedRun with whitespace-padded root_session_id (' r1 ')
+   - Scope check (L532-537) passes (trim().length > 0), validateDurableIdentifier fails (trim() !== value)
+   - Mutant changes 'root_session_id' to "", error becomes ' is malformed' vs 'root_session_id is malformed'
+
+2. L541 StringLiteral: validateDurableIdentifier('run_id', ...) in createScopedRun
+   - Test: createScopedRun with valid root_session_id but whitespace-padded run_id
+
+3. L539 StringLiteral: validateDurableIdentifier('tenant_id', ...) in createScopedRun (extra safety)
+
+4. L587 StringLiteral: validateDurableIdentifier('run_id', ...) in updateRunStatus
+   - Test: updateRunStatus with whitespace-padded run_id
+
+5. L782 StringLiteral: validateDurableIdentifier('operation_id', ...) in getReceipt
+   - Test: getReceipt with empty operation_id
+
+6-7. L503, L577 StringLiteral: createRun, getRun (extra safety, may already be killed)
+
+8. L839 ConditionalExpression (if(true)): close() always returns, db not closed
+   - Test: close() then createRun should throw (db closed). Mutant: createRun succeeds.
+
+9. L839 ConditionalExpression (if(false)): close() never returns early, double-close throws
+   - Test: close() twice should not throw. Mutant: second close() throws.
+
+10. L842 BlockStatement: close() finally body removed, this.closed never set to true
+    - Test: close() twice should not throw. Mutant: second close() throws (db already closed).
+
+11. L844 BooleanLiteral: this.closed = false instead of true
+    - Test: close() twice should not throw. Mutant: second close() throws.
+
+### validateDurableIdentifier behavior (verified from source)
+- Located at: session/sqlite-authority-internals.ts:34
+- Throws `${name} is malformed` for invalid values
+- Checks: typeof string, wellFormed (surrogate pairs), length > 0, trim() === value,
+  normalize('NFC') === value, byteLength <= MAX, no forbidden control chars
+- StringLiteral mutant changes name to "", error becomes ' is malformed'
+- Using whitespace-padded values bypasses scope check (trim().length > 0)
+  but fails validateDurableIdentifier (trim() !== value)

@@ -181,3 +181,149 @@ ToolsRegistry: chunkTimeoutMs 30min fix
 - toolsRegistry: PASSED (92.13%)
 - Next: Write more targeted tests for sqlite-session-store.ts and progress-store.ts
   Then rerun session mutation
+
+### Update: 2026-08-09 03:12
+- Session mutation re-run started (concurrency=2, chunkTimeout=30min)
+  - Previous run crashed with OOM (exit 137) after 4/12 chunks
+  - Added 38 targeted tests to sqlite-store-survival.test.ts (89 total)
+  - These tests cover: snapshot encryption round-trip, operation state transitions,
+    receipt conflicts, loadEvents decryption, isEffectConfirmed
+  - Expected to kill ~32 survived mutants to reach 90%
+  - Also increased session chunkTimeoutMs to 30min and reduced Stryker concurrency to 2
+  - HEAD: 6d542ffb, waivers rebound to new config hash f091d43
+  - Commit 50e9081b: 38 targeted session tests
+  - Commit 66a28af8: session chunk timeout 30min
+  - Commit 6d542ffb: Stryker concurrency 2 (prevent OOM)
+
+### Update: 2026-08-09 04:00
+- Session mutation re-run #3 started (concurrency=2, chunkTimeout=30min)
+  - Added 6 schema validation tests to sqlite-store-survival.test.ts (95 total)
+  - These tests directly test validateSessionStoreSchema with valid/invalid schemas
+  - Targeting the 23 survived mutants in L200-300 (schema validation area)
+  - Previous score: 86.43% (86.32% before first re-run)
+  - Need 90% (gap: ~32 kills)
+  - HEAD: b99b9feb
+
+### Update: 2026-08-09 04:40
+- Session mutation re-run #4 started
+  - Added 14 identifier validation error message tests (109 total in sqlite-store-survival)
+  - These tests check that error messages contain the correct field name
+  - Targeting StringLiteral mutants in validateDurableIdentifier calls (L665-670)
+  - Previous score: 87.2% (gap: 25 kills)
+  - HEAD: 39b56f3d
+
+### Update: 2026-08-09 08:18
+- Session mutation re-run #7 started (HEAD: 4b45965)
+  - Previous score: 89.93% (need 1 more kill for 90%)
+  - Added 1 test: openRunSession with valid 32-byte masterKey
+  - Targeting run-session.ts L47 UnaryOperator mutant (!== 32 -> !== +1)
+  - This mutant would reject valid 32-byte keys, so the new test should kill it
+  - Total session tests: 116 in sqlite-store-survival + 47 in durable-session-survival + 15 in progress-store-survival
+  - Session mutation run history:
+    Run 1 (d74ccba): 86.54% (old tests only)
+    Run 2 (e2366856): 86.32% (durable-session-survival added but uncommitted)
+    Run 3 (50e9081b): 86.43% (durable+progress-store-survival committed)
+    Run 4 (b99b9fe): 87.2% (schema validation tests added)
+    Run 5 (39b56f3d): 88.73% (identifier validation error message tests)
+    Run 6 (8e936375): 88.84% (encryption error message tests)
+    Run 7 (a91b932b): 89.61% (error recovery path tests for NoCov)
+    Run 8 (1109a254): 89.93% (openRunSession error path tests)
+    Run 9 (4b45965): IN PROGRESS (openRunSession valid masterKey test)
+
+### Update: 2026-08-09 09:00
+- Session mutation re-run #10 started (HEAD: 2def4f9f)
+  - Added 3 cloneJsonValue error message tests (circular reference, BigInt, export_)
+  - Targeting durable-session.ts L85/L192/L196 StringLiteral mutants
+  - Previous score: 89.5% (score fluctuated from 89.93% due to timeout non-determinism)
+  - Need 5 more kills for 90%
+  - Session mutation history shows fluctuation: 86.54% -> 86.32% -> 86.43% -> 87.2% -> 88.73% -> 88.84% -> 89.61% -> 89.93% -> 89.5%
+  - Fluctuation due to timeout mutants (sometimes timeout=11, sometimes timeout=1)
+  - Need deterministic kills (not timeout-dependent) to stabilize above 90%
+
+### Update: 2026-08-09 09:47
+- Session mutation run #11 started (HEAD: 033e9178)
+  - Added 10 new tests (8 identifier validation + 2 close() behavior)
+  - Targeting 8+ survived mutants:
+    - L540 StringLiteral (createScopedRun root_session_id)
+    - L541 StringLiteral (createScopedRun run_id)
+    - L539 StringLiteral (createScopedRun tenant_id) - extra safety
+    - L587 StringLiteral (updateRunStatus run_id)
+    - L782 StringLiteral (getReceipt operation_id)
+    - L503 StringLiteral (createRun run_id) - extra safety
+    - L577 StringLiteral (getRun run_id) - extra safety
+    - L839 ConditionalExpression (close if(true)/if(false))
+    - L842 BlockStatement (close finally body)
+    - L844 BooleanLiteral (close this.closed=true)
+  - Previous score: 89.50% (818/914, need 823 for 90.04%)
+  - CRITICAL CORRECTION: score formula is (killed+timeout)/total * 100
+    NOT (killed+timeout)/(total-nocov) * 100
+    NoCoverage mutants count against the score (in denominator, not numerator)
+  - Expected: 826/914 = 90.37% if all 8 mutants killed
+  - Log: /tmp/session-mutation-run11.log
+
+### Update: 2026-08-09 10:23
+- SESSION MUTATION PASSED: 90.15% (824/914)
+  - Previous: 89.50% (818/914)
+  - 6 new kills from:
+    - Chunk 451-600: K=97 S=2 (was K=94 S=5) -> +3 kills (createScopedRun/createRun/getRun/updateRunStatus)
+    - Chunk 751-847: K=60 S=3 (was K=59 S=4) -> +1 kill (close())
+    - durable-session chunks: +2 kills (cloneJsonValue tests)
+  - commit_sha: 033e917 (current HEAD)
+  - 3 FAIL modules remaining: gateway(75.05%, waivers), runtime(71.01%), session now PASS
+  - Next: runtime mutation (largest gap, 528 kills needed)
+
+### Update: 2026-08-09 10:49
+- Runtime mutation run #1 IN PROGRESS (HEAD: 033e9178)
+  - 6/33 chunks completed (all harness.ts)
+  - harness.ts partial: K=215 S=190 NC=68 Tot=473 (45.45%)
+  - Worst chunk: harness.ts:751-900 (K=22 S=80 NC=47 Tot=149, 14.8% killed)
+  - 27 remaining chunks are runtime/ files (should perform better with survival tests)
+  - Previous runtime score: 71.01% (1972/2777, from stale commit 399151b)
+  - Need: 2499/2777 = 90.0%
+  - Gap analysis: harness.ts alone needs ~597 kills for 90%, currently has ~215
+  - Even if runtime/ files reach 95%, harness.ts needs ~491/663 = 74.1%
+  - This is a massive gap requiring hundreds of targeted tests
+  - Log: /tmp/runtime-mutation-run1.log
+
+### Update: 2026-08-09 11:00
+- Runtime mutation run #1 IN PROGRESS (HEAD: 033e9178)
+  - 13/33 chunks completed
+  - harness.ts: 306/663 = 46.15% (unchanged, 0 improvement)
+  - runtime/errors.ts: 2/2 = 100%
+  - runtime/event-bus.ts: 31/34 = 91.2%
+  - runtime/harness-support.ts: 173/181 = 95.6% (improved from 87.26%!)
+  - hook-port.ts: NOT STARTED YET
+  - loop.ts: NOT STARTED YET
+  - Partial: 511/880 = 58.18%
+  - CRITICAL: harness.ts at 46.15% makes 90% impossible without massive test writing
+  - Need harness.ts to reach at least 75-80% for overall 90% to be achievable
+  - 100 NoCov mutants in harness.ts are easiest targets
+  - Worst section: L751-900 (47 NoCov + 80 survived = 127/149 non-killed)
+  - Log: /tmp/runtime-mutation-run1.log
+
+### Update: 2026-08-09 11:02
+- Runtime mutation run #1 IN PROGRESS (HEAD: 033e9178)
+  - 14/33 chunks completed (still on harness-support.ts chunk 4)
+  - harness.ts: 306/663 = 46.15% (unchanged, 0 improvement)
+  - harness-support.ts: 293/317 = 92.4% (improved from 87.26%, +30 kills)
+  - Partial: 631/1016 = 62.20%
+  - CRITICAL: harness.ts at 46.15% makes 90% impossible without massive test writing
+  - Mathematical proof: even if ALL other files (2114 mutants) reach 100%, 
+    max overall = (306+2114)/2777 = 87.2% (still FAIL)
+  - Need harness.ts to reach at least 75-80% for 90% to be achievable
+  - 100 NoCov mutants in harness.ts are easiest targets
+  - Plan: wait for full run, then write extensive harness.ts tests
+  - Log: /tmp/runtime-mutation-run1.log
+
+### Update: 2026-08-09 11:06
+- Runtime mutation run #1 IN PROGRESS (HEAD: 033e9178)
+  - 18/33 chunks completed
+  - harness.ts: 306/663 = 46.15% (unchanged)
+  - harness-support.ts: 384/416 = 92.3% (+21 kills vs previous 87.26%)
+  - hook-port.ts (3/4 chunks): K=268 S=116 NC=33 Tot=417 (64.3%)
+    WORSE than previous 70.68%! Chunk 2 (151-300) has 66 survived + 25 NoCov
+  - Partial: 990/1532 = 64.69% (WORSE than previous 71.01%!)
+  - CRITICAL: Runtime module score is REGRESSING, not improving
+  - Possible causes: code changes between commits, test regressions
+  - harness.ts remains the biggest bottleneck (46.15%, 357 non-killed)
+  - Log: /tmp/runtime-mutation-run1.log
