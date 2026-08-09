@@ -129,6 +129,7 @@ export const mutationModules = {
       'runtime/session-tree-port.ts',
     ],
     minimum: 90,
+    chunkTimeoutMs: 30 * 60 * 1000,
   },
   verification: {
     mutate: [
