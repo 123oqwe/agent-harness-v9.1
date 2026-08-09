@@ -972,6 +972,43 @@ describe('sqlite-store-survival: identifier validation error messages', () => {
   it('appendEvent throws with field name for empty run_id', () => {
     expect(() => ctx.store.appendEvent('', { seq: 1, type: 'user' as const, timestamp: '2026-01-01T00:00:00Z', data: {}, hash: 'h', prev_hash: '' })).toThrow('run_id is malformed');
   });
+
+  it('createScopedRun throws with field name for whitespace-padded root_session_id', () => {
+    expect(() => ctx.store.createScopedRun(
+      { tenant_id: 't1', root_session_id: ' r1 ' },
+      'r1', 'goal',
+    )).toThrow('root_session_id is malformed');
+  });
+
+  it('createScopedRun throws with field name for whitespace-padded run_id', () => {
+    expect(() => ctx.store.createScopedRun(
+      { tenant_id: 't1', root_session_id: 'r1' },
+      ' r1 ', 'goal',
+    )).toThrow('run_id is malformed');
+  });
+
+  it('createScopedRun throws with field name for whitespace-padded tenant_id', () => {
+    expect(() => ctx.store.createScopedRun(
+      { tenant_id: ' t1 ', root_session_id: 'r1' },
+      'r1', 'goal',
+    )).toThrow('tenant_id is malformed');
+  });
+
+  it('updateRunStatus throws with field name for whitespace-padded run_id', () => {
+    expect(() => ctx.store.updateRunStatus(' r1 ', 'completed')).toThrow('run_id is malformed');
+  });
+
+  it('getReceipt throws with field name for empty operation_id', () => {
+    expect(() => ctx.store.getReceipt('')).toThrow('operation_id is malformed');
+  });
+
+  it('createRun throws with field name for whitespace-padded run_id', () => {
+    expect(() => ctx.store.createRun(' r1 ', 'goal')).toThrow('run_id is malformed');
+  });
+
+  it('getRun throws with field name for whitespace-padded run_id', () => {
+    expect(() => ctx.store.getRun(' r1 ')).toThrow('run_id is malformed');
+  });
 });
 
 describe('sqlite-store-survival: error recovery paths (NoCov)', () => {
