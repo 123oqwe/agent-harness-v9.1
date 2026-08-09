@@ -1057,3 +1057,23 @@ describe('sqlite-store-survival: openRunSession error paths', () => {
     result.session.releaseWriter();
   });
 });
+
+describe('sqlite-store-survival: openRunSession with valid masterKey', () => {
+  it('succeeds with 32-byte masterKey and creates store', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ah-run-valid-'));
+    const result = openRunSession({
+      runId: 'valid-run-1',
+      goal: 'test goal',
+      strategy: undefined,
+      clock: () => '2026-01-01T00:00:00Z',
+      dataDir: dir,
+      masterKey: Buffer.alloc(32, 0x5a),
+    });
+    expect(result.store).not.toBeNull();
+    expect(result.session).toBeDefined();
+    expect(result.existingEvents).toEqual([]);
+    result.session.releaseWriter();
+    result.store?.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
