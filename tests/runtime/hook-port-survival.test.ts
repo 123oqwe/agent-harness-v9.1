@@ -943,3 +943,335 @@ describe('dispatchHookBoundary with aborted signal', () => {
 
 // Import vi for mocks
 import { vi } from 'vitest';
+
+// --- Extended attenuation policy: providerRequestNarrows edge cases ---
+
+describe('Hook attenuation: providerRequest max_tokens edge cases', () => {
+  const policy = createHarnessHookAttenuationPolicy();
+  const baseRequest = {
+    registry_snapshot_hash: 'hash-1',
+    request: { messages: [], tools: [], max_tokens: 4096 },
+    estimated_input_tokens: 100,
+    required_capabilities: ['text_reasoning'],
+    requires_structured_output: false,
+    data_policy: {
+      local_only: true,
+      allowed_regions: ['local'],
+      max_retention_days: 30,
+      training_allowed: false,
+    },
+    policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+    run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
+  };
+
+  it('rejects max_tokens when original undefined and candidate defined', () => {
+    const baseNoMax = { ...baseRequest, request: { messages: [], tools: [] } };
+    const candidate = { ...baseRequest, request: { messages: [], tools: [], max_tokens: 2048 } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: baseNoMax,
+      candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('allows max_tokens when both undefined', () => {
+    const baseNoMax = { ...baseRequest, request: { messages: [], tools: [] } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: baseNoMax,
+      candidate_payload: baseNoMax,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('rejects max_tokens when original is non-number', () => {
+    const candidate = { ...baseRequest, request: { messages: [], tools: [], max_tokens: 2048 } };
+    const badOriginal = { ...baseRequest, request: { messages: [], tools: [], max_tokens: 'not-a-number' } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: badOriginal,
+      candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects max_tokens when candidate is non-integer', () => {
+    const candidate = { ...baseRequest, request: { messages: [], tools: [], max_tokens: 2048.5 } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: baseRequest,
+      candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects max_tokens when candidate is negative', () => {
+    const candidate = { ...baseRequest, request: { messages: [], tools: [], max_tokens: -1 } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: baseRequest,
+      candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when original max_tokens is non-safe-integer', () => {
+    const badOriginal = { ...baseRequest, request: { messages: [], tools: [], max_tokens: Number.MAX_SAFE_INTEGER + 1 } };
+    const result = policy.validate({
+      event: 'before_provider_request',
+      scope,
+      original_payload: badOriginal,
+      candidate_payload: badOriginal,
+    });
+    expect(result.allowed).toBe(false);
+  });
+});
+
+// --- providerRequest data_policy edge cases ---
+
+describe('Hook attenuation: data_policy edge cases', () => {
+  const policy = createHarnessHookAttenuationPolicy();
+  const baseRequest = {
+    registry_snapshot_hash: 'hash-1',
+    request: { messages: [], tools: [], max_tokens: 4096 },
+    estimated_input_tokens: 100,
+    required_capabilities: ['text_reasoning'],
+    requires_structured_output: false,
+    data_policy: {
+      local_only: true,
+      allowed_regions: ['local', 'us'],
+      max_retention_days: 30,
+      training_allowed: false,
+    },
+    policy: { allowed_provider_ids: undefined, denied_provider_ids: [] },
+    run_plan: { allowed_provider_ids: undefined, required_capabilities: ['text_reasoning'] },
+  };
+
+  it('rejects when local_only is non-boolean', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, local_only: 'yes' as any } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when allowed_regions is not string array', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, allowed_regions: [1, 2] as any } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when max_retention_days is non-number', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, max_retention_days: '30' as any } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when max_retention_days is negative', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, max_retention_days: -1 } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when training_allowed is non-boolean', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, training_allowed: 'no' as any } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when data_policy has different keys', () => {
+    const bad = { ...baseRequest, data_policy: { ...baseRequest.data_policy, extra_field: 'bad' } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when data_policy.request is not a record', () => {
+    const bad = { ...baseRequest, request: 'not-a-record' };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('rejects when tools is not array', () => {
+    const bad = { ...baseRequest, request: { ...baseRequest.request, tools: 'not-array' } };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseRequest, candidate_payload: bad,
+    });
+    expect(result.allowed).toBe(false);
+  });
+
+  it('allows candidate with extra tool that matches original', () => {
+    const baseWithTools = {
+      ...baseRequest,
+      request: { messages: [], tools: [{ name: 'read_file' }, { name: 'write_file' }], max_tokens: 4096 },
+    };
+    const candidate = {
+      ...baseRequest,
+      request: { messages: [], tools: [{ name: 'read_file' }], max_tokens: 4096 },
+    };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseWithTools, candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('rejects candidate with tool not in original', () => {
+    const baseWithTools = {
+      ...baseRequest,
+      request: { messages: [], tools: [{ name: 'read_file' }], max_tokens: 4096 },
+    };
+    const candidate = {
+      ...baseRequest,
+      request: { messages: [], tools: [{ name: 'write_file' }], max_tokens: 4096 },
+    };
+    const result = policy.validate({
+      event: 'before_provider_request', scope, original_payload: baseWithTools, candidate_payload: candidate,
+    });
+    expect(result.allowed).toBe(false);
+  });
+});
+
+// --- dispatchHookBoundary with timeout ---
+
+describe('dispatchHookBoundary with timeout', () => {
+  it('returns deny on timeout for decision mode', async () => {
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return { event: 'user_prompt_submit' as const, action: 'continue' as const, payload: {}, follow_ups: [], replayed: false };
+      }),
+    };
+    const request = makeRequest('user_prompt_submit', { goal: 'test' });
+    const result = await dispatchHookBoundary(port, request, { mode: 'decision', timeout_ms: 100 });
+    expect(result.action).toBe('deny');
+    expect(result.reason_code).toBe('hook_timeout');
+  });
+
+  it('returns continue on timeout for observational mode', async () => {
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return { event: 'post_turn' as const, action: 'continue' as const, payload: {}, follow_ups: [], replayed: false };
+      }),
+    };
+    const request = makeRequest('post_turn', { data: 'test' });
+    const result = await dispatchHookBoundary(port, request, { mode: 'observational', timeout_ms: 100 });
+    expect(result.action).toBe('continue');
+  });
+
+  it('throws on invalid timeout_ms', async () => {
+    const port: HookRuntimePort = { dispatch: vi.fn(async () => ({ event: 'user_prompt_submit' as const, action: 'continue' as const, payload: {}, follow_ups: [], replayed: false })) };
+    const request = makeRequest('user_prompt_submit', { goal: 'test' });
+    await expect(dispatchHookBoundary(port, request, { mode: 'decision', timeout_ms: 0 })).rejects.toThrow();
+    await expect(dispatchHookBoundary(port, request, { mode: 'decision', timeout_ms: -1 } as any)).rejects.toThrow();
+  });
+});
+
+// --- dispatchHookBoundary with port error ---
+
+describe('dispatchHookBoundary with port error', () => {
+  it('returns deny when port throws error', async () => {
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async () => { throw new Error('port crashed'); }),
+    };
+    const request = makeRequest('user_prompt_submit', { goal: 'test' });
+    const result = await dispatchHookBoundary(port, request, { mode: 'decision' });
+    expect(result.action).toBe('deny');
+    expect(result.reason_code).toBe('hook_failed');
+  });
+
+  it('returns continue when port throws error in observational mode', async () => {
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async () => { throw new Error('port crashed'); }),
+    };
+    const request = makeRequest('post_turn', { data: 'test' });
+    const result = await dispatchHookBoundary(port, request, { mode: 'observational' });
+    expect(result.action).toBe('continue');
+  });
+});
+
+// --- dispatchHookBoundary with attenuation allowed ---
+
+describe('dispatchHookBoundary with attenuation', () => {
+  it('allows pre_tool_use to modify payload', async () => {
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async (req) => ({
+        event: req.event,
+        action: 'continue' as const,
+        payload: { ...req.payload, modified: true },
+        follow_ups: [],
+        replayed: false,
+      })),
+    };
+    const request = makeRequest('pre_tool_use', { path: '/test' });
+    const result = await dispatchHookBoundary(port, request, { mode: 'decision' });
+    expect(result.action).toBe('continue');
+  });
+
+  it('allows user_prompt_submit with narrowed constraints', async () => {
+    const originalTask = {
+      goal: 'test',
+      success_criteria: [],
+      constraints: [{ type: 'budget', value: '1000' }, { type: 'time', value: '5000' }],
+    };
+    const narrowedTask = {
+      goal: 'test',
+      success_criteria: [],
+      constraints: [{ type: 'budget', value: '500' }, { type: 'time', value: '3000' }],
+    };
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async (req) => ({
+        event: req.event,
+        action: 'continue' as const,
+        payload: narrowedTask,
+        follow_ups: [],
+        replayed: false,
+      })),
+    };
+    const request = makeRequest('user_prompt_submit', originalTask);
+    const result = await dispatchHookBoundary(port, request, { mode: 'decision' });
+    expect(result.action).toBe('continue');
+  });
+
+  it('denies user_prompt_submit with expanded constraints', async () => {
+    const originalTask = {
+      goal: 'test',
+      success_criteria: [],
+      constraints: [{ type: 'budget', value: '500' }],
+    };
+    const expandedTask = {
+      goal: 'test',
+      success_criteria: [],
+      constraints: [{ type: 'budget', value: '2000' }],
+    };
+    const port: HookRuntimePort = {
+      dispatch: vi.fn(async (req) => ({
+        event: req.event,
+        action: 'continue' as const,
+        payload: expandedTask,
+        follow_ups: [],
+        replayed: false,
+      })),
+    };
+    const request = makeRequest('user_prompt_submit', originalTask);
+    const result = await dispatchHookBoundary(port, request, { mode: 'decision' });
+    expect(result.action).toBe('deny');
+  });
+});
