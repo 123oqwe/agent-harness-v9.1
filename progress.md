@@ -586,3 +586,240 @@ tests/phase-2/integration/ (6), tests/phase-2/architecture/ (1), tests/phase-2/u
   - Total module has ~2777 mutants, estimated final gap ~400+
 - CI: GREEN (run 31313165326, all 14 steps passed)
 - HEAD: 84d93022 (pushed to origin)
+
+### Update: 2026-08-09 21:20 - Full Plan Rewrite with Verified Facts
+- HEAD: 5877c9d4 (verified via git rev-parse)
+- Mutation run #9: IN PROGRESS (screen "mutation", PID 15430, stryker PID 65471)
+  - Running at commit 84d93022 (1 commit behind HEAD)
+  - Previous result: 75.15% FAIL (need 90%)
+  - DO NOT KILL
+- 14/15 modules PASS (all stale SHA, need full Phase 1 rerun)
+- Only runtime FAIL (75.15%, security-critical, NO waivers)
+- Phase 2 tests: ALL 60 unit files >= 150 lines (verified via wc -l)
+  - Previous claim "51/64 < 150 lines" was a hallucination
+- Evidence: Phase 1: 40/40 stale, Phase 2: 0/64
+- CI: run 31314685538 in_progress for 5877c9d4
+- Planning files rewritten: task_plan.md (351 lines), findings.md (98 lines)
+- All facts verified from: git rev-parse, result.json files, equivalent-mutants.json,
+  wc -l on test files, gh run list, control/current-state.json
+- Key hallucinations corrected (9 items, see findings.md)
+- Next: wait for mutation run #9, then analyze results
+
+### Update: 2026-08-09 21:28 - Mutation Run #9 Progress
+- Run #9 at chunk 6/33 (harness.ts:751-900, 66 mutants)
+- Current chunk: 12/66 tested, 3 survived (25% survival rate, improved from 48%)
+- Elapsed: ~1h10m since start at 20:18
+- Previous result: 75.15% FAIL (need 90%, gap: 412 kills)
+- 122 new tests included in this run
+- Survival rate improving but still high in harness.ts chunks
+- Estimated completion: 2-4 more hours (chunks 7-33, runtime/ files faster)
+- Plan verified through 4 clean review passes
+- CI: SUCCESS for 5877c9d4 (all green)
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 21:35 - Mutation Run #9 Chunk 6/33 Progress
+- Chunk 6 (harness.ts:751-900): 35/66 tested, 18 survived (~51% survival rate)
+- Chunks 1-5 complete (harness.ts:1-750)
+- Estimated 2-4 more hours for remaining 27 chunks
+- Survival rate still high in harness.ts chunks (~40-50%)
+- Runtime/ files (chunks 10-33) expected to have better rates due to targeted tests
+- Planning phase COMPLETE (4 clean review passes)
+- Execution phase: B.1 (wait for mutation) IN PROGRESS
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 21:38 - Mutation Run #9 Harness.ts Chunks Complete
+- All 9 harness.ts chunks complete (chunks 1-9, 663 mutants total)
+- Run #9 harness.ts partial: K=359 S=241 TO=12 NC=51 = 663, rate=56.0%
+  (vs run #8: K=334 S=263 TO=3 NC=63 = 663, rate=50.8% = +5.2% improvement)
+- Best improvement: chunk 751-900 (39.6% vs 24.8% = +14.8%)
+- No improvement: chunks 151-300, 301-450, 901-1050, 1051-1200 (tests didn't target these)
+- Now processing runtime/ file chunks (10-33)
+  - Chunk 10 (errors.ts): COMPLETE (2 mutants)
+  - Chunk 11 (event-bus.ts): STARTED (34 mutants)
+- Runtime/ files expected to have better kill rates due to 122 new tests
+- Previous run runtime/ files: 1739K + 311S + 11TO + 53NC = 2114, rate=82.8%
+- Estimated 2-3 more hours for remaining 23 chunks
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 21:42 - Mutation Run #9 Event-bus Complete, Analysis
+- Chunk 11 (event-bus.ts): COMPLETE, K=25 S=3 TO=6 NC=0 = 34, rate=91.2%
+  - Same rate as run #8 (91.2%), but different distribution (more timeouts, fewer kills)
+  - New tests didn't improve event-bus.ts kill rate
+- Chunk 12 (harness-support.ts:1-150): STARTED, 64 mutants
+- Overall: 699/2777 mutants processed (25.2%), 404 kills (57.8%)
+- CRITICAL ANALYSIS:
+  - Even with 100% kill rate on remaining 2078 mutants: 404+2078=2482/2777=89.4%
+  - Still 17 kills short of 90%!
+  - Harness.ts kill rate: 56.0% (371/663) - BIGGEST BLOCKER
+  - Need 226 more kills in harness.ts alone to reach 90%
+  - harness-survival-3 (37 tests) and harness-survival-4 (23 tests) already committed
+    but harness.ts kill rate barely improved from 50.8% to 56.0% (+5.2%)
+  - Existing tests test same code paths but don't have specific assertions to kill mutants
+  - Next steps after run completes: write MORE targeted tests for harness.ts
+    Focus areas (by non-killed count):
+    1. harness.ts:751-900 (90 non-killed) - streaming, fallback, provider switching
+    2. harness.ts:601-750 (43 non-killed) - tool expansion, hooks
+    3. harness.ts:451-600 (39 non-killed) - session, routing
+    4. harness.ts:1201-1312 (38 non-killed) - hook dispatch, isTaskContract
+    5. harness.ts:1051-1200 (31 non-killed) - finalizeOverlay, cache
+  - Mutator types needing coverage (harness.ts):
+    ConditionalExpression: 84, StringLiteral: 49, LogicalOperator: 35,
+    ObjectLiteral: 32, BlockStatement: 18, EqualityOperator: 22,
+    NoCoverage: 51 (easy wins - just need to execute these code paths)
+
+### Update: 2026-08-09 21:45 - Mutation Run #9 Harness-support 100% Kill Rate
+- Chunk 12 (harness-support.ts:1-150): COMPLETE, K=64 S=0 TO=0 NC=0 = 64, rate=100%
+  - Previous run #8: entire harness-support.ts had 384K 32S = 92.3%
+  - First chunk shows 100% kill rate - significant improvement!
+- Chunk 13 (harness-support.ts:151-300): STARTED
+- Overall: 763/2777 mutants processed (27.5%), 468 kills (61.3%)
+- CRITICAL: Even with 100% kill on remaining 2014 mutants: 468+2014=2482/2777=89.4%
+  Still 17 kills short of 90%!
+  -> MUST improve harness.ts kill rate (currently 56.0%)
+  -> If runtime/ files reach 95%: need 117 more kills in harness.ts
+  -> If runtime/ files reach 100%: need only 14 more kills in harness.ts
+- Runtime/ file kill rates so far:
+  errors.ts: 100%, event-bus.ts: 91.2%, harness-support.ts:1-150: 100%
+  Pattern: runtime/ files showing 90-100% kill rates (excellent!)
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:00 - Mutation Run #9 Runtime Files Progress
+- Chunk 13 (harness-support.ts:151-300): nearly complete, K=108 S=8 = 93.1% (excellent!)
+- Overall completed: 12 chunks + chunk 13 nearly done = 13/33
+- Runtime/ file kill rates so far:
+  - errors.ts: 100% (2/2)
+  - event-bus.ts: 91.2% (31/34)
+  - harness-support.ts:1-150: 100% (64/64)
+  - harness-support.ts:151-300: ~93.1% (108/117)
+- KEY INSIGHT: Existing harness-survival-3/4 tests use weak assertions!
+  - `expect(outcome).toBeDefined()` instead of exact value checks
+  - This is why harness.ts has 56% kill rate despite 60 tests targeting it
+  - Need to write harness-survival-5.test.ts with EXACT assertions:
+    - `toBe()` for exact string/number values
+    - `toEqual()` for exact object structures
+    - `toThrow('exact error message')` for error cases
+    - Test all branches of conditionals (both true and false)
+    - Test all combinations of logical operators
+- CRITICAL MATH: Even with 100% kill on remaining runtime/ files:
+  468 + 2014 = 2482/2777 = 89.4% (still 17 kills short of 90%)
+  -> MUST improve harness.ts kill rate
+  -> If runtime/ reaches 95%: need 117 more kills in harness.ts
+  -> If runtime/ reaches 100%: need only 14 more kills in harness.ts
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:10 - Mutation Run #9 Chunk 14 Complete, Critical Math
+- Chunk 14 (harness-support.ts:301-450): COMPLETE, K=120 S=16 = 88.2% (good but not great)
+- Chunk 15 (harness-support.ts:451-556): STARTED
+- Overall: 1016/2777 mutants processed (36.6%), 697 kills (68.6%)
+- MAX POSSIBLE SCORE: 88.5% (even with 100% kill on remaining 1761 mutants)
+  -> STILL BELOW 90% threshold!
+  -> MUST improve harness.ts kill rate (currently 56.0%, 371/663)
+- To reach 90% overall: harness.ts must reach ~90% (597/663 kills)
+  -> Need 226 more kills in harness.ts (out of 292 non-killed)
+  -> That's 77.4% of non-killed mutants must be killed
+- Strategy: Write harness-survival-5.test.ts with EXACT assertions
+  targeting the 292 non-killed mutants in harness.ts
+  Focus areas (by non-killed count):
+    1. L765-895: streaming/fallback/provider switching (90 non-killed)
+    2. L601-750: tool expansion/hooks (43 non-killed)
+    3. L1201-1290: hook dispatch/isTaskContract (38 non-killed)
+    4. L451-600: prompt restriction/session/routing (39 non-killed)
+    5. L1051-1109: pre-tool-use hook rejection (20+ non-killed)
+    6. L901-985: pause/resume/verification (24 non-killed)
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:00 - Mutation Run #9 Crashed, Run #10 Started
+- Run #9 CRASHED on chunk 16 (hook-port.ts:1-150)
+  - Cause: harness-survival-5.test.ts had 13 failing tests
+  - Stryker dry run failed: "There were failed tests in the initial test run"
+  - Test file moved to /tmp/harness-survival-5.test.ts.bak
+- Run #10 STARTED at HEAD 5877c9d4 (screen "mutation", PID 1339)
+  - Log: /tmp/runtime-mutation-run10.log
+  - All 33 chunks will be re-processed from scratch
+  - No new test files in working tree (safe)
+  - Estimated time: 1.5-2 hours
+- Run #9 partial results (15 chunks, 1016 mutants):
+  - harness.ts: 56.0% kill rate (371/663) - MAIN BLOCKER
+  - runtime/ files: 92.4% kill rate (326/353) - excellent
+  - Max possible: 88.5% (below 90% threshold)
+  - MUST improve harness.ts kill rate after run #10 completes
+- Test file issues to fix:
+  1. user_prompt_submit tests: error is caught by harness, not thrown to caller
+     -> Change to check outcome.success === false instead of rejects.toThrow
+  2. sessionTreeAuthority test: missing readSessionHead function
+     -> Add readSessionHead mock
+  3. before_provider_request tests: might have similar issues
+  4. Other tests: need to verify
+- DO NOT KILL the mutation run #10
+
+### Update: 2026-08-09 22:15 - Mutation Run #10 Progress with New Tests
+- Run #10 at chunk 4/33 (harness.ts:451-600, 87/103 tested, 23 survived)
+  - Run #9 same chunk: K=64 S=34 TO=0 NC=5 = 103, rate=62.1%
+  - Run #10 tracking: ~80/103 tested = K=57, S=23, rate=71.1% (improvement!)
+  - New tests (harness-survival-5.test.ts, 41 tests) are being picked up from chunk 3+
+  - Dry run: 321 tests (280 + 41 new) - all passing
+- Chunks 1-3 used 280 tests (same as run #9, no improvement)
+  - Chunk 1 (harness.ts:1-150): 0% (0K, 4S, 1NC) - same as run #9
+  - Chunk 2 (harness.ts:151-300): 85.4% (41K, 7S) - same as run #9
+  - Chunk 3 (harness.ts:301-450): 75.0% (51K, 15S, 2NC) - same as run #9
+- Chunk 4+ uses 321 tests (with harness-survival-5.test.ts)
+  - Chunk 4 (harness.ts:451-600): IN PROGRESS, showing improvement (23S vs 34S at 87/103)
+- Key insight: New tests with exact assertions are killing more mutants
+  - But improvement is modest (~10 fewer survived per chunk)
+  - Need more targeted tests for chunks 5-9 (harness.ts:601-1312)
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:25 - Run #10 Chunk 4 Analysis, Tests Not Helping
+- CRITICAL FINDING: harness-survival-5.test.ts (41 tests) is NOT killing additional mutants
+  - Chunk 4 (harness.ts:451-600): Run #9 K=64 S=34 NC=5 vs Run #10 K=64 S=34 NC=5 (IDENTICAL)
+  - The 41 new tests exercise the same code paths as existing tests
+  - Assertions are still too weak to distinguish original code from mutants
+- Root cause: Tests check `outcome.success === false` instead of exact values like
+  `outcome.loop_result.termination_reason === 'denied'` or
+  `outcome.hook_disposition.state === 'approval_required'`
+- Strategy change: After run #10 completes, write harness-survival-6.test.ts with:
+  1. EXACT string assertions (termination_reason, error messages, event names)
+  2. EXACT object property assertions (hook_disposition.state, hook_disposition.action)
+  3. BOTH branches of conditionals (test force_prompt AND skip AND blocked)
+  4. NoCoverage path execution (verification failure, workspace finalize failure)
+- Run #10 progress: chunk 5/33 (harness.ts:601-750, 49/100 tested, 18 survived)
+- Max possible: 97.6% (if all remaining mutants killed)
+- But realistic estimate: ~80-85% based on current kill rates
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:30 - Run #10 Chunk 7/33, Tests Not Helping
+- Run #10 at chunk 7/33 (harness.ts:751-900, 149 mutants)
+  - 6 chunks completed, 324 mutants processed
+  - Kill rate: 64.2% (208K, 104S, 12NC)
+  - Max possible: 95.8% (if all remaining 2453 mutants killed)
+- CRITICAL: harness-survival-5.test.ts is NOT improving kill rates
+  - Chunks 1-4: IDENTICAL to run #9 (same K/S/NC counts)
+  - Chunk 5 (601-750): REGRESSED from 57.0% to 52.0% (more survived)
+  - The 41 new tests exercise same code paths but assertions too weak
+- Root cause: Tests check `outcome.success === false` instead of exact values
+  - Mutants survive because the test doesn't verify the specific behavior change
+  - Need exact string assertions, exact object properties, both branches of conditionals
+- After run #10 completes:
+  1. Analyze final mutation.json for survived mutants
+  2. Write harness-survival-6.test.ts with MUCH more specific assertions
+  3. Focus on NoCoverage (easy wins) and StringLiteral (exact string checks)
+  4. Commit, re-run mutation
+- DO NOT KILL the mutation run
+
+### Update: 2026-08-09 22:35 - Run #10 Chunk 7 Complete, Improvement Analysis
+- Chunk 6 (harness.ts:751-900): COMPLETE, K=62 S=76 TO=3 NC=8 = 149, rate=43.6%
+  - Run #9: K=54 S=81 TO=5 NC=9 = 149, rate=39.6% (+4.0% improvement)
+  - New tests (harness-survival-5) killed 8 more mutants in streaming/fallback paths
+- Overall: 473/2777 mutants processed (17.0%), 273 kills (57.7%)
+  - Max possible: 92.8% (if all remaining 2304 mutants killed)
+  - This means it's mathematically possible to reach 90%!
+  - Need: 0.90*2777 = 2499 kills; have 273; need 2226 more from 2304 remaining = 96.5% kill rate
+  - Remaining includes 2 more harness.ts chunks + all runtime/ files
+  - Runtime/ files showed 82-100% kill rates in run #9
+  - If runtime/ reaches 88%: 273 + 0.88*2304 = 273 + 2028 = 2301/2777 = 82.9% (FAIL)
+  - If runtime/ reaches 95%: 273 + 0.95*2304 = 273 + 2189 = 2462/2777 = 88.7% (FAIL)
+  - If runtime/ reaches 100%: 273 + 2304 = 2577/2777 = 92.8% (PASS!)
+  - REALISTIC: Need ~96.5% kill rate on remaining mutants to reach 90%
+  - This is VERY tight - every survived mutant matters
+- Chunk 7 (harness.ts:901-1050): STARTED, 67 mutants
+- DO NOT KILL the mutation run
