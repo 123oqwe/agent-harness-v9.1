@@ -46,7 +46,7 @@ function task(goal = 'Provide a concise answer'): TaskContract {
 
 function makeFixture(opts: {
   responses?: readonly ParsedResponse[];
-  hooks?: { dispatch: ReturnType<typeof vi.fn> };
+  hooks?: any;
 } = {}): { harness: Harness; config: HarnessConfig } {
   const workspace = rootDir('harness-nocov3-');
   const definitions = createPhase1ToolDefinitions() as ToolSpec[];
@@ -431,9 +431,9 @@ describe('Harness model fallback error types', () => {
       if (dispatchCount === 1) throw new Error('first provider failed');
       return realGateway.dispatch(...args);
     };
-    wrappedGateway.switchProvider = vi.fn((current: unknown) => {
-      return { ...current as object, provider_id: 'provider-2' };
-    });
+    wrappedGateway.switchProvider = vi.fn((current: any) => {
+      return { ...current, provider_id: 'provider-2' };
+    }) as any;
     const harness = new Harness({ ...config, gateway: wrappedGateway });
     const outcome = await harness.run(task());
     expect(outcome).toBeDefined();

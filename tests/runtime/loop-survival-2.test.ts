@@ -42,9 +42,10 @@ describe('Loop budget guard - max_output_tokens', () => {
     const budgetGuard = {
       beforeModelCall: vi.fn(async () => ({
         allowed: true,
+        reason: 'ok' as const,
         remaining_tokens: 5000,
         max_output_tokens: 500,
-      })),
+      })) as any,
       afterModelCall: vi.fn(async () => {}),
     };
     const deps = makeDeps({
@@ -62,7 +63,7 @@ describe('Loop budget guard - max_output_tokens', () => {
   it('uses original budget when guard returns no max_output_tokens', async () => {
     let receivedBudget: any;
     const budgetGuard = {
-      beforeModelCall: vi.fn(async () => ({ allowed: true, remaining_tokens: 5000 })),
+      beforeModelCall: vi.fn(async () => ({ allowed: true, reason: 'ok' as const, remaining_tokens: 5000 })) as any,
       afterModelCall: vi.fn(async () => {}),
     };
     const deps = makeDeps({
@@ -80,7 +81,7 @@ describe('Loop budget guard - max_output_tokens', () => {
   it('calls afterModelCall with usage from model turn', async () => {
     const afterCall = vi.fn(async () => {});
     const budgetGuard = {
-      beforeModelCall: vi.fn(async () => ({ allowed: true, remaining_tokens: 5000, max_output_tokens: 1000 })),
+      beforeModelCall: vi.fn(async () => ({ allowed: true, reason: 'ok' as const, remaining_tokens: 5000, max_output_tokens: 1000 })) as any,
       afterModelCall: afterCall,
     };
     const deps = makeDeps({
@@ -98,7 +99,7 @@ describe('Loop budget guard - max_output_tokens', () => {
   it('skips afterModelCall when turn has no usage', async () => {
     const afterCall = vi.fn(async () => {});
     const budgetGuard = {
-      beforeModelCall: vi.fn(async () => ({ allowed: true, remaining_tokens: 5000, max_output_tokens: 1000 })),
+      beforeModelCall: vi.fn(async () => ({ allowed: true, reason: 'ok' as const, remaining_tokens: 5000, max_output_tokens: 1000 })) as any,
       afterModelCall: afterCall,
     };
     const deps = makeDeps({
