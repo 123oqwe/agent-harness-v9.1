@@ -65,6 +65,14 @@ function spreadIfDefined<T>(key: string, value: T | undefined): Record<string, T
   return value === undefined ? {} : { [key]: value };
 }
 
+function hookActionToState(action: string): 'approval_required' | 'skipped' | 'blocked' {
+  switch (action) {
+    case 'force_prompt': return 'approval_required';
+    case 'skip': return 'skipped';
+    default: return 'blocked';
+  }
+}
+
 
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -468,12 +476,7 @@ export class Harness {
       if (promptRestriction && promptRestriction.action !== 'continue') {
         const action = promptRestriction.action;
         const reasonCode = promptRestriction.reason_code ?? 'hook_restricted';
-        const state =
-          action === 'force_prompt'
-            ? 'approval_required'
-            : action === 'skip'
-              ? 'skipped'
-              : 'blocked';
+        const state = hookActionToState(action);
         const failure = recordTerminalFailure(
           session,
           routing.run_plan?.reasoning_strategy ?? 'direct',
