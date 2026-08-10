@@ -8,17 +8,19 @@ import { recordSessionBranch } from '../../runtime/session-tree-port.js';
 
 describe('Event-bus survival-2 - batch mode', () => {
   it('buffers events in values mode and flushes after batchMs', async () => {
+    vi.useFakeTimers();
     const bus = new EventBus({ mode: 'values', batchMs: 10 });
     const received: any[] = [];
     bus.subscribe((e) => received.push(e));
     bus.publish(createEvent('model_called', 'run-1', { test: 1 }));
     // Events should be buffered, not yet delivered
     expect(received.length).toBe(0);
-    // Wait for batchMs
-    await new Promise((r) => setTimeout(r, 20));
+    // Advance time past batchMs to trigger auto-flush on next publish
+    vi.advanceTimersByTime(15);
     bus.publish(createEvent('model_called', 'run-1', { test: 2 }));
     // First event should have been flushed
     expect(received.length).toBeGreaterThanOrEqual(1);
+    vi.useRealTimers();
   });
 
   it('delivers events immediately in updates mode', () => {
