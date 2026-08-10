@@ -62,6 +62,14 @@ function combineAbortSignals(configSignal: AbortSignal | undefined, modelSignal:
   return modelSignal ?? configSignal;
 }
 
+function optionalSpread<T>(value: T | undefined): Record<string, never> | { [K in keyof T]: T[K] } {
+  return value === undefined ? {} : value as { [K in keyof T]: T[K] };
+}
+
+function spreadIfDefined<T>(key: string, value: T | undefined): Record<string, T> {
+  return value === undefined ? {} : { [key]: value };
+}
+
 type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type DocModule = typeof import('@agent-harness/documents');
@@ -680,12 +688,7 @@ export class Harness {
         goal: goalWithSkill,
         data_dir: this.config.dataDir,
         budget_tokens: this.execCtx.budget.token_limit,
-        ...(this.config.maxOutputTokensPerCall === undefined
-          ? {}
-          : {
-              max_output_tokens_per_call:
-                this.config.maxOutputTokensPerCall,
-            }),
+        ...spreadIfDefined('max_output_tokens_per_call', this.config.maxOutputTokensPerCall),
        run_plan: runPlan,
        clock: () => this.now(),
        // P1-10: read auto_execute from cancellation_policy (default true)
@@ -693,12 +696,12 @@ export class Harness {
         (runPlan.cancellation_policy as { auto_execute?: boolean }).auto_execute !== false,
       // #1: pass context capacity from the first model binding's max_context
       // #1: context capacity from gateway — use undefined if not available
-      ...(this.contextCapacity !== undefined ? { context_capacity_tokens: this.contextCapacity } : {}),
+      ...spreadIfDefined('context_capacity_tokens', this.contextCapacity),
     },
       {
         session,
-        ...(effectiveSteering === undefined ? {} : { steering: effectiveSteering }),
-        ...(effectiveBudgetGuard === undefined ? {} : { budgetGuard: effectiveBudgetGuard }),
+        ...spreadIfDefined('steering', effectiveSteering),
+        ...spreadIfDefined('budgetGuard', effectiveBudgetGuard),
        modelCall: async (
          messages: unknown[],
          _attempt: number,
@@ -727,7 +730,7 @@ export class Harness {
             modelBudget,
             registrySnapshotHash: this.config.gateway.registrySnapshotHash,
             selectedTools,
-            ...(directive === undefined ? {} : { directive }),
+            ...spreadIfDefined('directive', directive),
           });
           const beforeProvider = await this.decisionHook(
             'before_provider_request',
@@ -1272,7 +1275,7 @@ private async executeTool(
        idempotency_key: `hook-idempotency-${key}`,
        scope,
        payload,
-       ...(this.config.signal === undefined ? {} : { signal: this.config.signal }),
+       ...spreadIfDefined('signal', this.config.signal),
      },
      {
        mode,
