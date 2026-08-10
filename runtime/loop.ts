@@ -29,6 +29,8 @@ import type {
 } from './steering-port.js';
 import type { RuntimeBudgetPort } from './budget-port.js';
 
+const EMPTY_TURN = { content: '', decision_summary: '' } as const;
+
 export { LoopError } from './errors.js';
 
 export type TerminationReason =
@@ -429,7 +431,7 @@ export class LoopEngine {
             iteration: self.iterationsValue,
             messages,
           });
-         if (self.terminatedValue) return { content: '', decision_summary: '' };
+         if (self.terminatedValue) return EMPTY_TURN;
          // #1: context pressure check — if context window is near full, trigger reset
          if (self.config.context_capacity_tokens !== undefined) {
            const threshold = self.config.context_compaction_threshold ?? 0.85;
@@ -440,7 +442,7 @@ export class LoopEngine {
                pressure: estimated / self.config.context_capacity_tokens,
              });
              self.terminate('context_reset');
-             return { content: '', decision_summary: '' };
+             return EMPTY_TURN;
            }
          }
          const budgetDecision = self.deps.budgetGuard?.beforeModelCall({
@@ -456,7 +458,7 @@ export class LoopEngine {
           });
           if (budgetDecision && !budgetDecision.allowed) {
             self.terminate('budget_exhausted');
-            return { content: '', decision_summary: '' };
+            return EMPTY_TURN;
           }
           const approvedBudget = budgetDecision
             ? {
@@ -494,7 +496,7 @@ export class LoopEngine {
             self.steeringInterruptedModel = false;
             // Close the async beforeTurn/retry window before starting a provider.
             self.applySteering(messages, 'steer');
-            if (self.terminatedValue) return { content: '', decision_summary: '' };
+            if (self.terminatedValue) return EMPTY_TURN;
             const controller = new AbortController();
             self.activeModelAbort = controller;
             const signal = self.deps.signal
@@ -502,10 +504,10 @@ export class LoopEngine {
               : controller.signal;
             try {
               const turn = await callProvider(signal);
-              if (self.terminatedValue) return { content: '', decision_summary: '' };
+              if (self.terminatedValue) return EMPTY_TURN;
               if (!self.steeringInterruptedModel) return turn;
             } catch (error) {
-              if (self.terminatedValue) return { content: '', decision_summary: '' };
+              if (self.terminatedValue) return EMPTY_TURN;
               if (!self.steeringInterruptedModel) throw error;
             } finally {
               if (self.activeModelAbort === controller) self.activeModelAbort = null;
