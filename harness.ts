@@ -54,7 +54,6 @@ import { CacheManager } from './gateway/cache-manager.js';
 // Lazy-loaded Phase 2 package modules — dynamic imports for RAG and documents.
 // In dev: imports resolve via workspace symlinks in node_modules.
 // In packed root: imports resolve via @agent-harness/* package resolution.
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 function combineAbortSignals(configSignal: AbortSignal | undefined, modelSignal: AbortSignal | undefined): AbortSignal | undefined {
   if (configSignal && modelSignal && configSignal !== modelSignal) {
     return AbortSignal.any([configSignal, modelSignal]);
@@ -68,6 +67,7 @@ function spreadIfDefined<T>(key: string, value: T | undefined): Record<string, T
 
 
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type DocModule = typeof import('@agent-harness/documents');
