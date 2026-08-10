@@ -62,13 +62,11 @@ function combineAbortSignals(configSignal: AbortSignal | undefined, modelSignal:
   return modelSignal ?? configSignal;
 }
 
-function optionalSpread<T>(value: T | undefined): Record<string, never> | { [K in keyof T]: T[K] } {
-  return value === undefined ? {} : value as { [K in keyof T]: T[K] };
-}
-
 function spreadIfDefined<T>(key: string, value: T | undefined): Record<string, T> {
   return value === undefined ? {} : { [key]: value };
 }
+
+
 
 type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -114,6 +112,7 @@ import {
   type HookRuntimePort,
   type RuntimeHookEvent,
   type RuntimeHookOutcome,
+  type RuntimeHookScope,
 } from './runtime/hook-port.js';
 import {
   isTerminalRun,
@@ -1259,7 +1258,7 @@ private async executeTool(
    }>,
  ): Promise<RuntimeHookOutcome> {
    const context = this.execCtx ?? this.config.executionContext;
-   const scope = {
+   const scope: RuntimeHookScope = {
      tenant_id: context.tenant_id,
      run_id: scopeOverrides.run_id ?? context.run_id,
      session_id: scopeOverrides.session_id ?? context.session_id,
@@ -1279,9 +1278,7 @@ private async executeTool(
      },
      {
        mode,
-       ...(this.config.hookTimeoutMs === undefined
-         ? {}
-         : { timeout_ms: this.config.hookTimeoutMs }),
+       ...spreadIfDefined('timeout_ms', this.config.hookTimeoutMs),
      },
    );
  }
