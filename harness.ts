@@ -55,6 +55,13 @@ import { CacheManager } from './gateway/cache-manager.js';
 // In dev: imports resolve via workspace symlinks in node_modules.
 // In packed root: imports resolve via @agent-harness/* package resolution.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+function combineAbortSignals(configSignal: AbortSignal | undefined, modelSignal: AbortSignal | undefined): AbortSignal | undefined {
+  if (configSignal && modelSignal && configSignal !== modelSignal) {
+    return AbortSignal.any([configSignal, modelSignal]);
+  }
+  return modelSignal ?? configSignal;
+}
+
 type RagModule = typeof import('@agent-harness/rag');
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type DocModule = typeof import('@agent-harness/documents');
@@ -766,9 +773,7 @@ export class Harness {
            for await (const ev of this.config.gateway.dispatchStream(resolved, effectiveRequest, {
              operation_id: opId,
              attempt_id: attId,
-             signal: this.config.signal && modelSignal && this.config.signal !== modelSignal
-               ? AbortSignal.any([this.config.signal, modelSignal])
-               : (modelSignal ?? this.config.signal),
+             signal: combineAbortSignals(this.config.signal, modelSignal),
            })) {
              if (ev.type === 'text_delta' && ev.text) { onDelta(ev.text); contentBuffer += ev.text; }
              else if (ev.type === 'tool_call' && ev.tool_call) { toolCalls.push(ev.tool_call); }
@@ -788,9 +793,7 @@ export class Harness {
          }
        // N28 fix: ModelFallback — if dispatch fails, try switching providers
        let result: GatewayDispatchResult | undefined;
-       const dispatchSignal = this.config.signal && modelSignal && this.config.signal !== modelSignal
-         ? AbortSignal.any([this.config.signal, modelSignal])
-         : (modelSignal ?? this.config.signal);
+       const dispatchSignal = combineAbortSignals(this.config.signal, modelSignal);
        try {
          result = await this.config.gateway.dispatch(resolved, effectiveRequest, {
            operation_id: opId,
