@@ -1284,16 +1284,15 @@ private async executeTool(
  }
 
  private isTaskContract(value: unknown): value is TaskContract {
-   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-     return false;
-   }
+   if (value === null) return false;
+   if (typeof value !== 'object') return false;
+   if (Array.isArray(value)) return false;
    const candidate = value as Partial<TaskContract>;
-   return (
-     typeof candidate.goal === 'string' &&
-     candidate.goal.trim().length > 0 &&
-     Array.isArray(candidate.success_criteria) &&
-     Array.isArray(candidate.constraints)
-   );
+   if (typeof candidate.goal !== 'string') return false;
+   if (candidate.goal.trim().length === 0) return false;
+   if (!Array.isArray(candidate.success_criteria)) return false;
+   if (!Array.isArray(candidate.constraints)) return false;
+   return true;
  }
 
   /** Finalize the overlay: commit on success, discard on failure. */
