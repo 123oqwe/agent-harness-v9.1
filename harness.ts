@@ -868,10 +868,10 @@ export class Harness {
          return results;
        },
        signal: this.config.signal,
-       ...((this._onModelDelta ?? this.config.onModelDelta) ? { onModelDelta: this._onModelDelta ?? this.config.onModelDelta } : {}),
-       ...((this._onToolOutput ?? this.config.onToolOutput) ? { onToolOutput: this._onToolOutput ?? this.config.onToolOutput } : {}),
-       ...((this._eventBus ?? this.config.eventBus) ? { eventBus: this._eventBus ?? this.config.eventBus } : {}),
-       ...(this.contextCompiler ? { contextCompiler: this.contextCompiler } : {}),
+       ...spreadIfDefined('onModelDelta', this._onModelDelta ?? this.config.onModelDelta),
+       ...spreadIfDefined('onToolOutput', this._onToolOutput ?? this.config.onToolOutput),
+       ...spreadIfDefined('eventBus', this._eventBus ?? this.config.eventBus),
+       ...spreadIfDefined('contextCompiler', this.contextCompiler),
         turnHooks: {
           beforeTurn: async ({ iteration, messages }) => {
             const before = await this.decisionHook(
