@@ -110,6 +110,9 @@ import {
   restoreVerificationReport,
   restoreWorkspaceChanges,
   validateExecutionContext,
+  assertValidHookPayload,
+  assertValidPreTurnMessages,
+  assertNoToolSetExpansion,
   type ExecutionContext,
   type RunEvidence,
 } from './runtime/harness-support.js';
@@ -739,30 +742,17 @@ export class Harness {
             req,
             `provider-before:${runPlan.run_id}:${modelCallCount}`,
           );
-          if (
-            beforeProvider.payload === null ||
-            typeof beforeProvider.payload !== 'object' ||
-            Array.isArray(beforeProvider.payload)
-          ) {
-            throw new Error('before_provider_request returned an invalid request');
-          }
+          assertValidHookPayload(beforeProvider.payload, 'before_provider_request');
           const effectiveRequest = beforeProvider.payload as typeof req;
           // Validate that hooks did not expand the tool set beyond policy
           // filtering. Hooks can restrict a request but never authorize one.
-          const originalToolNames = new Set(
-            (req.request.tools ?? []).map((t: { name: string }) => t.name),
+          assertNoToolSetExpansion(
+            (req.request.tools ?? []) as readonly { name: string }[],
+            (
+              (effectiveRequest.request as unknown as { tools?: readonly { name: string }[] })
+                .tools ?? []
+            ),
           );
-          const effectiveToolNames = (
-            (effectiveRequest.request as unknown as { tools?: readonly { name: string }[] })
-              .tools ?? []
-          ).map((t) => t.name);
-          for (const toolName of effectiveToolNames) {
-            if (!originalToolNames.has(toolName)) {
-              throw new Error(
-                `before_provider_request expanded tool set beyond policy: ${toolName}`,
-              );
-            }
-          }
           const resolved = this.config.gateway.resolve(effectiveRequest);
           const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
           const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
@@ -889,21 +879,8 @@ export class Harness {
               { messages },
               `turn-before:${runPlan.run_id}:${iteration}`,
             );
-            const candidate = before.payload as { messages?: unknown };
-           if (!candidate || !Array.isArray(candidate.messages)) {
-             throw new Error('pre_turn returned invalid messages');
-           }
-            // Validate each message has a valid role before replacing
-            for (const msg of candidate.messages) {
-              if (
-                !msg ||
-                typeof msg !== 'object' ||
-                typeof (msg as Record<string, unknown>).role !== 'string'
-              ) {
-                throw new Error('pre_turn returned a message with invalid role');
-              }
-            }
-           messages.splice(0, messages.length, ...candidate.messages);
+            assertValidPreTurnMessages(before.payload);
+           messages.splice(0, messages.length, ...(before.payload as { messages: unknown[] }).messages);
           },
           afterTurn: async ({ iteration, turn, observations }) => {
             await this.observationalHook(
@@ -1109,13 +1086,7 @@ private async executeTool(
     }
     throw error;
   }
-  if (
-    preTool.payload === null ||
-    typeof preTool.payload !== 'object' ||
-    Array.isArray(preTool.payload)
-  ) {
-    throw new Error('PreToolUse hook returned invalid tool arguments');
-  }
+  assertValidHookPayload(preTool.payload, 'PreToolUse hook');
   const normalizedArgs = normalizeWorkspaceToolInput(
     name,
     preTool.payload as Record<string, unknown>,

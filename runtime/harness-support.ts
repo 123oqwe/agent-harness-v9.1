@@ -554,3 +554,40 @@ export function buildEvidence(input: EvidenceInput): RunEvidence {
     session_head_hash: events.at(-1)?.hash ?? null,
   };
 }
+
+
+export function assertValidHookPayload(payload: unknown, context: string): asserts payload is object {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error(`${context} returned an invalid request`);
+  }
+}
+
+export function assertValidPreTurnMessages(payload: unknown): asserts payload is { messages: unknown[] } {
+  const candidate = payload as { messages?: unknown };
+  if (!candidate || !Array.isArray(candidate.messages)) {
+    throw new Error('pre_turn returned invalid messages');
+  }
+  for (const msg of candidate.messages) {
+    if (
+      !msg ||
+      typeof msg !== 'object' ||
+      typeof (msg as Record<string, unknown>).role !== 'string'
+    ) {
+      throw new Error('pre_turn returned a message with invalid role');
+    }
+  }
+}
+
+export function assertNoToolSetExpansion(
+  originalTools: readonly { name: string }[],
+  effectiveTools: readonly { name: string }[],
+): void {
+  const originalNames = new Set(originalTools.map((t) => t.name));
+  for (const tool of effectiveTools) {
+    if (!originalNames.has(tool.name)) {
+      throw new Error(
+        `before_provider_request expanded tool set beyond policy: ${tool.name}`,
+      );
+    }
+  }
+}
