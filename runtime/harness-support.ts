@@ -3,10 +3,12 @@ import { createHash } from 'node:crypto';
 import type { TaskContract } from '../contracts/index.js';
 import type {
   ProviderSelectionRequest,
+  GatewayDispatchResult,
 } from '../gateway/model-gateway.js';
 import type {
   Message,
   ProviderTool,
+  StreamEvent,
 } from '../gateway/scripted-provider.js';
 import type { RunPlan } from '../router/static-router.js';
 import type { AuditEntry } from '../security/audit-sink.js';
@@ -590,4 +592,33 @@ export function assertNoToolSetExpansion(
       );
     }
   }
+}
+
+export async function processStreamEvents(
+  stream: AsyncIterable<StreamEvent>,
+  providerId: string,
+  onDelta: (delta: string) => void,
+): Promise<GatewayDispatchResult> {
+  let contentBuffer = '';
+  let usage: { input_tokens: number; output_tokens: number } | undefined;
+  const toolCalls: Array<{ id: string; name: string; arguments: Readonly<Record<string, unknown>> }> = [];
+  for await (const ev of stream) {
+    if (ev.type === 'text_delta' && ev.text) {
+      onDelta(ev.text);
+      contentBuffer += ev.text;
+    } else if (ev.type === 'tool_call' && ev.tool_call) {
+      toolCalls.push(ev.tool_call);
+    } else if (ev.type === 'message_stop' && ev.usage) {
+      usage = ev.usage;
+    }
+  }
+  return {
+    provider_id: providerId,
+    response: {
+      content: contentBuffer,
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      ...(usage !== undefined ? { usage } : {}),
+    },
+    usage: usage ?? { input_tokens: 0, output_tokens: 0 },
+  };
 }

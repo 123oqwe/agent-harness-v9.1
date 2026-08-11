@@ -104,6 +104,7 @@ import {
   canonicalHash,
   extractToolReceipts,
   gatewayResultToModelTurn,
+  processStreamEvents,
   normalizeWorkspaceToolInput,
   recordTerminalFailure,
   restoreLoopResult,
@@ -762,27 +763,15 @@ export class Harness {
          );
          // #4: streaming token output via dispatchStream when onDelta is provided
          if (onDelta) {
-           let contentBuffer = '';
-           let usage: { input_tokens: number; output_tokens: number } | undefined;
-           const toolCalls: Array<{ id: string; name: string; arguments: Readonly<Record<string, unknown>> }> = [];
-           for await (const ev of this.config.gateway.dispatchStream(resolved, effectiveRequest, {
-             operation_id: opId,
-             attempt_id: attId,
-             signal: combineAbortSignals(this.config.signal, modelSignal),
-           })) {
-             if (ev.type === 'text_delta' && ev.text) { onDelta(ev.text); contentBuffer += ev.text; }
-             else if (ev.type === 'tool_call' && ev.tool_call) { toolCalls.push(ev.tool_call); }
-             else if (ev.type === 'message_stop' && ev.usage) { usage = ev.usage; }
-           }
-           const streamResult: GatewayDispatchResult = {
-             provider_id: resolved.provider_id,
-             response: {
-               content: contentBuffer,
-               ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-                ...(usage !== undefined ? { usage } : {}),
-             },
-             usage: usage ?? { input_tokens: 0, output_tokens: 0 },
-           };
+           const streamResult = await processStreamEvents(
+             this.config.gateway.dispatchStream(resolved, effectiveRequest, {
+               operation_id: opId,
+               attempt_id: attId,
+               signal: combineAbortSignals(this.config.signal, modelSignal),
+             }),
+             resolved.provider_id,
+             onDelta,
+           );
            await this.observationalHook('after_response', streamResult, `provider-after:${runPlan.run_id}:${modelCallCount}`);
            return gatewayResultToModelTurn(streamResult);
          }
