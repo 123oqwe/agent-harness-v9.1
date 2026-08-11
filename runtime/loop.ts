@@ -15,7 +15,20 @@ import { LoopError } from './errors.js';
 import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
-import { buildLoopResult } from './harness-support.js';
+import {
+  buildLoopResult,
+  buildPlanModePausedEvent,
+  buildRunStateChangePausedEvent,
+  buildToolCallEvent,
+  buildToolCallStartEvent,
+  buildToolResultEvent,
+  buildToolResultPublishEvent,
+  buildRunTerminatedEvent,
+  buildRunStateChangeTerminatedEvent,
+  buildStepStateEvent,
+  buildDefaultContextLayers,
+  buildDefaultSelected,
+} from './harness-support.js';
 import { HookRestrictionError } from './hook-port.js';
 import type { EventBus, BusEvent } from './event-bus.js';
 import type { ContextCompiler } from '@agent-harness/runtime-core';
@@ -296,17 +309,8 @@ export class LoopEngine {
            context_capacity_tokens: this.config.context_capacity_tokens ?? 128_000,
            reserved_output_tokens: 4096,
            cache_breakpoint: 0,
-           layers: {
-             system_policy: [],
-             task: [{ id: 'goal', layer: 'task', token_count: Math.ceil(this.config.goal.length / 4), trust: 'trusted', tenant_id: 'default', acl: { tenant_id: 'default', principal_ids: ['default'] }, content: { role: 'user', text: this.config.goal }, source_hash: '', provenance: {} }],
-             active_plan: [],
-             recent_conversation: [],
-             retrieved_evidence: ragResults.map((r, i) => ({ id: `rag-${i}`, layer: 'retrieved_evidence', token_count: Math.ceil(r.chunk.text.length / 4), trust: 'untrusted', tenant_id: 'default', acl: { tenant_id: 'default', principal_ids: ['default'] }, content: { text: r.chunk.text, source: r.citation.source_path }, source_hash: r.citation.content_hash, provenance: {} })),
-             tool_definitions: [],
-             tool_results: [],
-             memory: [],
-           },
-           selected: { tool_ids: [], skill_ids: [], rag_source_ids: ragResults.map((_, i) => `rag-${i}`), disclosures: [] },
+           layers: buildDefaultContextLayers(this.config.goal, ragResults) as Parameters<typeof this.deps.contextCompiler.compile>[0]['layers'],
+           selected: buildDefaultSelected(ragResults),
          });
          for (const msg of compiled.messages) {
            messages.push({ role: msg.role, content: Array.isArray(msg.content) ? msg.content.join('\n') : msg.content });
@@ -346,14 +350,8 @@ export class LoopEngine {
       // P1-10: plan mode — if auto_execute is false, pause before executing
       // the frozen RunPlan and wait for human approval.
       if (this.config.auto_execute === false && !this.terminatedValue) {
-        this.deps.session.append('system', {
-          event: 'plan_mode_paused',
-          reason: 'auto_execute is false — awaiting human approval',
-        });
-        this.publishEvent('run_state_change', {
-          state: 'paused',
-          reason: 'auto_execute false — awaiting approval',
-        });
+        this.deps.session.append('system', buildPlanModePausedEvent());
+        this.publishEvent('run_state_change', buildRunStateChangePausedEvent());
         this.terminate('approval_required');
       }
      if (this.terminatedValue) {
@@ -659,18 +657,9 @@ export class LoopEngine {
     call: NonNullable<ModelTurn['tool_calls']>[number],
     stepId: string,
   ): void {
-    this.deps.session.append('tool_call', {
-      step: stepId,
-      tool_call_id: call.id,
-      tool: call.name,
-      arguments: call.arguments,
-    });
+    this.deps.session.append('tool_call', buildToolCallEvent(stepId, call.id, call.name, call.arguments));
     // P1-06: publish tool_call_start event
-    this.publishEvent('tool_call_start', {
-      tool_call_id: call.id,
-      tool: call.name,
-      arguments: call.arguments,
-    }, stepId);
+    this.publishEvent('tool_call_start', buildToolCallStartEvent(call.id, call.name, call.arguments), stepId);
   }
 
   private recordObservation(
@@ -713,21 +702,9 @@ export class LoopEngine {
         result: boundedPayload,
       };
     }
-    this.deps.session.append('tool_result', {
-      step: stepId,
-      tool_call_id: call.id,
-      tool: call.name,
-      status,
-      observation,
-    });
+    this.deps.session.append('tool_result', buildToolResultEvent(stepId, call.id, call.name, status, observation));
     // P1-06: publish tool_result event
-    this.publishEvent('tool_result', {
-      tool_call_id: call.id,
-      tool: call.name,
-      status,
-      bytes,
-      truncated,
-    }, stepId);
+    this.publishEvent('tool_result', buildToolResultPublishEvent(call.id, call.name, status, bytes, truncated), stepId);
     return observation;
   }
 
@@ -737,12 +714,7 @@ export class LoopEngine {
     details: Readonly<Record<string, unknown>> = {},
   ): void {
     this.stepStatesValue.set(stepId, state);
-    this.deps.session.append('system', {
-      event: 'step_state',
-      step: stepId,
-      status: state,
-      ...details,
-    });
+    this.deps.session.append('system', buildStepStateEvent(stepId, state, details));
     // P1-06: publish step_transition event
     this.publishEvent('step_transition', { state, ...details }, stepId);
   }
@@ -752,26 +724,9 @@ export class LoopEngine {
     this.terminatedValue = true;
     this.terminationReasonValue = reason;
     if (reason === 'context_reset') this.contextResetEmittedValue = true;
-    this.deps.session.append('system', {
-      event: 'run_terminated',
-      termination_reason: reason,
-      iterations: this.iterationsValue,
-      usage: {
-        input_tokens: this.inputTokens,
-        output_tokens: this.outputTokens,
-        total_tokens: this.usedTokens(),
-      },
-    });
+    this.deps.session.append('system', buildRunTerminatedEvent(reason, this.iterationsValue, this.inputTokens, this.outputTokens, this.usedTokens()));
     // P1-06: publish run_state_change event
-    this.publishEvent('run_state_change', {
-      termination_reason: reason,
-      iterations: this.iterationsValue,
-       usage: {
-         input_tokens: this.inputTokens,
-         output_tokens: this.outputTokens,
-         total_tokens: this.usedTokens(),
-       },
-    });
+    this.publishEvent('run_state_change', buildRunStateChangeTerminatedEvent(reason, this.iterationsValue, this.inputTokens, this.outputTokens, this.usedTokens()));
   }
 
   private classifyUnhandled(error: unknown): TerminationReason {

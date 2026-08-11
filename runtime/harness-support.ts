@@ -945,3 +945,172 @@ export function buildFallbackDispatchResult(
     initial_failure: dispatchResult,
   };
 }
+
+/** Build a plan_mode_paused event payload. */
+export function buildPlanModePausedEvent(): { event: string; reason: string } {
+  return {
+    event: 'plan_mode_paused',
+    reason: 'auto_execute is false — awaiting human approval',
+  };
+}
+
+/** Build a run_state_change paused event. */
+export function buildRunStateChangePausedEvent(): { state: string; reason: string } {
+  return {
+    state: 'paused',
+    reason: 'auto_execute false — awaiting approval',
+  };
+}
+
+/** Build a tool_call session event. */
+export function buildToolCallEvent(
+  stepId: string,
+  callId: string,
+  toolName: string,
+  args: unknown,
+): { step: string; tool_call_id: string; tool: string; arguments: unknown } {
+  return {
+    step: stepId,
+    tool_call_id: callId,
+    tool: toolName,
+    arguments: args,
+  };
+}
+
+/** Build a tool_call_start publish event. */
+export function buildToolCallStartEvent(
+  callId: string,
+  toolName: string,
+  args: unknown,
+): { tool_call_id: string; tool: string; arguments: unknown } {
+  return {
+    tool_call_id: callId,
+    tool: toolName,
+    arguments: args,
+  };
+}
+
+/** Build a tool_result session event. */
+export function buildToolResultEvent(
+  stepId: string,
+  callId: string,
+  toolName: string,
+  status: string,
+  observation: unknown,
+): { step: string; tool_call_id: string; tool: string; status: string; observation: unknown } {
+  return {
+    step: stepId,
+    tool_call_id: callId,
+    tool: toolName,
+    status,
+    observation,
+  };
+}
+
+/** Build a tool_result publish event. */
+export function buildToolResultPublishEvent(
+  callId: string,
+  toolName: string,
+  status: string,
+  bytes: number,
+  truncated: boolean,
+): { tool_call_id: string; tool: string; status: string; bytes: number; truncated: boolean } {
+  return {
+    tool_call_id: callId,
+    tool: toolName,
+    status,
+    bytes,
+    truncated,
+  };
+}
+
+/** Build a run_terminated session event. */
+export function buildRunTerminatedEvent(
+  reason: string,
+  iterations: number,
+  inputTokens: number,
+  outputTokens: number,
+  totalTokens: number,
+): { event: string; termination_reason: string; iterations: number; usage: { input_tokens: number; output_tokens: number; total_tokens: number } } {
+  return {
+    event: 'run_terminated',
+    termination_reason: reason,
+    iterations,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+    },
+  };
+}
+
+/** Build a run_state_change publish event for termination. */
+export function buildRunStateChangeTerminatedEvent(
+  reason: string,
+  iterations: number,
+  inputTokens: number,
+  outputTokens: number,
+  totalTokens: number,
+): { termination_reason: string; iterations: number; usage: { input_tokens: number; output_tokens: number; total_tokens: number } } {
+  return {
+    termination_reason: reason,
+    iterations,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+    },
+  };
+}
+
+/** Build a step_state session event. */
+export function buildStepStateEvent(
+  stepId: string,
+  state: string,
+  details: Record<string, unknown>,
+): { event: string; step: string; status: string } {
+  return {
+    event: 'step_state',
+    step: stepId,
+    status: state,
+    ...details,
+  };
+}
+
+/** Build the context compiler default layers. */
+export function buildDefaultContextLayers(
+  goal: string,
+  ragResults: ReadonlyArray<{ chunk: { text: string }; citation: { source_path: string; content_hash: string } }>,
+): {
+  system_policy: unknown[];
+  task: unknown[];
+  active_plan: unknown[];
+  recent_conversation: unknown[];
+  retrieved_evidence: unknown[];
+  tool_definitions: unknown[];
+  tool_results: unknown[];
+  memory: unknown[];
+} {
+  return {
+    system_policy: [],
+    task: [{ id: 'goal', layer: 'task', token_count: Math.ceil(goal.length / 4), trust: 'trusted', tenant_id: 'default', acl: { tenant_id: 'default', principal_ids: ['default'] }, content: { role: 'user', text: goal }, source_hash: '', provenance: {} }],
+    active_plan: [],
+    recent_conversation: [],
+    retrieved_evidence: ragResults.map((r, i) => ({ id: `rag-${i}`, layer: 'retrieved_evidence', token_count: Math.ceil(r.chunk.text.length / 4), trust: 'untrusted', tenant_id: 'default', acl: { tenant_id: 'default', principal_ids: ['default'] }, content: { text: r.chunk.text, source: r.citation.source_path }, source_hash: r.citation.content_hash, provenance: {} })),
+    tool_definitions: [],
+    tool_results: [],
+    memory: [],
+  };
+}
+
+/** Build the context compiler selected field. */
+export function buildDefaultSelected(
+  ragResults: readonly unknown[],
+): { tool_ids: string[]; skill_ids: string[]; rag_source_ids: string[]; disclosures: string[] } {
+  return {
+    tool_ids: [],
+    skill_ids: [],
+    rag_source_ids: ragResults.map((_, i) => `rag-${i}`),
+    disclosures: [],
+  };
+}
