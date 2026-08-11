@@ -114,6 +114,9 @@ import {
   assertValidHookPayload,
   assertValidPreTurnMessages,
   assertNoToolSetExpansion,
+  emitSessionEvent,
+  emitErrorEvent,
+  buildHarnessOutcome,
   type ExecutionContext,
   type RunEvidence,
 } from './runtime/harness-support.js';
@@ -459,13 +462,7 @@ export class Harness {
           iterations,
         );
         const restoredVerification = restoreVerificationReport(session);
-        return {
-          run_plan: routing.run_plan ?? null,
-          routing,
-          loop_result: restoredLoopResult,
-          verification_report: restoredVerification,
-          session,
-          evidence: buildEvidence({
+        const terminalEvidence = buildEvidence({
             session,
             runPlan: routing.run_plan,
             loopResult: restoredLoopResult,
@@ -473,9 +470,8 @@ export class Harness {
             workspaceChanges: restoreWorkspaceChanges(session),
             auditEntries: this.config.security.auditSink.all,
             buildCommitSha: this.config.buildCommitSha,
-          }),
-          success: termination === 'goal_satisfied',
-        };
+          });
+        return buildHarnessOutcome(routing.run_plan ?? null, routing, restoredLoopResult, restoredVerification, session, terminalEvidence, termination === 'goal_satisfied');
       }
       if (promptRestriction && promptRestriction.action !== 'continue') {
         const action = promptRestriction.action;
@@ -504,13 +500,7 @@ export class Harness {
             encryptionKey: this.config.sessionMasterKey!,
           });
         }
-        return {
-          run_plan: routing.run_plan ?? null,
-          routing,
-          loop_result: failure,
-          verification_report: null,
-          session,
-          evidence: buildEvidence({
+        const promptEvidence = buildEvidence({
             session,
             runPlan: routing.run_plan,
             loopResult: failure,
@@ -518,13 +508,10 @@ export class Harness {
             workspaceChanges: [],
             auditEntries: this.config.security.auditSink.all,
             buildCommitSha: this.config.buildCommitSha,
-          }),
-          success: false,
-          hook_disposition: {
-            action,
-            state,
-            reason_code: reasonCode,
-          },
+          });
+        return {
+          ...buildHarnessOutcome(routing.run_plan ?? null, routing, failure, null, session, promptEvidence, false),
+          hook_disposition: { action, state, reason_code: reasonCode },
         };
       }
     if (routing.outcome !== 'route') {
@@ -897,13 +884,11 @@ export class Harness {
         run_id: actualRunId,
         operation_id: `${this.execCtx!.operation_id}-pause`,
       });
-      session.acquireWriter();
-      session.append('system', {
+      emitSessionEvent(session, {
         event: 'pause_resume_evaluated',
         action: pauseAction.action,
         operation_id: pauseAction.operation_id,
       });
-      session.releaseWriter();
       if (pauseAction.action === 'continue_next_step') {
         // Resume execution by re-running the loop
         const resumedResult = await loop.run();
@@ -928,12 +913,7 @@ export class Harness {
       } catch (error) {
         verificationReport = null;
         success = false;
-        session.acquireWriter();
-        session.append('error', {
-          event: 'verification_engine_failed',
-          message: error instanceof Error ? error.message : 'unknown',
-        });
-        session.releaseWriter();
+        emitErrorEvent(session, 'verification_engine_failed', error instanceof Error ? error.message : 'unknown');
       }
       loopResult = {
         ...executionResult,
@@ -952,16 +932,10 @@ export class Harness {
         ...loopResult,
         termination_reason: 'internal_error',
       };
-      session.acquireWriter();
-      session.append('error', {
-        event: 'workspace_finalize_failed',
-        message: error instanceof Error ? error.message : 'unknown',
-      });
-      session.releaseWriter();
+      emitErrorEvent(session, 'workspace_finalize_failed', error instanceof Error ? error.message : 'unknown');
     }
 
-    session.acquireWriter();
-    session.append('system', {
+    emitSessionEvent(session, {
       event: 'run_finalized',
       termination_reason: loopResult.termination_reason,
       verification_report: verificationReport,
@@ -972,7 +946,6 @@ export class Harness {
       iterations: loopResult.iterations,
       last_event_seq: session.eventCount(),
     });
-    session.releaseWriter();
 
     // 4. Persist session if path provided
     if (this.config.sessionLogPath) {
@@ -1001,15 +974,7 @@ export class Harness {
       { termination_reason: loopResult.termination_reason },
       `stop:${actualRunId}:${loopResult.termination_reason}`,
     );
-    return {
-      run_plan: runPlan,
-      routing,
-      loop_result: loopResult,
-      verification_report: verificationReport,
-      session,
-      evidence,
-      success,
-    };
+    return buildHarnessOutcome(runPlan, routing, loopResult, verificationReport, session, evidence, success);
     } catch (error) {
       await this.observationalHook(
         'stop',

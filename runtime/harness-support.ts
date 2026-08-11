@@ -10,7 +10,7 @@ import type {
   ProviderTool,
   StreamEvent,
 } from '../gateway/scripted-provider.js';
-import type { RunPlan } from '../router/static-router.js';
+import type { RunPlan, RoutingResult } from '../router/static-router.js';
 import type { AuditEntry } from '../security/audit-sink.js';
 import type { DurableSession } from '../session/durable-session.js';
 import type { SessionEvent } from '../session/durable-session.js';
@@ -620,5 +620,55 @@ export async function processStreamEvents(
       ...(usage !== undefined ? { usage } : {}),
     },
     usage: usage ?? { input_tokens: 0, output_tokens: 0 },
+  };
+}
+
+/** Emit a system event to the session with proper writer lifecycle. */
+export function emitSessionEvent(
+  session: DurableSession,
+  data: Record<string, unknown>,
+): void {
+  session.acquireWriter();
+  session.append('system', data);
+  session.releaseWriter();
+}
+
+/** Emit an error event to the session with proper writer lifecycle. */
+export function emitErrorEvent(
+  session: DurableSession,
+  eventName: string,
+  message: string,
+): void {
+  session.acquireWriter();
+  session.append('error', { event: eventName, message });
+  session.releaseWriter();
+}
+
+/** Build the harness outcome object from its components. */
+export function buildHarnessOutcome(
+  runPlan: RunPlan | null,
+  routing: RoutingResult,
+  loopResult: LoopResult,
+  verificationReport: VerificationReport | null,
+  session: DurableSession,
+  evidence: RunEvidence,
+  success: boolean,
+): {
+  run_plan: RunPlan | null;
+  routing: RoutingResult;
+  loop_result: LoopResult;
+  verification_report: VerificationReport | null;
+  session: DurableSession;
+  evidence: RunEvidence;
+  success: boolean;
+} {
+  return {
+    run_plan: runPlan,
+    routing,
+    loop_result: loopResult,
+    verification_report: verificationReport,
+    session,
+    evidence,
+    success,
   };
 }
