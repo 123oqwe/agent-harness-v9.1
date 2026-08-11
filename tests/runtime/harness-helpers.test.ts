@@ -150,3 +150,91 @@ describe('buildHarnessOutcome', () => {
     expect(outcome.success).toBe(true);
   });
 });
+
+import { buildLoopResult } from '../../runtime/harness-support.js';
+
+describe('buildLoopResult', () => {
+  it('builds result with all fields', () => {
+    const result = buildLoopResult(
+      'direct', 3, 'completed',
+      [{ role: 'user', content: 'hi' }],
+      [{ summary: 'done' }],
+      '/data', false, 100, 50, 150,
+      new Map([['step1', 'done']]),
+    );
+    expect(result.strategy).toBe('direct');
+    expect(result.iterations).toBe(3);
+    expect(result.termination_reason).toBe('completed');
+    expect(result.turns).toEqual([{ role: 'user', content: 'hi' }]);
+    expect(result.decision_summaries).toEqual([{ summary: 'done' }]);
+    expect(result.progress_path).toBeDefined();
+    expect(result.context_reset_emitted).toBe(false);
+    expect(result.usage).toEqual({ input_tokens: 100, output_tokens: 50, total_tokens: 150 });
+    expect(result.step_states).toEqual({ step1: 'done' });
+    expect(Object.isFrozen(result.step_states)).toBe(true);
+  });
+
+  it('omits progress_path when dataDir is undefined', () => {
+    const result = buildLoopResult(
+      'react', 1, 'goal_satisfied',
+      [], [], undefined, false, 0, 0, 0,
+      new Map(),
+    );
+    expect(result.progress_path).toBeUndefined();
+  });
+
+  it('includes progress_path when dataDir is set', () => {
+    const result = buildLoopResult(
+      'plan_execute', 5, 'verification_failed',
+      [], [], '/tmp/run', true, 200, 100, 300,
+      new Map([['s1', 'done'], ['s2', 'pending']]),
+    );
+    expect(result.progress_path).toBe('/tmp/run/progress.json');
+  });
+
+  it('handles context_reset_emitted true', () => {
+    const result = buildLoopResult(
+      'direct', 2, 'context_reset',
+      [], [], undefined, true, 50, 25, 75,
+      new Map(),
+    );
+    expect(result.context_reset_emitted).toBe(true);
+  });
+
+  it('freezes step_states object', () => {
+    const result = buildLoopResult(
+      'direct', 1, 'completed',
+      [], [], undefined, false, 0, 0, 0,
+      new Map([['a', 'b']]),
+    );
+    expect(Object.isFrozen(result.step_states)).toBe(true);
+  });
+
+  it('handles empty stepStates map', () => {
+    const result = buildLoopResult(
+      'direct', 0, 'internal_error',
+      [], [], undefined, false, 0, 0, 0,
+      new Map(),
+    );
+    expect(result.step_states).toEqual({});
+    expect(Object.isFrozen(result.step_states)).toBe(true);
+  });
+
+  it('preserves termination_reason value', () => {
+    for (const reason of ['completed', 'goal_satisfied', 'verification_failed', 'budget_exhausted', 'user_cancel', 'deadline', 'internal_error', 'context_reset', 'approval_required']) {
+      const result = buildLoopResult('direct', 1, reason, [], [], undefined, false, 0, 0, 0, new Map());
+      expect(result.termination_reason).toBe(reason);
+    }
+  });
+
+  it('handles large token counts', () => {
+    const result = buildLoopResult(
+      'direct', 100, 'completed',
+      [], [], undefined, false, 999999, 888888, 1888877,
+      new Map(),
+    );
+    expect(result.usage.input_tokens).toBe(999999);
+    expect(result.usage.output_tokens).toBe(888888);
+    expect(result.usage.total_tokens).toBe(1888877);
+  });
+});
