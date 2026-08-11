@@ -117,6 +117,11 @@ import {
   emitSessionEvent,
   emitErrorEvent,
   buildHarnessOutcome,
+  buildToolRejectionReceipt,
+  buildToolCallIdentity,
+  buildToolCallExecutionContext,
+  buildFallbackOperationId,
+  buildSkillActivationEvent,
   HookIdentity,
   type ExecutionContext,
   type RunEvidence,
@@ -628,7 +633,7 @@ export class Harness {
       try {
         const activation = await skillLoader.activate(skillBindings[0]!.skill_name);
         skillInstructions = activation.instructions;
-        session.append('system', { event: 'skill_activated', skill: skillBindings[0]!.skill_name, version: activation.frozen_version });
+        session.append('system', buildSkillActivationEvent(skillBindings[0]!.skill_name, activation.frozen_version));
       } catch (e) {
         const failure = recordTerminalFailure(
           session,
@@ -805,7 +810,7 @@ export class Harness {
                 fallbackResolved = this.config.gateway.switchProvider(fallbackResolved, effectiveRequest, [...attempted]);
                 attempted.add(fallbackResolved.provider_id);
                 result = await this.config.gateway.dispatch(fallbackResolved, effectiveRequest, {
-                   operation_id: `${opId}-fb${i}`,
+                   operation_id: buildFallbackOperationId(opId, i),
                    attempt_id: attId,
                    ...(dispatchSignal ? { signal: dispatchSignal } : {}),
                  });
@@ -1029,14 +1034,12 @@ private async executeTool(
         tool_call_id: call.tool_call_id,
         tool: name,
         status: 'rejected',
-        receipt: Object.freeze({
-          tool_name: name,
-          timestamp: this.now(),
-          success: false,
-          error: `hook_${error.action}:${error.reason_code}`,
-          duration_ms: 0,
-          input_hash: canonicalHash(initialArgs, 16),
-        }),
+        receipt: buildToolRejectionReceipt(
+          name,
+          error,
+          this.now(),
+          canonicalHash(initialArgs, 16),
+        ),
       });
     }
     throw error;
@@ -1048,33 +1051,21 @@ private async executeTool(
   );
   for (const key of Object.keys(args)) delete args[key];
   Object.assign(args, normalizedArgs);
-  const identity = canonicalHash(
-    {
-      run_id: this.execCtx!.run_id,
-      step_id: call.step_id,
-      tool_call_id: call.tool_call_id,
-      tool_name: name,
-    },
-    24,
+  const identity = buildToolCallIdentity(
+    this.execCtx!.run_id,
+    call.step_id,
+    call.tool_call_id,
+    name,
   );
   const inputIdentity = canonicalHash(normalizedArgs, 24);
   // ExecutionContext is always set (required in HarnessConfig, set in run())
-  const execCtxForTool = {
-    tenant_id: this.execCtx!.tenant_id,
-    user_id: this.execCtx!.user_id,
-    run_id: this.execCtx!.run_id,
-    plan_id: this.execCtx!.plan_id,
-    step_id: call.step_id,
-    attempt_id: `attempt-${identity}-${call.attempt_index}`,
-    operation_id: `operation-${identity}`,
-    idempotency_key: `idempotency-${identity}-${inputIdentity}`,
-    confirmation_key_thumbprint: this.execCtx!.confirmation_key_thumbprint,
-    run_phase: 'agent' as const,
-    budget: {
-      token_limit: this.execCtx!.budget.token_limit,
-      usd_micros: this.execCtx!.budget.usd_micros,
-    },
-  };
+  const execCtxForTool = buildToolCallExecutionContext(
+    this.execCtx!,
+    call.step_id,
+    identity,
+    inputIdentity,
+    call.attempt_index,
+  );
   // Pass overlay VFS (if active) so tool writes go through the overlay, not the real FS
   const activeVfs = this.currentWorkspace ? this.currentOverlayAsVfs() : this.config.vfs;
   const executor = new ActionExecutor(

@@ -726,3 +726,135 @@ export const HookIdentity = {
   toolAfter: (runId: string, stepId: string, toolCallId: string, attemptIndex: number): string =>
     `tool-after:${runId}:${stepId}:${toolCallId}:${attemptIndex}`,
 } as const;
+
+/** Build a frozen tool rejection receipt for HookRestrictionError cases. */
+export function buildToolRejectionReceipt(
+  name: string,
+  error: { action: string; reason_code: string },
+  timestamp: string,
+  inputHash: string,
+): Readonly<{
+  tool_name: string;
+  timestamp: string;
+  success: boolean;
+  error: string;
+  duration_ms: number;
+  input_hash: string;
+}> {
+  return Object.freeze({
+    tool_name: name,
+    timestamp,
+    success: false,
+    error: `hook_${error.action}:${error.reason_code}`,
+    duration_ms: 0,
+    input_hash: inputHash,
+  });
+}
+
+/** Build a canonical identity hash for a tool call. */
+export function buildToolCallIdentity(
+  runId: string,
+  stepId: string,
+  toolCallId: string,
+  toolName: string,
+): string {
+  return canonicalHash(
+    {
+      run_id: runId,
+      step_id: stepId,
+      tool_call_id: toolCallId,
+      tool_name: toolName,
+    },
+    24,
+  );
+}
+
+/** Build the execution context for a tool call. */
+export function buildToolCallExecutionContext(
+  execCtx: {
+    tenant_id: string;
+    user_id: string;
+    run_id: string;
+    plan_id: string;
+    confirmation_key_thumbprint: string;
+    budget: { token_limit: number; usd_micros: number };
+  },
+  stepId: string,
+  identity: string,
+  inputIdentity: string,
+  attemptIndex: number,
+): {
+  tenant_id: string;
+  user_id: string;
+  run_id: string;
+  plan_id: string;
+  step_id: string;
+  attempt_id: string;
+  operation_id: string;
+  idempotency_key: string;
+  confirmation_key_thumbprint: string;
+  run_phase: 'agent';
+  budget: { token_limit: number; usd_micros: number };
+} {
+  return {
+    tenant_id: execCtx.tenant_id,
+    user_id: execCtx.user_id,
+    run_id: execCtx.run_id,
+    plan_id: execCtx.plan_id,
+    step_id: stepId,
+    attempt_id: `attempt-${identity}-${attemptIndex}`,
+    operation_id: `operation-${identity}`,
+    idempotency_key: `idempotency-${identity}-${inputIdentity}`,
+    confirmation_key_thumbprint: execCtx.confirmation_key_thumbprint,
+    run_phase: 'agent' as const,
+    budget: {
+      token_limit: execCtx.budget.token_limit,
+      usd_micros: execCtx.budget.usd_micros,
+    },
+  };
+}
+
+/** Build the fallback operation ID for a provider fallback attempt. */
+export function buildFallbackOperationId(
+  opId: string,
+  attemptIndex: number,
+): string {
+  return `${opId}-fb${attemptIndex}`;
+}
+
+/** Build a skill activation event payload. */
+export function buildSkillActivationEvent(
+  skillName: string,
+  version: string,
+): { event: string; skill: string; version: string } {
+  return {
+    event: 'skill_activated',
+    skill: skillName,
+    version,
+  };
+}
+
+/** Build a skill activation failure record. */
+export function buildSkillActivationFailure(
+  strategy: string,
+  skillName: string,
+  errorMessage: string,
+): {
+  reason: string;
+  skill: string;
+  error: string;
+} {
+  return {
+    reason: 'skill_activation_failed',
+    skill: skillName,
+    error: errorMessage,
+  };
+}
+
+/** Check if budget ledger components are both defined. */
+export function shouldUseBudgetLedger(
+  ledger: unknown,
+  pricing: unknown,
+): boolean {
+  return ledger !== undefined && pricing !== undefined;
+}
