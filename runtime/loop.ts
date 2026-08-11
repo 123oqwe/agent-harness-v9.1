@@ -6,7 +6,7 @@
  * cannot claim task success; post-loop VerificationGraph execution owns that.
  */
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+
 import { writeProgressAtomic } from '../session/progress-store.js';
 import type { DurableSession } from '../session/durable-session.js';
 import type { RunPlan } from '../contracts/index.js';
@@ -15,6 +15,7 @@ import { LoopError } from './errors.js';
 import { runDirect } from './direct.js';
 import { runReact } from './react.js';
 import { runPlanExecute } from './plan-execute.js';
+import { buildLoopResult } from './harness-support.js';
 import { HookRestrictionError } from './hook-port.js';
 import type { EventBus, BusEvent } from './event-bus.js';
 import type { ContextCompiler } from '@agent-harness/runtime-core';
@@ -390,23 +391,19 @@ export class LoopEngine {
       this.deps.session.releaseWriter();
       this.lifecycle = 'finished';
     }
-    return {
-      strategy: this.config.strategy,
-      iterations: this.iterationsValue,
-      termination_reason: this.terminationReasonValue ?? 'internal_error',
-      turns: this.turns,
-      decision_summaries: this.decisionSummariesValue,
-      ...(this.config.data_dir === undefined
-        ? {}
-        : { progress_path: join(this.config.data_dir, 'progress.json') }),
-      context_reset_emitted: this.contextResetEmittedValue,
-      usage: {
-        input_tokens: this.inputTokens,
-        output_tokens: this.outputTokens,
-        total_tokens: this.usedTokens(),
-      },
-      step_states: Object.freeze(Object.fromEntries(this.stepStatesValue)),
-    };
+    return buildLoopResult(
+      this.config.strategy,
+      this.iterationsValue,
+      this.terminationReasonValue ?? 'internal_error',
+      this.turns,
+      this.decisionSummariesValue,
+      this.config.data_dir,
+      this.contextResetEmittedValue,
+      this.inputTokens,
+      this.outputTokens,
+      this.usedTokens(),
+      this.stepStatesValue,
+    );
   }
 
   stop(reason: TerminationReason): void {

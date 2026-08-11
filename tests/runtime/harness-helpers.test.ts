@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { emitSessionEvent, emitErrorEvent, buildHarnessOutcome } from '../../runtime/harness-support.js';
 import { DurableSession } from '../../session/durable-session.js';
-import type { LoopResult, RunEvidence } from '../../runtime/harness-support.js';
+import type { RunEvidence } from '../../runtime/harness-support.js';
+import type { LoopResult } from '../../runtime/loop.js';
 import type { RunPlan, RoutingResult } from '../../router/static-router.js';
 import type { VerificationReport } from '../../verification/verification-engine.js';
 

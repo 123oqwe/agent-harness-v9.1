@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 
 import type { TaskContract } from '../contracts/index.js';
 import type {
@@ -671,4 +672,37 @@ export function buildHarnessOutcome(
     evidence,
     success,
   };
+}
+
+/** Build a LoopResult object from its components. */
+export function buildLoopResult(
+  strategy: string,
+  iterations: number,
+  terminationReason: string,
+  turns: readonly unknown[],
+  decisionSummaries: readonly unknown[],
+  dataDir: string | undefined,
+  contextResetEmitted: boolean,
+  inputTokens: number,
+  outputTokens: number,
+  totalTokens: number,
+  stepStates: ReadonlyMap<string, string>,
+): LoopResult {
+  return {
+    strategy,
+    iterations,
+    termination_reason: terminationReason as LoopResult['termination_reason'],
+    turns: turns as LoopResult['turns'],
+    decision_summaries: decisionSummaries as LoopResult['decision_summaries'],
+    ...(dataDir === undefined
+      ? {}
+      : { progress_path: join(dataDir, 'progress.json') }),
+    context_reset_emitted: contextResetEmitted,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+    },
+    step_states: Object.freeze(Object.fromEntries(stepStates)),
+  } as LoopResult;
 }
