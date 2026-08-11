@@ -238,3 +238,68 @@ describe('buildLoopResult', () => {
     expect(result.usage.total_tokens).toBe(1888877);
   });
 });
+
+import { HookIdentity } from '../../runtime/harness-support.js';
+
+describe('HookIdentity builders', () => {
+  it('builds prompt identity', () => {
+    expect(HookIdentity.prompt('run-123')).toBe('prompt:run-123');
+  });
+  it('builds sessionStart identity', () => {
+    expect(HookIdentity.sessionStart('r1')).toBe('session-start:r1');
+  });
+  it('builds sessionEnd identity', () => {
+    expect(HookIdentity.sessionEnd('r1')).toBe('session-end:r1');
+  });
+  it('builds stopPrompt identity with action', () => {
+    expect(HookIdentity.stopPrompt('r1', 'deny')).toBe('stop:r1:prompt-deny');
+  });
+  it('builds stopPrompt identity with force_prompt', () => {
+    expect(HookIdentity.stopPrompt('r1', 'force_prompt')).toBe('stop:r1:prompt-force_prompt');
+  });
+  it('builds stopDenied identity', () => {
+    expect(HookIdentity.stopDenied('r1')).toBe('stop:r1:denied');
+  });
+  it('builds stopSkill identity', () => {
+    expect(HookIdentity.stopSkill('r1')).toBe('stop:r1:skill-activation');
+  });
+  it('builds stopTermination identity', () => {
+    expect(HookIdentity.stopTermination('r1', 'goal_satisfied')).toBe('stop:r1:goal_satisfied');
+  });
+  it('builds stopTermination with verification_failed', () => {
+    expect(HookIdentity.stopTermination('r1', 'verification_failed')).toBe('stop:r1:verification_failed');
+  });
+  it('builds stopInternalError identity', () => {
+    expect(HookIdentity.stopInternalError('r1')).toBe('stop:r1:internal-error');
+  });
+  it('builds providerBefore identity', () => {
+    expect(HookIdentity.providerBefore('r1', 1)).toBe('provider-before:r1:1');
+  });
+  it('builds providerAfter identity', () => {
+    expect(HookIdentity.providerAfter('r1', 3)).toBe('provider-after:r1:3');
+  });
+  it('builds turnBefore identity', () => {
+    expect(HookIdentity.turnBefore('r1', 0)).toBe('turn-before:r1:0');
+  });
+  it('builds turnAfter identity', () => {
+    expect(HookIdentity.turnAfter('r1', 2)).toBe('turn-after:r1:2');
+  });
+  it('builds toolBefore identity with all params', () => {
+    expect(HookIdentity.toolBefore('r1', 's1', 'tc1', 0)).toBe('tool-before:r1:s1:tc1:0');
+  });
+  it('builds toolAfter identity with all params', () => {
+    expect(HookIdentity.toolAfter('r1', 's2', 'tc2', 1)).toBe('tool-after:r1:s2:tc2:1');
+  });
+  it('handles empty runId', () => {
+    expect(HookIdentity.prompt('')).toBe('prompt:');
+  });
+  it('handles special characters in runId', () => {
+    expect(HookIdentity.prompt('run-abc-123')).toBe('prompt:run-abc-123');
+  });
+  it('produces different identities for different runIds', () => {
+    expect(HookIdentity.prompt('r1')).not.toBe(HookIdentity.prompt('r2'));
+  });
+  it('produces different identities for different actions', () => {
+    expect(HookIdentity.stopPrompt('r1', 'deny')).not.toBe(HookIdentity.stopPrompt('r1', 'skip'));
+  });
+});

@@ -117,6 +117,7 @@ import {
   emitSessionEvent,
   emitErrorEvent,
   buildHarnessOutcome,
+  HookIdentity,
   type ExecutionContext,
   type RunEvidence,
 } from './runtime/harness-support.js';
@@ -378,7 +379,7 @@ export class Harness {
       const prompt = await this.dispatchHook(
         'user_prompt_submit',
         task,
-        `prompt:${requestedRunId}`,
+        HookIdentity.prompt(requestedRunId),
         'decision',
         {
           run_id: requestedRunId,
@@ -446,7 +447,7 @@ export class Harness {
       await this.observationalHook(
         'session_start',
         { restored: existingEvents.length > 0 },
-        `session-start:${actualRunId}`,
+        HookIdentity.sessionStart(actualRunId),
       );
       if (isTerminalRun(openedSession)) {
         session.releaseWriter();
@@ -493,7 +494,7 @@ export class Harness {
         await this.observationalHook(
           'stop',
           { termination_reason: 'denied', hook_action: action, hook_state: state },
-          `stop:${actualRunId}:prompt-${action}`,
+          HookIdentity.stopPrompt(actualRunId, action),
         );
         if (this.config.sessionLogPath) {
           persistSession(session, this.config.sessionLogPath, {
@@ -529,7 +530,7 @@ export class Harness {
       await this.observationalHook(
         'stop',
         { termination_reason: 'denied', routing_outcome: routing.outcome },
-        `stop:${actualRunId}:denied`,
+        HookIdentity.stopDenied(actualRunId),
       );
       if (this.config.sessionLogPath) {
         persistSession(session, this.config.sessionLogPath, {
@@ -649,7 +650,7 @@ export class Harness {
         await this.observationalHook(
           'stop',
           { termination_reason: 'denied', reason: 'skill_activation_failed' },
-          `stop:${actualRunId}:skill-activation`,
+          HookIdentity.stopSkill(actualRunId),
         );
         return {
           run_plan: runPlan,
@@ -728,7 +729,7 @@ export class Harness {
           const beforeProvider = await this.decisionHook(
             'before_provider_request',
             req,
-            `provider-before:${runPlan.run_id}:${modelCallCount}`,
+            HookIdentity.providerBefore(runPlan.run_id, modelCallCount),
           );
           assertValidHookPayload(beforeProvider.payload, 'before_provider_request');
           const effectiveRequest = beforeProvider.payload as typeof req;
@@ -759,7 +760,7 @@ export class Harness {
              resolved.provider_id,
              onDelta,
            );
-           await this.observationalHook('after_response', streamResult, `provider-after:${runPlan.run_id}:${modelCallCount}`);
+           await this.observationalHook('after_response', streamResult, HookIdentity.providerAfter(runPlan.run_id, modelCallCount));
            return gatewayResultToModelTurn(streamResult);
          }
        // N28 fix: ModelFallback — if dispatch fails, try switching providers
@@ -821,7 +822,7 @@ export class Harness {
        await this.observationalHook(
          'after_response',
          result,
-         `provider-after:${runPlan.run_id}:${modelCallCount}`,
+         HookIdentity.providerAfter(runPlan.run_id, modelCallCount),
        );
        return gatewayResultToModelTurn(result);
         },
@@ -853,7 +854,7 @@ export class Harness {
             const before = await this.decisionHook(
               'pre_turn',
               { messages },
-              `turn-before:${runPlan.run_id}:${iteration}`,
+              HookIdentity.turnBefore(runPlan.run_id, iteration),
             );
             assertValidPreTurnMessages(before.payload);
            messages.splice(0, messages.length, ...(before.payload as { messages: unknown[] }).messages);
@@ -862,7 +863,7 @@ export class Harness {
             await this.observationalHook(
               'post_turn',
               { iteration, turn, observations },
-              `turn-after:${runPlan.run_id}:${iteration}`,
+              HookIdentity.turnAfter(runPlan.run_id, iteration),
             );
           },
         },
@@ -972,14 +973,14 @@ export class Harness {
     await this.observationalHook(
       'stop',
       { termination_reason: loopResult.termination_reason },
-      `stop:${actualRunId}:${loopResult.termination_reason}`,
+      HookIdentity.stopTermination(actualRunId, loopResult.termination_reason),
     );
     return buildHarnessOutcome(runPlan, routing, loopResult, verificationReport, session, evidence, success);
     } catch (error) {
       await this.observationalHook(
         'stop',
         { termination_reason: 'internal_error' },
-        `stop:${actualRunId}:internal-error`,
+        HookIdentity.stopInternalError(actualRunId),
       );
       throw error;
     } finally {
@@ -987,7 +988,7 @@ export class Harness {
         await this.observationalHook(
           'session_end',
           { run_id: actualRunId },
-          `session-end:${actualRunId}`,
+          HookIdentity.sessionEnd(actualRunId),
         );
         this.finalizeOverlay(false);
       } finally {
@@ -1015,7 +1016,7 @@ private async executeTool(
     preTool = await this.decisionHook(
       'pre_tool_use',
       initialArgs,
-      `tool-before:${this.execCtx!.run_id}:${call.step_id}:${call.tool_call_id}:${call.attempt_index}`,
+      HookIdentity.toolBefore(this.execCtx!.run_id, call.step_id, call.tool_call_id, call.attempt_index),
       {
         operation_id: `${this.execCtx!.operation_id}:${call.tool_call_id}`,
         attempt_id: `${this.execCtx!.attempt_id}:${call.attempt_index}`,
@@ -1106,7 +1107,7 @@ private async executeTool(
          await this.observationalHook(
            'post_tool_use',
            { tool_name: name, input, result },
-           `tool-after:${this.execCtx!.run_id}:${call.step_id}:${call.tool_call_id}:${call.attempt_index}`,
+           HookIdentity.toolAfter(this.execCtx!.run_id, call.step_id, call.tool_call_id, call.attempt_index),
            {
              operation_id: execCtxForTool.operation_id,
              attempt_id: execCtxForTool.attempt_id,

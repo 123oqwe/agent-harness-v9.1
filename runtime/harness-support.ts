@@ -706,3 +706,23 @@ export function buildLoopResult(
     step_states: Object.freeze(Object.fromEntries(stepStates)),
   } as LoopResult;
 }
+
+/** Build hook identity strings used for invocation_id and idempotency_key. */
+export const HookIdentity = {
+  prompt: (runId: string): string => `prompt:${runId}`,
+  sessionStart: (runId: string): string => `session-start:${runId}`,
+  sessionEnd: (runId: string): string => `session-end:${runId}`,
+  stopPrompt: (runId: string, action: string): string => `stop:${runId}:prompt-${action}`,
+  stopDenied: (runId: string): string => `stop:${runId}:denied`,
+  stopSkill: (runId: string): string => `stop:${runId}:skill-activation`,
+  stopTermination: (runId: string, reason: string): string => `stop:${runId}:${reason}`,
+  stopInternalError: (runId: string): string => `stop:${runId}:internal-error`,
+  providerBefore: (runId: string, count: number): string => `provider-before:${runId}:${count}`,
+  providerAfter: (runId: string, count: number): string => `provider-after:${runId}:${count}`,
+  turnBefore: (runId: string, iteration: number): string => `turn-before:${runId}:${iteration}`,
+  turnAfter: (runId: string, iteration: number): string => `turn-after:${runId}:${iteration}`,
+  toolBefore: (runId: string, stepId: string, toolCallId: string, attemptIndex: number): string =>
+    `tool-before:${runId}:${stepId}:${toolCallId}:${attemptIndex}`,
+  toolAfter: (runId: string, stepId: string, toolCallId: string, attemptIndex: number): string =>
+    `tool-after:${runId}:${stepId}:${toolCallId}:${attemptIndex}`,
+} as const;
