@@ -122,6 +122,7 @@ import {
   buildToolCallExecutionContext,
   buildFallbackOperationId,
   buildSkillActivationEvent,
+  shouldUseBudgetLedger,
   HookIdentity,
   type ExecutionContext,
   type RunEvidence,
@@ -574,11 +575,11 @@ export class Harness {
     });
     // Phase 2: when a BudgetLedger is provided, wrap it in the runtime
     // adapter so the loop's budget guard goes through the ledger authority.
-    const ledgerAdapter =
-      this.budgetLedger !== undefined && this.budgetLedgerPricing !== undefined
+    const useBudgetLedger = shouldUseBudgetLedger(this.budgetLedger, this.budgetLedgerPricing);
+    const ledgerAdapter = useBudgetLedger
         ? new BudgetLedgerRuntimeAdapter({
-            ledger: this.budgetLedger,
-            pricing: this.budgetLedgerPricing,
+            ledger: this.budgetLedger!,
+            pricing: this.budgetLedgerPricing!,
           })
         : undefined;
     const effectiveBudgetGuard = ledgerAdapter ?? budgetGuard;
