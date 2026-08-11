@@ -858,3 +858,90 @@ export function shouldUseBudgetLedger(
 ): boolean {
   return ledger !== undefined && pricing !== undefined;
 }
+
+/** Combine two abort signals into one, handling undefined cases. */
+export function combineAbortSignals(
+  configSignal: AbortSignal | undefined,
+  modelSignal: AbortSignal | undefined,
+): AbortSignal | undefined {
+  if (configSignal && modelSignal && configSignal !== modelSignal) {
+    return AbortSignal.any([configSignal, modelSignal]);
+  }
+  return modelSignal ?? configSignal;
+}
+
+/** Build a terminal failure record for routing failures. */
+export function buildRoutingFailureRecord(
+  routingOutcome: string,
+  askUserMessage: string | undefined,
+  abstainReason: string | undefined,
+): {
+  reason: string;
+  outcome: string;
+  ask_user_message: string | undefined;
+  abstain_reason: string | undefined;
+} {
+  return {
+    reason:
+      routingOutcome === 'ask_user'
+        ? 'routing_requires_user_input'
+        : 'routing_abstained',
+    outcome: routingOutcome,
+    ask_user_message: askUserMessage,
+    abstain_reason: abstainReason,
+  };
+}
+
+/** Build the prompt restriction failure detail. */
+export function buildPromptRestrictionFailure(
+  action: string,
+  reasonCode: string,
+): {
+  reason: string;
+  hook_action: string;
+  hook_state: 'approval_required' | 'skipped' | 'blocked';
+  reason_code: string;
+  approval_required: boolean;
+} {
+  return {
+    reason: 'user_prompt_hook_restricted',
+    hook_action: action,
+    hook_state: hookActionToState(action),
+    reason_code: reasonCode,
+    approval_required: action === 'force_prompt',
+  };
+}
+
+/** Map hook action to state string. */
+export function hookActionToState(action: string): 'approval_required' | 'skipped' | 'blocked' {
+  switch (action) {
+    case 'force_prompt': return 'approval_required';
+    case 'skip': return 'skipped';
+    default: return 'blocked';
+  }
+}
+
+/** Build session branch scope for SessionTree. */
+export function buildSessionBranchScope(
+  tenantId: string,
+  rootSessionId: string,
+): {
+  tenant_id: string;
+  root_session_id: string;
+} {
+  return {
+    tenant_id: tenantId,
+    root_session_id: rootSessionId,
+  };
+}
+
+/** Build the fallback dispatch result structure. */
+export function buildFallbackDispatchResult(
+  dispatchResult: unknown,
+  fallbackResult: { dispatch_result: unknown },
+): { dispatch_result: unknown; initial_failure: unknown } {
+  return {
+    dispatch_result: fallbackResult.dispatch_result,
+    initial_failure: dispatchResult,
+  };
+}

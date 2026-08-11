@@ -54,23 +54,8 @@ import { CacheManager } from './gateway/cache-manager.js';
 // Lazy-loaded Phase 2 package modules — dynamic imports for RAG and documents.
 // In dev: imports resolve via workspace symlinks in node_modules.
 // In packed root: imports resolve via @agent-harness/* package resolution.
-function combineAbortSignals(configSignal: AbortSignal | undefined, modelSignal: AbortSignal | undefined): AbortSignal | undefined {
-  if (configSignal && modelSignal && configSignal !== modelSignal) {
-    return AbortSignal.any([configSignal, modelSignal]);
-  }
-  return modelSignal ?? configSignal;
-}
-
 function spreadIfDefined<T>(key: string, value: T | undefined): Record<string, T> {
   return value === undefined ? {} : { [key]: value };
-}
-
-function hookActionToState(action: string): 'approval_required' | 'skipped' | 'blocked' {
-  switch (action) {
-    case 'force_prompt': return 'approval_required';
-    case 'skip': return 'skipped';
-    default: return 'blocked';
-  }
 }
 
 
@@ -123,6 +108,11 @@ import {
   buildFallbackOperationId,
   buildSkillActivationEvent,
   shouldUseBudgetLedger,
+  combineAbortSignals,
+  hookActionToState,
+  buildRoutingFailureRecord,
+  buildPromptRestrictionFailure,
+  buildSessionBranchScope,
   HookIdentity,
   type ExecutionContext,
   type RunEvidence,
@@ -487,13 +477,7 @@ export class Harness {
         const failure = recordTerminalFailure(
           session,
           routing.run_plan?.reasoning_strategy ?? 'direct',
-          {
-            reason: 'user_prompt_hook_restricted',
-            hook_action: action,
-            hook_state: state,
-            reason_code: reasonCode,
-            approval_required: action === 'force_prompt',
-          },
+          buildPromptRestrictionFailure(action, reasonCode),
         );
         session.releaseWriter();
         sqliteStore?.updateRunStatus(actualRunId, 'denied');
@@ -522,15 +506,8 @@ export class Harness {
         };
       }
     if (routing.outcome !== 'route') {
-      const failure = recordTerminalFailure(session, 'direct', {
-        reason:
-          routing.outcome === 'ask_user'
-            ? 'routing_requires_user_input'
-            : 'routing_abstained',
-        outcome: routing.outcome,
-        ask_user_message: routing.ask_user_message,
-        abstain_reason: routing.abstain_reason,
-      });
+      const failure = recordTerminalFailure(session, 'direct',
+        buildRoutingFailureRecord(routing.outcome, routing.ask_user_message, routing.abstain_reason));
       session.releaseWriter();
       sqliteStore?.updateRunStatus(actualRunId, 'denied');
       await this.observationalHook(
@@ -596,10 +573,7 @@ export class Harness {
     if (this.sessionTreeAuthority) {
       await recordSessionBranch({
         authority: this.sessionTreeAuthority,
-        scope: {
-          tenant_id: this.execCtx.tenant_id,
-          root_session_id: actualRunId,
-        },
+        scope: buildSessionBranchScope(this.execCtx.tenant_id, actualRunId),
         rootSessionId: actualRunId,
         childSessionId: `${actualRunId}-branch`,
       });
