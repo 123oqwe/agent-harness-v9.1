@@ -148,14 +148,14 @@ describe('harness-support-survival-4: buildSkillActivationEvent', () => {
 
 describe('harness-support-survival-4: buildSkillActivationFailure', () => {
   it('returns failure record with correct fields', () => {
-    const failure = buildSkillActivationFailure('direct', 'my_skill', 'activation failed');
+    const failure = buildSkillActivationFailure('my_skill', new Error('activation failed'));
     expect(failure.reason).toBe('skill_activation_failed');
     expect(failure.skill).toBe('my_skill');
     expect(failure.error).toBe('activation failed');
   });
 
   it('has exactly 3 keys', () => {
-    const failure = buildSkillActivationFailure('react', 's', 'e');
+    const failure = buildSkillActivationFailure('s', 'e');
     expect(Object.keys(failure).sort()).toEqual(['error', 'reason', 'skill']);
   });
 });

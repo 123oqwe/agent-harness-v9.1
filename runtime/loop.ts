@@ -28,6 +28,9 @@ import {
   buildStepStateEvent,
   buildDefaultContextLayers,
   buildDefaultSelected,
+  buildRuntimeErrorEvent,
+  buildPostTurnHookFailedEvent,
+  buildProgressWriteFailedEvent,
 } from './harness-support.js';
 import { HookRestrictionError } from './hook-port.js';
 import type { EventBus, BusEvent } from './event-bus.js';
@@ -368,21 +371,14 @@ export class LoopEngine {
       if (!this.terminatedValue) this.terminate('completed');
     } catch (error) {
       const reason = this.classifyUnhandled(error);
-      this.deps.session.append('error', {
-        event: 'runtime_error',
-        classification: reason,
-        message: error instanceof Error ? error.message : 'unknown runtime error',
-      });
+      this.deps.session.append('error', buildRuntimeErrorEvent(reason, error));
       this.terminate(reason);
     } finally {
       unsubscribeSteering?.();
       try {
         await this.flushPendingTurnHook();
       } catch (error) {
-        this.deps.session.append('error', {
-          event: 'post_turn_hook_failed',
-          message: error instanceof Error ? error.message : 'unknown hook error',
-        });
+        this.deps.session.append('error', buildPostTurnHookFailedEvent(error));
         if (!this.terminatedValue) this.terminate(this.classifyUnhandled(error));
       }
       this.writeProgressSafely();
@@ -569,7 +565,9 @@ export class LoopEngine {
   }
 
   private applySteering(messages: unknown[], queue: RuntimeSteeringQueue): void {
-    for (const command of this.deps.steering?.drain(queue) ?? []) {
+    const steering = this.deps.steering;
+    if (!steering) return;
+    for (const command of steering.drain(queue)) {
       if (command.priority === 'kill' || command.priority === 'human_cancel') {
         this.stop('user_cancel');
         continue;
@@ -837,10 +835,7 @@ export class LoopEngine {
       });
     } catch (error) {
       if (!this.terminatedValue) {
-        this.deps.session.append('error', {
-          event: 'progress_write_failed',
-          message: error instanceof Error ? error.message : 'unknown',
-        });
+        this.deps.session.append('error', buildProgressWriteFailedEvent(error));
         this.terminate('internal_error');
       }
     }

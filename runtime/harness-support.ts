@@ -836,18 +836,13 @@ export function buildSkillActivationEvent(
 
 /** Build a skill activation failure record. */
 export function buildSkillActivationFailure(
-  strategy: string,
-  skillName: string,
-  errorMessage: string,
-): {
-  reason: string;
-  skill: string;
-  error: string;
-} {
+  skillName: string | undefined,
+  error: unknown,
+): { reason: string; skill: string | undefined; error: string } {
   return {
     reason: 'skill_activation_failed',
     skill: skillName,
-    error: errorMessage,
+    error: error instanceof Error ? error.message : 'skill activation failed',
   };
 }
 
@@ -1113,4 +1108,74 @@ export function buildDefaultSelected(
     rag_source_ids: ragResults.map((_, i) => `rag-${i}`),
     disclosures: [],
   };
+}
+
+// ---- Error event builders extracted from loop.ts ----
+// These are pure functions that build error event payloads.
+// Extracted to enable direct testing without LoopEngine instantiation.
+
+/** Build a runtime_error event payload for the catch block of LoopEngine.run(). */
+export function buildRuntimeErrorEvent(
+  classification: string,
+  error: unknown,
+): { event: string; classification: string; message: string } {
+  return {
+    event: 'runtime_error',
+    classification,
+    message: error instanceof Error ? error.message : 'unknown runtime error',
+  };
+}
+
+/** Build a post_turn_hook_failed event payload for the finally block of LoopEngine.run(). */
+export function buildPostTurnHookFailedEvent(
+  error: unknown,
+): { event: string; message: string } {
+  return {
+    event: 'post_turn_hook_failed',
+    message: error instanceof Error ? error.message : 'unknown hook error',
+  };
+}
+
+/** Build a progress_write_failed event payload for writeProgressSafely(). */
+export function buildProgressWriteFailedEvent(
+  error: unknown,
+): { event: string; message: string } {
+  return {
+    event: 'progress_write_failed',
+    message: error instanceof Error ? error.message : 'unknown',
+  };
+}
+// ---- Error builders extracted from harness.ts ----
+
+/** Build a tool dispatch error message. */
+export function buildToolDispatchError(
+  dispatchError: string | undefined,
+): string {
+  return dispatchError ?? 'tool dispatch failed';
+}
+
+/** Build a hook restriction error reason code. */
+export function buildHookRestrictionReasonCode(
+  reasonCode: string | undefined,
+): string {
+  return reasonCode ?? 'restricted';
+}
+
+/** Build a prompt restriction reason code. */
+export function buildPromptRestrictionReasonCode(
+  reasonCode: string | undefined,
+): string {
+  return reasonCode ?? 'hook_restricted';
+}
+
+/** Build the 'model dispatch returned no result' error. */
+export function buildNoResultError(): string {
+  return 'model dispatch returned no result after fallback';
+}
+
+/** Build the workspace finalize failed error message. */
+export function buildWorkspaceFinalizeFailedMessage(
+  error: unknown,
+): string {
+  return error instanceof Error ? error.message : 'unknown';
 }

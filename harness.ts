@@ -113,6 +113,12 @@ import {
   buildRoutingFailureRecord,
   buildPromptRestrictionFailure,
   buildSessionBranchScope,
+  buildSkillActivationFailure,
+  buildToolDispatchError,
+  buildHookRestrictionReasonCode,
+  buildPromptRestrictionReasonCode,
+  buildNoResultError,
+  buildWorkspaceFinalizeFailedMessage,
   HookIdentity,
   type ExecutionContext,
   type RunEvidence,
@@ -472,7 +478,7 @@ export class Harness {
       }
       if (promptRestriction && promptRestriction.action !== 'continue') {
         const action = promptRestriction.action;
-        const reasonCode = promptRestriction.reason_code ?? 'hook_restricted';
+       const reasonCode = buildPromptRestrictionReasonCode(promptRestriction.reason_code);
         const state = hookActionToState(action);
         const failure = recordTerminalFailure(
           session,
@@ -613,11 +619,7 @@ export class Harness {
         const failure = recordTerminalFailure(
           session,
           runPlan.reasoning_strategy,
-          {
-          reason: 'skill_activation_failed',
-          skill: skillBindings[0]!.skill_name,
-          error: e instanceof Error ? e.message : 'skill activation failed',
-          },
+          buildSkillActivationFailure(skillBindings[0]!.skill_name, e),
         );
         session.releaseWriter();
         this.finalizeOverlay(false);
@@ -798,7 +800,7 @@ export class Harness {
            }
          }
        }
-       if (!result) throw new Error('model dispatch returned no result after fallback');
+      if (!result) throw new Error(buildNoResultError());
        await this.observationalHook(
          'after_response',
          result,
@@ -913,7 +915,7 @@ export class Harness {
         ...loopResult,
         termination_reason: 'internal_error',
       };
-      emitErrorEvent(session, 'workspace_finalize_failed', error instanceof Error ? error.message : 'unknown');
+      emitErrorEvent(session, 'workspace_finalize_failed', buildWorkspaceFinalizeFailedMessage(error));
     }
 
     emitSessionEvent(session, {
@@ -1087,7 +1089,7 @@ private async executeTool(
      input: normalizedArgs,
    });
    if (!dispatchResult.success) {
-     throw new Error(dispatchResult.error ?? 'tool dispatch failed');
+     throw new Error(buildToolDispatchError(dispatchResult.error));
    }
    return dispatchResult.result;
  }
@@ -1114,7 +1116,7 @@ private async executeTool(
      throw new HookRestrictionError(
        event,
        result.action,
-       result.reason_code ?? 'restricted',
+       buildHookRestrictionReasonCode(result.reason_code),
      );
    }
    return result;
