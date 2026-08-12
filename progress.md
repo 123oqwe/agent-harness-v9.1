@@ -173,3 +173,28 @@
 - Fresh dist/ build
 - Monitor: tail /tmp/verify-phase1-local-v2.log
 - Screen session: verify2
+
+## 2026-08-12 18:21 — verify:phase1:local in progress (mutation step)
+
+### verify:phase1:local Steps Completed
+1. typecheck: PASS
+2. check:cycles: PASS
+3. build: PASS
+4. lint: PASS
+5. npm test --maxWorkers=1: PASS (381 files, 7983 tests, 0 failed)
+6. test:coverage --maxWorkers=1: PASS (lines 95.95%, branches 92.28%, functions 96.41%)
+7. test:mutation:phase1: IN PROGRESS (all 15 modules, started 18:20)
+
+### Mutation Phase 1 Full Run
+- PID: 33720
+- Log: /tmp/mutation-phase1-full.log
+- Currently on: gateway module, chunk 1/43
+- This reruns ALL 15 modules with current HEAD (19157939)
+- Expected: all 15 PASS (runtime verified at 90.76% in run #39)
+- Duration: 5-8 hours
+- DO NOT KILL
+
+### Commits
+- 19157939: docs: update planning files after run #39 PASS (90.76%) and Phase C verification complete
+- a50fc31d: refactor+test: extract 40 string-returning functions + 41 exact-value tests
+- Waivers rebound to 19157939 (uncommitted, as intended)
