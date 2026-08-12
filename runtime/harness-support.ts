@@ -1179,3 +1179,222 @@ export function buildWorkspaceFinalizeFailedMessage(
 ): string {
   return error instanceof Error ? error.message : 'unknown';
 }
+
+// === Extracted string constants for mutation testability ===
+// These functions extract string literals from harness.ts and loop.ts
+// so that Stryker mutants on those strings can be killed by direct tests.
+
+/** Build the invalid TaskContract error message from UserPromptSubmit hook. */
+export function buildInvalidTaskContractError(): string {
+  return 'UserPromptSubmit hook returned an invalid TaskContract';
+}
+
+/** Build the plan_id from routing run_plan hash or fallback to actualRunId. */
+export function buildPlanId(runPlanHash: string | undefined, actualRunId: string): string {
+  return runPlanHash ?? `plan-${actualRunId}`;
+}
+
+/** Build the branch session ID from the root session ID. */
+export function buildBranchSessionId(rootSessionId: string): string {
+  return `${rootSessionId}-branch`;
+}
+
+/** Build the attempt operation ID for model calls. */
+export function buildAttemptOperationId(operationId: string, modelCallCount: number): string {
+  return `${operationId}-att-${modelCallCount}`;
+}
+
+/** Build the attempt ID for model calls. */
+export function buildAttemptId(attemptId: string, modelCallCount: number): string {
+  return `${attemptId}-${modelCallCount}`;
+}
+
+/** Build the pause operation ID. */
+export function buildPauseOperationId(operationId: string): string {
+  return `${operationId}-pause`;
+}
+
+/** Build the tool operation ID. */
+export function buildToolOperationId(operationId: string, toolCallId: string): string {
+  return `${operationId}:${toolCallId}`;
+}
+
+/** Build the tool attempt ID. */
+export function buildToolAttemptId(attemptId: string, attemptIndex: number): string {
+  return `${attemptId}:${attemptIndex}`;
+}
+
+/** Build the hook invocation ID. */
+export function buildHookInvocationId(key: string): string {
+  return `hook-${key}`;
+}
+
+/** Build the hook idempotency key. */
+export function buildHookIdempotencyKey(key: string): string {
+  return `hook-idempotency-${key}`;
+}
+
+/** Build the RAG evidence join separator. */
+export function buildRagEvidenceSeparator(): string {
+  return '\n\n';
+}
+
+/** Build the finished lifecycle state. */
+export function buildFinishedLifecycle(): 'finished' {
+  return 'finished';
+}
+
+/** Build the loop stop abort reason. */
+export function buildLoopStopReason(): 'loop_stop' {
+  return 'loop_stop';
+}
+
+/** Build the follow-up steering queue name. */
+export function buildFollowUpQueue(): 'follow_up' {
+  return 'follow_up';
+}
+
+/** Build the steer queue name. */
+export function buildSteerQueue(): 'steer' {
+  return 'steer';
+}
+
+/** Build the steering interrupt abort reason. */
+export function buildSteeringInterruptReason(): 'steering_interrupt' {
+  return 'steering_interrupt';
+}
+
+/** Build the user trust level. */
+export function buildUserTrust(): 'user' {
+  return 'user';
+}
+
+/** Build the invalid usage error message. */
+export function buildInvalidUsageErrorMessage(): string {
+  return 'model returned invalid usage';
+}
+
+/** Build the invalid timestamp error message. */
+export function buildInvalidTimestampErrorMessage(): string {
+  return 'clock returned an invalid timestamp';
+}
+
+/** Build the goal_satisfied termination reason. */
+export function buildGoalSatisfiedTermination(): 'goal_satisfied' {
+  return 'goal_satisfied';
+}
+
+/** Build the denied status string. */
+export function buildDeniedStatus(): 'denied' {
+  return 'denied';
+}
+
+/** Build the stop hook event name. */
+export function buildStopHookEvent(): 'stop' {
+  return 'stop';
+}
+
+/** Build the internal_error termination reason. */
+export function buildInternalErrorTermination(): 'internal_error' {
+  return 'internal_error';
+}
+
+/** Build the skill_activation_failed reason. */
+export function buildSkillActivationFailedReason(): 'skill_activation_failed' {
+  return 'skill_activation_failed';
+}
+
+/** Build the continue_next_step action. */
+export function buildContinueNextStepAction(): 'continue_next_step' {
+  return 'continue_next_step';
+}
+
+/** Build the pause_resume_evaluated event name. */
+export function buildPauseResumeEvaluatedEvent(): 'pause_resume_evaluated' {
+  return 'pause_resume_evaluated';
+}
+
+/** Build the rejected tool status. */
+export function buildRejectedStatus(): 'rejected' {
+  return 'rejected';
+}
+
+/** Build the after_response hook event name. */
+export function buildAfterResponseEvent(): 'after_response' {
+  return 'after_response';
+}
+
+/** Build the before_provider_request hook event name. */
+export function buildBeforeProviderRequestEvent(): 'before_provider_request' {
+  return 'before_provider_request';
+}
+
+/** Build the pre_tool_use hook event name. */
+export function buildPreToolUseEvent(): 'pre_tool_use' {
+  return 'pre_tool_use';
+}
+
+/** Build the post_tool_use hook event name. */
+export function buildPostToolUseEvent(): 'post_tool_use' {
+  return 'post_tool_use';
+}
+
+/** Build the pre_turn hook event name. */
+export function buildPreTurnEvent(): 'pre_turn' {
+  return 'pre_turn';
+}
+
+/** Build the decision hook mode. */
+export function buildDecisionMode(): 'decision' {
+  return 'decision';
+}
+
+/** Build the observational hook mode. */
+export function buildObservationalMode(): 'observational' {
+  return 'observational';
+}
+
+/** Build the default tenant ID. */
+export function buildDefaultTenantId(): 'default' {
+  return 'default';
+}
+
+/** Build the default principal ID. */
+export function buildDefaultPrincipalId(): 'default' {
+  return 'default';
+}
+
+/** Build the default cache key. */
+export function buildDefaultCacheKey(): 'default' {
+  return 'default';
+}
+
+/** Build the PreToolUse hook validation label. */
+export function buildPreToolUseHookLabel(): string {
+  return 'PreToolUse hook';
+}
+
+/** Build the before_provider_request validation label. */
+export function buildBeforeProviderRequestLabel(): string {
+  return 'before_provider_request';
+}
+
+/** Build the system role string. */
+export function buildSystemRole(): 'system' {
+  return 'system';
+}
+
+/** Build the direct strategy fallback. */
+export function buildDirectStrategy(): 'direct' {
+  return 'direct';
+}
+
+/** Build the approval_required termination reason. */
+export function buildApprovalRequiredTermination(): 'approval_required' {
+  return 'approval_required';
+}
+
+/** Build the completed termination reason. */
+export function buildCompletedTermination(): 'completed' {
+  return 'completed';
+}

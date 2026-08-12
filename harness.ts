@@ -119,6 +119,34 @@ import {
   buildPromptRestrictionReasonCode,
   buildNoResultError,
   buildWorkspaceFinalizeFailedMessage,
+  buildInvalidTaskContractError,
+  buildPlanId,
+  buildBranchSessionId,
+  buildAttemptOperationId,
+  buildAttemptId,
+  buildPauseOperationId,
+  buildToolOperationId,
+  buildToolAttemptId,
+  buildHookInvocationId,
+  buildHookIdempotencyKey,
+  buildDeniedStatus,
+  buildStopHookEvent,
+  buildInternalErrorTermination,
+  buildSkillActivationFailedReason,
+  buildContinueNextStepAction,
+  buildPauseResumeEvaluatedEvent,
+  buildRejectedStatus,
+  buildAfterResponseEvent,
+  buildBeforeProviderRequestEvent,
+  buildPreToolUseEvent,
+  buildPostToolUseEvent,
+  buildPreTurnEvent,
+  buildDecisionMode,
+  buildObservationalMode,
+  buildDefaultCacheKey,
+  buildPreToolUseHookLabel,
+  buildBeforeProviderRequestLabel,
+  buildDirectStrategy,
   HookIdentity,
   type ExecutionContext,
   type RunEvidence,
@@ -392,7 +420,7 @@ export class Harness {
         return await this.runOnce(task, requestedRunId, prompt);
       }
       if (!this.isTaskContract(prompt.payload)) {
-        throw new Error('UserPromptSubmit hook returned an invalid TaskContract');
+        throw new Error(buildInvalidTaskContractError());
       }
       return await this.runOnce(prompt.payload, requestedRunId);
     } finally {
@@ -421,7 +449,7 @@ export class Harness {
       ...this.config.executionContext,
       session_id: actualRunId,
       run_id: actualRunId,
-      plan_id: routing.run_plan?.run_plan_hash ?? `plan-${actualRunId}`,
+      plan_id: buildPlanId(routing.run_plan?.run_plan_hash, actualRunId),
     };
 
     const openedSession = openRunSession({
@@ -482,13 +510,13 @@ export class Harness {
         const state = hookActionToState(action);
         const failure = recordTerminalFailure(
           session,
-          routing.run_plan?.reasoning_strategy ?? 'direct',
+          routing.run_plan?.reasoning_strategy ?? buildDirectStrategy(),
           buildPromptRestrictionFailure(action, reasonCode),
         );
         session.releaseWriter();
-        sqliteStore?.updateRunStatus(actualRunId, 'denied');
+        sqliteStore?.updateRunStatus(actualRunId, buildDeniedStatus());
         await this.observationalHook(
-          'stop',
+          buildStopHookEvent(),
           { termination_reason: 'denied', hook_action: action, hook_state: state },
           HookIdentity.stopPrompt(actualRunId, action),
         );
@@ -517,8 +545,8 @@ export class Harness {
       session.releaseWriter();
       sqliteStore?.updateRunStatus(actualRunId, 'denied');
       await this.observationalHook(
-        'stop',
-        { termination_reason: 'denied', routing_outcome: routing.outcome },
+        buildStopHookEvent(),
+        { termination_reason: buildDeniedStatus(), routing_outcome: routing.outcome },
         HookIdentity.stopDenied(actualRunId),
       );
       if (this.config.sessionLogPath) {
@@ -581,7 +609,7 @@ export class Harness {
         authority: this.sessionTreeAuthority,
         scope: buildSessionBranchScope(this.execCtx.tenant_id, actualRunId),
         rootSessionId: actualRunId,
-        childSessionId: `${actualRunId}-branch`,
+        childSessionId: buildBranchSessionId(actualRunId),
       });
     }
 
@@ -631,7 +659,7 @@ export class Harness {
         sqliteStore?.updateRunStatus(actualRunId, 'denied');
         await this.observationalHook(
           'stop',
-          { termination_reason: 'denied', reason: 'skill_activation_failed' },
+          { termination_reason: buildDeniedStatus(), reason: buildSkillActivationFailedReason() },
           HookIdentity.stopSkill(actualRunId),
         );
         return {
@@ -709,11 +737,11 @@ export class Harness {
             ...spreadIfDefined('directive', directive),
           });
           const beforeProvider = await this.decisionHook(
-            'before_provider_request',
+            buildBeforeProviderRequestEvent(),
             req,
             HookIdentity.providerBefore(runPlan.run_id, modelCallCount),
           );
-          assertValidHookPayload(beforeProvider.payload, 'before_provider_request');
+          assertValidHookPayload(beforeProvider.payload, buildBeforeProviderRequestLabel());
           const effectiveRequest = beforeProvider.payload as typeof req;
           // Validate that hooks did not expand the tool set beyond policy
           // filtering. Hooks can restrict a request but never authorize one.
@@ -725,11 +753,11 @@ export class Harness {
             ),
           );
           const resolved = this.config.gateway.resolve(effectiveRequest);
-          const opId = `${this.execCtx!.operation_id}-att-${modelCallCount}`;
-          const attId = `${this.execCtx!.attempt_id}-${modelCallCount}`;
+          const opId = buildAttemptOperationId(this.execCtx!.operation_id, modelCallCount);
+          const attId = buildAttemptId(this.execCtx!.attempt_id, modelCallCount);
          // P2-12: track LLM cache key for prompt cache management
          this.cacheManager.trackCall(
-           this.cacheManager.computeKey(resolved.provider_id, 'default', false),
+           this.cacheManager.computeKey(resolved.provider_id, buildDefaultCacheKey(), false),
          );
          // #4: streaming token output via dispatchStream when onDelta is provided
          if (onDelta) {
@@ -742,7 +770,7 @@ export class Harness {
              resolved.provider_id,
              onDelta,
            );
-           await this.observationalHook('after_response', streamResult, HookIdentity.providerAfter(runPlan.run_id, modelCallCount));
+           await this.observationalHook(buildAfterResponseEvent(), streamResult, HookIdentity.providerAfter(runPlan.run_id, modelCallCount));
            return gatewayResultToModelTurn(streamResult);
          }
        // N28 fix: ModelFallback — if dispatch fails, try switching providers
@@ -802,7 +830,7 @@ export class Harness {
        }
       if (!result) throw new Error(buildNoResultError());
        await this.observationalHook(
-         'after_response',
+         buildAfterResponseEvent(),
          result,
          HookIdentity.providerAfter(runPlan.run_id, modelCallCount),
        );
@@ -834,7 +862,7 @@ export class Harness {
         turnHooks: {
           beforeTurn: async ({ iteration, messages }) => {
             const before = await this.decisionHook(
-              'pre_turn',
+              buildPreTurnEvent(),
               { messages },
               HookIdentity.turnBefore(runPlan.run_id, iteration),
             );
@@ -865,14 +893,14 @@ export class Harness {
     ) {
       const pauseAction = await this.pauseResume.resume({
         run_id: actualRunId,
-        operation_id: `${this.execCtx!.operation_id}-pause`,
+        operation_id: buildPauseOperationId(this.execCtx!.operation_id),
       });
       emitSessionEvent(session, {
-        event: 'pause_resume_evaluated',
+        event: buildPauseResumeEvaluatedEvent(),
         action: pauseAction.action,
         operation_id: pauseAction.operation_id,
       });
-      if (pauseAction.action === 'continue_next_step') {
+      if (pauseAction.action === buildContinueNextStepAction()) {
         // Resume execution by re-running the loop
         const resumedResult = await loop.run();
         loopResult = resumedResult;
@@ -960,8 +988,8 @@ export class Harness {
     return buildHarnessOutcome(runPlan, routing, loopResult, verificationReport, session, evidence, success);
     } catch (error) {
       await this.observationalHook(
-        'stop',
-        { termination_reason: 'internal_error' },
+        buildStopHookEvent(),
+        { termination_reason: buildInternalErrorTermination() },
         HookIdentity.stopInternalError(actualRunId),
       );
       throw error;
@@ -996,12 +1024,12 @@ private async executeTool(
   let preTool: RuntimeHookOutcome;
   try {
     preTool = await this.decisionHook(
-      'pre_tool_use',
+      buildPreToolUseEvent(),
       initialArgs,
       HookIdentity.toolBefore(this.execCtx!.run_id, call.step_id, call.tool_call_id, call.attempt_index),
       {
-        operation_id: `${this.execCtx!.operation_id}:${call.tool_call_id}`,
-        attempt_id: `${this.execCtx!.attempt_id}:${call.attempt_index}`,
+        operation_id: buildToolOperationId(this.execCtx!.operation_id, call.tool_call_id),
+        attempt_id: buildToolAttemptId(this.execCtx!.attempt_id, call.attempt_index),
       },
     );
   } catch (error) {
@@ -1010,7 +1038,7 @@ private async executeTool(
         step: call.step_id,
         tool_call_id: call.tool_call_id,
         tool: name,
-        status: 'rejected',
+        status: buildRejectedStatus(),
         receipt: buildToolRejectionReceipt(
           name,
           error,
@@ -1021,7 +1049,7 @@ private async executeTool(
     }
     throw error;
   }
-  assertValidHookPayload(preTool.payload, 'PreToolUse hook');
+  assertValidHookPayload(preTool.payload, buildPreToolUseHookLabel());
   const normalizedArgs = normalizeWorkspaceToolInput(
     name,
     preTool.payload as Record<string, unknown>,
@@ -1073,7 +1101,7 @@ private async executeTool(
      {
        observe: async ({ input, result }) => {
          await this.observationalHook(
-           'post_tool_use',
+           buildPostToolUseEvent(),
            { tool_name: name, input, result },
            HookIdentity.toolAfter(this.execCtx!.run_id, call.step_id, call.tool_call_id, call.attempt_index),
            {
@@ -1109,7 +1137,7 @@ private async executeTool(
      event,
      payload,
      identity,
-     'decision',
+     buildDecisionMode(),
      scopeOverrides,
    );
    if (result.action !== 'continue') {
@@ -1137,7 +1165,7 @@ private async executeTool(
      event,
      payload,
      identity,
-     'observational',
+     buildObservationalMode(),
      scopeOverrides,
    );
  }
@@ -1167,8 +1195,8 @@ private async executeTool(
      this.hookPort ?? this.config.hooks,
      {
        event,
-       invocation_id: `hook-${key}`,
-       idempotency_key: `hook-idempotency-${key}`,
+       invocation_id: buildHookInvocationId(key),
+       idempotency_key: buildHookIdempotencyKey(key),
        scope,
        payload,
        ...spreadIfDefined('signal', this.config.signal),

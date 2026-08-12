@@ -31,6 +31,21 @@ import {
   buildRuntimeErrorEvent,
   buildPostTurnHookFailedEvent,
   buildProgressWriteFailedEvent,
+  buildRagEvidenceSeparator,
+  buildFinishedLifecycle,
+  buildLoopStopReason,
+  buildFollowUpQueue,
+  buildSteerQueue,
+  buildSteeringInterruptReason,
+  buildUserTrust,
+  buildInvalidUsageErrorMessage,
+  buildInvalidTimestampErrorMessage,
+  buildGoalSatisfiedTermination,
+  buildSystemRole,
+  buildApprovalRequiredTermination,
+  buildCompletedTermination,
+  buildDefaultTenantId,
+  buildDefaultPrincipalId,
 } from './harness-support.js';
 import { HookRestrictionError } from './hook-port.js';
 import type { EventBus, BusEvent } from './event-bus.js';
@@ -304,8 +319,8 @@ export class LoopEngine {
            ? await this.deps.ragQuery(this.config.goal, 5).catch(() => [])
            : [];
          const compiled = await this.deps.contextCompiler.compile({
-           tenant_id: 'default',
-           principal_id: 'default',
+           tenant_id: buildDefaultTenantId(),
+           principal_id: buildDefaultPrincipalId(),
            run_id: this.config.run_id,
            session_id: this.config.run_id,
            context_generation: 0,
@@ -331,7 +346,7 @@ export class LoopEngine {
            if (results.length > 0) {
            const evidence = results.map((r) =>
              `[${r.citation.source_path}]\n${r.chunk.text}`,
-           ).join('\n\n');
+           ).join(buildRagEvidenceSeparator());
            // N27 fix: inject as 'user' role, not 'system'. LLMs treat system
            // messages as trusted instructions; untrusted RAG evidence must
            // not be in the system role or it becomes a prompt injection vector.
@@ -353,9 +368,9 @@ export class LoopEngine {
       // P1-10: plan mode — if auto_execute is false, pause before executing
       // the frozen RunPlan and wait for human approval.
       if (this.config.auto_execute === false && !this.terminatedValue) {
-        this.deps.session.append('system', buildPlanModePausedEvent());
+        this.deps.session.append(buildSystemRole(), buildPlanModePausedEvent());
         this.publishEvent('run_state_change', buildRunStateChangePausedEvent());
-        this.terminate('approval_required');
+        this.terminate(buildApprovalRequiredTermination());
       }
      if (this.terminatedValue) {
        // A replayed cancellation remains authoritative after restart.
@@ -383,7 +398,7 @@ export class LoopEngine {
       }
       this.writeProgressSafely();
       this.deps.session.releaseWriter();
-      this.lifecycle = 'finished';
+      this.lifecycle = buildFinishedLifecycle();
     }
     return buildLoopResult(
       this.config.strategy,
@@ -403,7 +418,7 @@ export class LoopEngine {
   stop(reason: TerminationReason): void {
     if (this.lifecycle === 'finished' || this.terminatedValue) return;
     this.requestedStop = reason;
-    this.activeModelAbort?.abort('loop_stop');
+    this.activeModelAbort?.abort(buildLoopStopReason());
     if (this.lifecycle === 'running') this.terminate(reason);
   }
 
@@ -416,8 +431,8 @@ export class LoopEngine {
         ...this.deps,
         modelCall: async (messages, attempt, budget, directive) => {
           await self.flushPendingTurnHook();
-          if (self.turns.length > 0) self.applySteering(messages, 'follow_up');
-          self.applySteering(messages, 'steer');
+          if (self.turns.length > 0) self.applySteering(messages, buildFollowUpQueue());
+          self.applySteering(messages, buildSteerQueue());
           await self.deps.turnHooks?.beforeTurn({
             iteration: self.iterationsValue,
             messages,
@@ -486,7 +501,7 @@ export class LoopEngine {
           for (;;) {
             self.steeringInterruptedModel = false;
             // Close the async beforeTurn/retry window before starting a provider.
-            self.applySteering(messages, 'steer');
+            self.applySteering(messages, buildSteerQueue());
             if (self.terminatedValue) return EMPTY_TURN;
             const controller = new AbortController();
             self.activeModelAbort = controller;
@@ -503,7 +518,7 @@ export class LoopEngine {
             } finally {
               if (self.activeModelAbort === controller) self.activeModelAbort = null;
             }
-            self.applySteering(messages, 'steer');
+            self.applySteering(messages, buildSteerQueue());
           }
         },
       },
@@ -560,7 +575,7 @@ export class LoopEngine {
     }
     if (command.queue === 'steer') {
       this.steeringInterruptedModel = true;
-      this.activeModelAbort?.abort('steering_interrupt');
+      this.activeModelAbort?.abort(buildSteeringInterruptReason());
     }
   }
 
@@ -577,7 +592,7 @@ export class LoopEngine {
         content: command.content,
         metadata: {
           source: 'steering',
-          trust: 'user',
+          trust: buildUserTrust(),
           command_id: command.command_id,
           priority: command.priority,
         },
@@ -610,7 +625,7 @@ export class LoopEngine {
     const input = turn.usage?.input_tokens ?? 0;
     const output = turn.usage?.output_tokens ?? 0;
     if (!validUsage(input) || !validUsage(output)) {
-      throw new LoopError('model returned invalid usage');
+      throw new LoopError(buildInvalidUsageErrorMessage());
     }
     this.inputTokens += input;
     this.outputTokens += output;
@@ -747,7 +762,7 @@ export class LoopEngine {
   private now(): string {
     const value = this.config.clock?.() ?? new Date().toISOString();
     if (!Number.isFinite(Date.parse(value))) {
-      throw new LoopError('clock returned an invalid timestamp');
+      throw new LoopError(buildInvalidTimestampErrorMessage());
     }
     return value;
   }
@@ -826,8 +841,8 @@ export class LoopEngine {
         open_tasks: this.terminatedValue ? [] : [this.config.goal],
         last_error:
           this.terminationReasonValue === null ||
-          this.terminationReasonValue === 'completed' ||
-          this.terminationReasonValue === 'goal_satisfied'
+          this.terminationReasonValue === buildCompletedTermination() ||
+          this.terminationReasonValue === buildGoalSatisfiedTermination()
             ? null
             : this.terminationReasonValue,
         checkpoint_refs: this.turns.map((turn) => turn.timestamp),

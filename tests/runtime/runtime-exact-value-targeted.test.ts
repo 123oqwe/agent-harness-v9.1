@@ -321,3 +321,221 @@ describe('exact-value targeted mutation tests', () => {
     });
   });
 });
+
+// ================================================================
+// Extracted function tests (from harness.ts and loop.ts)
+// ================================================================
+
+import {
+  buildInvalidTaskContractError,
+  buildPlanId,
+  buildBranchSessionId,
+  buildAttemptOperationId,
+  buildAttemptId,
+  buildPauseOperationId,
+  buildToolOperationId,
+  buildToolAttemptId,
+  buildHookInvocationId,
+  buildHookIdempotencyKey,
+  buildRagEvidenceSeparator,
+  buildFinishedLifecycle,
+  buildLoopStopReason,
+  buildFollowUpQueue,
+  buildSteerQueue,
+  buildSteeringInterruptReason,
+  buildUserTrust,
+  buildInvalidUsageErrorMessage,
+  buildInvalidTimestampErrorMessage,
+  buildGoalSatisfiedTermination,
+  buildDeniedStatus,
+  buildStopHookEvent,
+  buildInternalErrorTermination,
+  buildSkillActivationFailedReason,
+  buildContinueNextStepAction,
+  buildPauseResumeEvaluatedEvent,
+  buildRejectedStatus,
+  buildAfterResponseEvent,
+  buildBeforeProviderRequestEvent,
+  buildPreToolUseEvent,
+  buildPostToolUseEvent,
+  buildPreTurnEvent,
+  buildDecisionMode,
+  buildObservationalMode,
+  buildDefaultCacheKey,
+  buildPreToolUseHookLabel,
+  buildBeforeProviderRequestLabel,
+  buildDirectStrategy,
+  buildApprovalRequiredTermination,
+  buildCompletedTermination,
+} from '../../runtime/harness-support';
+
+describe('extracted function exact-value tests', () => {
+
+  describe('harness.ts extracted functions', () => {
+    it('buildInvalidTaskContractError returns exact message', () => {
+      expect(buildInvalidTaskContractError()).toBe('UserPromptSubmit hook returned an invalid TaskContract');
+    });
+
+    it('buildPlanId returns hash when provided', () => {
+      expect(buildPlanId('abc123', 'run-1')).toBe('abc123');
+    });
+
+    it('buildPlanId returns fallback when hash undefined', () => {
+      expect(buildPlanId(undefined, 'run-1')).toBe('plan-run-1');
+    });
+
+    it('buildBranchSessionId returns exact format', () => {
+      expect(buildBranchSessionId('run-1')).toBe('run-1-branch');
+    });
+
+    it('buildAttemptOperationId returns exact format', () => {
+      expect(buildAttemptOperationId('op-1', 3)).toBe('op-1-att-3');
+    });
+
+    it('buildAttemptId returns exact format', () => {
+      expect(buildAttemptId('att-1', 2)).toBe('att-1-2');
+    });
+
+    it('buildPauseOperationId returns exact format', () => {
+      expect(buildPauseOperationId('op-1')).toBe('op-1-pause');
+    });
+
+    it('buildToolOperationId returns exact format', () => {
+      expect(buildToolOperationId('op-1', 'call-1')).toBe('op-1:call-1');
+    });
+
+    it('buildToolAttemptId returns exact format', () => {
+      expect(buildToolAttemptId('att-1', 0)).toBe('att-1:0');
+    });
+
+    it('buildHookInvocationId returns exact format', () => {
+      expect(buildHookInvocationId('key1')).toBe('hook-key1');
+    });
+
+    it('buildHookIdempotencyKey returns exact format', () => {
+      expect(buildHookIdempotencyKey('key1')).toBe('hook-idempotency-key1');
+    });
+
+    it('buildDeniedStatus returns "denied"', () => {
+      expect(buildDeniedStatus()).toBe('denied');
+    });
+
+    it('buildStopHookEvent returns "stop"', () => {
+      expect(buildStopHookEvent()).toBe('stop');
+    });
+
+    it('buildInternalErrorTermination returns "internal_error"', () => {
+      expect(buildInternalErrorTermination()).toBe('internal_error');
+    });
+
+    it('buildSkillActivationFailedReason returns exact value', () => {
+      expect(buildSkillActivationFailedReason()).toBe('skill_activation_failed');
+    });
+
+    it('buildContinueNextStepAction returns exact value', () => {
+      expect(buildContinueNextStepAction()).toBe('continue_next_step');
+    });
+
+    it('buildPauseResumeEvaluatedEvent returns exact value', () => {
+      expect(buildPauseResumeEvaluatedEvent()).toBe('pause_resume_evaluated');
+    });
+
+    it('buildRejectedStatus returns "rejected"', () => {
+      expect(buildRejectedStatus()).toBe('rejected');
+    });
+
+    it('buildAfterResponseEvent returns "after_response"', () => {
+      expect(buildAfterResponseEvent()).toBe('after_response');
+    });
+
+    it('buildBeforeProviderRequestEvent returns exact value', () => {
+      expect(buildBeforeProviderRequestEvent()).toBe('before_provider_request');
+    });
+
+    it('buildPreToolUseEvent returns "pre_tool_use"', () => {
+      expect(buildPreToolUseEvent()).toBe('pre_tool_use');
+    });
+
+    it('buildPostToolUseEvent returns "post_tool_use"', () => {
+      expect(buildPostToolUseEvent()).toBe('post_tool_use');
+    });
+
+    it('buildPreTurnEvent returns "pre_turn"', () => {
+      expect(buildPreTurnEvent()).toBe('pre_turn');
+    });
+
+    it('buildDecisionMode returns "decision"', () => {
+      expect(buildDecisionMode()).toBe('decision');
+    });
+
+    it('buildObservationalMode returns "observational"', () => {
+      expect(buildObservationalMode()).toBe('observational');
+    });
+
+    it('buildDefaultCacheKey returns "default"', () => {
+      expect(buildDefaultCacheKey()).toBe('default');
+    });
+
+    it('buildPreToolUseHookLabel returns exact label', () => {
+      expect(buildPreToolUseHookLabel()).toBe('PreToolUse hook');
+    });
+
+    it('buildBeforeProviderRequestLabel returns exact label', () => {
+      expect(buildBeforeProviderRequestLabel()).toBe('before_provider_request');
+    });
+
+    it('buildDirectStrategy returns "direct"', () => {
+      expect(buildDirectStrategy()).toBe('direct');
+    });
+  });
+
+  describe('loop.ts extracted functions', () => {
+    it('buildRagEvidenceSeparator returns double newline', () => {
+      expect(buildRagEvidenceSeparator()).toBe('\n\n');
+    });
+
+    it('buildFinishedLifecycle returns "finished"', () => {
+      expect(buildFinishedLifecycle()).toBe('finished');
+    });
+
+    it('buildLoopStopReason returns "loop_stop"', () => {
+      expect(buildLoopStopReason()).toBe('loop_stop');
+    });
+
+    it('buildFollowUpQueue returns "follow_up"', () => {
+      expect(buildFollowUpQueue()).toBe('follow_up');
+    });
+
+    it('buildSteerQueue returns "steer"', () => {
+      expect(buildSteerQueue()).toBe('steer');
+    });
+
+    it('buildSteeringInterruptReason returns exact value', () => {
+      expect(buildSteeringInterruptReason()).toBe('steering_interrupt');
+    });
+
+    it('buildUserTrust returns "user"', () => {
+      expect(buildUserTrust()).toBe('user');
+    });
+
+    it('buildInvalidUsageErrorMessage returns exact message', () => {
+      expect(buildInvalidUsageErrorMessage()).toBe('model returned invalid usage');
+    });
+
+    it('buildInvalidTimestampErrorMessage returns exact message', () => {
+      expect(buildInvalidTimestampErrorMessage()).toBe('clock returned an invalid timestamp');
+    });
+
+    it('buildGoalSatisfiedTermination returns "goal_satisfied"', () => {
+      expect(buildGoalSatisfiedTermination()).toBe('goal_satisfied');
+    });
+
+    it('buildApprovalRequiredTermination returns "approval_required"', () => {
+      expect(buildApprovalRequiredTermination()).toBe('approval_required');
+    });
+
+    it('buildCompletedTermination returns "completed"', () => {
+      expect(buildCompletedTermination()).toBe('completed');
+    });
+  });
+});
