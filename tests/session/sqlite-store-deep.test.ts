@@ -101,18 +101,28 @@ describe('assertSessionDatabaseIdentity', () => {
 
   it('throws DATABASE_IDENTITY_CHANGED when main dev differs', () => {
     const stat = lstatSync(dbPath);
-    expect(() => assertSessionDatabaseIdentity(dbPath, stateRoot, {
+    const fn = () => assertSessionDatabaseIdentity(dbPath, stateRoot, {
       parent_identity: stateRoot.identity,
       main_identity: { dev: stat.dev + 1, ino: stat.ino },
-    })).toThrow(SessionStateRootError);
+    });
+    expect(fn).toThrow(SessionStateRootError);
+    try { fn(); } catch (e) {
+      expect((e as SessionStateRootError).code).toBe('DATABASE_IDENTITY_CHANGED');
+      expect((e as Error).message).toBe('session database identity changed before SQLite initialization');
+    }
   });
 
   it('throws DATABASE_IDENTITY_CHANGED when main ino differs', () => {
     const stat = lstatSync(dbPath);
-    expect(() => assertSessionDatabaseIdentity(dbPath, stateRoot, {
+    const fn2 = () => assertSessionDatabaseIdentity(dbPath, stateRoot, {
       parent_identity: stateRoot.identity,
       main_identity: { dev: stat.dev, ino: stat.ino + 1 },
-    })).toThrow(SessionStateRootError);
+    });
+    expect(fn2).toThrow(SessionStateRootError);
+    try { fn2(); } catch (e) {
+      expect((e as SessionStateRootError).code).toBe('DATABASE_IDENTITY_CHANGED');
+      expect((e as Error).message).toBe('session database identity changed before SQLite initialization');
+    }
   });
 
   it('throws DATABASE_IDENTITY_CHANGED when parent dev differs', () => {
