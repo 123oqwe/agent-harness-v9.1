@@ -245,7 +245,7 @@ const commonRuntimeRoot = (left, right) => {
 
 export const compileDependencyBuilderBubblewrapCommand = ({ builder, argv,
   executable = "/usr/bin/bwrap", nodeExecutable = realpathSync(process.execPath),
-  npmExecutable = argv?.[0] }) => {
+  npmExecutable = argv?.[0], extraBinds = [] }) => {
   const runtimeRoot = typeof npmExecutable === "string"
     ? commonRuntimeRoot(dirname(dirname(nodeExecutable)), dirname(dirname(dirname(dirname(npmExecutable)))))
     : dirname(dirname(nodeExecutable));
@@ -262,6 +262,7 @@ export const compileDependencyBuilderBubblewrapCommand = ({ builder, argv,
     ...(existsSync("/lib") ? ["--ro-bind", "/lib", "/lib"] : []),
     ...(existsSync("/lib64") ? ["--ro-bind", "/lib64", "/lib64"] : []),
     ...runtimeBind,
+    ...extraBinds,
     "--dir", dirname(builder), "--bind", builder, builder, "--chdir", builder,
     "--", "/usr/bin/prlimit", "--cpu=900", "--as=4294967296", "--nproc=128",
     "--nofile=2048", "--", nodeExecutable, ...argv,
@@ -293,8 +294,17 @@ export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
   });
   if (install.error) throw install.error;
   if (install.status !== 0) throw new Error(`native fixture clean install failed: ${install.stderr.trim()}`);
+  const nodeVersion = process.versions.node;
+  const nodeGypHeaderDir = join(home, ".node-gyp", nodeVersion);
+  const nodeGypResult = spawnSync(process.execPath, [npmExecutable, "exec", "--yes", "--", "node-gyp", "install"], {
+    cwd: builder, encoding: "utf8", env, shell: false, timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
+  });
+  if (nodeGypResult.status !== 0 || !existsSync(nodeGypHeaderDir)) {
+    throw new Error(`native fixture node-gyp header pre-download failed: ${nodeGypResult.stderr?.trim()?.slice(0, 500)}`);
+  }
   const rebuild = compileDependencyBuilderBubblewrapCommand({ builder, executable: bubblewrap.path,
-    npmExecutable, argv: [npmExecutable, "rebuild", "better-sqlite3", "--no-audit", "--no-fund"] });
+    npmExecutable, argv: [npmExecutable, "rebuild", "better-sqlite3", "--no-audit", "--no-fund"],
+    extraBinds: ["--ro-bind", home, home] });
   const rebuilt = spawnSync(rebuild.executable, rebuild.args, { cwd: builder, encoding: "utf8",
     env: { ...env, npm_config_ignore_scripts: "false" }, shell: false, timeout: 15 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
   if (rebuilt.error) throw rebuilt.error;
