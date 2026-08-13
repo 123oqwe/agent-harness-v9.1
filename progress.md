@@ -909,3 +909,31 @@ recorded the blockers that cannot be fixed without changing mutationAuthorityFil
 - Move RUN_ID 15 module chunk dirs to /tmp/chunks-backup, keep phase1.json
 - EXPECTED_SHA/MUTATION_ARTIFACT_NAME/MUTATION_ARTIFACT_DIGEST -> npm run test:glm:live
 - Verify 24/24 PASS, restore chunks, then push + CI
+
+## 2026-08-14 — Phase 1 GLM root cause LOCKED; blocked on GLM_API_KEY
+
+### Root cause (probe-confirmed, three probes)
+- run-glm-acceptance.mjs:263 spawns run-agent.mjs by absolute path under
+  mkdtempSync(tmpdir()) = /var/folders/... On macOS /var is a symlink to /private/var.
+  Node's ESM loader realpaths import.meta.url -> /private/var/... while process.argv[1]
+  keeps /var/... -> entry guard (run-agent.mjs:553) resolves unequal -> main() never runs
+  -> exit 0 + empty stdout -> JSON.parse('') "Unexpected end of JSON input" at line 277.
+  This is the ORIGINAL Phase 1 failure; NOT sandbox/API/package related.
+- Probe evidence: guard-probe.mjs at /var/folders absolute path -> equal=false;
+  same file via relative path (cwd) -> equal=true; /Users absolute path -> equal=true.
+
+### Workaround (filesystem-level, ZERO source change; verified)
+- export TMPDIR=/Users/guanjieqiao/.phase1-tmp -> isolated tree on a non-symlink path
+  -> guard PASS. Also fixes run-harness-case.mjs:526 (its path derives from run-agent's
+  own here). Durable fix kept unapplied to preserve zero-diff: realpathSync() the spawn path.
+- Chunks already moved (15 -> /tmp/chunks-backup; reports/mutation = 44M, ENOBUFS-safe);
+  phase1/mutation.json + runs/$RUN_ID/phase1.json rebound to HEAD=41917554;
+  DIGEST=c5ef3b79172afc451344770a9fd2791c6613cd79bfc5009d711d8872c9724e35
+  NAME=phase1-mutation-41917554b75c7e58de28c447c1aeabf0ea2c47c0.
+
+### BLOCKED (hard, external)
+- GLM_API_KEY missing: ~/.env:36 is an EMPTY placeholder (val_len=0). Full-disk search
+  for non-empty GLM/ZAI/ZHIPU keys found nothing; macOS keychain has no z.ai/GLM entry.
+  Phase 2's key was session-injected, not persisted. Cannot run live acceptance until the
+  key is supplied. (claude doctor: environment healthy, no install issues — irrelevant to
+  the key absence.)
