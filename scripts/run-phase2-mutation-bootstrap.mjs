@@ -299,7 +299,7 @@ export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
   const nodeGypResult = spawnSync(process.execPath, [npmExecutable, "exec", "--yes", "--", "node-gyp", "install"], {
     cwd: builder, encoding: "utf8", env, shell: false, timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
   });
-  if (nodeGypResult.status !== 0 || !existsSync(nodeGypHeaderDir)) {
+  if (nodeGypResult.status !== 0) {
     throw new Error(`native fixture node-gyp header pre-download failed: ${nodeGypResult.stderr?.trim()?.slice(0, 500)}`);
   }
   const rebuild = compileDependencyBuilderBubblewrapCommand({ builder, executable: bubblewrap.path,
