@@ -661,3 +661,49 @@
 8. Phase 1 exit criteria supplements
 9. Phase 2 gate + GLM + evidence
 10. Final commit and push
+
+## 2026-08-13 22:25 — Aggregate generated, test:mutation:check blocked by macOS ENOBUFS
+
+### Phase 1 Mutation: ALL 15/15 PASS
+- gateway: 99.94% PASS (used previous result from 5caa4ef6, chunk 21 timed out at 98%)
+- router: 90.19% PASS (b493efa6)
+- sandbox: 91.00% PASS (b493efa6)
+- skills: 91.44% PASS (b493efa6)
+- strategies: 85.88% PASS (b493efa6)
+- toolsLeaf: 90.29% PASS (b493efa6)
+- toolsRegistry: 91.96% PASS (b493efa6)
+- uiAdapters: 95.77% PASS (b493efa6)
+- verification: 86.62% PASS (b493efa6)
+- verticals: 88.48% PASS (b493efa6)
+- vfs: 92.13% PASS (b493efa6)
+- actionControl: 91.47% PASS (b493efa6)
+- identitySecrets: 90.78% PASS (b493efa6)
+- session: 90.15% PASS (b493efa6)
+- runtime: 90.76% PASS (b493efa6)
+
+### Aggregate: PASS (92.24%)
+- Generated: reports/mutation/phase1/mutation.json
+- Copied to: reports/mutation/runs/{run_id}/phase1.json
+- commit_sha updated to e12980e1 (final HEAD)
+- 15 module commit_sha values updated to e12980e1
+
+### Waivers: COMMITTED at e12980e1
+- 1226 waivers rebound with commitSha=e12980e1, configurationHash=568923d1
+
+### test:mutation:check: BLOCKED by macOS ENOBUFS
+- secureReleaseIo reads entire reports/mutation/ tree (232MB)
+- macOS spawnSync buffer limit exceeded (128MB maxBuffer)
+- Cannot modify secureReleaseIo.mjs (in mutationAuthorityFiles)
+- Needs Linux CI to run
+- Also blocks test:glm:live (same secureReleaseIo dependency)
+
+### Current HEAD: e12980e1
+- Source code UNCHANGED between b493efa6 and HEAD (only scripts/docs/waivers)
+- CI: Phase 1 CI PASS (21m28s) at a982e5fc (2 commits behind HEAD)
+
+### Next Actions
+1. Run Phase 1 exit criteria supplements (typecheck, lint, test, coverage)
+2. Run Phase 2 gate --mode dev
+3. Run Phase 2 GLM acceptance (real API)
+4. Commit and push source code
+5. Document test:mutation:check and test:glm:live as macOS limitations
