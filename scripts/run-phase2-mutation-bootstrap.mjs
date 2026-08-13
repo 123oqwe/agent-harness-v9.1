@@ -354,6 +354,7 @@ const installPrivateDependencies = (snapshot, parent) => {
     npm_config_userconfig: npmUserConfig,
     npm_config_globalconfig: npmGlobalConfig,
   };
+  const npmExecutable = realpathSync(join(dirname(process.execPath), "npm"));
   const npmVersion = spawnSync(process.execPath, [npmExecutable, "--version"], {
     encoding: "utf8",
     env: npmEnvironment,
@@ -382,15 +383,20 @@ const installPrivateDependencies = (snapshot, parent) => {
   if (install.status !== 0)
     throw new Error(`private npm ci failed: ${install.stderr.trim()}`);
   for (const name of patchNames) applyCommittedPatch(builder, join(builder, "patches", name));
-  const npmExecutable = realpathSync(join(dirname(process.execPath), "npm"));
   const bubblewrap = trustedBubblewrap();
   if (process.platform === "linux" && bubblewrap === null)
     throw new Error("native dependency rebuild requires trusted bubblewrap");
+  const nodeGypHdrResult = spawnSync(process.execPath, [npmExecutable, "exec", "--yes", "--", "node-gyp", "install"], {
+    cwd: builder, encoding: "utf8", env, shell: false, timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
+  });
+  if (nodeGypHdrResult.status !== 0)
+    throw new Error("private npm node-gyp header pre-download failed: " + (nodeGypHdrResult.stderr || "").trim().slice(0, 500));
   const rebuildCommand = process.platform === "linux"
     ? compileDependencyBuilderBubblewrapCommand({ builder,
         argv: [npmExecutable, "rebuild", "better-sqlite3", "--no-audit", "--no-fund"],
         npmExecutable,
-        executable: bubblewrap.path })
+        executable: bubblewrap.path,
+        extraBinds: ["--ro-bind", env.HOME, env.HOME, "--ro-bind", "/etc", "/etc"] })
     : { executable: process.execPath,
         argv: [npmExecutable, "rebuild", "better-sqlite3", "--no-audit", "--no-fund"] };
   const rebuildNative = spawnSync(rebuildCommand.executable, rebuildCommand.args ?? rebuildCommand.argv, {
@@ -407,7 +413,8 @@ const installPrivateDependencies = (snapshot, parent) => {
   const smokeArgv = ["--input-type=module", "-e",
     "import Database from 'better-sqlite3'; const db = new Database(':memory:'); if (db.prepare('select 1 as value').get().value !== 1) process.exit(9); db.close();"];
   const smokeCommand = process.platform === "linux"
-    ? compileDependencyBuilderBubblewrapCommand({ builder, argv: smokeArgv, npmExecutable, executable: bubblewrap.path })
+    ? compileDependencyBuilderBubblewrapCommand({ builder, argv: smokeArgv, npmExecutable, executable: bubblewrap.path,
+        extraBinds: ["--ro-bind", "/etc", "/etc"] })
     : { executable: process.execPath, args: smokeArgv };
   const nativeSmoke = spawnSync(smokeCommand.executable, smokeCommand.args, {
     cwd: builder,
