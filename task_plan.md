@@ -125,6 +125,8 @@
    - CI run 31752612786: success (job "deterministic")
    - Commit: https://github.com/123oqwe/agent-harness-v9.1/commit/cf13177861fe7d6844da7154ff59958ad2b6a7e4
    - Run: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31752612786
+   - Follow-up record commit ce842286 pushed (cf131778..ce842286); CI green again:
+   - Run: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31754143208 (success, deterministic)
 3. Control state: needs CTO approval (protected path, unchanged)
 
 ## ENV VARS (Phase 1 acceptance, as actually run)

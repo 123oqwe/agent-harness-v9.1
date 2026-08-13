@@ -1005,3 +1005,12 @@ recorded the blockers that cannot be fixed without changing mutationAuthorityFil
 - Still blocked (honest, root-cause-verified, unchanged): test:mutation:check
   (BLOCKER 1 ENOBUFS + BLOCKER 2 waiver), gate --mode local (mutation step + Linux),
   Phase 2 evidence 0/64, control state update (needs CTO approval)
+
+## 2026-08-14 — Record commit pushed; CI green on pushed HEAD (ce842286)
+
+- Committed ce842286 "docs: record CI green for Phase 1 acceptance (cf131778)"
+- Pushed cf131778..ce842286 (fast-forward, no force); remote HEAD = ce842286
+- CI run 31754143208 for ce842286: SUCCESS (job "deterministic")
+  - Commit: https://github.com/123oqwe/agent-harness-v9.1/commit/ce842286598746b1fbe697bd37ac444dad1c4dfa
+  - Run: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31754143208
+- Docs-only change; mutation evidence remains frozen at e783bc62 (digest f1ef8b80)
