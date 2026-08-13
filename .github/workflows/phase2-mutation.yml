@@ -1,0 +1,125 @@
+name: Phase 2 Mutation Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  mutation:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20.18.1
+          cache: npm
+      - name: Freeze npm and isolation authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm_tgz="$RUNNER_TEMP/npm-10.8.2.tgz"
+          npm_user_config="$RUNNER_TEMP/npm-user.rc"
+          npm_global_config="$RUNNER_TEMP/npm-global.rc"
+          : > "$npm_user_config"
+          : > "$npm_global_config"
+          curl --fail --silent --show-error --location \
+            'https://registry.npmjs.org/npm/-/npm-10.8.2.tgz' --output "$npm_tgz"
+          test "$(openssl dgst -sha512 -binary "$npm_tgz" | openssl base64 -A)" = \
+            'x/AIjFIKRllrhcb48dqUNAAZl0ig9+qMuN91RpZo3Cb2+zuibfh+KISl6+kVVyktDz230JKc208UkQwwMqyB+w=='
+          (
+            cd "$RUNNER_TEMP"
+            NPM_CONFIG_USERCONFIG="$npm_user_config" \
+            NPM_CONFIG_GLOBALCONFIG="$npm_global_config" \
+            npm install --global "$npm_tgz" --ignore-scripts --no-audit --no-fund \
+              --registry='https://registry.npmjs.org/'
+          )
+          test "$(npm --version)" = "10.8.2"
+          bubblewrap_deb="$RUNNER_TEMP/bubblewrap_0.6.1-1ubuntu0.1_amd64.deb"
+          curl --fail --silent --show-error --location \
+            'https://security.ubuntu.com/ubuntu/pool/main/b/bubblewrap/bubblewrap_0.6.1-1ubuntu0.1_amd64.deb' \
+            --output "$bubblewrap_deb"
+          echo 'f75c835d6871d1b36370e12ee82940334b2a9f94efc7b959b5b236447e89743d  '"$bubblewrap_deb" | sha256sum --check --strict
+          sudo dpkg --install "$bubblewrap_deb"
+          test "$(dpkg-query -W -f='${Version}' bubblewrap)" = "0.6.1-1ubuntu0.1"
+          test -x /usr/bin/prlimit
+          mkdir -p reports/phase2
+          {
+            echo "node_version=$(node --version)"
+            echo "node_sha256=$(sha256sum "$(command -v node)" | cut -d' ' -f1)"
+            echo "npm_version=$(npm --version)"
+            echo "npm_sha256=$(sha256sum "$(command -v npm)" | cut -d' ' -f1)"
+            echo "bubblewrap_version=$(dpkg-query -W -f='${Version}' bubblewrap)"
+            echo "bubblewrap_sha256=$(sha256sum /usr/bin/bwrap | cut -d' ' -f1)"
+            echo "prlimit_sha256=$(sha256sum /usr/bin/prlimit | cut -d' ' -f1)"
+            echo "registry=https://registry.npmjs.org/"
+          } > reports/phase2/workflow-toolchain.txt
+      - name: Extract exact-SHA launcher and bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/git cat-file blob "$GITHUB_SHA:scripts/run-phase2-mutation-launcher.mjs" > "$RUNNER_TEMP/run-phase2-mutation-launcher.mjs"
+          /usr/bin/git cat-file blob "$GITHUB_SHA:scripts/run-phase2-mutation-bootstrap.mjs" > "$RUNNER_TEMP/run-phase2-mutation-bootstrap.mjs"
+          chmod 0400 "$RUNNER_TEMP/run-phase2-mutation-launcher.mjs" "$RUNNER_TEMP/run-phase2-mutation-bootstrap.mjs"
+      - name: Run exact-SHA Phase 2 mutation gate
+        env:
+          PHASE2_MUTATION_ATTESTED_SHA: ${{ github.sha }}
+          PHASE2_MUTATION_EXTRACTED_BOOTSTRAP: ${{ runner.temp }}/run-phase2-mutation-bootstrap.mjs
+        run: |
+          node "$RUNNER_TEMP/run-phase2-mutation-launcher.mjs" native-fixture
+          node "$RUNNER_TEMP/run-phase2-mutation-launcher.mjs" phase2
+      - name: Probe OIDC signing prerequisite
+        id: attestation_capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" && \
+             curl --fail --silent --show-error --location \
+               --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+               "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sigstore" >/dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload one candidate publication
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: phase2-mutation-${{ github.sha }}
+          path: reports/phase2/
+          if-no-files-found: error
+      - name: Record immutable artifact identity
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "artifact-name: phase2-mutation-${GITHUB_SHA}"
+            echo "artifact-id: ${{ steps.upload.outputs.artifact-id }}"
+            echo "subject-digest: ${{ steps.upload.outputs.artifact-digest }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Attest uploaded candidate artifact
+        id: sigstore_attestation
+        if: steps.attestation_capability.outputs.available == 'true' && steps.upload.outcome == 'success'
+        continue-on-error: true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-name: phase2-mutation-${{ github.sha }}
+          subject-digest: ${{ steps.upload.outputs.artifact-digest }}
+      - name: Declare external verification path without upgrading the candidate
+        if: always() && steps.upload.outcome == 'success'
+        shell: bash
+        run: |
+          if test "${{ steps.sigstore_attestation.outcome }}" = "success"; then
+            echo 'verification-method=github_sigstore' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'verification-method=github_actions_api' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo 'verification-status=PENDING_EXTERNAL' >> "$GITHUB_STEP_SUMMARY"
