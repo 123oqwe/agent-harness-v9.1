@@ -287,7 +287,7 @@ export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
     npm_config_cache: cache, npm_config_registry: "https://registry.npmjs.org/",
     npm_config_userconfig: "/dev/null", npm_config_globalconfig: "/dev/null" };
   const version = spawnSync(process.execPath, [npmExecutable, "--version"], { encoding: "utf8", env, shell: false });
-  if (version.status !== 0 || version.stdout.trim() !== "10.8.2") throw new Error("native fixture requires npm@10.8.2");
+  if (version.status !== 0 || version.stdout.trim() !== "10.8.2") throw new Error(`native fixture requires npm@10.8.2 (status=${version.status}, stdout=${JSON.stringify(version.stdout?.trim())}, stderr=${JSON.stringify(version.stderr?.trim()?.slice(0, 500))}, npmExecutable=${npmExecutable}, error=${version.error?.message ?? "none"})`);
   const install = spawnSync(process.execPath, [npmExecutable, "ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
     cwd: builder, encoding: "utf8", env, shell: false, timeout: 30 * 60 * 1000, maxBuffer: 64 * 1024 * 1024,
   });
