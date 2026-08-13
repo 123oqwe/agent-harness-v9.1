@@ -120,7 +120,11 @@
      buffered stderr lost. Relaunched under the Monitor supervisor (1h cap) with
      stdout+stderr → run.log; completed exit 0. Environmental, not a case failure.
    - Evidence: /tmp/glm-p1/glm-5.2-xhigh-phase1-e783bc62753184fc3a79f7b10b2c4f2552b081b1.json
-2. Push to origin, wait for CI green (ci.yml does NOT run mutation:check) — NEXT
+2. [x] Push to origin + CI green (ci.yml does NOT run mutation:check)
+   - Pushed: d1d5164d..cf13177861fe7d6844da7154ff59958ad2b6a7e4
+   - CI run 31752612786: success (job "deterministic")
+   - Commit: https://github.com/123oqwe/agent-harness-v9.1/commit/cf13177861fe7d6844da7154ff59958ad2b6a7e4
+   - Run: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31752612786
 3. Control state: needs CTO approval (protected path, unchanged)
 
 ## ENV VARS (Phase 1 acceptance, as actually run)

@@ -983,3 +983,25 @@ recorded the blockers that cannot be fixed without changing mutationAuthorityFil
    and the acceptance evidence records digest f1ef8b80 for the accepted artifact; a changed
    digest would break the evidence<->report linkage the digest is designed to enforce.
    The docs commit changes no code, so the acceptance remains valid for its source.
+
+## 2026-08-14 — Push + CI green; all completable work done
+
+### DONE (verified)
+1. Pushed codex/phase2-integrated: d1d5164d..cf13177861fe7d6844da7154ff59958ad2b6a7e4
+   (fast-forward, no force). Commit carries the Phase 1 acceptance record + BLOCKER 3
+   resolution.
+2. CI run 31752612786 (Phase 1 CI, "deterministic" job): SUCCESS
+   - Commit: https://github.com/123oqwe/agent-harness-v9.1/commit/cf13177861fe7d6844da7154ff59958ad2b6a7e4
+   - Run: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31752612786
+   - ci.yml does NOT run mutation:check (BLOCKER 2 waiver chicken-and-egg), so CI green
+     does not imply mutation check; the mutation evidence is the local phase1/mutation.json
+     + acceptance evidence bound to e783bc62.
+
+### FINAL STATE
+- Phase 2 GLM acceptance 6/6 PASS; Phase 2 gate --mode dev success=true (earlier)
+- Phase 1 GLM acceptance 24/24 PASS (evidence bound to e783bc62)
+- Mutation report frozen at e783bc62, digest f1ef8b80 (matches evidence), score 92.24
+- 0 tracked build artifacts; only source code pushed
+- Still blocked (honest, root-cause-verified, unchanged): test:mutation:check
+  (BLOCKER 1 ENOBUFS + BLOCKER 2 waiver), gate --mode local (mutation step + Linux),
+  Phase 2 evidence 0/64, control state update (needs CTO approval)
