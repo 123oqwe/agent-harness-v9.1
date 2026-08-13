@@ -6,7 +6,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { fileURLToPath } from 'node:url';
 
@@ -324,7 +324,10 @@ function runRecoveryCase(input) {
   const { benchmarkCase, workspace } = input;
   const key = randomBytes(32);
   const dbPath = resolve(workspace, 'session.sqlite');
-  const store = new api.SqliteSessionStore(dbPath, { masterKey: key });
+  const store = new api.SqliteSessionStore(dbPath, {
+    masterKey: key,
+    state_root: api.createTrustedSessionStateRoot(dirname(dbPath)),
+  });
   const runId = `benchmark-${benchmarkCase.id}`;
   const operationId = 'operation-1';
   const idempotencyKey = 'bench-effect-1';
@@ -350,7 +353,10 @@ function runRecoveryCase(input) {
   });
   store.close();
 
-  const restored = new api.SqliteSessionStore(dbPath, { masterKey: key });
+  const restored = new api.SqliteSessionStore(dbPath, {
+    masterKey: key,
+    state_root: api.createTrustedSessionStateRoot(dirname(dbPath)),
+  });
   const confirmed = restored.isEffectConfirmed(idempotencyKey);
   let duplicateEffects = 0;
   if (!confirmed) {
