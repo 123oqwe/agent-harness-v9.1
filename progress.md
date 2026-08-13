@@ -590,3 +590,40 @@
 - 0b5105fa: fix: allow workspace symlinks in dependency snapshot check
 - Source code UNCHANGED between b493efa6 and HEAD (only scripts/docs changed)
 - mutationAuthorityFiles UNCHANGED (configuration hash same)
+
+## 2026-08-13 18:45 — Phase 1 CI running, mutation on runtime 13/39
+
+### Phase 2 Mutation CI Status (DOCUMENTED LIMITATION)
+- Run 31691882543: FAILED at 2m58s
+- Native fixture PASSed (bootstrap completed successfully!)
+- Failed at candidate runner stage: `trusted executable chain is not root-owned: /`
+- Root cause: `trusted-git.mjs` validates that `/` is owned by root (uid 0)
+  On GitHub Actions runners, `/` may not be owned by root in the candidate
+  snapshot environment
+- This is a PRE-EXISTING bug in `trusted-git.mjs`, masked by bootstrap failures
+- `trusted-git.mjs` is in `mutationAuthorityFiles` - cannot modify without
+  invalidating Phase 1 mutation configuration hash
+- DOCUMENTED as known limitation: Phase 2 mutation CI requires trusted-git.mjs fix
+  which needs CTO approval (changes mutationAuthorityFiles)
+
+### Phase 1 CI Status
+- Run 31691861870: IN PROGRESS (6m, at test step)
+- Previous successful run: 31676980906 (21m4s)
+- Expected to complete in ~15 min
+
+### Phase 1 Mutation Status
+- 10/15 PASS, 1/15 FAIL (gateway timeout), 4/15 remaining
+- Runtime chunk 13/39 (harness-support.ts:151-300)
+- DO NOT KILL stryker processes
+- All module results have commit_sha=b493efa6
+
+### Bootstrap Fixes Applied (7 total, ALL VERIFIED)
+1. npm config double-loading /dev/null (commit 1f1ea050)
+2. node-gyp headers not in sandbox (commit 18722f59)
+3. cc compiler not in sandbox (commit 5cb07045)
+4. TDZ bug in installPrivateDependencies (commit 4e0de89a)
+5. Missing extraBinds in installPrivateDependencies (commit 4e0de89a)
+6. Lint: unused nodeGypHeaderDir (commit 24e11be2)
+7. Workspace symlink check (commit 0b5105fa)
+- Native fixture now PASSes in CI (verified in run 31691882543)
+- Only remaining issue: trusted-git.mjs root ownership check (pre-existing)
