@@ -523,3 +523,43 @@
 10. Update Phase 1 evidence (Step 9)
 11. Phase 2 gate + GLM + evidence (Steps 12-14)
 12. Final commit and push (Step 15)
+
+## 2026-08-13 18:35 — Phase 2 mutation CI RUNNING, Phase 1 on runtime 9/39
+
+### Phase 2 Mutation CI Fix History (ALL FIXED)
+1. npm config double-loading /dev/null (commit 1f1ea050): use distinct empty config paths
+2. node-gyp headers not available in sandbox (commit 18722f59): pre-download with node-gyp install
+3. existsSync check too strict (commit before 5cb07045): removed, trust exit code
+4. cc compiler not found in sandbox (commit 5cb07045): bind-mount /etc for symlink resolution
+5. TDZ bug in installPrivateDependencies (commit 4e0de89a): move npmExecutable declaration
+6. Missing extraBinds in installPrivateDependencies (commit 4e0de89a): add /etc + HOME
+
+### Phase 2 Mutation CI Status
+- Run 31691455337: RUNNING (2+ minutes, bootstrap completed successfully!)
+- All previous runs failed at bootstrap within 30-40s
+- This run is past the bootstrap, running actual Phase 2 mutation tests
+- Expected duration: 60+ minutes
+
+### Phase 1 Mutation Status
+- 10/15 PASS: router, toolsRegistry, toolsLeaf, skills, strategies,
+  actionControl, identitySecrets, vfs, sandbox, session (90.15%)
+- 1/15 FAIL: gateway (timeout on model-gateway-ts-301-450, score=0)
+- 4/15 remaining: runtime (chunk 9/39), verification, verticals, uiAdapters
+- All module results have commit_sha=b493efa6
+- DO NOT KILL stryker processes
+
+### Current HEAD
+- 4e0de89a: fix: TDZ bug + add extraBinds to installPrivateDependencies sandbox
+- Source code UNCHANGED between b493efa6 and HEAD (only scripts/docs changed)
+
+### Next Actions
+1. Wait for Phase 1 mutation to complete (~2-3h remaining for runtime + 3 modules)
+2. Re-run gateway separately
+3. Generate aggregate
+4. Commit waivers at final HEAD
+5. Update aggregate commit_sha (re-tag)
+6. Run test:mutation:check
+7. Run GLM 5.2 live acceptance
+8. Phase 1 exit criteria supplements
+9. Phase 2 gate + GLM + evidence
+10. Final commit and push
