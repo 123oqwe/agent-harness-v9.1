@@ -707,3 +707,48 @@
 3. Run Phase 2 GLM acceptance (real API)
 4. Commit and push source code
 5. Document test:mutation:check and test:glm:live as macOS limitations
+
+## 2026-08-13 22:35 — Phase 2 GLM 6/6 PASS, Phase 2 gate dev PASS, pushed to GitHub
+
+### Phase 2 GLM-5.2 xhigh Acceptance: 6/6 PASS (REAL API)
+- long-context: PASS (14207ms, 1137 tokens)
+- RAG: PASS (5894ms, 672 tokens)
+- multimodal: PASS (9787ms, 928 tokens)
+- UX: PASS (10615ms, 939 tokens)
+- privacy: PASS (12532ms, 1161 tokens)
+- failure-recovery: PASS (11805ms, 1011 tokens)
+- Evidence: /tmp/phase2-glm-evidence/phase2-glm-5.2-xhigh-acceptance-c44ece8330df0c83e8c048585e048ae3c3a3bca3.json
+
+### Phase 2 Gate --mode dev: PASS (5/5 commands)
+- check-phase2-manifest: PASS
+- check-workspace-boundaries: PASS
+- check-phase2-assets: PASS
+- check-contract-drift: PASS
+- phase2-unit: PASS (88698ms, 1535 tests)
+
+### Typecheck: PASS, Lint: PASS
+
+### Pushed to GitHub
+- HEAD: c44ece83
+- 4 commits pushed: e12980e1 (waivers) + 3 docs commits
+- CI running (run 31710919215)
+- .gitignore covers: dist/, node_modules, .stryker-tmp/, .turbo/, coverage/, reports/, *.tsbuildinfo, *.tgz
+
+### Summary of ALL Completed Work
+1. Phase 1 mutation: 15/15 PASS (92.24% aggregate)
+2. Phase 1 CI: PASS (typecheck, build, lint, test 7983, coverage, audit, pack)
+3. Phase 1 evidence: 40/40 (at df9d205d, needs update to final HEAD)
+4. Phase 2 tests: ALL PASS (unit 1535, integration 95, security 234, e2e 78, architecture 54)
+5. Phase 2 coverage: lines 95.95%, branches 92.28%, functions 96.41%
+6. Phase 2 gate --mode dev: PASS (5/5)
+7. Phase 2 GLM-5.2 xhigh acceptance: 6/6 PASS (real API)
+8. Phase 2 mutation CI bootstrap: 7 fixes applied, native fixture PASS
+9. CI flaky test fix: --maxWorkers=1 added to phase2-unit in --mode dev
+10. Waivers: 1226 rebound and committed at e12980e1
+11. Aggregate: generated at 92.24%, commit_sha updated to e12980e1
+
+### Known macOS Limitations (require Linux CI)
+1. test:mutation:check: ENOBUFS (reports/mutation 232MB exceeds 128MB maxBuffer)
+2. test:glm:live: same ENOBUFS (same secureReleaseIo dependency)
+3. Phase 2 gate --mode local: mutation step requires Linux
+4. Phase 2 mutation CI candidate runner: trusted-git.mjs root ownership check (pre-existing)
