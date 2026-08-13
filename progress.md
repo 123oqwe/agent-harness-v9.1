@@ -219,3 +219,94 @@
   6. test:coverage: lines 95.95%, branches 92.28%, functions 96.41%
 - Step 7 (mutation:phase1) is the current blocker, 5-8h total
 - All 15 modules previously PASS (stale SHAs, runtime 90.76% from run #39)
+
+## 2026-08-13 02:10 — Session mutation gap=1, fix committed, monitoring runtime
+
+### Session Module Issue Found
+- Session: 89.93% FAIL (need 90%, gap=1 kill)
+- Previous: 90.15% PASS (stale SHA 033e9178)
+- Cause: likely test count change or flaky timeout from extraction
+- Fix: Added exact code+message assertions to 2 tests in sqlite-store-deep.test.ts
+  - Asserts (e).code === 'DATABASE_IDENTITY_CHANGED' (L343 StringLiteral)
+  - Asserts (e).message === 'session database identity changed...' (L344 StringLiteral)
+  - Should kill 2 StringLiteral mutants, only need 1
+- Committed as 5caa4ef6
+- Typecheck: PASS, Tests: 21/21 pass
+- Waivers rebound to 5caa4ef6
+
+### Current Mutation Run Status
+- Still running: runtime module, chunk 4/39
+- PID 37823, screen session "mutation"
+- After runtime: uiAdapters, verification, verticals remain
+- DO NOT KILL
+- After full run completes: need to re-run session module with new HEAD (5caa4ef6)
+
+### Commits
+- 5caa4ef6: test: assert exact SessionStateRootError code+message
+- b5737e41: docs: update progress.md with verify:phase1:local status
+- 19157939: docs: update planning files after run #39 PASS
+
+## 2026-08-13 05:13 — Mutation:phase1 full run COMPLETED, session re-run PASS, gateway re-run started
+
+### Full Run Results (completed ~04:30)
+- 13/15 modules PASS with FRESH SHA b5737e41
+- gateway: TIMED OUT on model-gateway-ts-301-450 chunk, kept old result (354a2694, 99.92% PASS)
+- session: FAIL 89.93% (gap=1)
+
+### Session Re-run (completed 05:13, commit 5caa4ef6)
+- Score: 90.15% PASS
+- Total: 914, Killed: 824, Survived: 84, NoCov: 6
+- Fix worked: exact StringLiteral assertions killed 2 mutants (only needed 1)
+- commit_sha: 5caa4ef6 (current HEAD)
+
+### Gateway Re-run (started 05:13, PID 69110)
+- Running all 43 chunks with current HEAD
+- model-gateway-ts-301-450 may timeout again (30min limit)
+- If it times out: runner keeps old chunk result, but overall result.json may not update
+- Monitor: tail /tmp/mutation-gateway-rerun.log
+- DO NOT KILL
+
+### verify:phase1:local Status
+- Steps 1-6: ALL PASS (typecheck, cycles, build, lint, npm test 7983/7983, coverage)
+- Step 7 (mutation:phase1): PARTIALLY DONE
+  - Full run completed but gateway timed out + session was FAIL
+  - Session re-run: PASS (90.15%)
+  - Gateway re-run: IN PROGRESS
+  - After gateway completes: all 15 modules should have FRESH SHA + PASS
+
+## 2026-08-13 09:45 — ALL 15 MODULES PASS! verify:phase1:local COMPLETE
+
+### Gateway Re-run Result (COMPLETED 09:42)
+- Score: 99.94% PASS (was 99.92%)
+- Commit: 5caa4ef6 (FRESH)
+- Killed: 3567, Timeout: 59, Survived: 2, NoCov: 0, Ignored: 1206
+- The previously-timeout chunk (model-gateway-ts-301-450) completed successfully this time
+
+### Final All-Module Status (ALL 15/15 PASS, ALL FRESH SHA)
+| Module          | Score  | Thr | SHA       |
+| gateway        | 99.94  | 85  | 5caa4ef6  |
+| router         | 90.19  | 90  | b5737e41  |
+| sandbox        | 91.00  | 90  | b5737e41  |
+| skills         | 91.44  | 85  | b5737e41  |
+| strategies     | 85.88  | 85  | b5737e41  |
+| toolsLeaf      | 90.29  | 85  | b5737e41  |
+| toolsRegistry  | 91.96  | 90  | b5737e41  |
+| uiAdapters     | 95.77  | 85  | b5737e41  |
+| verification   | 86.62  | 85  | b5737e41  |
+| verticals      | 88.48  | 85  | b5737e41  |
+| vfs            | 92.13  | 90  | b5737e41  |
+| actionControl  | 91.50  | 90  | b5737e41  |
+| identitySecrets| 90.78  | 90  | b5737e41  |
+| session        | 90.15  | 90  | 5caa4ef6  |
+| runtime        | 90.76  | 90  | b5737e41  |
+
+### verify:phase1:local COMPLETE (all 7 steps)
+1. typecheck: PASS
+2. check:cycles: PASS
+3. build: PASS
+4. lint: PASS
+5. npm test --maxWorkers=1: 381 files, 7983 tests, 0 failed
+6. test:coverage: lines 95.95%, branches 92.28%, functions 96.41%
+7. test:mutation:phase1: ALL 15/15 PASS with fresh SHA
+
+### Next: B-Sup (Phase 1 exit_criteria supplements)
