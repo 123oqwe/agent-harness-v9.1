@@ -154,7 +154,9 @@ const dependencySnapshot = (dependencyRoot) => {
       hash.update("\0");
       if (metadata.isSymbolicLink()) {
         const target = readlinkSync(absolute);
-        if (target.startsWith("/") || resolve(dirname(absolute), target).startsWith(`${dependencyRoot}/`) === false)
+        const resolved = resolve(dirname(absolute), target);
+        const projectRoot = dirname(dependencyRoot);
+        if (target.startsWith("/") || (resolved.startsWith(`${dependencyRoot}/`) === false && resolved.startsWith(`${projectRoot}/`) === false))
           throw new Error(`dependency snapshot symlink escapes root: ${relative}`);
         hash.update(target);
       } else if (metadata.isDirectory()) {
