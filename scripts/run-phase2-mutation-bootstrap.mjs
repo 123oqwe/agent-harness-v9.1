@@ -304,7 +304,7 @@ export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
   }
   const rebuild = compileDependencyBuilderBubblewrapCommand({ builder, executable: bubblewrap.path,
     npmExecutable, argv: [npmExecutable, "rebuild", "better-sqlite3", "--no-audit", "--no-fund"],
-    extraBinds: ["--ro-bind", home, home] });
+    extraBinds: ["--ro-bind", home, home, "--ro-bind", "/etc", "/etc"] });
   const rebuilt = spawnSync(rebuild.executable, rebuild.args, { cwd: builder, encoding: "utf8",
     env: { ...env, npm_config_ignore_scripts: "false" }, shell: false, timeout: 15 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
   if (rebuilt.error) throw rebuilt.error;
