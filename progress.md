@@ -441,3 +441,30 @@
 4. Run GLM 5.2 live test at 0ce72664
 5. Re-commit docs as new commits
 6. Push to GitHub
+
+## 2026-08-13 14:40 — Phase 2 mutation CI still failing, Phase 1 mutation progressing
+
+### Phase 2 Mutation CI (4th attempt, still failing)
+- Run 31674548389: FAILED (34s) - "native fixture requires npm@10.8.2"
+- Fix attempts:
+  1. 5a0c0314: Changed verifyNativeCleanInstallFixture to use process.execPath
+  2. 7f650383: Also changed installPrivateDependencies to use process.execPath
+- "Freeze npm" step PASSES (npm 10.8.2 installed, `npm --version` = "10.8.2")
+- But bootstrap's spawnSync(process.execPath, [npmExecutable, "--version"]) still fails
+- Root cause unclear - may be related to restricted env (npm_config_userconfig=/dev/null)
+- Cannot reproduce locally (works on macOS)
+- This is a CI-specific issue requiring further investigation
+
+### Phase 1 Mutation Progress
+- Currently on toolsRegistry module (3rd of 15)
+- Gateway FAILED (timeout on model-gateway.ts:301-450, same as before)
+- Router PASSED (90.19%)
+- toolsRegistry in progress (69% of current chunk)
+- Started at 11:47AM, ~3h elapsed
+- 12 more modules to go
+- Will need to re-run gateway separately after full run
+- Will use scripts/generate-phase1-aggregate.mjs to combine results
+
+### Phase 1 CI
+- Run 31674506349: IN PROGRESS (4m27s)
+- Latest commit: 7f650383 (bootstrap npm fix)
