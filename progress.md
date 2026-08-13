@@ -937,3 +937,49 @@ recorded the blockers that cannot be fixed without changing mutationAuthorityFil
   Phase 2's key was session-injected, not persisted. Cannot run live acceptance until the
   key is supplied. (claude doctor: environment healthy, no install issues — irrelevant to
   the key absence.)
+
+## 2026-08-14 — Phase 1 GLM acceptance 24/24 PASS; BLOCKER 3 resolved
+
+### DONE (real, verified)
+1. Phase 1 GLM-5.2 xhigh acceptance: 24/24 PASS, safety hard gate PASS, score=100
+   - Evidence: /tmp/glm-p1/glm-5.2-xhigh-phase1-e783bc62753184fc3a79f7b10b2c4f2552b081b1.json
+   - commit_sha=e783bc62, model=glm-5.2, reasoning_effort=xhigh, temperature=1, seed=null
+   - unauthorized_effects=0, duplicate_effects=0 (all 24 cases)
+   - mutation_configuration_hash=568923d1 unchanged; mutation_run_id=2026-08-13T03-47-28-368Z-...
+   - forbidden_secrets_check: GLM_API_KEY absent from serialized evidence
+2. Fix committed (e783bc62): runRecoveryCase must pass trusted session state root
+   - run-harness-case.mjs constructed SqliteSessionStore without the state_root required
+     by the session storage trust boundary; GLM smoke supplied it, recovery-case path did
+     not, so recovery_crash_resume / recovery_duplicate_effect aborted with
+     SessionStateRootError. Both constructions now pass
+     api.createTrustedSessionStateRoot(dirname(dbPath)) (matches run-session.ts).
+   - benchmarks/phase1/runner NOT in mutationAuthorityFiles -> configuration_hash and
+     mutation score (92.24) unaffected.
+3. Mutation report REBOUND to e783bc62 (top-level AND all per-module commit_sha; the
+   earlier rebind had only updated top-level — latent inconsistency fixed).
+   MUTATION_ARTIFACT_DIGEST=f1ef8b80... (sha256 of phase1/mutation.json, verified).
+4. Chunks RESTORED: 15 module dirs back into reports/mutation/runs/$RUN_ID
+   - 14 complete (result.json + mutation.json + chunks/ matching the report)
+   - gateway PARTIAL: 21 chunks + FAIL result (1800000ms Stryker timeout), missing the
+     merged mutation.json. Pre-existing gap from a prior ENOBUFS move; the 22 missing
+     chunks were searched disk-wide and never located. Restored as-is; NOT fabricated.
+     The authoritative top-level reports/mutation/gateway/result.json remains PASS (43 chunks).
+
+### Process note — first acceptance attempt killed by background-task timeout
+- Ran scripts/run-glm-acceptance.mjs as a Bash background task with timeout=600000 (10 min).
+- The 24-case xhigh run exceeded 10 min while in the run-agent phase; the task was killed,
+  the process's buffered stderr (DIAG lines) never flushed to run.log, so the failure
+  initially looked like a case failure. Root cause proven by the launch record
+  (timeout=600000) + no leftover per-case workspaces + no evidence file.
+- Relaunched under the Monitor supervisor (1h cap, stdout+stderr -> /tmp/glm-p1/run.log);
+  completed with exit 0. Environmental, not a case failure.
+
+### NEXT
+1. Commit these docs (HEAD advances past e783bc62) -> verify git ls-files has zero build
+   artifacts -> push origin codex/phase2-integrated -> wait for CI green (ci.yml does NOT
+   run mutation:check) -> record URL+SHA.
+2. The mutation report is FROZEN at e783bc62 (digest f1ef8b80) — deliberately NOT rebound
+   to the docs-commit HEAD. Re-binding post-acceptance would change mutation.json's digest,
+   and the acceptance evidence records digest f1ef8b80 for the accepted artifact; a changed
+   digest would break the evidence<->report linkage the digest is designed to enforce.
+   The docs commit changes no code, so the acceptance remains valid for its source.

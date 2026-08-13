@@ -1,5 +1,5 @@
-# Task Plan: agent-harness Phase 2 Completion (v4, 2026-08-14 02:10)
-# HEAD: 41917554b75c7e58de28c447c1aeabf0ea2c47c0 (codex/phase2-integrated)
+# Task Plan: agent-harness Phase 2 Completion (v5, 2026-08-14)
+# HEAD: e783bc62753184fc3a79f7b10b2c4f2552b081b1 (codex/phase2-integrated)
 # Skill: planning-with-files v3.9.0
 # IF CONTEXT COMPACTED: READ THIS FILE FIRST, THEN CONTINUE
 
@@ -21,14 +21,20 @@
 - [x] Docs updated and committed (this commit)
 - [x] Phase 1 GLM root cause LOCKED (entry guard /var→/private/var symlink) + zero-source
   workaround verified (TMPDIR non-symlink path). Execution blocked on GLM_API_KEY (BLOCKER 3)
+- [x] Phase 1 GLM-5.2 xhigh acceptance: 24/24 PASS (real API)
+  - Evidence: /tmp/glm-p1/glm-5.2-xhigh-phase1-e783bc62753184fc3a79f7b10b2c4f2552b081b1.json
+  - commit_sha=e783bc62, model=glm-5.2, reasoning_effort=xhigh, score=100
+  - safety_hard_gate PASS; unauthorized_effects=0; duplicate_effects=0
+  - mutation_configuration_hash=568923d1 unchanged; mutation_run_id=2026-08-13T03-47-28-...
+  - Fix committed (e783bc62): runRecoveryCase must pass trusted session state root
+    (SqliteSessionStore asserts a trusted state_root with no env fallback)
+- [x] BLOCKER 3 RESOLVED: GLM_API_KEY supplied at runtime (key value NOT recorded in docs)
 
 ### BLOCKED (root cause verified at code level, NOT worked around)
 - [ ] test:mutation:check: CANNOT PASS (see BLOCKERS below)
 - [ ] gate --mode local: CANNOT PASS on this machine (mutation step + ENOBUFS + Linux)
 - [ ] Phase 2 evidence: 0/64 (requires gate --mode local pass)
 - [ ] Control state update: needs CTO approval (protected path)
-- [ ] Phase 1 GLM-5.2 acceptance: READY (chunks moved, report rebound, workaround verified)
-      but blocked on GLM_API_KEY (BLOCKER 3)
 
 ## BLOCKERS (honest record, root causes verified)
 
@@ -52,10 +58,11 @@
   converge (commitSha must equal the SHA that contains the rebind).
 - Conclusion: test:mutation:check cannot pass; evidence remains 0/64.
 
-### BLOCKER 3: GLM_API_KEY missing — Phase 1 GLM acceptance (hard, external)
-- ~/.env:36 GLM_API_KEY= is an EMPTY placeholder (val_len=0). Full-disk search for
+### BLOCKER 3: GLM_API_KEY missing — Phase 1 GLM acceptance (hard, external) — RESOLVED 2026-08-14
+- ~~~/.env:36 GLM_API_KEY= is an EMPTY placeholder (val_len=0). Full-disk search for
   non-empty GLM/ZAI/ZHIPU keys found nothing; macOS keychain has no z.ai/GLM entry.
-  Phase 2's key was session-injected, not persisted.
+  Phase 2's key was session-injected, not persisted.~~ RESOLVED: key supplied at runtime.
+  Key value intentionally NOT recorded in this repo.
 - Historical Phase 1 run failure root cause (separate, LOCKED): run-glm-acceptance.mjs:263
   spawns run-agent.mjs by absolute path under mkdtempSync(tmpdir()) = /var/folders/... On
   macOS /var→/private/var is a symlink; Node's ESM loader realpaths import.meta.url to
@@ -78,20 +85,25 @@
 ## VERIFIED CURRENT STATE (2026-08-14 02:10)
 
 ### Git
-- HEAD: 41917554b75c7e58de28c447c1aeabf0ea2c47c0
+- HEAD: e783bc62753184fc3a79f7b10b2c4f2552b081b1
 - Branch: codex/phase2-integrated
-- Worktree clean before docs commit
+- Worktree clean
 - Remote: origin=github.com/123oqwe/agent-harness-v9.1.git
-- Source diff e12980e1..HEAD: only progress.md + scripts/run-glm-acceptance.mjs (+8/-2),
-  neither in mutation source_files -> configurationHash unchanged (568923d11662d314...)
+- Latest code commit: e783bc62 "fix: runRecoveryCase must pass trusted session state root"
+  (benchmarks/phase1/runner/run-harness-case.mjs; NOT in mutationAuthorityFiles ->
+  configurationHash unchanged 568923d1, mutation score unchanged 92.24)
 
-### Phase 1 Mutation (completed, REBOUND to current HEAD)
+### Phase 1 Mutation (completed, REBOUND to e783bc62)
 - 15/15 PASS, aggregate status=PASS, score=92.24
 - configuration_hash=568923d11662d314... remains valid (authority files unchanged)
-- phase1/mutation.json AND runs/$RUN_ID/phase1.json REBOUND to current HEAD
+- phase1/mutation.json AND runs/$RUN_ID/phase1.json REBOUND to e783bc62
   (filesystem-level; reports/ gitignored → verifyReleaseRepository clean-check unaffected)
+- MUTATION_ARTIFACT_DIGEST=f1ef8b803d32c33be40e600f13422f4898818f902b053d0a9c91228d75fadf97
+  (sha256 of reports/mutation/phase1/mutation.json at e783bc62; matches acceptance evidence)
 - RUN_ID=2026-08-13T03-47-28-368Z-d7f1ea7c-775b-46fc-8826-24e8da0b410b
-- 15 module chunk dirs moved to /tmp/chunks-backup (reports/mutation now 44M, ENOBUFS-safe)
+- 15 module chunk dirs RESTORED to runs/$RUN_ID (14 complete: result+mutation+chunks;
+  gateway partial: 21 chunks + FAIL result, missing merged mutation.json — pre-existing
+  gap from a prior ENOBUFS workaround move; 22 chunks never located on disk, NOT fabricated)
 
 ### Phase 2
 - Unit/Integration/Security/E2E/Architecture all PASS (7983 tests on CI)
@@ -101,24 +113,26 @@
 - Phase 2 evidence: 0/64 (blocked)
 
 ## REMAINING WORK AFTER THIS SESSION
-1. Phase 1 GLM-5.2 xhigh acceptance via test:glm:live — READY EXCEPT GLM_API_KEY:
-   - STATE DONE: 15 chunk dirs → /tmp/chunks-backup (reports/mutation now 44M, ENOBUFS-safe);
-     mutation report REBOUND to current HEAD (filesystem-level; reports/ gitignored)
-   - ROOT CAUSE LOCKED + WORKAROUND READY: BLOCKER 3 (guard symlink; TMPDIR variant)
-   - TO RUN once key provided (HEAD = commit carrying this doc):
-     export TMPDIR=/Users/guanjieqiao/.phase1-tmp ACCEPTANCE_EVIDENCE_ROOT=/tmp/glm-p1
-     export EXPECTED_SHA=$(git rev-parse HEAD)
-     export MUTATION_ARTIFACT_NAME=phase1-mutation-$(git rev-parse HEAD)
-     export MUTATION_ARTIFACT_DIGEST=$(shasum -a 256 reports/mutation/phase1/mutation.json | cut -d' ' -f1)
-     npm run test:glm:live  →  verify 24/24 PASS  →  restore chunks from /tmp/chunks-backup
-2. Push to origin, wait for CI green (ci.yml does NOT run mutation:check)
+1. [x] Phase 1 GLM-5.2 xhigh acceptance: 24/24 PASS — DONE (this session)
+   - Ran scripts/run-glm-acceptance.mjs directly with GLM_API_KEY + TMPDIR workaround
+   - First attempt died in run-agent phase: launched as Bash background task with
+     timeout=600000 (10 min) — the 24-case GLM run exceeded it; process was killed,
+     buffered stderr lost. Relaunched under the Monitor supervisor (1h cap) with
+     stdout+stderr → run.log; completed exit 0. Environmental, not a case failure.
+   - Evidence: /tmp/glm-p1/glm-5.2-xhigh-phase1-e783bc62753184fc3a79f7b10b2c4f2552b081b1.json
+2. Push to origin, wait for CI green (ci.yml does NOT run mutation:check) — NEXT
 3. Control state: needs CTO approval (protected path, unchanged)
 
-## ENV VARS
-GLM_API_KEY=<MISSING on machine; must be supplied to run Phase 1 GLM>
+## ENV VARS (Phase 1 acceptance, as actually run)
+GLM_API_KEY=<supplied at runtime; value NOT recorded in this repo>
 GLM_MODEL=glm-5.2
 GLM_REASONING_EFFORT=xhigh
 GLM_ALLOW_REMOTE=1
+TMPDIR=/Users/guanjieqiao/.phase1-tmp   # entry-guard symlink workaround
+EXPECTED_SHA=e783bc62753184fc3a79f7b10b2c4f2552b081b1
+MUTATION_ARTIFACT_NAME=phase1-mutation-e783bc62753184fc3a79f7b10b2c4f2552b081b1
+MUTATION_ARTIFACT_DIGEST=f1ef8b803d32c33be40e600f13422f4898818f902b053d0a9c91228d75fadf97
+ACCEPTANCE_EVIDENCE_ROOT=/tmp/glm-p1
 
 ## THRESHOLDS (unchanged)
 85%: gateway, toolsLeaf, skills, strategies, verification, verticals, uiAdapters
