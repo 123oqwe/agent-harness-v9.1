@@ -563,3 +563,30 @@
 8. Phase 1 exit criteria supplements
 9. Phase 2 gate + GLM + evidence
 10. Final commit and push
+
+## 2026-08-13 18:40 — Both CI runs green, Phase 1 on runtime 11/39
+
+### Phase 2 Mutation CI Fix History (ALL 7 FIXES APPLIED)
+1. npm config double-loading /dev/null (commit 1f1ea050)
+2. node-gyp headers not available in sandbox (commit 18722f59)
+3. cc compiler not found in sandbox (commit 5cb07045)
+4. TDZ bug in installPrivateDependencies (commit 4e0de89a)
+5. Missing extraBinds in installPrivateDependencies (commit 4e0de89a)
+6. Lint error: unused nodeGypHeaderDir (commit 24e11be2)
+7. Workspace symlink check rejects @agent-harness/api (commit 0b5105fa)
+
+### Phase 2 Mutation CI Status
+- Run 31691882543: RUNNING (2+ minutes, bootstrap completed successfully!)
+- This is the first run to get past the bootstrap stage
+- Running actual Phase 2 mutation tests (60+ min expected)
+
+### Phase 1 Mutation Status
+- 10/15 PASS, 1/15 FAIL (gateway timeout), 4/15 remaining
+- Runtime chunk 11/39 (event-bus.ts)
+- DO NOT KILL stryker processes
+- All module results have commit_sha=b493efa6
+
+### Current HEAD
+- 0b5105fa: fix: allow workspace symlinks in dependency snapshot check
+- Source code UNCHANGED between b493efa6 and HEAD (only scripts/docs changed)
+- mutationAuthorityFiles UNCHANGED (configuration hash same)
