@@ -627,3 +627,37 @@
 7. Workspace symlink check (commit 0b5105fa)
 - Native fixture now PASSes in CI (verified in run 31691882543)
 - Only remaining issue: trusted-git.mjs root ownership check (pre-existing)
+
+## 2026-08-13 18:58 — Phase 1 CI SUCCESS! Mutation on runtime 19/39
+
+### Phase 1 CI: SUCCESS (21m28s)
+- Run 31691861870: ALL CHECKS PASS
+  - typecheck, build:workspaces, typecheck, check:cycles, build, lint
+  - npm test --maxWorkers=1 (7983 tests)
+  - test:coverage (lines 95.95%, branches 92.28%, functions 96.41%)
+  - npm audit --omit=dev --audit-level=high
+  - npm pack --dry-run --ignore-scripts
+- All CI fixes verified: flaky test fix, lint fixes, bootstrap fixes
+
+### Phase 1 Mutation: IN PROGRESS
+- 10/15 PASS, 1/15 FAIL (gateway timeout), 4/15 remaining
+- Runtime chunk 19/39 (harness-support.ts:1051-1200)
+- DO NOT KILL stryker processes
+- All module results have commit_sha=b493efa6
+
+### Phase 2 Mutation CI: KNOWN LIMITATION
+- Bootstrap completed successfully (native fixture PASS)
+- Fails at candidate runner: trusted-git.mjs root ownership check
+- Pre-existing bug, cannot fix without invalidating Phase 1 mutation config hash
+
+### Next Actions
+1. Wait for Phase 1 mutation to complete (~1-2h remaining for runtime + 3 modules)
+2. Re-run gateway separately
+3. Generate aggregate
+4. Commit waivers at final HEAD
+5. Update aggregate commit_sha (re-tag)
+6. Run test:mutation:check
+7. Run GLM 5.2 live acceptance
+8. Phase 1 exit criteria supplements
+9. Phase 2 gate + GLM + evidence
+10. Final commit and push
