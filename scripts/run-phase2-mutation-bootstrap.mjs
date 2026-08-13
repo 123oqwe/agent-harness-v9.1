@@ -344,7 +344,7 @@ const installPrivateDependencies = (snapshot, parent) => {
     npm_config_userconfig: npmUserConfig,
     npm_config_globalconfig: npmGlobalConfig,
   };
-  const npmVersion = spawnSync("npm", ["--version"], {
+  const npmVersion = spawnSync(process.execPath, [npmExecutable, "--version"], {
     encoding: "utf8",
     env: npmEnvironment,
     shell: false,
