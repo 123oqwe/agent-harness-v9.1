@@ -310,3 +310,22 @@
 7. test:mutation:phase1: ALL 15/15 PASS with fresh SHA
 
 ### Next: B-Sup (Phase 1 exit_criteria supplements)
+
+## 2026-08-13 10:36 — CI GREEN, Phase 2 local gate started
+
+### CI Status
+- Run 31659156130: SUCCESS (21m22s) after rerun
+- Previous failure was flaky (phase2-gate-orchestration.test.ts:953 - passes locally)
+- All CI checks pass: typecheck, build, lint, test, coverage, audit, pack
+
+### Phase 2 Local Gate (started 10:35, screen 'phase2gate')
+- 23 commands, 3-4h expected
+- Currently running: phase2-unit (command 13)
+- Monitor: ps aux | grep verify-phase2
+- DO NOT KILL
+- Log: /tmp/phase2-local-gate.log (may be buffered)
+
+### Commits
+- df9d205d: evidence: update all 40 Phase 1 evidence files
+- 3f04f719: docs: all 15/15 mutation modules PASS
+- 5caa4ef6: test: assert exact SessionStateRootError code+message
