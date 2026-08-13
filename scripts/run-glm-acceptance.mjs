@@ -62,9 +62,11 @@ function assertLiveConfiguration(source) {
 function smokeSqliteSessionStore(packageEntrypoint, databasePath, options) {
   const program = [
     "import { Buffer } from 'node:buffer';",
-    `import { SqliteSessionStore } from ${JSON.stringify(packageEntrypoint)};`,
+    `import { SqliteSessionStore, createTrustedSessionStateRoot } from ${JSON.stringify(packageEntrypoint)};`,
+    `import { dirname } from 'node:path';`,
+    `const stateRoot = createTrustedSessionStateRoot(dirname(${JSON.stringify(databasePath)}));`,
     `const store = new SqliteSessionStore(${JSON.stringify(databasePath)},`,
-    '  { masterKey: Buffer.alloc(32, 7) });',
+    '  { masterKey: Buffer.alloc(32, 7), state_root: stateRoot });',
     'store.close();',
   ].join('\n');
   run(process.execPath, ['--input-type=module', '--eval', program], options);
