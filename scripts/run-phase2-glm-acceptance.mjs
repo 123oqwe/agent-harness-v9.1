@@ -15,7 +15,6 @@
 import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
-  readFileSync,
   writeFileSync,
   existsSync,
 } from "node:fs";
@@ -143,10 +142,10 @@ async function callGlm(apiKey, messages, timeoutMs = 120_000) {
     temperature: 1,
     max_tokens: 4096,
   };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new globalThis.AbortController();
+  const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(ENDPOINT, {
+    const response = await globalThis.fetch(ENDPOINT, {
       method: "POST",
       signal: controller.signal,
       headers: {
@@ -161,7 +160,7 @@ async function callGlm(apiKey, messages, timeoutMs = 120_000) {
     }
     return await response.json();
   } finally {
-    clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
 }
 
