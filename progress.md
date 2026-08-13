@@ -329,3 +329,47 @@
 - df9d205d: evidence: update all 40 Phase 1 evidence files
 - 3f04f719: docs: all 15/15 mutation modules PASS
 - 5caa4ef6: test: assert exact SessionStateRootError code+message
+
+## 2026-08-13 12:05 — Critical findings, Phase 2 GLM acceptance, mutation re-run started
+
+### Critical Findings (hallucinations from previous progress.md)
+1. verify:phase1:local was NOT complete (step 7 aggregate never regenerated)
+2. Phase 1 aggregate mutation.json STALE (commit_sha=5edc6497, Aug 8)
+3. test:mutation:check FAILS (needs EXPECTED_SHA + fresh aggregate)
+4. Phase 2 mutation CANNOT run on macOS (bootstrap line 758 throws on darwin)
+5. Phase 2 gate --mode local CANNOT pass on macOS
+6. GLM live test CANNOT run until aggregate regenerated
+7. No Phase 2 GLM scenario acceptance script existed
+8. Control state not updated (protected path)
+
+### Actions Taken
+- HEAD: b493efa6 → 0ce72664 (2 new commits: docs + Phase 2 GLM script)
+- Waivers rebound to 0ce72664 (uncommitted, as intended)
+- Phase 1 mutation re-run STARTED (screen session "mutation", PID 91678)
+  - Running all 15 modules with current HEAD
+  - Currently on gateway chunk 3/43
+  - DO NOT KILL
+  - Log: /tmp/mutation-phase1-rerun.log
+- Phase 2 gate --mode dev: 5/5 PASS (manifest, workspace-boundaries, assets, contract-drift, phase2-unit)
+- Phase 2 GLM-5.2 xhigh scenario acceptance: 6/6 PASS (REAL API, not mock)
+  - long-context: PASS (12260ms, 893 tokens)
+  - RAG: PASS (8425ms, 660 tokens)
+  - multimodal: PASS (17049ms, 1253 tokens)
+  - UX: PASS (13713ms, 784 tokens)
+  - privacy: PASS (9521ms, 896 tokens)
+  - failure-recovery: PASS (16445ms, 1062 tokens)
+  - Evidence: /tmp/phase2-glm-evidence/phase2-glm-5.2-xhigh-acceptance-0ce72664.json
+  - Forbidden secrets check: PASS (no API key leaked)
+- Phase 2 mutation CI triggered (run 31665884387, workflow_dispatch)
+  - Pushed phase2-mutation.yml to main branch (required for workflow_dispatch)
+  - Running on ubuntu-22.04 with Node 20.18.1
+  - URL: https://github.com/123oqwe/agent-harness-v9.1/actions/runs/31665884387
+- Phase 1 CI running (run 31664959972, from push)
+
+### Next Steps
+1. Wait for Phase 1 mutation re-run to complete (5-8h)
+2. Verify 15/15 modules PASS with commit_sha=0ce72664
+3. Run test:mutation:check with EXPECTED_SHA + MUTATION_ARTIFACT_DIGEST
+4. Run GLM 5.2 live test (Phase 1 supplement B5a)
+5. Monitor Phase 2 mutation CI
+6. Final commit and push
