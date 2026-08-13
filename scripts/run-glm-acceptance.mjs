@@ -170,6 +170,10 @@ export function runGlmAcceptance(source = process.env) {
       cwd: isolatedRoot,
       env: nonModelEnvironment,
     });
+    run('npm', ['run', 'build:workspaces', '--silent'], {
+      cwd: isolatedRoot,
+      env: nonModelEnvironment,
+    });
     run('npm', ['run', 'build'], {
       cwd: isolatedRoot,
       env: nonModelEnvironment,
