@@ -1,7 +1,7 @@
 {
   "requirement_id": "AH-GATEWAY-PROVIDER-001",
-  "commit_sha": "bd85e7edc564f4f3e4489bd5b1e5439f433326fe",
-  "tree_sha": "d97cacf00561947a0504093bcf257778c9a8e3c9",
+  "commit_sha": "3f04f719089bdb64b5e3d080a1b8beabc18d9f1d",
+  "tree_sha": "26a8d191009bf337455eb0e70b12b241747efec9",
   "source_files": [
     "gateway/model-gateway.ts"
   ],
