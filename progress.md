@@ -373,3 +373,35 @@
 4. Run GLM 5.2 live test (Phase 1 supplement B5a)
 5. Monitor Phase 2 mutation CI
 6. Final commit and push
+
+## 2026-08-13 12:15 — Lint fix pushed, Phase 2 mutation CI failed twice
+
+### Phase 1 CI
+- Run 31665921777: FAILED (lint errors in run-phase2-glm-acceptance.mjs)
+  - readFileSync unused import, no-undef for AbortController/setTimeout/fetch/clearTimeout
+- Fix committed: f5e1d758 (use globalThis prefix, remove unused import)
+- Run 31666297162: IN PROGRESS (lint fix pushed)
+
+### Phase 2 Mutation CI
+- Run 31665884387: FAILED (25s) - "native fixture requires npm@10.8.2"
+- Run 31666225621: FAILED (26s) - same error
+- Root cause: bootstrap line 283-290 checks npm version in restricted env
+  - realpathSync resolves npm symlink to npm-cli.js
+  - spawnSync with shell:false may fail to execute JS file via shebang
+  - OR: npm install --global with NPM_CONFIG_USERCONFIG=/dev/null installs to wrong prefix
+  - Bootstrap is protected file (in PHASE2_BOOTSTRAP_AUTHORITY_PATHS)
+  - Workflow file is also protected (SHA verified by bootstrap)
+  - CANNOT fix without CTO approval
+
+### Phase 1 Mutation Re-run
+- Still running: gateway chunk 3/43, 61% (101/164 tested, 16 survived)
+- Started at 0ce72664 (will need to checkout this SHA for test:mutation:check)
+- Current HEAD: f5e1d758 (3 commits ahead of mutation SHA)
+- No source code changed between 0ce72664 and f5e1d758 (only docs + script)
+- Estimated completion: ~5h from start (~17:00 Shanghai)
+
+### Commits
+- f5e1d758: fix: resolve lint errors in Phase 2 GLM acceptance script
+- e370a992: docs: update progress.md with critical findings
+- 0ce72664: feat: add Phase 2 GLM-5.2 xhigh scenario acceptance script
+- b493efa6: docs: rewrite task_plan.md and update progress.md with critical findings
