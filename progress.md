@@ -405,3 +405,39 @@
 - e370a992: docs: update progress.md with critical findings
 - 0ce72664: feat: add Phase 2 GLM-5.2 xhigh scenario acceptance script
 - b493efa6: docs: rewrite task_plan.md and update progress.md with critical findings
+
+## 2026-08-13 13:10 — Mutation monitoring, Phase 2 CI blocker analysis
+
+### Phase 1 Mutation Re-run Status
+- Running at commit 0ce72664 (when mutation started)
+- Current HEAD: 9d49f812 (3 commits ahead, no source code changes)
+- Progress: chunk 18/43 of gateway module (first of 15 modules)
+- Started: 11:47AM Shanghai (03:47 UTC)
+- Estimated completion: ~17:00-18:00 Shanghai (5-6h total)
+- Screen session: "mutation" (PID 91678)
+- DO NOT KILL
+- Log: /tmp/mutation-phase1-rerun.log
+
+### Phase 2 Mutation CI Blocker (DETAILED)
+- Failed twice (runs 31665884387, 31666225621)
+- Error: "native fixture requires npm@10.8.2"
+- Root cause: bootstrap verifyNativeCleanInstallFixture() line 290
+  - npmExecutable = realpathSync(join(dirname(process.execPath), "npm"))
+  - Resolves to npm-cli.js symlink target
+  - spawnSync(npmExecutable, ["--version"], {shell: false}) fails
+  - With shell:false, OS tries to execute .js file via shebang
+  - Shebang #!/usr/bin/env node needs node in PATH
+  - PATH includes dirname(process.execPath) which has node
+  - BUT: "Freeze npm" step may have changed npm binary location
+  - OR: spawnSync returns non-zero status (can't execute .js via shebang)
+- Bootstrap is in PHASE2_BOOTSTRAP_AUTHORITY_PATHS (protected)
+- Workflow SHA is verified by bootstrap (can't change workflow)
+- Cannot fix without CTO approval
+
+### Plan After Mutation Completes
+1. git reset --soft 0ce72664 (move HEAD to mutation SHA, keep docs staged)
+2. Rebind waivers to 0ce72664
+3. Run test:mutation:check with EXPECTED_SHA=0ce72664
+4. Run GLM 5.2 live test at 0ce72664
+5. Re-commit docs as new commits
+6. Push to GitHub
