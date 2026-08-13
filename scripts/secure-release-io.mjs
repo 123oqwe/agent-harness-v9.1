@@ -155,7 +155,7 @@ export function secureReleaseIo(request) {
         env: safeEnvironment(testing),
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe', descriptor],
-        maxBuffer: 128 * 1024 * 1024,
+        maxBuffer: 512 * 1024 * 1024,
         timeout: 120_000,
       },
     );
