@@ -99,7 +99,7 @@ export const phase2CommandGraph = (repositoryRoot, mode) => {
       command(
         "phase2-unit",
         process.execPath,
-        [vitest, "run", "tests/phase-2/unit"],
+        [vitest, "run", "tests/phase-2/unit", "--", "--maxWorkers=1"],
         {
           timeoutMs: 600_000,
         },
