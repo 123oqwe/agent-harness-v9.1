@@ -294,8 +294,6 @@ export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
   });
   if (install.error) throw install.error;
   if (install.status !== 0) throw new Error(`native fixture clean install failed: ${install.stderr.trim()}`);
-  const nodeVersion = process.versions.node;
-  const nodeGypHeaderDir = join(home, ".node-gyp", nodeVersion);
   const nodeGypResult = spawnSync(process.execPath, [npmExecutable, "exec", "--yes", "--", "node-gyp", "install"], {
     cwd: builder, encoding: "utf8", env, shell: false, timeout: 120_000, maxBuffer: 64 * 1024 * 1024,
   });
