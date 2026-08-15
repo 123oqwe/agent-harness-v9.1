@@ -16,7 +16,11 @@ function detectOciRuntime(): boolean {
 
 const hasRuntime = detectOciRuntime();
 
-describe('AH-SANDBOX-OCI-001: Rootless OCI sandbox adapter with security hardening', () => {
+// The hasRuntime tests spawn a real OCI runtime via spawnSync (60s budget).
+// The vitest default testTimeout (5s) is tighter than the runtime's own budget,
+// so under CI cold-start/load a runc invocation can exceed 5s and vitest kills
+// the test — the phase2-unit gate flake. Budget the whole file generously.
+describe('AH-SANDBOX-OCI-001: Rootless OCI sandbox adapter with security hardening', { timeout: 90_000 }, () => {
   it('throws ToolUnavailableError with tool_name=oci_sandbox and reason=provider_unavailable when no runtime exists', async () => {
     if (hasRuntime) {
       // Runtime available: function should return a result, not throw
