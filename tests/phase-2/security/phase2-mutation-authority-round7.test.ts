@@ -105,7 +105,7 @@ describe("Phase 2 mutation authority review round 7", () => {
     ];
     const semanticWords = [
       "runs-on: ubuntu-22.04", "contents: read", "id-token: write",
-      "attestations: write", "node-version: 20.18.1", "npm-10.8.2.tgz",
+      "attestations: write", "node-version: 20.19.0", "npm-10.8.2.tgz",
       "x/AIjFIKRllrhcb48dqUNAAZl0ig9+qMuN91RpZo3Cb2+zuibfh+KISl6+kVVyktDz230JKc208UkQwwMqyB+w==",
       "bubblewrap_0.6.1-1ubuntu0.1_amd64.deb",
       "f75c835d6871d1b36370e12ee82940334b2a9f94efc7b959b5b236447e89743d",

@@ -14,7 +14,7 @@
     "dependency_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "authority_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "mutant_completeness_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "toolchain": { "type": "object", "additionalProperties": false, "required": ["node_version", "node_sha256", "npm_version", "npm_sha256", "registry", "bubblewrap_version", "bubblewrap_sha256", "prlimit_sha256"], "properties": { "node_version": { "const": "v20.18.1" }, "node_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "npm_version": { "const": "10.8.2" }, "npm_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "registry": { "const": "https://registry.npmjs.org/" }, "bubblewrap_version": { "const": "bubblewrap 0.6.1" }, "bubblewrap_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "prlimit_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
+    "toolchain": { "type": "object", "additionalProperties": false, "required": ["node_version", "node_sha256", "npm_version", "npm_sha256", "registry", "bubblewrap_version", "bubblewrap_sha256", "prlimit_sha256"], "properties": { "node_version": { "const": "v20.19.0" }, "node_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "npm_version": { "const": "10.8.2" }, "npm_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "registry": { "const": "https://registry.npmjs.org/" }, "bubblewrap_version": { "const": "bubblewrap 0.6.1" }, "bubblewrap_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "prlimit_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
     "isolation_mechanism": { "const": "bubblewrap" }
   }
 }

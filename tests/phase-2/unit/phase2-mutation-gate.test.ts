@@ -504,7 +504,7 @@ describe("Phase 2 mutation report integrity", () => {
         dependency_manifest_sha256: "6".repeat(64),
         authority_closure_sha256: "7".repeat(64),
         toolchain: {
-          node_version: "v20.18.1",
+          node_version: "v20.19.0",
           node_sha256: "8".repeat(64),
           npm_version: "10.8.2",
           npm_sha256: "9".repeat(64),

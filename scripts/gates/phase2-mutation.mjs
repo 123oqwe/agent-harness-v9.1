@@ -195,7 +195,7 @@ export const validatePhase2MutationCandidateSchema = (report) => {
   const receipt = report?.execution_receipt;
   errors.push(...exactFieldErrors(receipt, EXECUTION_RECEIPT_FIELDS, "execution receipt"));
   errors.push(...exactFieldErrors(receipt?.toolchain, TOOLCHAIN_FIELDS, "execution toolchain"));
-  if (receipt?.toolchain?.node_version !== "v20.18.1" || !HASH_64.test(receipt?.toolchain?.node_sha256 ?? "") ||
+  if (receipt?.toolchain?.node_version !== "v20.19.0" || !HASH_64.test(receipt?.toolchain?.node_sha256 ?? "") ||
       receipt?.toolchain?.npm_version !== "10.8.2" || !HASH_64.test(receipt?.toolchain?.npm_sha256 ?? "") ||
       receipt?.toolchain?.registry !== "https://registry.npmjs.org/" ||
       receipt?.toolchain?.bubblewrap_version !== "bubblewrap 0.6.1" ||

@@ -66,7 +66,7 @@ const forgedZeroMutationPublication = () => {
     source_snapshot_sha256: "1".repeat(64), dependency_snapshot_sha256: "5".repeat(64),
     dependency_manifest_sha256: "6".repeat(64), authority_closure_sha256: "7".repeat(64),
     mutant_completeness_sha256: "8".repeat(64),
-    toolchain: { node_version: "v20.18.1", node_sha256: "8".repeat(64), npm_version: "10.8.2",
+    toolchain: { node_version: "v20.19.0", node_sha256: "8".repeat(64), npm_version: "10.8.2",
       npm_sha256: "9".repeat(64), registry: "https://registry.npmjs.org/", bubblewrap_version: "bubblewrap 0.6.1",
       bubblewrap_sha256: "a".repeat(64), prlimit_sha256: "b".repeat(64) },
     isolation_mechanism: "bubblewrap",

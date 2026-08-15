@@ -10,7 +10,7 @@ name: Phase 2 Gate
 # re-runs its 6h suite, this gate runs its 23-command graph and publishes
 # Phase 2 Evidence. Manual dispatch re-runs at an already-green HEAD.
 #
-# The Phase 2 mutation bootstrap is exact-version locked: Node v20.18.1,
+# The Phase 2 mutation bootstrap is exact-version locked: Node v20.19.0,
 # npm@10.8.2, bubblewrap 0.6.1 (pinned deb, sha256-verified), /usr/bin/prlimit.
 # The freeze step below installs that authority, mirrored from
 # phase2-mutation.yml. The gate's own commands need node_modules, so this
@@ -44,7 +44,7 @@ jobs:
           test -x /usr/bin/prlimit
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 20.18.1
+          node-version: 20.19.0
           cache: npm
       - name: Freeze npm and isolation authority
         shell: bash

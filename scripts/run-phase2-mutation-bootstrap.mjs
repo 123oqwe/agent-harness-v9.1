@@ -275,7 +275,7 @@ export const compileDependencyBuilderBubblewrapCommand = ({ builder, argv,
 
 export const verifyNativeCleanInstallFixture = ({ snapshot, parent }) => {
   if (process.platform !== "linux") throw new Error("native clean-install fixture is a Linux release gate");
-  if (process.version !== "v20.18.1") throw new Error(`native fixture requires Node v20.18.1; received ${process.version}`);
+  if (process.version !== "v20.19.0") throw new Error(`native fixture requires Node v20.19.0; received ${process.version}`);
   const bubblewrap = trustedBubblewrap();
   if (bubblewrap === null) throw new Error("native fixture requires trusted bubblewrap");
   const fixture = join(snapshot, "tests/phase-2/fixtures/native-clean-install");
@@ -340,8 +340,8 @@ const installPrivateDependencies = (snapshot, parent) => {
     copyFileSync(join(snapshot, "patches", name), join(builder, "patches", name));
   for (const npmrc of [join(snapshot, ".npmrc"), join(dirname(snapshot), ".npmrc")])
     if (existsSync(npmrc)) throw new Error(`reject project/user .npmrc: ${npmrc}`);
-  if (process.version !== "v20.18.1")
-    throw new Error(`release candidate requires exact Node v20.18.1; received ${process.version}`);
+  if (process.version !== "v20.19.0")
+    throw new Error(`release candidate requires exact Node v20.19.0; received ${process.version}`);
   const npmUserConfig = join(parent, "npm-user.rc");
   const npmGlobalConfig = join(parent, "npm-global.rc");
   copyFileSync("/dev/null", npmUserConfig);
