@@ -1,48 +1,46 @@
-name: Phase 1 Mutation Verify
+name: Phase 1 Mutation Full Run
 
-# Phase 1 mutation verification, DISPATCH-ONLY.
+# Full Phase 1 mutation run on a self-hosted macOS runner.
 #
-# The full ~15h suite runs in phase1-mutation-full.yml on the self-hosted
-# macOS runner (mac-mutation) -- GitHub-hosted jobs are hard-capped at 360min,
-# which the suite exceeds. This workflow is the manual GitHub-hosted fallback;
-# it cannot complete the suite within the 6h cap and should only be dispatched
-# deliberately. Trigger was changed from push to workflow_dispatch so task-4
-# code pushes never auto-fire a multi-hour run.
+# Why not GitHub-hosted: jobs are hard-capped at 360min, but the Phase 1 suite
+# measures ~15h (14 modules ~6.2h sequential + gateway 43 chunks ~8.7h;
+# run-mutation.mjs runs modules/chunks sequentially, Stryker concurrency is
+# capped at 2). A self-hosted runner has no per-job timeout cap, so this
+# workflow runs the whole suite in one job at the exact commit under test.
 #
-# The waiver registry (mutation/equivalent-mutants.json) is a mutation
-# authority file and must stay in git. The check (check-mutation-thresholds.mjs)
-# reads it from the working tree and parseEquivalentMutants requires every
-# waiver's commitSha === current HEAD and configurationHash === the computed
-# configuration hash. No commit can carry waivers bound to its own SHA, so this
-# step rebinds the waivers in the checkout (uncommitted) to $GITHUB_SHA and the
-# hash computed from this checkout BEFORE the mutation run -- run-mutation.mjs
-# permits exactly this one file to be dirty. The rebind changes only the two
-# hash-excluded fields (commitSha, configurationHash), so the mutation
-# configuration itself is untouched.
+# Evidence pipeline (all in this job):
+#   checkout -> npm ci -> build -> REBIND waivers (commitSha=$GITHUB_SHA and the
+#   configuration hash computed from this checkout; run-mutation.mjs permits
+#   exactly this one dirty file) -> full suite -> aggregate -> threshold check
+#   -> upload reports/mutation/ as an artifact. ENOBUFS is fixed upstream by
+#   secure-release-io.mjs maxBuffer=512MiB (232MiB tree ~= 330MiB base64).
+#
+# Trigger: workflow_dispatch only in practice. The push+paths filter fires once
+# when this workflow file itself is committed; code pushes (task 4+) never
+# re-trigger the ~15h suite.
 
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/phase2-integrated]
+    paths:
+      - '.github/workflows/phase1-mutation-full.yml'
 
 permissions:
   contents: read
 
 concurrency:
-  group: phase1-mutation-verify
-  cancel-in-progress: true
+  group: phase1-mutation-full
+  cancel-in-progress: false
 
 jobs:
-  mutation-verify:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 360
+  mutation:
+    runs-on: mac-mutation
+    timeout-minutes: 1200
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Install Linux sandbox authority
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes bubblewrap util-linux
-          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
@@ -75,9 +73,7 @@ jobs:
           NODE
       - name: Run Phase 1 mutation suite
         run: npm run test:mutation:phase1
-        # Leave ~30min of the 360min job budget for aggregate + threshold
-        # verification + artifact upload after the suite finishes.
-        timeout-minutes: 330
+        timeout-minutes: 1080
       - name: Build Phase 1 aggregate report
         run: node scripts/generate-phase1-aggregate.mjs
       - name: Verify Phase 1 mutation thresholds
@@ -85,7 +81,7 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
           MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}
         run: |
-          DIGEST="$(sha256sum reports/mutation/phase1/mutation.json | cut -d' ' -f1)"
+          DIGEST="$(shasum -a 256 reports/mutation/phase1/mutation.json | cut -d' ' -f1)"
           echo "artifact_digest=$DIGEST"
           MUTATION_ARTIFACT_DIGEST="$DIGEST" node scripts/check-mutation-thresholds.mjs phase1
       - name: Upload mutation evidence

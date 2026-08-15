@@ -1,0 +1,111 @@
+name: Phase 2 Gate
+
+# Phase 2 local gate at the exact commit under test. Runs the full
+# verify-phase2-local.mjs --mode local command graph (23 commands incl. the
+# Phase 2 mutation suite) and, on candidateReady, publishes 64 Evidence records
+# to reports/phase2/evidence/<commitSha>-<runId>.
+#
+# Push-triggered (like phase1-mutation-verify.yml): each pushed HEAD to this
+# branch is verified independently and concurrently -- Phase 1 mutation verify
+# re-runs its 6h suite, this gate runs its 23-command graph and publishes
+# Phase 2 Evidence. Manual dispatch re-runs at an already-green HEAD.
+#
+# The Phase 2 mutation bootstrap is exact-version locked: Node v20.18.1,
+# npm@10.8.2, bubblewrap 0.6.1 (pinned deb, sha256-verified), /usr/bin/prlimit.
+# The freeze step below installs that authority, mirrored from
+# phase2-mutation.yml. The gate's own commands need node_modules, so this
+# workflow also runs npm ci (phase2-mutation.yml deliberately does not).
+
+on:
+  push:
+    branches: [codex/phase2-integrated]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase2-gate
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install prlimit authority
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes util-linux
+          test -x /usr/bin/prlimit
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20.18.1
+          cache: npm
+      - name: Freeze npm and isolation authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm_tgz="$RUNNER_TEMP/npm-10.8.2.tgz"
+          npm_user_config="$RUNNER_TEMP/npm-user.rc"
+          npm_global_config="$RUNNER_TEMP/npm-global.rc"
+          : > "$npm_user_config"
+          : > "$npm_global_config"
+          curl --fail --silent --show-error --location \
+            'https://registry.npmjs.org/npm/-/npm-10.8.2.tgz' --output "$npm_tgz"
+          test "$(openssl dgst -sha512 -binary "$npm_tgz" | openssl base64 -A)" = \
+            'x/AIjFIKRllrhcb48dqUNAAZl0ig9+qMuN91RpZo3Cb2+zuibfh+KISl6+kVVyktDz230JKc208UkQwwMqyB+w=='
+          (
+            cd "$RUNNER_TEMP"
+            NPM_CONFIG_USERCONFIG="$npm_user_config" \
+            NPM_CONFIG_GLOBALCONFIG="$npm_global_config" \
+            npm install --global "$npm_tgz" --ignore-scripts --no-audit --no-fund \
+              --registry='https://registry.npmjs.org/'
+          )
+          test "$(npm --version)" = "10.8.2"
+          bubblewrap_deb="$RUNNER_TEMP/bubblewrap_0.6.1-1ubuntu0.1_amd64.deb"
+          curl --fail --silent --show-error --location \
+            'https://security.ubuntu.com/ubuntu/pool/main/b/bubblewrap/bubblewrap_0.6.1-1ubuntu0.1_amd64.deb' \
+            --output "$bubblewrap_deb"
+          echo 'f75c835d6871d1b36370e12ee82940334b2a9f94efc7b959b5b236447e89743d  '"$bubblewrap_deb" | sha256sum --check --strict
+          sudo dpkg --install "$bubblewrap_deb"
+          test "$(dpkg-query -W -f='${Version}' bubblewrap)" = "0.6.1-1ubuntu0.1"
+          test -x /usr/bin/prlimit
+          mkdir -p reports/phase2
+          {
+            echo "node_version=$(node --version)"
+            echo "node_sha256=$(sha256sum "$(command -v node)" | cut -d' ' -f1)"
+            echo "npm_version=$(npm --version)"
+            echo "npm_sha256=$(sha256sum "$(command -v npm)" | cut -d' ' -f1)"
+            echo "bubblewrap_version=$(dpkg-query -W -f='${Version}' bubblewrap)"
+            echo "bubblewrap_sha256=$(sha256sum /usr/bin/bwrap | cut -d' ' -f1)"
+            echo "prlimit_sha256=$(sha256sum /usr/bin/prlimit | cut -d' ' -f1)"
+            echo "registry=https://registry.npmjs.org/"
+          } > reports/phase2/workflow-toolchain.txt
+      - name: Smoke-test bubblewrap isolation
+        run: |
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
+      - run: npm ci
+      # The gate's typecheck/build commands compile root TS that imports
+      # @agent-harness/* workspace packages; their dist/ must exist first.
+      # Prebuild workspaces so the gate graph (which runs build:root before
+      # build:workspaces) resolves them.
+      - name: Build workspace packages
+        run: npm run build:workspaces --silent
+      - name: Run Phase 2 local gate
+        run: node scripts/gates/verify-phase2-local.mjs --mode local
+        # 23 commands; the mutation suite alone is budgeted 60min inside the
+        # script and source-checkout-reproduction another 60min. Leave room for
+        # the gate's own report + evidence publication before the job cap.
+        timeout-minutes: 330
+      - name: Upload Phase 2 gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase2-gate-${{ github.sha }}
+          path: reports/phase2/
+          if-no-files-found: error

@@ -168,3 +168,47 @@ ACCEPTANCE_EVIDENCE_ROOT=/tmp/glm-p1
 ## THRESHOLDS (unchanged)
 85%: gateway, toolsLeaf, skills, strategies, verification, verticals, uiAdapters
 90%: router, toolsRegistry, actionControl, identitySecrets, vfs, sandbox, session, runtime
+
+## 2026-08-15 UPDATE — self-hosted runner decision (user-approved)
+
+### Flake confirmed
+- Rerun of CI run 31855979626 (npm test step): **PASS**. The gate-orchestration
+  test "keeps the complete gate and helper authority independent of PATH git"
+  failure in the original run was a **flake** (cross-process interference when
+  the gate spawns nested vitest under the parent npm test). ci.yml is green;
+  no ci.yml change needed.
+
+### ENOBUFS is a code bug, not a macOS limit (user correction)
+- secure-release-io.mjs maxBuffer is a Node.js spawnSync cap (128MiB), not an
+  OS limit. 232MiB reports/mutation tree -> ~330MiB base64 payload -> overflow
+  on ANY OS, Linux CI included. check-mutation-thresholds reads the full tree
+  via secureArtifactEntries, so it also ENOBUFS without the fix.
+- Current state: **maxBuffer = 512MiB already applied** at
+  scripts/secure-release-io.mjs:162 (CTO decision B commit 0a218893). The
+  historical 3301f909->0a859cc8 revert is superseded; configHash change
+  (568923d1 -> 3209e503) is expected and accepted.
+
+### Phase 1 suite is too big for GitHub-hosted jobs (verified)
+- Modules run sequentially (Stryker concurrency 2): 14 non-gateway modules
+  6.2h + gateway 43 chunks ~8.7h => ~15h full suite.
+- GitHub-hosted jobs hard-cap at 360min (verified: higher timeout ignored).
+- Multi-job GitHub-hosted split would need a run_id injection edit to
+  run-mutation.mjs (authority file) -> configHash change again -> rejected.
+
+### New execution path
+- `.github/workflows/phase1-mutation-full.yml` (NEW): self-hosted runner
+  (mac-mutation), one job runs the whole ~15h suite + rebind + aggregate +
+  threshold check + artifact upload. Triggers: workflow_dispatch + push with
+  paths filter on the workflow file itself (fires once on this commit, never
+  again on code pushes).
+- `.github/workflows/phase1-mutation-verify.yml`: trigger changed to
+  workflow_dispatch ONLY (was push). Manual GitHub-hosted fallback; cannot
+  complete the suite within 6h, kept only for deliberate dispatch.
+- Self-hosted runner REGISTERED: ~/actions-runner, name mac-phase1-runner,
+  labels [self-hosted, macOS, ARM64, mac-mutation], running under
+  `caffeinate -i` (nohup, PID recorded). Started 2026-08-15 02:02Z, online.
+
+### This push (HEAD 0a218893 -> phase1-mutation-full.yml added)
+- Fires in parallel: phase1-mutation-full (self-hosted, ~15h) +
+  phase2-gate (GitHub-hosted, ~3h, push-triggered, cancel-in-progress).
+- phase2-gate.yml keeps push trigger (it is the 3h gate; phase2 suite fits 6h).
