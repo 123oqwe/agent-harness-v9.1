@@ -36,6 +36,31 @@
 - [ ] Phase 2 evidence: 0/64 (requires gate --mode local pass)
 - [ ] Control state update: needs CTO approval (protected path)
 
+## TASK 1 RESOLUTION (2026-08-15, CTO decision: 改 authority + 全量重跑)
+
+- configHash: `568923d1` -> `3209e5035c37422ddff6a21dabb5ae8bf525600d4b9a9c45d3edf9ba4c43b46d` (NEW)
+- Authority edits (2, both in mutationAuthorityFiles):
+  - `scripts/secure-release-io.mjs:158` maxBuffer `128MiB` -> `512MiB`. ENOBUFS is a
+    Node-side code cap (OS-independent); the 232MiB tree reads as ~330MiB base64 JSON.
+  - `scripts/check-mutation-thresholds.mjs:682-689` waivers read from the working tree
+    (fs), not a git blob. A git blob can never satisfy parseEquivalentMutants's
+    commitSha===current binding (self-referential); the CI rebind makes it satisfiable.
+    The binding itself is unchanged.
+- New `.github/workflows/phase1-mutation-verify.yml` (push on codex/phase2-integrated +
+  workflow_dispatch): checkout -> npm ci -> build -> REBIND waivers (commitSha=$GITHUB_SHA,
+  configHash=3209e503) -> test:mutation:phase1 (350min) -> generate-phase1-aggregate ->
+  sha256sum digest -> check-mutation-thresholds phase1 (EXPECTED_SHA=$GITHUB_SHA) ->
+  upload reports/mutation. Rebind keeps the two hash-excluded fields only.
+- Smoke test (pre-commit, local): read_tree of 232MiB tree OK (no ENOBUFS), fs waiver read
+  OK, fails only at "waiver 0 not bound to the current commit" (committed waivers bind
+  a982e5fc) -- the exact point the CI rebind fixes. Pipeline is now satisfiable.
+- FROZEN evidence now HISTORICAL (accepted): e783bc62 run, digest f1ef8b80, GLM acceptance
+  mutation_configuration_hash=568923d1. New self-consistent evidence comes from the CI run.
+- Local consequence: after this commit, local reports (configHash 568923d1) are stale; a
+  local `npm run test:mutation:phase1` refuses until waivers are rebound to the new HEAD
+  (run-mutation requires commitSha/configHash match). CI does the rebind; local runs need
+  the same step.
+
 ## BLOCKERS (honest record, root causes verified)
 
 ### BLOCKER 1: ENOBUFS — test:mutation:check AND test:glm:live

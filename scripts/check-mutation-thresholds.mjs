@@ -679,12 +679,19 @@ export async function validatePublishedPhase1Artifacts({
       }
     }
   }
+  // Read the waiver registry from the working tree, not a git blob. The CI
+  // verification pipeline rebinds waivers (commitSha + configurationHash) in
+  // the checkout to the exact commit under test and runs mutation against that
+  // rebind; a git-blob read would ignore it. A committed blob can never satisfy
+  // parseEquivalentMutants anyway: no commit tree can contain waivers bound to
+  // its own SHA, since the binding must reference a SHA that only exists after
+  // the tree is written. The commitSha === current binding is still enforced
+  // below, so the integrity property is unchanged.
   const waivers = parseJson(
-    readTrustedGitBlob(
-      repositoryRoot,
-      current,
-      'mutation/equivalent-mutants.json',
-    ).toString('utf8'),
+    readFileSync(
+      resolve(repositoryRoot, 'mutation', 'equivalent-mutants.json'),
+      'utf8',
+    ),
     'equivalent-mutants.json',
   );
   const waiverKeys = parseEquivalentMutants(

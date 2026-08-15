@@ -155,7 +155,11 @@ export function secureReleaseIo(request) {
         env: safeEnvironment(testing),
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe', descriptor],
-        maxBuffer: 128 * 1024 * 1024,
+        // 512 MiB: read_tree returns the whole reports/mutation tree (all 15
+        // modules + every chunk) as one base64 JSON payload (~330 MiB for the
+        // measured 232 MiB tree). 128 MiB overflowed on any OS; this is a
+        // Node-side buffer cap, not a platform-dependent limit.
+        maxBuffer: 512 * 1024 * 1024,
         timeout: 120_000,
       },
     );

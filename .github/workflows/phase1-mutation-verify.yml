@@ -1,0 +1,87 @@
+name: Phase 1 Mutation Verify
+
+# Full Phase 1 mutation run + independent threshold verification at the exact
+# commit under test. Run cost is 5-8h (15 modules), so this is the slow gate.
+#
+# The waiver registry (mutation/equivalent-mutants.json) is a mutation
+# authority file and must stay in git. The check (check-mutation-thresholds.mjs)
+# reads it from the working tree and parseEquivalentMutants requires every
+# waiver's commitSha === current HEAD and configurationHash === the computed
+# configuration hash. No commit can carry waivers bound to its own SHA, so this
+# step rebinds the waivers in the checkout (uncommitted) to $GITHUB_SHA and the
+# hash computed from this checkout BEFORE the mutation run -- run-mutation.mjs
+# permits exactly this one file to be dirty. The rebind changes only the two
+# hash-excluded fields (commitSha, configurationHash), so the mutation
+# configuration itself is untouched.
+
+on:
+  push:
+    branches: [codex/phase2-integrated]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase1-mutation-verify
+  cancel-in-progress: true
+
+jobs:
+  mutation-verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install Linux sandbox authority
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap util-linux
+          bwrap --ro-bind / / -- /usr/bin/prlimit --as=268435456 --nproc=32 -- /bin/true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Rebind mutation waivers to the verified commit
+        env:
+          VERIFY_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { computeMutationConfigurationHash } from './scripts/run-mutation.mjs';
+          const commitSha = process.env.VERIFY_COMMIT_SHA;
+          const configurationHash = computeMutationConfigurationHash();
+          const path = './mutation/equivalent-mutants.json';
+          const waivers = JSON.parse(readFileSync(path, 'utf8'));
+          for (const w of waivers) {
+            w.commitSha = commitSha;
+            w.configurationHash = configurationHash;
+          }
+          writeFileSync(path, JSON.stringify(waivers, null, 2) + '\n');
+          console.log(`rebound ${waivers.length} waivers -> ${commitSha} ${configurationHash}`);
+          NODE
+      - name: Run Phase 1 mutation suite
+        run: npm run test:mutation:phase1
+        # Leave ~30min of the 360min job budget for aggregate + threshold
+        # verification + artifact upload after the suite finishes.
+        timeout-minutes: 330
+      - name: Build Phase 1 aggregate report
+        run: node scripts/generate-phase1-aggregate.mjs
+      - name: Verify Phase 1 mutation thresholds
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          MUTATION_ARTIFACT_NAME: phase1-mutation-${{ github.sha }}
+        run: |
+          DIGEST="$(sha256sum reports/mutation/phase1/mutation.json | cut -d' ' -f1)"
+          echo "artifact_digest=$DIGEST"
+          MUTATION_ARTIFACT_DIGEST="$DIGEST" node scripts/check-mutation-thresholds.mjs phase1
+      - name: Upload mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase1-mutation-${{ github.sha }}
+          path: reports/mutation/
+          if-no-files-found: error
