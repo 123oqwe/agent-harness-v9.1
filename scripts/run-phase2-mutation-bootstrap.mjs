@@ -61,14 +61,14 @@ export const PHASE2_BOOTSTRAP_AUTHORITY_PATHS = Object.freeze([
 ]);
 const AUTHORITY_PATHS = PHASE2_BOOTSTRAP_AUTHORITY_PATHS;
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-const WORKFLOW_RAW_SHA256 = "d14a9c95ec953a0c4ff9855224fd24284e6106b4481dd825b21ac79af458a354";
+const WORKFLOW_RAW_SHA256 = "366b15f0cd02a6e738706d4bf6854f27779f4919f212963dd57c9d1af8cd99ec";
 
 export const validateCommittedWorkflowContract = (snapshot) => {
   const contract = JSON.parse(readFileSync(join(snapshot, "verification/gates/phase2-mutation-workflow-contract.json"), "utf8"));
   if (canonicalJson(contract) !== canonicalJson({
     schema_version: "phase2-mutation-workflow-contract/v1",
     workflow_path: ".github/workflows/phase2-mutation.yml",
-    workflow_ast_sha256: "c76971d2ab2ef7ced7c47c4bcb95a938b978935cc02458720cbdda9729a4a09c",
+    workflow_ast_sha256: "d753753c1ad57b8a6cb22dc79a8c50d8e8d6aa1a253c66454718096cfc45dd65",
     authority_scope: "candidate_only",
     formal_evidence_eligible: false,
     formal_authority_status: "external_required_unprovisioned",
