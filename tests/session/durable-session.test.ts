@@ -179,6 +179,21 @@ describe('DurableSession', () => {
     expect(() => DurableSession.import_(exported as any)).toThrow(SessionError);
   });
 
+  it('import_ rejects a fractional snapshot last_seq with a clean SessionError, not a TypeError', () => {
+    // Defensive `?.` on the snapshot hash lookup must turn a malformed
+    // (non-integer) last_seq into a SessionError. Without it, the direct
+    // index read throws TypeError instead of a typed error.
+    const s1 = new DurableSession('s1');
+    s1.acquireWriter();
+    s1.append('user', { content: 'test' });
+    const bad = {
+      session_id: 's1',
+      events: s1.getEvents(),
+      snapshot: { session_id: 's1', version: 1, last_seq: 0.5, last_hash: 'corrupt' },
+    };
+    expect(() => DurableSession.import_(bad as any)).toThrow(SessionError);
+  });
+
   it('restore is alias for import_', () => {
     const s1 = new DurableSession('s1');
     s1.acquireWriter();
