@@ -398,7 +398,12 @@ export function buildMutationChunkConfig(moduleName, chunk, runId) {
     // (durable-session.sqlite/encryption spawn work), so it gets the same
     // single-worker, 60s-per-mutant budget. Verified at concurrency=1: chunk
     // durable-session.ts:151-300 completes in 9m31s with 130/130 tested.
-    ...(moduleName === 'sandbox' || moduleName === 'session' ? { concurrency: 1, timeoutMS: 60_000 } : {}),
+    // gateway: model-gateway spawns long-lived model subprocesses; verified
+    // clean at concurrency=1 (164 mutants, 0 FATAL/EPERM, 23 timed out which
+    // score as killed) vs repeated chunk FATAL at concurrency=2.
+    ...(moduleName === 'sandbox' || moduleName === 'session' || moduleName === 'gateway'
+      ? { concurrency: 1, timeoutMS: 60_000 }
+      : {}),
     thresholds: {
       high: module.minimum,
       low: Math.max(0, module.minimum - 5),
