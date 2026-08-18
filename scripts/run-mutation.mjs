@@ -392,7 +392,13 @@ export function buildMutationChunkConfig(moduleName, chunk, runId) {
     tempDirName: `.stryker-tmp/${runId}/${moduleName}/${chunk.chunk_id}`,
     jsonReporter: { fileName: `${chunkRoot}/mutation.json` },
     htmlReporter: { fileName: `${chunkRoot}/mutation.html` },
-    ...(moduleName === 'sandbox' ? { concurrency: 1, timeoutMS: 60_000 } : {}),
+    // sandbox precedent: heavy subprocess-backed tests time out under the
+    // mutation runner's concurrency=2 (killed worker leaves a subprocess tree
+    // holding the report pipe -> chunk FATAL). session has the same profile
+    // (durable-session.sqlite/encryption spawn work), so it gets the same
+    // single-worker, 60s-per-mutant budget. Verified at concurrency=1: chunk
+    // durable-session.ts:151-300 completes in 9m31s with 130/130 tested.
+    ...(moduleName === 'sandbox' || moduleName === 'session' ? { concurrency: 1, timeoutMS: 60_000 } : {}),
     thresholds: {
       high: module.minimum,
       low: Math.max(0, module.minimum - 5),
