@@ -5,7 +5,6 @@ import { ToolUnavailableError } from '../../tools/media-errors.js';
 import { createPhase3ToolHandlers } from '../../tools/phase3-tool-handlers.js';
 import { PHASE3_TOOL_NAMES } from '../../tools/phase3-tool-definitions.js';
 import type { VideoGenerationAdapter } from '../../tools/generate-video.js';
-import type { MusicGenerationAdapter } from '../../tools/generate-music.js';
 import type { BrowserSessionAdapter, BrowserSession } from '../../tools/browser-operate.js';
 import type { ComputerControllerAdapter, ComputerController } from '../../tools/computer-operate.js';
 import type { ToolExecutorDeps } from '../../tools/tool-executor.js';

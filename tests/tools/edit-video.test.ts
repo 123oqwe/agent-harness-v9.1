@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import { StoreBackend, VirtualFilesystem } from '../../vfs/virtual-filesystem.js';
-import { MediaToolError, ToolUnavailableError } from '../../tools/media-errors.js';
+import { ToolUnavailableError } from '../../tools/media-errors.js';
 import {
   createEditVideo,
   DEFAULT_EDIT_STDERR_MAX_CHARS,

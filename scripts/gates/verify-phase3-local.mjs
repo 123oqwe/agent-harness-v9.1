@@ -164,14 +164,16 @@ export const verifyPhase3 = (mode = "dev") => {
       return { status: "PASS", detail: "tsc --noEmit exit 0" };
     });
 
-    // ---- lint (phase-3 surface: sources, evals, gate scripts, tests) --------
+    // ---- lint: canonical target (like phase-2's npm run lint) + phase-3 surface
     record("lint", () => {
-      const target = [
-        "router", "runtime", "security", "tools",
-        "evals/routing/eval.ts",
-        "tests/router", "tests/tools", "tests/security", "tests/runtime",
-        "scripts/gates",
-      ].join(" ");
+      const testTarget = new Set();
+      for (const req of requirements) {
+        for (const f of req.test_files ?? []) testTarget.add(f);
+      }
+      const canonical =
+        "gateway security runtime router sandbox session skills tools ui verification vfs " +
+        "domains ingestion harness.ts index.ts scripts benchmarks packages apps tests/phase-2/architecture";
+      const target = `${canonical} evals/routing/eval.ts ${[...testTarget].join(" ")}`;
       const result = runCommand(
         `${join(repoRoot, "node_modules/.bin/eslint")} ${target} --quiet`,
         { timeout: 300_000 },

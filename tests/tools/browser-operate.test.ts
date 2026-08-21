@@ -29,14 +29,6 @@ interface FakeSessionCalls {
 }
 
 function fakeSession(overrides: Partial<BrowserSession> = {}): BrowserSession & FakeSessionCalls {
-  const calls: FakeSessionCalls = {
-    navigated: [],
-    clicked: [],
-    filled: [],
-    extracted: [],
-    screenshots: 0,
-    closed: false,
-  };
   const session: BrowserSession & FakeSessionCalls = {
     origin: ALLOWED,
     navigated: [] as string[],
