@@ -39,7 +39,7 @@ import type { SandboxProfile } from './sandbox/process-sandbox.js';
 import { ActionExecutor, OutputFormatValidator } from './security/action-executor.js';
 import type { RagIndexStore } from '@agent-harness/rag';
 import type { DefaultDocumentIngestor } from '@agent-harness/documents';
-import { ToolDispatcher } from './tools/tool-dispatcher.js';
+import { ToolDispatcher, type ToolImplementation } from './tools/tool-dispatcher.js';
 import { LocalToolHost } from './tools/local-tool-host.js';
 import type { AuthorizationService } from './security/authorization-service.js';
 import type { CapabilityStateStore } from './security/capability.js';
@@ -274,6 +274,10 @@ export interface HarnessConfig {
   onToolOutput?: (toolCallId: string, stepId: string, stream: 'stdout' | 'stderr', chunk: string) => void;
   /** EventBus for pub/sub of agent activity events (tool calls, model calls, turns). */
   eventBus?: EventBus;
+  /** Phase 3: full ToolImplementations dispatched through the tool host
+   * (media / browser / computer tools). Receives ToolExecutorDeps, so
+   * credentials from the secrets broker flow into the handlers. */
+  extraToolHandlers?: Readonly<Record<string, ToolImplementation>>;
 }
 
 export class Harness {
@@ -341,7 +345,9 @@ export class Harness {
     this.localToolHost = new LocalToolHost(() => ({
       transaction: this.currentWorkspace!.transaction,
       sandbox: this.currentWorkspace!.sandbox,
-    }));
+    }), config.extraToolHandlers !== undefined
+      ? { extraHandlers: config.extraToolHandlers }
+      : {});
     // Phase 2: wire runtime-core packages into the composition root.
     this.sessionTreeAuthority = config.sessionTreeAuthority;
     this.steeringController = config.steeringController;

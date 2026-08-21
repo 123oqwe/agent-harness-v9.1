@@ -11,6 +11,8 @@ import { LocalBackend } from '../vfs/virtual-filesystem.js';
 import type { SandboxProfile } from '../sandbox/process-sandbox.js';
 import { createDefaultExecutionContext } from '../runtime/harness-support.js';
 import { createPhase1ToolDefinitions } from '../tools/tool-definitions.js';
+import { createPhase3ToolDefinitions, PHASE3_TOOL_NAMES } from '../tools/phase3-tool-definitions.js';
+import { createPhase3ToolHandlers } from '../tools/phase3-tool-handlers.js';
 import { generateKeyPairSync } from 'node:crypto';
 import { AuthorizationService } from '../security/authorization-service.js';
 import { InMemoryCapabilityStateStore } from '../security/capability.js';
@@ -82,6 +84,13 @@ const ALLOWED_TOOLS = [
   'read_file', 'write_file', 'edit_file', 'execute_command',
   'list_directory', 'search_files', 'create_artifact', 'parse_document',
   'apply_patch', 'undo', 'web_fetch', 'web_search', 'screenshot',
+  // Phase 3 media/browser/computer tools (AH-TOOL-VIDEO-GEN-001,
+  // AH-TOOL-MUSIC-GEN-001, AH-TOOL-VIDEO-EDIT-001, AH-TOOL-BROWSER-001,
+  // AH-TOOL-COMPUTER-001). Registered, policy-gated and dispatchable; handlers
+  // that need external infrastructure (provider/browser/platform adapter)
+  // fail closed with a clean ToolUnavailableError until an adapter is injected
+  // via createPhase3ToolHandlers.
+  ...PHASE3_TOOL_NAMES,
 ];
 
 export function createManagedGateway(): ManagedGateway {
@@ -147,6 +156,9 @@ export function createHarnessForTask(
 ): Harness {
   const toolRegistry = new ToolRegistry();
   for (const spec of createPhase1ToolDefinitions()) {
+    if (ALLOWED_TOOLS.includes(spec.name)) toolRegistry.register(spec);
+  }
+  for (const spec of createPhase3ToolDefinitions()) {
     if (ALLOWED_TOOLS.includes(spec.name)) toolRegistry.register(spec);
   }
 
@@ -260,6 +272,17 @@ export function createHarnessForTask(
     contextCompactor,
     // N32: ModelFallbackController for provider fallback
     modelFallback,
+    // Phase 3: dispatch the media/browser/computer tools. No external
+    // adapters are wired by default — video_edit runs sandboxed; the other
+    // four fail closed with ToolUnavailableError until an adapter (provider
+    // HTTP / CDP session / platform controller) is injected here.
+    // Security note: ALLOWED_TOOLS consent auto-approval (createSecurityDeps)
+    // now covers video_gen/music_gen too. That is safe only while no
+    // credential broker is wired — video_gen derives T3 (session_confirm
+    // + preview) and must NOT be auto-approved once a broker + provider
+    // adapter make a real paid API call possible. Wire a ConsentService
+    // handler and drop those tools from autoApprove at that point.
+    extraToolHandlers: createPhase3ToolHandlers(),
   };
 
   return new Harness(config);

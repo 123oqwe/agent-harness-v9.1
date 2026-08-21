@@ -279,7 +279,7 @@ export class StaticRouter {
    * Skill required_tools are capability prerequisites, not a command to invoke
    * every tool. This selects the concrete, ordered action nodes for this task.
    */
-  private workflowTools(
+  workflowTools(
     task: TaskContract,
     intent: IntentProfile,
     strategy: ReasoningStrategy,
@@ -339,7 +339,7 @@ export class StaticRouter {
     return [];
   }
 
-  private policyPostRouteViolation(task: TaskContract, provider: ResolvedProviderDescription): string | undefined {
+  policyPostRouteViolation(task: TaskContract, provider: ResolvedProviderDescription): string | undefined {
     const localOnly = task.constraints.some(
       (constraint) => constraint.type === 'privacy' && constraint.value === 'local_only',
     );
@@ -349,7 +349,7 @@ export class StaticRouter {
     return undefined;
   }
 
-  private skillFor(intent: IntentProfile): string | undefined {
+  skillFor(intent: IntentProfile): string | undefined {
     const goal = intent.goal.toLowerCase();
     if (intent.domains.includes('coding') && /\b(bug|fix|patch)\b|缺陷|修复|漏洞/u.test(goal)) return 'bug-fix';
     if (
@@ -365,7 +365,7 @@ export class StaticRouter {
     return undefined;
   }
 
-  private providerSelection(
+  providerSelection(
     task: TaskContract,
     strategy: ReasoningStrategy,
     requiredTools: readonly string[],

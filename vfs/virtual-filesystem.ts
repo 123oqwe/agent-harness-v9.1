@@ -299,6 +299,10 @@ export class VirtualFilesystem {
   edit(path: string, data: Buffer | string): void { this.write(path, data); this.log[this.log.length - 1]!.operation = 'edit'; }
   delete(path: string): void { this.checkPermission(path, true); const b = this.route(path); b.delete(path); this.record({ path, backend: b.kind, operation: 'delete', timestamp: now() }); }
   exists(path: string): boolean { try { this.checkPermission(path, false); return this.route(path).exists(path); } catch { return false; } }
+  /** True if the path is mounted AND the permission rules allow writing to it. */
+  canWrite(path: string): boolean {
+    try { this.checkPermission(path, true); this.route(path); return true; } catch { return false; }
+  }
   search(root: string, needle: string): VfsEntry[] {
     const lower = needle.toLowerCase();
     const matches: VfsEntry[] = [];

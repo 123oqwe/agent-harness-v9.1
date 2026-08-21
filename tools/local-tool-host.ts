@@ -28,18 +28,24 @@ interface LocalToolHostDependencies {
     profile: SandboxProfile,
     input: ExecCommandInput,
   ) => Promise<ExecCommandOutput>;
+  /** Phase 3 tools: full ToolImplementations dispatched outside the switch.
+   * Each receives ToolExecutorDeps (vfs, credentials, sandbox), so media/
+   * browser/computer handlers get the secrets-broker credentials they need. */
+  extraHandlers?: Readonly<Record<string, ToolImplementation>>;
 }
 
 export class LocalToolHost {
   private readonly commandRunner: NonNullable<
     LocalToolHostDependencies['executeCommand']
   >;
+  private readonly extraHandlers: Readonly<Record<string, ToolImplementation>>;
 
   constructor(
     private readonly workspace: () => LocalToolWorkspace,
     dependencies: LocalToolHostDependencies = {},
   ) {
     this.commandRunner = dependencies.executeCommand ?? executeCommand;
+    this.extraHandlers = dependencies.extraHandlers ?? {};
   }
 
   implementations(toolNames: readonly string[]): ReadonlyMap<
@@ -49,12 +55,13 @@ export class LocalToolHost {
     return new Map(
       toolNames.map((toolName) => [
         toolName,
-        async (dependencies, input) =>
-          this.execute(
-            toolName,
-            input as Record<string, unknown>,
-            dependencies.vfs,
-          ),
+        this.extraHandlers[toolName] ??
+          (async (dependencies, input) =>
+            this.execute(
+              toolName,
+              input as Record<string, unknown>,
+              dependencies.vfs,
+            )),
       ]),
     );
   }

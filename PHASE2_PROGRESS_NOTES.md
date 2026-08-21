@@ -640,3 +640,59 @@ STILL REMAINING — DO NOT SKIP THESE:
 ### DO NOT RUN verify:phase1:local UNTIL P6, P8, P9 ARE DONE
 4 modules still FAIL: gateway 55.23%, runtime 65.57%, session 84.14%, toolsRegistry 86.16%
 After P6/P8/P9: commit everything, run `node scripts/run-mutation.mjs phase1`, then verify
+
+## Task #7: Phase 1 re-run — session/gateway mutation diagnosis (2026-08-15 .. 08-19)
+
+### session module FATAL root cause + fix (commit 5f3d795b)
+- Symptom: session chunk at concurrency=2 → "Stryker kill EPERM ... no report is accepted",
+  chunk FATAL, exit=1 (night run 08-15).
+- Mechanism: `scripts/run-process-tree.mjs` signalProcessGroup uses `process.kill(-pid, sig)`;
+  under heavy system load (user python ~95% CPU, load1 11-15) the kill can race into EPERM,
+  which throws → the Stryker kill-phase aborts the whole chunk.
+- Proof: concurrency=1 diagnostic for session ran 9m31s, 130 mutants, 97.69% — clean.
+- Precedent: `sandbox` module already had `{ concurrency: 1, timeoutMS: 60_000 }` in
+  buildMutationChunkConfig (run-mutation.mjs line 401). session was missing it.
+- Fix: add session to the same single-worker/60s budget. Verified by killing test run.
+
+### gateway module hypothesis (diagnostic in progress)
+- 08-15T02 gateway chunk "Stryker kill EPERM for gateway/gateway-capability-registry-ts-1-150", score 0 FAIL.
+- Same family as sandbox/session: heavy subprocess tests + concurrency=2 + load → EPERM.
+- Diagnostic `/tmp/gateway-cr1-150-c1w.json` (concurrency=1, timeoutMS=60s) started 08-19.
+- IF clean completion (no FATAL) → add `|| moduleName === 'gateway'` to line 401.
+
+### re-run choreography (decided, not yet executed)
+- Per-module loops are abandoned: check-mutation-thresholds requires ONE runRoot for all 15
+  modules (same run_id, chunks under runs/<run_id>/<module>/chunks, exactSet of chunk files).
+- Use built-in `node scripts/run-mutation.mjs phase1`; wipe reports/mutation/runs/* +
+  per-module result.json/mutation.json + phase1/ first; rebind waivers to new SHA after.
+
+## Task #7 re-run executed (2026-08-19)
+
+- Gateway diagnostic at concurrency=1 + 60s: 164 mutants, 0 FATAL/EPERM, 23 timed out
+  (score as killed), 86.6% — clean. Confirmed gateway needs the same single-worker
+  treatment as sandbox/session.
+- Committed fix(scripts/run-mutation.mjs) `f924d261` — gateway joins the single-worker
+  60s-per-mutant budget. Pushed.
+- Dispatched phase1-mutation-full on codex/phase2-integrated: run 32199097147 @ f924d26,
+  picked up by mac-phase1-runner, in_progress (watch b0jlsut37). Waivers auto-rebind in
+  the workflow (VERIFY_COMMIT_SHA + computeMutationConfigurationHash).
+
+## WP-2: 5 routing extension requirements implemented (2026-08-19)
+
+- router/dag-failure.ts + tests (11 tests): 11 failure types, critical-path abort,
+  non-critical no-cascade, BLOCKED(not FAILED) + dependency_failed, classifyFailure /
+  decidePropagation / FailureClassification / PropagationDecision / CriticalityLevel.
+- router/fallback.ts + tests (12 tests): 11 fallback types, retryable classification,
+  buildFallbackChain excludes primary + policyOk re-validation, decideNext retry-cap,
+  evaluateCascade durable pause + user notification.
+- router/budget-dynamic.ts + tests (9 tests): allocateBudget from parent remaining,
+  proportional scale-down no overshoot, requestReallocation approval/denial events,
+  trySpend stops subagent on exhaustion.
+- router/context-topology.ts + tests (13 tests): 7 topologies, shared-only crossing,
+  vfsReadAllowlist VFS enforcement layer, verifyIsolation property test (secret in A
+  invisible to B).
+- router/skill-chain.ts + tests (9 tests): backward-chained feeds, MCP discovery no
+  endpoint leak, capability token per skill, partial results preserved + failure logged.
+- Verification: tsc -b exit 0, eslint clean, vitest tests/router 375/375 (321 WP-1 + 54 WP-2).
+- All 5 modules stay UNCOMMITTED (re-run SHA f924d26 clean; none are in any mutation
+  module mutate list). Will commit as WP-2 after re-run green, same as WP-1.

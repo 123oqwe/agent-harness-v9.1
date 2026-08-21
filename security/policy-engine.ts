@@ -502,7 +502,7 @@ export function isHostAllowed(host: string, policy: EgressPolicy | NormalizedEgr
   return normalized.domain_rules.some((rule) => rule.action === 'allow' && hostMatches(host, rule.host));
 }
 
-function isPrivateOrLocalAddress(address: string): boolean {
+export function isPrivateOrLocalAddress(address: string): boolean {
   const normalized = normalizeHost(address, false).toLowerCase();
   const version = isIP(normalized);
   if (version === 4) {
