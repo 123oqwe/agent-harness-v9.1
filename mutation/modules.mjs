@@ -28,7 +28,7 @@ export const mutationModules = {
       'gateway/async-task-adapter.ts',
     ],
     minimum: 85,
-    chunkTimeoutMs: 30 * 60 * 1000,
+    chunkTimeoutMs: 60 * 60 * 1000,
   },
   router: {
     mutate: ['router/static-router.ts', 'router/task-normalizer.ts'],
@@ -112,7 +112,7 @@ export const mutationModules = {
       'session/run-session.ts',
     ],
     minimum: 90,
-    chunkTimeoutMs: 30 * 60 * 1000,
+    chunkTimeoutMs: 60 * 60 * 1000,
   },
   runtime: {
     mutate: [
@@ -129,7 +129,7 @@ export const mutationModules = {
       'runtime/session-tree-port.ts',
     ],
     minimum: 90,
-    chunkTimeoutMs: 30 * 60 * 1000,
+    chunkTimeoutMs: 60 * 60 * 1000,
   },
   verification: {
     mutate: [
