@@ -1,0 +1,6830 @@
+{
+  "schema": "routing-dataset/v1",
+  "generator": "scripts/generate-routing-dataset.mjs",
+  "task_count": 206,
+  "route_vocabulary": {
+    "static_dag/single": "execution_mode=static_dag, 1 agent",
+    "routing_slip/single": "execution_mode=routing_slip, 1 agent",
+    "workflow_script/multi": "execution_mode=workflow_script, >=2 agents"
+  },
+  "hard_constraint_tokens": [
+    "single_agent",
+    "multi_agent",
+    "execution_static_dag",
+    "execution_routing_slip",
+    "execution_workflow_script",
+    "no_routing_slip",
+    "no_workflow_script",
+    "budget_usd_micros_le_1000000"
+  ],
+  "tasks": [
+    {
+      "id": "routing-0001",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that parses the CSV export and returns a list of records",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0002",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a function that validates an email address and returns a boolean",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0003",
+      "category": "simple_single_agent_code",
+      "goal": "Write a utility that sorts the orders array by total descending",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0004",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a rolling-average calculator for the time series data",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0005",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that deduplicates the user list by id",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0006",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a retry wrapper for the fetch call with exponential backoff",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0007",
+      "category": "simple_single_agent_code",
+      "goal": "Write a helper that formats a duration in milliseconds as HH:MM:SS",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0008",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a debounce function with a configurable wait window",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0009",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that converts snake_case keys to camelCase",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0010",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a deep-merge for two plain objects",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0011",
+      "category": "simple_single_agent_code",
+      "goal": "Write a memoized selector for the state store",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0012",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a rate limiter that enforces a max calls per second",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0013",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that normalizes phone numbers to E.164",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0014",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a slug generator from an arbitrary title string",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0015",
+      "category": "simple_single_agent_code",
+      "goal": "Write a CSV row parser that handles quoted fields",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0016",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a binary search over a sorted number array",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0017",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes the edit distance between two strings",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0018",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a chunk function that splits an array into fixed-size groups",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0019",
+      "category": "simple_single_agent_code",
+      "goal": "Write a validator that checks a password against strength rules",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0020",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a URL query-string parser returning a plain object",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0021",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that flattens a nested object into dot paths",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0022",
+      "category": "simple_single_agent_code",
+      "goal": "Implement an LRU cache with a capacity limit",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0023",
+      "category": "simple_single_agent_code",
+      "goal": "Write a shuffle function that returns a deterministic permutation",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0024",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a JSON-safe clone that drops cyclic references",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0025",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that resolves relative import paths",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0026",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a tokenizer for a simple arithmetic grammar",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0027",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes a rolling window median",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0028",
+      "category": "simple_single_agent_code",
+      "goal": "Implement an event emitter with once semantics",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0029",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that merges two sorted linked lists",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0030",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a priority queue backed by a binary heap",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0031",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that extracts the top-N keywords from text",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0032",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a min-max normalizer for a numeric array",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0033",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that validates an IBAN string",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0034",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a state machine transition validator",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0035",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes the Levenshtein distance",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0036",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a rate-window counter using a ring buffer",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0037",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that interpolates missing values in a series",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0038",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a set-difference helper for two keyed collections",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0039",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that parses an ISO-8601 duration string",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0040",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a graph adjacency builder from an edge list",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0041",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes connected components of a graph",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0042",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a topological sort for a dependency map",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0043",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that batches an async workload with a concurrency cap",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0044",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a semaphore with acquire and release",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0045",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that detects a cycle in a singly linked list",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0046",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a trie with insert, search, and prefix-match",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0047",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes a 64-bit FNV-1a hash",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0048",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a token-bucket rate limiter",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0049",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that validates a credit-card number via Luhn",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0050",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a diff function over two string arrays",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0051",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that resolves a promise with a timeout",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0052",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a pub-sub bus with topic filtering",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0053",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that computes the longest common subsequence",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0054",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a circular queue with fixed capacity",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0055",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that sanitizes HTML input by stripping tags",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0056",
+      "category": "simple_single_agent_code",
+      "goal": "Implement an incrementing id generator with reset support",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0057",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that converts a number to a compact unit string",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0058",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a group-by helper that buckets by a key function",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0059",
+      "category": "simple_single_agent_code",
+      "goal": "Write a function that validates a JWT structure without verification",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0060",
+      "category": "simple_single_agent_code",
+      "goal": "Implement a coalescing cache that fetches on first miss",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0061",
+      "category": "simple_single_agent_read",
+      "goal": "Read src/utils.ts and summarize the exported helpers",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0062",
+      "category": "simple_single_agent_read",
+      "goal": "Search the repository for all callers of the deprecated API",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0063",
+      "category": "simple_single_agent_read",
+      "goal": "Read the deployment logs and identify the failing service",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0064",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the profiling output and list the top five hotspots",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0065",
+      "category": "simple_single_agent_read",
+      "goal": "Read data/orders.csv and count the orders per region",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0066",
+      "category": "simple_single_agent_read",
+      "goal": "Search the codebase for every TODO and group them by module",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0067",
+      "category": "simple_single_agent_read",
+      "goal": "Read the error log and extract the unique stack traces",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0068",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the test coverage report and list uncovered branches",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0069",
+      "category": "simple_single_agent_read",
+      "goal": "Read the release notes and summarize the breaking changes",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0070",
+      "category": "simple_single_agent_read",
+      "goal": "Search for all usage of the shared cache and report call sites",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0071",
+      "category": "simple_single_agent_read",
+      "goal": "Read the schema file and list tables that lack an index",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0072",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the API response and extract the pagination metadata",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0073",
+      "category": "simple_single_agent_read",
+      "goal": "Read the configuration file and summarize the feature flags",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0074",
+      "category": "simple_single_agent_read",
+      "goal": "Search the monorepo for duplicate package names",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0075",
+      "category": "simple_single_agent_read",
+      "goal": "Read the migration script and list the tables it alters",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0076",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the bundle report and rank the largest dependencies",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0077",
+      "category": "simple_single_agent_read",
+      "goal": "Read the incident timeline and summarize the root cause",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0078",
+      "category": "simple_single_agent_read",
+      "goal": "Search the docs for outdated references to the old API",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0079",
+      "category": "simple_single_agent_read",
+      "goal": "Read the trace file and identify the slowest span",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0080",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the query plan and flag any sequential scans",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0081",
+      "category": "simple_single_agent_read",
+      "goal": "Read the checklist and list the incomplete items",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0082",
+      "category": "simple_single_agent_read",
+      "goal": "Search the issue tracker export for unassigned P0 bugs",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0083",
+      "category": "simple_single_agent_read",
+      "goal": "Read the changelog and extract the security fixes",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0084",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the socket trace and list connections that leaked",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0085",
+      "category": "simple_single_agent_read",
+      "goal": "Read the generated types and report the unused exports",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0086",
+      "category": "simple_single_agent_read",
+      "goal": "Search the test files for assertions that are never run",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0087",
+      "category": "simple_single_agent_read",
+      "goal": "Read the pricing table and compute the median plan cost",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0088",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the metrics file and flag values outside the threshold",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0089",
+      "category": "simple_single_agent_read",
+      "goal": "Read the auth policy and summarize the required scopes",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0090",
+      "category": "simple_single_agent_read",
+      "goal": "Search the service directory for hard-coded credentials",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0091",
+      "category": "simple_single_agent_read",
+      "goal": "Read the audit log and count the failed login attempts",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0092",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the latency histogram and report the p99",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0093",
+      "category": "simple_single_agent_read",
+      "goal": "Read the dependency manifest and list vulnerable versions",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0094",
+      "category": "simple_single_agent_read",
+      "goal": "Search the templates for unescaped interpolations",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0095",
+      "category": "simple_single_agent_read",
+      "goal": "Read the inventory file and compute the total stock value",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0096",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the event stream and group records by source",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0097",
+      "category": "simple_single_agent_read",
+      "goal": "Read the build log and extract the first failing step",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0098",
+      "category": "simple_single_agent_read",
+      "goal": "Search the scripts directory for shell-glob footguns",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0099",
+      "category": "simple_single_agent_read",
+      "goal": "Read the database dump and count orphaned rows",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0100",
+      "category": "simple_single_agent_read",
+      "goal": "Analyze the access log and list the top client IPs",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0101",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the README introduction more concisely",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0102",
+      "category": "single_agent_writing",
+      "goal": "Draft a release announcement for the new API version",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0103",
+      "category": "single_agent_writing",
+      "goal": "Polish the onboarding email so it is shorter",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0104",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the error messages in the config validator",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0105",
+      "category": "single_agent_writing",
+      "goal": "Draft a changelog entry for the bugfix release",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0106",
+      "category": "single_agent_writing",
+      "goal": "Copyedit the technical design doc for clarity",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0107",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the CLI help text so flags are easier to scan",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0108",
+      "category": "single_agent_writing",
+      "goal": "Draft a support response template for billing issues",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0109",
+      "category": "single_agent_writing",
+      "goal": "Polish the migration guide into plain language",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0110",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the function docstrings to a single-line style",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0111",
+      "category": "single_agent_writing",
+      "goal": "Draft a quarterly summary of the product roadmap",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0112",
+      "category": "single_agent_writing",
+      "goal": "Copyedit the incident postmortem for public release",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0113",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the landing-page hero copy to be more direct",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0114",
+      "category": "single_agent_writing",
+      "goal": "Draft a deprecation notice for the legacy endpoint",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0115",
+      "category": "single_agent_writing",
+      "goal": "Polish the security policy into a one-page summary",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0116",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the test names to describe behavior",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0117",
+      "category": "single_agent_writing",
+      "goal": "Draft an internal memo about the ownership transfer",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0118",
+      "category": "single_agent_writing",
+      "goal": "Copyedit the architecture overview and tighten the prose",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0119",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the alert messages so they state the next action",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0120",
+      "category": "single_agent_writing",
+      "goal": "Draft a reply to a customer asking about data retention",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0121",
+      "category": "single_agent_writing",
+      "goal": "Polish the contribution guide and shorten it",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0122",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the status page descriptions for accuracy",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0123",
+      "category": "single_agent_writing",
+      "goal": "Draft a decision record for the cache choice",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0124",
+      "category": "single_agent_writing",
+      "goal": "Copyedit the release checklist into a sequence",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0125",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the operator manual introduction",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0126",
+      "category": "single_agent_writing",
+      "goal": "Draft a training blurb for the new dashboard",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0127",
+      "category": "single_agent_writing",
+      "goal": "Polish the API reference preface for a broader audience",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0128",
+      "category": "single_agent_writing",
+      "goal": "Rewrite the feature flags page and cut the jargon",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0129",
+      "category": "single_agent_writing",
+      "goal": "Draft a thank-you note for the beta testers",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0130",
+      "category": "single_agent_writing",
+      "goal": "Copyedit the outage summary into five sentences",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "budget",
+          "value": "250000"
+        }
+      ],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "budget_usd_micros_le_1000000"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0131",
+      "category": "open_ended_research",
+      "goal": "Research the competitive landscape and explore pricing strategies",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0132",
+      "category": "open_ended_research",
+      "goal": "Explore the codebase to discover all configuration entry points",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0133",
+      "category": "open_ended_research",
+      "goal": "Research vector databases and explore their trade-offs for our stack",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0134",
+      "category": "open_ended_research",
+      "goal": "Investigate open problems in the queueing layer and explore options",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0135",
+      "category": "open_ended_research",
+      "goal": "Research LLM evaluation methods and explore which fit our use case",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0136",
+      "category": "open_ended_research",
+      "goal": "Explore the incident archive and discover recurring failure patterns",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0137",
+      "category": "open_ended_research",
+      "goal": "Research idempotency patterns and explore their failure modes",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0138",
+      "category": "open_ended_research",
+      "goal": "Explore the telemetry schemas and discover the least-documented fields",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0139",
+      "category": "open_ended_research",
+      "goal": "Research on-call rotation models and explore the options for a small team",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0140",
+      "category": "open_ended_research",
+      "goal": "Explore the migration history and discover why the schema drifted",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0141",
+      "category": "open_ended_research",
+      "goal": "Research offline-first sync strategies and explore the alternatives",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0142",
+      "category": "open_ended_research",
+      "goal": "Explore the dependency graph and discover unused transitive packages",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0143",
+      "category": "open_ended_research",
+      "goal": "Research feature-flag rollout strategies and explore the trade-offs",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0144",
+      "category": "open_ended_research",
+      "goal": "Explore the error taxonomy and discover the unhandled categories",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0145",
+      "category": "open_ended_research",
+      "goal": "Research cost-optimization levers for the GPU pool and explore each",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0146",
+      "category": "open_ended_research",
+      "goal": "Explore the search index and discover which fields are never queried",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0147",
+      "category": "open_ended_research",
+      "goal": "Research session-replay tools and explore the privacy constraints",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0148",
+      "category": "open_ended_research",
+      "goal": "Explore the backup inventory and discover coverage gaps",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0149",
+      "category": "open_ended_research",
+      "goal": "Research monotonic-clock portability and explore the pitfalls",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0150",
+      "category": "open_ended_research",
+      "goal": "Explore the auth flows and discover the least-tested path",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0151",
+      "category": "open_ended_research",
+      "goal": "Research license compatibility and explore the constraint surface",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0152",
+      "category": "open_ended_research",
+      "goal": "Explore the dashboard queries and discover the heaviest ones",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0153",
+      "category": "open_ended_research",
+      "goal": "Research cache-invalidation strategies and explore the edge cases",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0154",
+      "category": "open_ended_research",
+      "goal": "Explore the audit schema and discover the missing dimensions",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0155",
+      "category": "open_ended_research",
+      "goal": "Research graceful-shutdown patterns and explore the ordering rules",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0156",
+      "category": "open_ended_research",
+      "goal": "Explore the CLI surface and discover the undocumented flags",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0157",
+      "category": "open_ended_research",
+      "goal": "Research streaming replication and explore the failure windows",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0158",
+      "category": "open_ended_research",
+      "goal": "Explore the config matrix and discover the invalid combinations",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0159",
+      "category": "open_ended_research",
+      "goal": "Research secret-rotation schedules and explore the blast radii",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0160",
+      "category": "open_ended_research",
+      "goal": "Explore the access-control model and discover the over-permissive roles",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script",
+        "execution_routing_slip"
+      ],
+      "preferred_order": [
+        "routing_slip/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0161",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out to run the regression suite across all 14 browser profiles in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0162",
+      "category": "multi_agent_fanout",
+      "goal": "Spin up multiple agents to migrate each of the 18 modules concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0163",
+      "category": "multi_agent_fanout",
+      "goal": "Run the price audit across all 24 regions in parallel and aggregate the results",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0164",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out a security review over every package in the monorepo in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0165",
+      "category": "multi_agent_fanout",
+      "goal": "Dispatch multiple agents to translate the docs into 16 languages concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0166",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out to benchmark each of the 20 query patterns in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0167",
+      "category": "multi_agent_fanout",
+      "goal": "Run the contract tests against all 12 provider stubs concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0168",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out a performance profile across the 30 endpoints in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0169",
+      "category": "multi_agent_fanout",
+      "goal": "Dispatch agents to update each of the 15 config files concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0170",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out the data-quality checks across all 22 shards in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0171",
+      "category": "multi_agent_fanout",
+      "goal": "Run the accessibility audit over all 26 pages concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0172",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out to regenerate the fixtures for the 18 services in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0173",
+      "category": "multi_agent_fanout",
+      "goal": "Dispatch multiple agents to review the 40 pull-request diffs concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0174",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out the license scan across all 28 vendored modules in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0175",
+      "category": "multi_agent_fanout",
+      "goal": "Run the schema drift check against all 16 databases concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0176",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out a dependency audit over the 32 leaf packages in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0177",
+      "category": "multi_agent_fanout",
+      "goal": "Dispatch agents to backfill the 19 time partitions concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0178",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out the alert triage across all 25 monitor groups in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0179",
+      "category": "multi_agent_fanout",
+      "goal": "Run the golden-file comparison over the 21 snapshot suites concurrently",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0180",
+      "category": "multi_agent_fanout",
+      "goal": "Fan out to extract metrics from each of the 17 log streams in parallel",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0181",
+      "category": "large_scope_workflow",
+      "goal": "Process the annual dataset and produce the full report",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0182",
+      "category": "large_scope_workflow",
+      "goal": "Run the end-to-end certification pass and collect results",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0183",
+      "category": "large_scope_workflow",
+      "goal": "Execute the complete migration rehearsal and summarize outcomes",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0184",
+      "category": "large_scope_workflow",
+      "goal": "Produce the quarterly compliance review across all controls",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0185",
+      "category": "large_scope_workflow",
+      "goal": "Run the full performance baseline and aggregate the metrics",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0186",
+      "category": "large_scope_workflow",
+      "goal": "Complete the platform-wide load test and assemble the findings",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 13 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0187",
+      "category": "large_scope_workflow",
+      "goal": "Run the multi-environment deploy rehearsal and log every step",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 13 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0188",
+      "category": "large_scope_workflow",
+      "goal": "Produce the capacity plan for the next growth cycle",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 13 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0189",
+      "category": "large_scope_workflow",
+      "goal": "Execute the full schema rebuild and verify each table",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 13 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0190",
+      "category": "large_scope_workflow",
+      "goal": "Run the complete trace analysis and summarize the bottlenecks",
+      "success_criteria": [
+        {
+          "criterion": "criterion 1 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 2 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 3 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 4 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 5 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 6 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 7 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 8 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 9 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 10 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 11 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 12 completed",
+          "verification_method": "deterministic"
+        },
+        {
+          "criterion": "criterion 13 completed",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "workflow_script/multi"
+      ],
+      "forbidden_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "hard_constraints": [
+        "multi_agent",
+        "execution_workflow_script"
+      ],
+      "preferred_order": [
+        "workflow_script/multi"
+      ],
+      "single_agent_sufficient": false
+    },
+    {
+      "id": "routing-0191",
+      "category": "prohibition_single_agent",
+      "goal": "Do not use multiple agents or parallel execution. Refactor the auth module to use dependency injection",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0192",
+      "category": "prohibition_single_agent",
+      "goal": "Never fan out this work. Fix the retry bug in the worker pool",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0193",
+      "category": "prohibition_single_agent",
+      "goal": "Do not spin up multiple agents. Optimize the hot loop in the indexer",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0194",
+      "category": "prohibition_single_agent",
+      "goal": "Never use parallel execution for this. Patch the quota check in the gateway",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0195",
+      "category": "prohibition_single_agent",
+      "goal": "Do not use multiple agents. Port the config loader to the new format",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0196",
+      "category": "prohibition_single_agent",
+      "goal": "Never fan out this small change. Add the missing null guard in the parser",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0197",
+      "category": "prohibition_single_agent",
+      "goal": "Do not dispatch agents for this. Update the cache eviction policy",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0198",
+      "category": "prohibition_single_agent",
+      "goal": "Never parallelize this. Correct the timestamp handling in the logger",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0199",
+      "category": "prohibition_single_agent",
+      "goal": "Do not use multiple agents. Replace the deprecated date calls in the scheduler",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0200",
+      "category": "prohibition_single_agent",
+      "goal": "Never fan out. Fix the ordering bug in the merge step",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "static_dag/single",
+        "routing_slip/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0201",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate the root cause of the login timeout and propose a fix",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0202",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate why the nightly job overshoots its budget and propose a remedy",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0203",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate the source of the stray nulls in the import pipeline and propose a patch",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0204",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate the dropped websocket frames and propose a corrective change",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0205",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate the configuration drift and propose a re-application plan",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    },
+    {
+      "id": "routing-0206",
+      "category": "regret_allowed_suboptimal",
+      "goal": "Investigate the throttling in the rate limiter and propose a calibration",
+      "success_criteria": [
+        {
+          "criterion": "completed without error",
+          "verification_method": "deterministic"
+        }
+      ],
+      "constraints": [],
+      "allowed_routes": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "forbidden_routes": [
+        "workflow_script/multi"
+      ],
+      "hard_constraints": [
+        "single_agent",
+        "no_workflow_script"
+      ],
+      "preferred_order": [
+        "routing_slip/single",
+        "static_dag/single"
+      ],
+      "single_agent_sufficient": true
+    }
+  ]
+}

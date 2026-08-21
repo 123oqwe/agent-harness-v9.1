@@ -1,0 +1,26 @@
+{
+  "schema_version": "phase3-evidence/v1",
+  "requirement_id": "AH-AGENT-AUTHORING-001",
+  "phase": 3,
+  "gate_runner": "phase3-gate-report/v1",
+  "commit_sha": "f924d261157d871844d9b57f188d6928d3d296a3",
+  "status": "verified",
+  "test_suites": [
+    "tests/tools/agent-authoring.test.ts"
+  ],
+  "checks": [
+    {
+      "check": "manifest",
+      "status": "PASS"
+    },
+    {
+      "check": "workspace-boundaries",
+      "status": "PASS"
+    },
+    {
+      "check": "unit-tests",
+      "status": "PASS"
+    }
+  ],
+  "produced_at": "2026-08-21T22:03:20.915Z"
+}

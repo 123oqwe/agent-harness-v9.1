@@ -1,0 +1,474 @@
+{
+  "schema_version": "1.0.0",
+  "phase": 3,
+  "baseline": {
+    "repository": "https://github.com/123oqwe/agent-harness-v9.1.git",
+    "sha": "f924d261157d871844d9b57f188d6928d3d296a3"
+  },
+  "evidence_root": "artifacts/phase-3",
+  "spec_authority": "https://github.com/123oqwe/agent-harness-v9.1/blob/main/spec/phases/phase-3.yaml",
+  "phase3_prerequisites": [
+    "AH-CONTRACT-RUNPLAN-001",
+    "AH-CONTRACT-TOOLSPEC-001",
+    "AH-CAPABILITY-001",
+    "AH-POLICY-ENGINE-001",
+    "AH-SANDBOX-001",
+    "AH-SANDBOX-OCI-001",
+    "AH-TOOL-REGISTRY-001",
+    "AH-RUNTIME-STEERING-001"
+  ],
+  "requirements": [
+    {
+      "id": "AH-AGENT-AUTHORING-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-MULTIAGENT-DAG-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/agent-authoring.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-AGENT-AUTHORING-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/agent-authoring.ts"
+      ],
+      "test_files": [
+        "tests/tools/agent-authoring.test.ts"
+      ],
+      "owned_sources": [
+        "tools/agent-authoring.ts"
+      ],
+      "integration_sources": [
+        "router/multiagent-dag.ts"
+      ]
+    },
+    {
+      "id": "AH-MULTIAGENT-DAG-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "routing",
+      "test_suites": [
+        "tests/router/multiagent-dag.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-MULTIAGENT-DAG-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/multiagent-dag.ts"
+      ],
+      "test_files": [
+        "tests/router/multiagent-dag.test.ts"
+      ],
+      "owned_sources": [
+        "router/multiagent-dag.ts"
+      ],
+      "integration_sources": [
+        "router/pipeline.ts"
+      ]
+    },
+    {
+      "id": "AH-MULTIAGENT-MERGE-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "runtime",
+      "test_suites": [
+        "tests/runtime/merge-conflict.test.ts",
+        "tests/runtime/stale-base.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-MULTIAGENT-MERGE-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "runtime/merge-conflict.ts"
+      ],
+      "test_files": [
+        "tests/runtime/merge-conflict.test.ts",
+        "tests/runtime/stale-base.test.ts"
+      ],
+      "owned_sources": [
+        "runtime/merge-conflict.ts"
+      ],
+      "integration_sources": [
+        "security/subagent.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-BUDGET-DYNAMIC-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "routing",
+      "test_suites": [
+        "tests/router/budget-dynamic.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-BUDGET-DYNAMIC-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/budget-dynamic.ts"
+      ],
+      "test_files": [
+        "tests/router/budget-dynamic.test.ts"
+      ],
+      "owned_sources": [
+        "router/budget-dynamic.ts"
+      ],
+      "integration_sources": [
+        "router/pipeline.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-CONTEXT-TOPOLOGY-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "routing",
+      "test_suites": [
+        "tests/router/context-topology.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-CONTEXT-TOPOLOGY-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/context-topology.ts"
+      ],
+      "test_files": [
+        "tests/router/context-topology.test.ts"
+      ],
+      "owned_sources": [
+        "router/context-topology.ts"
+      ],
+      "integration_sources": [
+        "vfs/virtual-filesystem.ts",
+        "router/pipeline.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-DAG-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CONTRACT-RUNPLAN-001",
+        "AH-POLICY-ENGINE-001"
+      ],
+      "owner": "router",
+      "test_suites": [
+        "tests/router/dag-pipeline.test.ts",
+        "tests/router/no-parallel.test.ts",
+        "tests/router/policy-isolation.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-DAG-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [
+        "evals/routing/dataset.json"
+      ],
+      "source_files": [
+        "router/pipeline.ts"
+      ],
+      "test_files": [
+        "tests/router/dag-pipeline.test.ts",
+        "tests/router/no-parallel.test.ts",
+        "tests/router/policy-isolation.test.ts"
+      ],
+      "owned_sources": [
+        "router/pipeline.ts"
+      ],
+      "integration_sources": [
+        "router/static-router.ts",
+        "security/policy-engine.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-DAG-FAILURE-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "runtime",
+      "test_suites": [
+        "tests/router/dag-failure.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-DAG-FAILURE-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/dag-failure.ts"
+      ],
+      "test_files": [
+        "tests/router/dag-failure.test.ts"
+      ],
+      "owned_sources": [
+        "router/dag-failure.ts"
+      ],
+      "integration_sources": [
+        "router/multiagent-dag.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-EVAL-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "router",
+      "test_suites": [
+        "tests/router/eval.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-EVAL-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [
+        "evals/routing/dataset.json"
+      ],
+      "source_files": [
+        "evals/routing/dataset.json",
+        "evals/routing/eval.ts"
+      ],
+      "test_files": [
+        "tests/router/eval.test.ts"
+      ],
+      "owned_sources": [
+        "evals/routing/eval.ts"
+      ],
+      "integration_sources": [
+        "router/pipeline.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-FALLBACK-11-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "runtime",
+      "test_suites": [
+        "tests/router/fallback-11.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-FALLBACK-11-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/fallback.ts"
+      ],
+      "test_files": [
+        "tests/router/fallback-11.test.ts"
+      ],
+      "owned_sources": [
+        "router/fallback.ts"
+      ],
+      "integration_sources": [
+        "router/dag-failure.ts"
+      ]
+    },
+    {
+      "id": "AH-ROUTER-SKILL-CHAIN-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "routing",
+      "test_suites": [
+        "tests/router/skill-chain.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-ROUTER-SKILL-CHAIN-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "router/skill-chain.ts"
+      ],
+      "test_files": [
+        "tests/router/skill-chain.test.ts"
+      ],
+      "owned_sources": [
+        "router/skill-chain.ts"
+      ],
+      "integration_sources": [
+        "skills/skill-registry.ts",
+        "router/pipeline.ts"
+      ]
+    },
+    {
+      "id": "AH-SUBAGENT-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-CAPABILITY-001",
+        "AH-ROUTER-DAG-001"
+      ],
+      "owner": "security",
+      "test_suites": [
+        "tests/security/subagent-capability.test.ts",
+        "tests/security/parent-cannot-sign.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-SUBAGENT-001.json",
+      "mutation_class": "critical",
+      "eval_suites": [],
+      "source_files": [
+        "security/subagent.ts"
+      ],
+      "test_files": [
+        "tests/security/subagent-capability.test.ts",
+        "tests/security/parent-cannot-sign.test.ts"
+      ],
+      "owned_sources": [
+        "security/subagent.ts"
+      ],
+      "integration_sources": [
+        "security/capability.ts",
+        "router/multiagent-dag.ts"
+      ]
+    },
+    {
+      "id": "AH-TOOL-BROWSER-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-TOOL-REGISTRY-001",
+        "AH-SANDBOX-OCI-001",
+        "AH-RUNTIME-STEERING-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/browser-operate.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-TOOL-BROWSER-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/browser-operate.ts"
+      ],
+      "test_files": [
+        "tests/tools/browser-operate.test.ts"
+      ],
+      "owned_sources": [
+        "tools/browser-operate.ts"
+      ],
+      "integration_sources": [
+        "tools/phase3-tool-definitions.ts",
+        "tools/phase3-tool-handlers.ts"
+      ]
+    },
+    {
+      "id": "AH-TOOL-COMPUTER-001",
+      "priority": "P0",
+      "dependencies": [
+        "AH-TOOL-REGISTRY-001",
+        "AH-SANDBOX-OCI-001",
+        "AH-RUNTIME-STEERING-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/computer-operate.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-TOOL-COMPUTER-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/computer-operate.ts"
+      ],
+      "test_files": [
+        "tests/tools/computer-operate.test.ts"
+      ],
+      "owned_sources": [
+        "tools/computer-operate.ts"
+      ],
+      "integration_sources": [
+        "tools/phase3-tool-definitions.ts",
+        "tools/phase3-tool-handlers.ts"
+      ]
+    },
+    {
+      "id": "AH-TOOL-MUSIC-GEN-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/generate-music.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-TOOL-MUSIC-GEN-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/generate-music.ts"
+      ],
+      "test_files": [
+        "tests/tools/generate-music.test.ts"
+      ],
+      "owned_sources": [
+        "tools/generate-music.ts"
+      ],
+      "integration_sources": [
+        "tools/phase3-tool-definitions.ts",
+        "tools/phase3-tool-handlers.ts"
+      ]
+    },
+    {
+      "id": "AH-TOOL-VIDEO-EDIT-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-SANDBOX-001",
+        "AH-TOOL-VIDEO-GEN-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/edit-video.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-TOOL-VIDEO-EDIT-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/edit-video.ts"
+      ],
+      "test_files": [
+        "tests/tools/edit-video.test.ts"
+      ],
+      "owned_sources": [
+        "tools/edit-video.ts"
+      ],
+      "integration_sources": [
+        "tools/generate-video.ts",
+        "tools/phase3-tool-definitions.ts",
+        "tools/phase3-tool-handlers.ts"
+      ]
+    },
+    {
+      "id": "AH-TOOL-VIDEO-GEN-001",
+      "priority": "P1",
+      "dependencies": [
+        "AH-CONTRACT-TOOLSPEC-001",
+        "AH-POLICY-ENGINE-001"
+      ],
+      "owner": "tools",
+      "test_suites": [
+        "tests/tools/generate-video.test.ts",
+        "tests/tools/phase3-tool-handlers.test.ts"
+      ],
+      "evidence_path": "artifacts/phase-3/AH-TOOL-VIDEO-GEN-001.json",
+      "mutation_class": "core",
+      "eval_suites": [],
+      "source_files": [
+        "tools/generate-video.ts"
+      ],
+      "test_files": [
+        "tests/tools/generate-video.test.ts",
+        "tests/tools/phase3-tool-handlers.test.ts"
+      ],
+      "owned_sources": [
+        "tools/generate-video.ts"
+      ],
+      "integration_sources": [
+        "tools/phase3-tool-definitions.ts",
+        "tools/phase3-tool-handlers.ts",
+        "tools/local-tool-host.ts"
+      ]
+    }
+  ]
+}
