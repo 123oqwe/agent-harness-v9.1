@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["audio_path","duration_seconds","provider"],"properties":{"audio_path":{"type":"string"},"duration_seconds":{"type":"number","minimum":0},"provider":{"type":"string"}},"additionalProperties":false}

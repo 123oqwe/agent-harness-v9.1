@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["prompt"],"properties":{"prompt":{"type":"string","minLength":1},"duration":{"type":"integer","minimum":1},"genre":{"type":"string"},"tempo":{"type":"string"}},"additionalProperties":false}
