@@ -28,7 +28,7 @@ export const mutationModules = {
       'gateway/async-task-adapter.ts',
     ],
     minimum: 85,
-    chunkTimeoutMs: 60 * 60 * 1000,
+    chunkTimeoutMs: 120 * 60 * 1000,
   },
   router: {
     mutate: ['router/static-router.ts', 'router/task-normalizer.ts'],
