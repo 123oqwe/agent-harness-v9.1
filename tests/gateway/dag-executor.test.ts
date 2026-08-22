@@ -160,3 +160,37 @@ describe('DagExecutor', () => {
     expect(result.total_tokens).toBeGreaterThan(0);
   });
 });
+
+  it('passes empty context when all dependencies fail', async () => {
+    const calls: string[] = [];
+    const gw = {
+      complete: async (prompt: string, opts: any) => {
+        calls.push(prompt);
+        if (opts.stepId === 'fail-a' || opts.stepId === 'fail-b') throw new Error('model error');
+        return {
+          response: 'ok-response',
+          usage: { success: true, cost_usd: 0.01, prompt_tokens: 100, completion_tokens: 50, latency_ms: 100 },
+          model_used: 'm', provider_used: 'p', fallback_triggered: false,
+        };
+      },
+    } as unknown as ManagedGateway;
+    const executor = new DagExecutor(gw);
+    const dag: DagDefinition = {
+      nodes: [
+        { step_id: 'fail-a', node_type: 'reasoning', tier: 'work', required_capabilities: ['code'], prompt: 'fail a', depends_on: [] },
+        { step_id: 'fail-b', node_type: 'reasoning', tier: 'work', required_capabilities: ['code'], prompt: 'fail b', depends_on: [] },
+        { step_id: 'dep-node', node_type: 'writing', tier: 'work', required_capabilities: ['code'], prompt: 'dependent task', depends_on: ['fail-a', 'fail-b'] },
+      ],
+      edges: [
+        { from: 'fail-a', to: 'dep-node' },
+        { from: 'fail-b', to: 'dep-node' },
+      ],
+    };
+    const result = await executor.execute(dag, { userId: 'u1', taskId: 't1' });
+    // dep-node should be skipped because all dependencies failed
+    const depResult = result.results.find(r => r.step_id === 'dep-node');
+    expect(depResult).toBeDefined();
+    expect(depResult!.success).toBe(false);
+  });
+
+
