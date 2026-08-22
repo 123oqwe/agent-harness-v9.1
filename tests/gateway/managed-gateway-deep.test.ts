@@ -170,8 +170,10 @@ describe('ManagedGateway.complete() deep tests', () => {
       userId: 'u1', taskId: 'task1', stepId: 's1', tier: 'work',
     });
     expect(result.usage.success).toBe(true);
-    expect(result.usage.cost_usd).toBeGreaterThan(0);
-    expect(result.usage.cost_usd).toBeLessThan(1);
+    // zhipu glm-5.2: price_input=0.5, price_output=1.5
+    // mock response: prompt_tokens=10, completion_tokens=20 (mapped to input_tokens=10, output_tokens=20)
+    // cost = 10/1_000_000 * 0.5 + 20/1_000_000 * 1.5 = 0.000035
+    expect(result.usage.cost_usd).toBeCloseTo(0.000035, 10);
   });
 
   it('returns fallback_triggered=false on single provider success', async () => {

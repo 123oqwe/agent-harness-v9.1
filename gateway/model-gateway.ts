@@ -339,13 +339,15 @@ function uniqueStrings(value: unknown, location: string, allowEmpty: boolean): s
   return normalized.sort(binaryCompare);
 }
 
-function deepFreeze<T>(value: T): T {
+function deepFreeze<T>(value: T, depth = 0): T {
+  if (depth > 100) throw new RangeError('deepFreeze: nesting too deep (possible circular reference)');
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;
-  for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested, depth + 1);
   return Object.freeze(value);
 }
 
-function canonicalJson(value: unknown): string {
+function canonicalJson(value: unknown, depth = 0): string {
+  if (depth > 100) throw new ProviderConfigurationError('hash input nesting too deep (possible circular reference)');
   if (value === null || typeof value === 'boolean' || typeof value === 'string') {
     return JSON.stringify(value);
   }
@@ -353,12 +355,12 @@ function canonicalJson(value: unknown): string {
     if (!Number.isFinite(value)) throw new ProviderConfigurationError('hash input must be JSON');
     return JSON.stringify(value);
   }
-  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry, depth + 1)).join(',')}]`;
   if (isPlainRecord(value)) {
     return `{${Object.entries(value)
       .filter(([, entry]) => entry !== undefined)
       .sort(([left], [right]) => binaryCompare(left, right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry, depth + 1)}`)
       .join(',')}}`;
   }
   throw new ProviderConfigurationError('hash input must be plain JSON data');
