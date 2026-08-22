@@ -461,3 +461,67 @@ describe('seedanceParseTaskStatus edge cases', () => {
     expect(() => config.parseTaskId({ id: 123 })).toThrow(/no task_id/);
   });
 });
+
+describe('seedanceSubmitBody extractPrompt and body construction', () => {
+  function makeRequest(messages: Array<{ role: string; content: string }>) {
+    return { messages } as any;
+  }
+
+  function getConfig() {
+    const keyVault = new KeyVault();
+    keyVault.addKey('seedance', 'test-key');
+    return getSeedanceTaskConfig(makeBinding());
+  }
+
+  it('extracts first user message as prompt', () => {
+    const config = getConfig();
+    const body = config.buildSubmitBody(makeBinding(), makeRequest([
+      { role: 'system', content: 'system instructions' },
+      { role: 'user', content: 'generate a video of a sunset' },
+      { role: 'assistant', content: 'previous response' },
+      { role: 'user', content: 'second user message' },
+    ]));
+    expect(body.model).toBe('seedance-1-0-pro');
+    expect(body.content).toEqual([{ type: 'text', text: 'generate a video of a sunset' }]);
+  });
+
+  it('falls back to joining all messages when no user message', () => {
+    const config = getConfig();
+    const body = config.buildSubmitBody(makeBinding(), makeRequest([
+      { role: 'system', content: 'system prompt' },
+      { role: 'assistant', content: 'assistant reply' },
+    ]));
+    expect(body.content).toEqual([{ type: 'text', text: 'system prompt\nassistant reply' }]);
+  });
+
+  it('uses model_id from binding in submit body', () => {
+    const config = getConfig();
+    const binding = makeBinding({ model_id: 'seedance-1-0-lite' });
+    const body = config.buildSubmitBody(binding, makeRequest([
+      { role: 'user', content: 'hello' },
+    ]));
+    expect(body.model).toBe('seedance-1-0-lite');
+  });
+
+  it('sets content type to text', () => {
+    const config = getConfig();
+    const body = config.buildSubmitBody(makeBinding(), makeRequest([
+      { role: 'user', content: 'test prompt' },
+    ])) as Record<string, unknown>;
+    const content = body.content as Array<Record<string, unknown>>;
+    expect(content[0]!.type).toBe('text');
+    expect(content[0]!.text).toBe('test prompt');
+  });
+
+  it('includes video generation parameters', () => {
+    const config = getConfig();
+    const body = config.buildSubmitBody(makeBinding(), makeRequest([
+      { role: 'user', content: 'prompt' },
+    ])) as Record<string, unknown>;
+    const params = body.parameters as Record<string, unknown>;
+    expect(params.resolution).toBe('720p');
+    expect(params.duration).toBe(5);
+    expect(params.fps).toBe(30);
+    expect(params.aspect_ratio).toBe('16:9');
+  });
+});
