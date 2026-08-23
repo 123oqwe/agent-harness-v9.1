@@ -22,13 +22,14 @@ name: Phase 1 Mutation Full Run
 #   rest-mutation:    same but `phase1:rest` (run dir R2) -> upload as
 #     phase1-mutation-rest-{sha}.
 #   verify:           needs both. Downloads both artifacts into one
-#     reports/mutation/ tree, rebinds waivers, generates the aggregate
-#     (reference run_id = R2, the first non-gateway result), consolidates R1's
-#     gateway dirs into R2 (rewriting the run_id embedded in gateway's chunk
-#     stryker.config.json so it matches buildMutationChunkConfig(…, R2)),
-#     publishes runs/R2/phase1.json (byte-identical to phase1/mutation.json),
-#     runs check-mutation-thresholds, then re-uploads the canonical
-#     phase1-mutation-{sha} artifact the attestation names.
+#     reports/mutation/ tree, rebinds waivers, consolidates R1's gateway dirs
+#     into R2 (the reference run = first non-gateway result; rewrites the
+#     run_id embedded in gateway's chunk stryker.config.json so it matches
+#     buildMutationChunkConfig(…, R2)), THEN builds the aggregate once the
+#     moved configs are at their final bytes (rebinding every chunk's
+#     config_sha256), publishes runs/R2/phase1.json (byte-identical to
+#     phase1/mutation.json), runs check-mutation-thresholds, then re-uploads
+#     the canonical phase1-mutation-{sha} artifact the attestation names.
 #
 # Trigger: workflow_dispatch only in practice. The push+paths filter fires once
 # when this workflow file itself is committed; code pushes never re-trigger the
@@ -192,15 +193,23 @@ jobs:
           writeFileSync(path, JSON.stringify(waivers, null, 2) + '\n');
           console.log(`rebound ${waivers.length} waivers -> ${commitSha} ${configurationHash}`);
           NODE
-      - name: Build Phase 1 aggregate report
-        run: node scripts/generate-phase1-aggregate.mjs
       - name: Consolidate mutation run directories
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync, readdirSync, cpSync, rmSync, existsSync } from 'node:fs';
           import { join } from 'node:path';
-          const report = JSON.parse(readFileSync('reports/mutation/phase1/mutation.json', 'utf8'));
-          const ref = report.run_id;
+          // Reference run = first non-gateway result — the same selection the
+          // aggregate uses. gateway runs in its own run dir (separate job), so
+          // it is the one moved into the reference run dir below.
+          const refCandidates = readdirSync('reports/mutation')
+            .filter((m) => existsSync(join('reports/mutation', m, 'result.json')))
+            .map((m) => ({
+              module: m,
+              run_id: JSON.parse(readFileSync(join('reports/mutation', m, 'result.json'), 'utf8')).run_id,
+            }));
+          const refResult = refCandidates.find((r) => r.module !== 'gateway');
+          if (!refResult) throw new Error('no non-gateway result to use as reference run');
+          const ref = refResult.run_id;
           const runsRoot = 'reports/mutation/runs';
           const refDir = join(runsRoot, ref);
           if (!existsSync(refDir)) throw new Error(`reference run dir missing: ${refDir}`);
@@ -237,11 +246,11 @@ jobs:
           }
           console.log(`consolidated into ${ref}; rewrote run_id in ${rewritten} chunk configs`);
           NODE
-      # Re-run the aggregate AFTER consolidation: the moved run's chunk
+      # Build the aggregate AFTER consolidation: the moved run's chunk
       # stryker.config.json was rewritten to embed the reference run_id, which
       # changes its bytes, so the aggregate must rebind every chunk's
       # config_sha256 to the final on-disk bytes the checker will hash.
-      - name: Rebuild aggregate and publish reference run phase1.json
+      - name: Build aggregate and publish reference run phase1.json
         run: |
           node scripts/generate-phase1-aggregate.mjs
           REF="$(node -e "const r=require('./reports/mutation/phase1/mutation.json');process.stdout.write(r.run_id)")"

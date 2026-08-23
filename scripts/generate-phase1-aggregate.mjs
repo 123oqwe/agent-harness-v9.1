@@ -9,10 +9,12 @@
  * Reads: reports/mutation/{module}/result.json (all 15 modules)
  * Writes: reports/mutation/phase1/mutation.json
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, createHash } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPhase1Report, validatePhase1Report, mutationModules } from "./run-mutation.mjs";
+import { buildPhase1Report, validatePhase1Report } from "./run-mutation.mjs";
+import { mutationModules } from "../mutation/modules.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const root = join(dirname(scriptPath), "..");
