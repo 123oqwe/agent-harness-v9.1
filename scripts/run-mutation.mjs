@@ -16,6 +16,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { hostname } from 'node:os';
@@ -74,13 +75,20 @@ export function resolveChunkTimeoutMs(moduleName) {
 
 export function resolveMutationTarget(target) {
   if (!target) {
-    throw new Error('usage: node scripts/run-mutation.mjs <module|phase1>');
+    throw new Error('usage: node scripts/run-mutation.mjs <module|phase1|phase1:gateway|phase1:rest>');
   }
-  if (target !== 'phase1' && !Object.hasOwn(mutationModules, target)) {
+  if (target !== 'phase1' && target !== 'phase1:gateway' && target !== 'phase1:rest' && !Object.hasOwn(mutationModules, target)) {
     throw new Error(`unknown mutation target: ${target}`);
   }
   return target;
 }
+
+// Subset targets for the split Phase 1 pipeline (two jobs, then a verify job
+// that consolidates both runs into the reference run_id).
+export const phase1SubsetTargets = {
+  'phase1:gateway': ['gateway'],
+  'phase1:rest': Object.keys(mutationModules).filter((name) => name !== 'gateway'),
+};
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -922,25 +930,49 @@ async function runModule(moduleName, context) {
    atomicWriteJson(configPath, config);
    console.log(`\n[${index + 1}/${chunks.length}] ${chunk.mutate_pattern}`);
     let chunkReport;
-    try {
-      chunkReport = await runMutationChunkCommand({
-       executable: stryker,
-       args: ['run', configPath],
-       cwd: harnessRoot,
-       env: {
-         ...process.env,
-         STRYKER: 'true',
-         HARNESS_SPEC_ROOT: resolveSpecRoot(),
-       },
-       timeoutMs: chunkTimeoutMs,
-       moduleName,
-       chunkId: chunk.chunk_id,
-       reportPath: chunkReportPath,
-     });
-    } catch (error) {
-      console.error(`\n  CHUNK FAILED ${chunk.chunk_id}: ${error instanceof Error ? error.message : error}`);
-      chunkFailures.push({ chunk_id: chunk.chunk_id, error: error instanceof Error ? error.message : String(error) });
-      chunkReport = { files: {}, schema_version: 1, thresholds: { high: module.minimum, low: Math.max(0, module.minimum - 5), break: null } };
+    // Retry-once for the flaky vitest forks-pool dry-run worker crash
+    // ("Stryker exited 1" / "did not produce <report>"; ~1 per ~43 chunks on
+    // the gateway 17-file set, reproduced deterministically in isolation).
+    // Timeouts are NOT retried — a chunk that exceeds chunkTimeoutMs will not
+    // finish faster on a second attempt, and a second 3-5h pass only wastes
+    // the runner. Invalid-report failures are deterministic; retrying would
+    // mask a real config defect.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        chunkReport = await runMutationChunkCommand({
+         executable: stryker,
+         args: ['run', configPath],
+         cwd: harnessRoot,
+         env: {
+           ...process.env,
+           STRYKER: 'true',
+           HARNESS_SPEC_ROOT: resolveSpecRoot(),
+         },
+         timeoutMs: chunkTimeoutMs,
+         moduleName,
+         chunkId: chunk.chunk_id,
+         reportPath: chunkReportPath,
+       });
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const transient =
+          !/timed out after/iu.test(message) &&
+          (/Stryker exited/iu.test(message) || /did not produce/iu.test(message));
+        if (attempt === 1 && transient) {
+          console.error(`\n  RETRY ${chunk.chunk_id} after transient failure: ${message}`);
+          try {
+            unlinkSync(chunkReportPath);
+          } catch {
+            // best-effort: stale report (if any) is overwritten by the retry
+          }
+          continue;
+        }
+        console.error(`\n  CHUNK FAILED ${chunk.chunk_id}: ${message}`);
+        chunkFailures.push({ chunk_id: chunk.chunk_id, error: message });
+        chunkReport = { files: {}, schema_version: 1, thresholds: { high: module.minimum, low: Math.max(0, module.minimum - 5), break: null } };
+        break;
+      }
     }
    chunkReports.push(chunkReport);
  }
@@ -1066,10 +1098,39 @@ async function runPhase1(context) {
   return report;
 }
 
+async function runSubset(context, moduleNames) {
+  const results = [];
+  for (const moduleName of moduleNames) {
+    const moduleContext = {
+      ...context,
+      moduleStartedAt: new Date().toISOString(),
+    };
+    try {
+      results.push(await runOne(moduleName, moduleContext));
+    } catch (error) {
+      const failed = failedModuleResult(moduleName, moduleContext, error);
+      results.push(failed);
+      atomicWriteJson(join(context.runRoot, moduleName, 'result.json'), failed);
+      console.error(`\nFAIL ${moduleName}: ${failed.error}`);
+    }
+  }
+  return results;
+}
+
 async function main() {
   const target = resolveMutationTarget(process.argv[2]);
-  const context = createRunContext(target === 'phase1');
-  const lockPath = join(reportsDir, '.phase1.lock');
+  // Disjoint subset jobs (gateway vs rest) each hold their own lock so a
+  // second registered runner can execute them in parallel without contending.
+  const lockName =
+    target === 'phase1:gateway'
+      ? '.phase1.lock.gateway'
+      : target === 'phase1:rest'
+        ? '.phase1.lock.rest'
+        : '.phase1.lock';
+  const context = createRunContext(
+    target === 'phase1' || Object.hasOwn(phase1SubsetTargets, target),
+  );
+  const lockPath = join(reportsDir, lockName);
   acquireRunLock(lockPath, {
     run_id: context.runId,
     pid: process.pid,
@@ -1081,6 +1142,18 @@ async function main() {
     if (target === 'phase1') {
       const report = await runPhase1(context);
       process.exitCode = report.aggregate.status === 'PASS' ? 0 : 1;
+    } else if (Object.hasOwn(phase1SubsetTargets, target)) {
+      const results = await runSubset(context, phase1SubsetTargets[target]);
+      console.log(`\n=== ${target} subset aggregate ===`);
+      for (const result of results) {
+        console.log(
+          `  ${result.module}: ${result.score}% / ${result.minimum}% ` +
+            `[${result.status}]${result.error ? ` (${result.error})` : ''}`,
+        );
+      }
+      process.exitCode = results.every((result) => result.status === 'PASS')
+        ? 0
+        : 1;
     } else {
       const result = await runOne(target, context);
       process.exitCode = result.status === 'PASS' ? 0 : 1;

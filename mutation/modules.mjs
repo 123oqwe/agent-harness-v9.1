@@ -28,7 +28,10 @@ export const mutationModules = {
       'gateway/async-task-adapter.ts',
     ],
     minimum: 85,
-    chunkTimeoutMs: 120 * 60 * 1000,
+    // 301-450 (normalize*/deepFreeze/canonicalJson region) projects to ~216min
+    // at ~59s/mutant x 220 mutants (all killed/timeout). 120min killed it at
+    // 2h. 300min gives backstop margin over the measured projection.
+    chunkTimeoutMs: 300 * 60 * 1000,
   },
   router: {
     mutate: ['router/static-router.ts', 'router/task-normalizer.ts'],

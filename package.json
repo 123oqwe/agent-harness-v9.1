@@ -90,7 +90,9 @@
     "test:phase2:package-smoke": "node scripts/gates/package-smoke.mjs",
     "test:phase2:workspace-smoke": "node scripts/gates/package-smoke.mjs --mode workspace",
     "generate:contracts": "node scripts/generate-contracts.mjs",
-    "prepare": "patch-package"
+    "prepare": "patch-package",
+    "test:mutation:gateway": "node scripts/run-mutation.mjs phase1:gateway",
+    "test:mutation:rest": "node scripts/run-mutation.mjs phase1:rest"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
